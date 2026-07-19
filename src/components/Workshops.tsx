@@ -1,0 +1,2249 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Calendar, MapPin, Users, Award, Sparkles, MessageSquare, 
+  Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
+  Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
+  ShieldCheck, CreditCard, Wallet, Upload
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { INITIAL_COMMENTS } from '../data';
+import { getDynamicWorkshops, saveDynamicWorkshops } from '../utils/dynamicData';
+import { WorkshopComment, WorkshopEvent, AppUser } from '../types';
+import { DatabaseEngine, WorkshopRegistration, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
+
+interface WorkshopsProps {
+  onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
+}
+
+interface ChatMessage {
+  id: string;
+  sender: string;
+  role: string;
+  text: string;
+  time: string;
+  isSelf?: boolean;
+}
+
+export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
+  const [workshops, setWorkshops] = useState(getDynamicWorkshops);
+  
+  const initialWorkshopId = workshops.length > 0 ? workshops[0].id : '';
+  const [selectedWorkshopId, setSelectedWorkshopId] = useState<string>(initialWorkshopId);
+  const [seatCount, setSeatCount] = useState<number>(1);
+  
+  // Comments state with localStorage persistence
+  const [comments, setComments] = useState<WorkshopComment[]>(() => {
+    const saved = localStorage.getItem('scoders_comments');
+    if (saved) return JSON.parse(saved);
+    return INITIAL_COMMENTS;
+  });
+
+  // Comment Form States
+  const [authorName, setAuthorName] = useState('');
+  const [role, setRole] = useState('Attendee');
+  const [content, setContent] = useState('');
+  const [rating, setRating] = useState<number>(5);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  // Admin and Dynamic Sync States
+  const [editingWorkshopId, setEditingWorkshopId] = useState<string | null>(null);
+  const [tempPrice, setTempPrice] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    return localStorage.getItem('scoders_admin_auth') === 'true';
+  });
+
+  // Access control state persistence
+  const [registeredKeys, setRegisteredKeys] = useState<{
+    [workshopId: string]: {
+      key: string;
+      name: string;
+      email: string;
+      role: string;
+      timestamp: string;
+    }
+  }>(() => {
+    const saved = localStorage.getItem('scoders_registered_workshops');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Registration Form States
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regRole, setRegRole] = useState('Developer');
+  const [showRegModal, setShowRegModal] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [regSuccessKey, setRegSuccessKey] = useState<string | null>(null);
+  const [manualKey, setManualKey] = useState('');
+  const [manualKeyError, setManualKeyError] = useState<string | null>(null);
+  const [regMode, setRegMode] = useState<'register' | 'enterKey'>('register');
+
+  // New Payment States inside Workshops Modal
+  const [paymentStep, setPaymentStep] = useState(false);
+  const [payTicketsCount, setPayTicketsCount] = useState(1);
+  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'bank'>('upi');
+  const [selectedUpiApp, setSelectedUpiApp] = useState<'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic' | null>(null);
+  const [cardNo, setCardNo] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [paymentSimulating, setPaymentSimulating] = useState(false);
+  const [whatsappJoined, setWhatsappJoined] = useState(false);
+  const [otpVerificationStep, setOtpVerificationStep] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [upiPendingStep, setUpiPendingStep] = useState(false);
+  const [upiVerified, setUpiVerified] = useState(false);
+  const [upiVerifying, setUpiVerifying] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(60);
+  const [isPaymentVerified, setIsPaymentVerified] = useState(false);
+  const [generatedWorkshopKey, setGeneratedWorkshopKey] = useState<string | null>(null);
+  const [ruyTimer, setRuyTimer] = useState(300);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [receiptFile, setReceiptFile] = useState<any>(null);
+  const [receiptName, setReceiptName] = useState('');
+
+  // Active Workshop Classroom States
+  const [activeTab, setActiveTab] = useState<'sandbox' | 'resources' | 'discussion'>('sandbox');
+  
+  // Sandbox State
+  const [sandboxCode, setSandboxCode] = useState('');
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
+  const [isCompiling, setIsCompiling] = useState(false);
+
+  // Download States
+  const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  // Discussion / Chatroom State
+  const [chatInput, setChatInput] = useState('');
+  const [chatroomMessages, setChatroomMessages] = useState<ChatMessage[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Sync current user state
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('scoders_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    const handleSyncAuth = () => {
+      setIsAdmin(localStorage.getItem('scoders_admin_auth') === 'true');
+      const savedUser = localStorage.getItem('scoders_user');
+      setCurrentUser(savedUser ? JSON.parse(savedUser) : null);
+    };
+    window.addEventListener('scoders_auth_change', handleSyncAuth);
+    window.addEventListener('focus', handleSyncAuth);
+    return () => {
+      window.removeEventListener('scoders_auth_change', handleSyncAuth);
+      window.removeEventListener('focus', handleSyncAuth);
+    };
+  }, []);
+
+  // Pre-populate fields if logged in
+  useEffect(() => {
+    if (currentUser) {
+      setRegName(currentUser.name || '');
+      setRegEmail(currentUser.email || '');
+    }
+  }, [currentUser, showRegModal]);
+
+  // OTP Countdown Timer
+  useEffect(() => {
+    let timer: any;
+    if (otpVerificationStep && otpCountdown > 0) {
+      timer = setInterval(() => {
+        setOtpCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [otpVerificationStep, otpCountdown]);
+
+  // Ruy Gateway Timer
+  useEffect(() => {
+    let interval: any;
+    if (upiPendingStep && ruyTimer > 0) {
+      interval = setInterval(() => {
+        setRuyTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [upiPendingStep, ruyTimer]);
+
+  // Listen to external database changes
+  useEffect(() => {
+    const reloadWorkshops = () => {
+      setWorkshops(getDynamicWorkshops());
+    };
+    window.addEventListener('scoders_data_change', reloadWorkshops);
+    return () => {
+      window.removeEventListener('scoders_data_change', reloadWorkshops);
+    };
+  }, []);
+
+  const handleSavePrice = (id: string) => {
+    const updated = workshops.map(w => w.id === id ? { ...w, price: tempPrice } : w);
+    setWorkshops(updated);
+    saveDynamicWorkshops(updated);
+    setEditingWorkshopId(null);
+    window.dispatchEvent(new Event('scoders_data_change'));
+  };
+
+  // Filter comments for currently active/selected workshop
+  const activeWorkshopComments = comments.filter(c => c.workshopId === selectedWorkshopId);
+  
+  const activeWorkshop = workshops.find(w => w.id === selectedWorkshopId) || workshops[0] || {
+    id: 'w-1',
+    title: 'No Workshops Scheduled',
+    date: 'TBA',
+    location: 'Remote',
+    summary: 'Check back soon for upcoming advanced developer workshops!',
+    category: 'N/A',
+    attendees: 0,
+    achievements: [],
+    photo: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500',
+    price: 1499
+  };
+
+  // Check if active workshop is registered
+  const isRegistered = !!registeredKeys[activeWorkshop.id];
+  const activeRegInfo = registeredKeys[activeWorkshop.id];
+
+  // Load sandbox initial code template based on selected workshop
+  useEffect(() => {
+    if (activeWorkshop.id === 'w-1') {
+      setSandboxCode(`// WORKSHOP 1: Building AI Agents with n8n & Gemini
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+async function startAgent() {
+  console.log("Initializing Agent Core...");
+  
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: "Create an action-plan for managing incoming emails.",
+  });
+
+  console.log("Gemini response fetched successfully!");
+  console.log(response.text);
+}
+
+startAgent();`);
+    } else {
+      setSandboxCode(`// WORKSHOP 2: SaaS React Multi-Tenant Architectures
+import React, { useState } from 'react';
+
+export default function TenantDashboard() {
+  const [tenant, setTenant] = useState('AgroSmart_Tenant');
+  
+  return (
+    <div className="p-6 bg-slate-900 rounded-xl text-white">
+      <h3 className="font-bold text-brand-teal">SaaS Multi-Tenant Frame</h3>
+      <p className="text-xs text-gray-400 mt-2">Active: {tenant}</p>
+    </div>
+  );
+}`);
+    }
+    setTerminalLogs([]);
+  }, [selectedWorkshopId]);
+
+  // Handle key creation & registration (starts payment flow)
+  const handleRegisterWorkshop = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName || !regEmail || !regRole) return;
+    setPaymentStep(true);
+  };
+
+  // Helper to generate the most robust device-specific UPI deep link
+  const getUpiDeviceLink = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic', address: string, name: string, amount: number, note: string) => {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    
+    const encodedName = encodeURIComponent(name);
+    const encodedNote = encodeURIComponent(note);
+    const params = `pa=${address}&pn=${encodedName}&am=${amount}&cu=INR&tn=${encodedNote}`;
+    
+    if (isAndroid) {
+      if (app === 'phonepe') {
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+      } else if (app === 'gpay') {
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+      } else if (app === 'paytm') {
+        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+      } else if (app === 'bhim') {
+        return `intent://pay?${params}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+      }
+      return `upi://pay?${params}`;
+    } else if (isIOS) {
+      if (app === 'phonepe') {
+        return `phonepe://pay?${params}`;
+      } else if (app === 'gpay') {
+        return `gpay://upi/pay?${params}`;
+      } else if (app === 'paytm') {
+        return `paytmmp://pay?${params}`;
+      }
+      return `upi://pay?${params}`;
+    } else {
+      return `upi://pay?${params}`;
+    }
+  };
+
+  const handleInitiateUpiPayment = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic') => {
+    setSelectedUpiApp(app);
+    setPaymentSimulating(true);
+    setUpiVerified(false);
+    setUpiVerifying(false);
+    setRuyTimer(300); // 5 minutes
+    
+    // Construct real UPI URI
+    const payeeAddress = 'scoders@ybl';
+    const payeeName = 'S-CODERS Technologies';
+    const payAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+    const note = `Workshop Pass: ${activeWorkshop.title.substring(0, 20)}`;
+    
+    const intentUri = getUpiDeviceLink(app, payeeAddress, payeeName, payAmount, note);
+
+    // Try launching the deep link immediately
+    try {
+      window.location.href = intentUri;
+    } catch (err) {
+      console.warn("Could not launch custom deep link automatically:", err);
+    }
+
+    setTimeout(() => {
+      setPaymentSimulating(false);
+      setUpiPendingStep(true);
+    }, 1500);
+  };
+
+  const handleReceiptMockUpload = () => {
+    setReceiptName(`SCO_BANK_WIRE_RECEIPT_${Math.floor(1000 + Math.random() * 9000)}.pdf`);
+    setReceiptFile({ size: 1450000 });
+  };
+
+  const handleInitiateBankPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!receiptFile) {
+      alert('Please upload/simulate receipt first.');
+      return;
+    }
+    setPaymentSimulating(true);
+    setTimeout(() => {
+      setPaymentSimulating(false);
+      setIsPaymentVerified(true);
+      setRegMode('enterKey');
+    }, 1500);
+  };
+
+  const handleSimulateUpiSuccess = () => {
+    setUpiVerifying(true);
+    setTimeout(() => {
+      setUpiVerifying(false);
+      setUpiVerified(true);
+    }, 1500);
+  };
+
+  const handleInitiateCardPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardNo || !cardExpiry || !cardCvv) {
+      alert('Please fill in card details.');
+      return;
+    }
+    setPaymentSimulating(true);
+    setTimeout(() => {
+      setPaymentSimulating(false);
+      setOtpVerificationStep(true);
+      setOtpCountdown(60);
+      setOtpValue('');
+      setOtpError(null);
+    }, 1500);
+  };
+
+  const handleGenerateUniqueKey = () => {
+    let activeClient = currentUser;
+    if (!activeClient) {
+      const newClient: AppUser = {
+        uid: 'client-' + Date.now().toString(),
+        name: regName || 'Workshop Attendee',
+        email: regEmail || 'attendee@scoders.com',
+        role: 'client',
+        company: 'Independent Client',
+        phone: 'Not Specified',
+        createdAt: new Date().toISOString()
+      };
+      
+      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
+      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
+      if (!clients.some(c => c.email.toLowerCase() === newClient.email.toLowerCase().trim())) {
+        clients.push(newClient);
+        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
+      }
+
+      const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
+      if (!passwordsMap[newClient.email.toLowerCase()]) {
+        passwordsMap[newClient.email.toLowerCase()] = 'password';
+        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
+      }
+
+      localStorage.setItem('scoders_user', JSON.stringify(newClient));
+      setCurrentUser(newClient);
+      activeClient = newClient;
+      window.dispatchEvent(new Event('scoders_auth_change'));
+    }
+
+    const code = activeWorkshop.id.toUpperCase();
+    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
+    const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+
+    const newKeys = {
+      ...registeredKeys,
+      [activeWorkshop.id]: {
+        key: generatedKey,
+        name: activeClient.name,
+        email: activeClient.email,
+        role: regRole || 'Registered Developer',
+        tickets: payTicketsCount,
+        totalPaid: (activeWorkshop.price ?? 1499) * payTicketsCount,
+        timestamp: new Date().toLocaleDateString()
+      }
+    };
+
+    setRegisteredKeys(newKeys);
+    localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
+
+    // Complete relational DatabaseEngine integration
+    try {
+      const regId = 'REG-WKSP-' + Date.now().toString().slice(-4);
+      const mockChatId = 'CHT-WKSP-' + Date.now().toString().slice(-4);
+      const mockPdfId = 'FIL-WKSP-' + Date.now().toString().slice(-4);
+      const mockSrcId = 'FIL-WSRC-' + Date.now().toString().slice(-4);
+
+      const dbWorkshopReg: WorkshopRegistration = {
+        id: regId,
+        participantProfile: {
+          name: activeClient.name,
+          email: activeClient.email,
+          phone: '+91 99999 00000',
+          role: regRole || 'Registered Developer'
+        },
+        workshopId: activeWorkshop.id,
+        workshopTitle: activeWorkshop.title,
+        paymentStatus: 'Successful',
+        amountPaid: (activeWorkshop.price ?? 1499) * payTicketsCount,
+        paymentMethod: paymentMethod || 'UPI (Google Pay)',
+        paymentDate: new Date().toISOString().split('T')[0],
+        transactionId: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
+        uniqueAccessKey: generatedKey,
+        materialsFileIds: [mockPdfId, mockSrcId],
+        chatId: mockChatId,
+        feedbackId: null
+      };
+
+      // Save registration
+      const currentRegs = DatabaseEngine.getWorkshopRegistrations();
+      DatabaseEngine.saveWorkshopRegistrations([dbWorkshopReg, ...currentRegs]);
+
+      // Save Payment Transaction
+      const dbPayment: PaymentTransaction = {
+        id: dbWorkshopReg.transactionId,
+        clientId: activeClient.email,
+        clientName: activeClient.name,
+        clientEmail: activeClient.email,
+        amount: dbWorkshopReg.amountPaid,
+        paymentMethod: dbWorkshopReg.paymentMethod,
+        status: 'Successful',
+        timestamp: new Date().toISOString(),
+        reference: `Workshop Key Registration: ${activeWorkshop.title}`,
+        interrupted: false,
+        failureReason: null
+      };
+      const currentPayments = DatabaseEngine.getPayments();
+      DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
+
+      // Save Chat Conversation
+      const dbChat: ChatConversation = {
+        id: mockChatId,
+        clientName: activeClient.name,
+        clientEmail: activeClient.email,
+        registrationId: regId,
+        reference: activeWorkshop.title,
+        messages: [
+          { id: 'msg-wksp-1', sender: 'team', content: `Congratulations ${activeClient.name}! You are registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your individual materials and cheat sheets are loaded in your student dashboard. Feel free to ask questions here!`, timestamp: new Date().toISOString() }
+        ],
+        lastUpdated: new Date().toISOString()
+      };
+      const currentChats = DatabaseEngine.getChats();
+      DatabaseEngine.saveChats([dbChat, ...currentChats]);
+
+      // Save separate File Records
+      const dbPdfFile: FileRecord = {
+        id: mockPdfId,
+        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_guide.pdf`,
+        type: 'workshop_pdf',
+        url: '#download-guide-pdf',
+        size: '1.4 MB',
+        clientId: activeClient.email,
+        registrationId: regId,
+        uploadDate: new Date().toISOString().split('T')[0]
+      };
+      const dbSrcFile: FileRecord = {
+        id: mockSrcId,
+        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_boilerplate.zip`,
+        type: 'workshop_source_code',
+        url: '#download-boilerplate-zip',
+        size: '890 KB',
+        clientId: activeClient.email,
+        registrationId: regId,
+        uploadDate: new Date().toISOString().split('T')[0]
+      };
+      const currentFiles = DatabaseEngine.getFiles();
+      DatabaseEngine.saveFiles([dbPdfFile, dbSrcFile, ...currentFiles]);
+    } catch (dbErr) {
+      console.error("Database Engine Workshop Registration Error:", dbErr);
+    }
+
+    setGeneratedWorkshopKey(generatedKey);
+  };
+
+  const handleVerifyOtpAndComplete = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpValue.trim() !== '123456' && otpValue.trim().length !== 6) {
+      setOtpError('Invalid OTP. For testing, enter the bank OTP code: 123456');
+      return;
+    }
+    setPaymentSimulating(true);
+    setOtpVerificationStep(false);
+    setTimeout(() => {
+      setPaymentSimulating(false);
+      setIsPaymentVerified(true);
+      setRegMode('enterKey');
+    }, 1500);
+  };
+
+  const handleVerifyUpiPaymentAndComplete = () => {
+    setPaymentSimulating(true);
+    setTimeout(() => {
+      setPaymentSimulating(false);
+      setUpiPendingStep(false);
+      setIsPaymentVerified(true);
+      setRegMode('enterKey');
+    }, 1500);
+  };
+
+  const handleCompletePayment = () => {
+    setPaymentSimulating(true);
+    setTimeout(() => {
+      // Auto-signup / log-in on the fly if not logged in!
+      let activeClient = currentUser;
+      if (!activeClient) {
+        const newClient: AppUser = {
+          uid: 'client-' + Date.now().toString(),
+          name: regName,
+          email: regEmail,
+          role: 'client',
+          company: 'Independent Client',
+          phone: 'Not Specified',
+          createdAt: new Date().toISOString()
+        };
+        
+        // Save client profile in local client list
+        const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
+        const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
+        if (!clients.some(c => c.email.toLowerCase() === regEmail.toLowerCase().trim())) {
+          clients.push(newClient);
+          localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
+        }
+
+        // Save password secure map default for on-demand
+        const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
+        if (!passwordsMap[newClient.email.toLowerCase()]) {
+          passwordsMap[newClient.email.toLowerCase()] = 'password';
+          localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
+        }
+
+        // Log in
+        localStorage.setItem('scoders_user', JSON.stringify(newClient));
+        setCurrentUser(newClient);
+        activeClient = newClient;
+        
+        // Dispatch events to sync other parts of the app
+        window.dispatchEvent(new Event('scoders_auth_change'));
+      }
+
+      const code = activeWorkshop.id.toUpperCase();
+      const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
+      const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+
+      const newKeys = {
+        ...registeredKeys,
+        [activeWorkshop.id]: {
+          key: generatedKey,
+          name: regName,
+          email: regEmail,
+          role: regRole,
+          tickets: payTicketsCount,
+          totalPaid: (activeWorkshop.price ?? 1499) * payTicketsCount,
+          timestamp: new Date().toLocaleDateString()
+        }
+      };
+
+      setRegisteredKeys(newKeys);
+      localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
+      setRegSuccessKey(generatedKey);
+      setPaymentSimulating(false);
+      setPaymentStep(false);
+    }, 2000);
+  };
+
+  const handleVerifyManualKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualKey.trim()) return;
+
+    const trimmed = manualKey.trim().toUpperCase();
+    const code = activeWorkshop.id.toUpperCase();
+    const expectedPrefix = `BTD-WKSP-${code}-`;
+
+    if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
+      const newKeys = {
+        ...registeredKeys,
+        [activeWorkshop.id]: {
+          key: trimmed,
+          name: currentUser?.name || 'Manual Attendee',
+          email: currentUser?.email || 'manual@wksp-pass.in',
+          role: 'Registered Developer',
+          timestamp: new Date().toLocaleDateString()
+        }
+      };
+      setRegisteredKeys(newKeys);
+      localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
+      setShowRegModal(false);
+      setManualKey('');
+      setManualKeyError(null);
+    } else {
+      setManualKeyError(`Invalid key format. Pass for this session must start with: ${expectedPrefix}`);
+    }
+  };
+
+  const handleRemovePass = (id: string) => {
+    const updated = { ...registeredKeys };
+    delete updated[id];
+    setRegisteredKeys(updated);
+    localStorage.setItem('scoders_registered_workshops', JSON.stringify(updated));
+  };
+
+  const handleCopyKey = (keyText: string) => {
+    navigator.clipboard.writeText(keyText);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  // RUN CODE SANDBOX SIMULATION
+  const handleRunSandbox = () => {
+    setIsCompiling(true);
+    setTerminalLogs([
+      `🕒 [${new Date().toLocaleTimeString()}] COMPILING SOURCE FILES (TSX -> ESNext Node)...`,
+      `⚙️ Checking dependencies map in package.json...`,
+      `🔍 Resolving system import: "@google/genai"`
+    ]);
+
+    setTimeout(() => {
+      setTerminalLogs(prev => [
+        ...prev,
+        `🔑 Verifying local keychain token auth: [${activeRegInfo?.key || 'MOCK_KEY'}]`,
+        `🚀 Executing application server thread...`,
+        `📟 [CONSOLE LOG]: Initializing Agent Core...`,
+        `📡 Contacting Google Cloud Run server routing to Gemini endpoint...`,
+      ]);
+    }, 1000);
+
+    setTimeout(() => {
+      setTerminalLogs(prev => [
+        ...prev,
+        `📟 [CONSOLE LOG]: Gemini response fetched successfully!`,
+        `📝 [RESPONSE TEXT]:\n   1. Analyze subject line triggers.\n   2. Map to dynamic categorization tags.\n   3. Forward split payloads via Webhook triggers.`,
+        `✅ BUILD AND EXECUTION FINISHED SUCCESSFULLY (Status: 0, Time: 2.14s)`
+      ]);
+      setIsCompiling(false);
+    }, 2200);
+  };
+
+  // RESOURCE MOCK DOWNLOAD
+  const handleDownloadResource = (itemName: string) => {
+    setDownloadingItem(itemName);
+    setDownloadProgress(0);
+  };
+
+  useEffect(() => {
+    if (!downloadingItem) return;
+    if (downloadProgress < 100) {
+      const timer = setTimeout(() => {
+        setDownloadProgress(prev => Math.min(100, prev + Math.floor(Math.random() * 25) + 10));
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTimeout(() => {
+        setDownloadingItem(null);
+        setDownloadProgress(0);
+        alert(`Downloaded file assets for "${itemNameFormat(downloadingItem)}" safely!`);
+      }, 500);
+    }
+  }, [downloadingItem, downloadProgress]);
+
+  const itemNameFormat = (name: string) => {
+    switch (name) {
+      case 'json': return 'n8n_agent_pipeline_blueprint.json';
+      case 'pdf_prompt': return 'gemini_prompt_architectures_cheat.pdf';
+      case 'zip': return 'nextjs_15_multitenant_boilerplate.zip';
+      case 'pdf_slides': return 'official_session_slides_v3.pdf';
+      default: return 'workshop_asset.zip';
+    }
+  };
+
+  // VERIFIED COMMUNITY CHATROOM FEED SIMULATOR
+  useEffect(() => {
+    // Initial messages set
+    const mockMessages: ChatMessage[] = [
+      { id: '1', sender: 'Aravind K', role: 'SDE-2, Swiggy', text: 'Wait, does the Gemini Node SDK support streaming responses out of the box?', time: '10:41 AM' },
+      { id: '2', sender: 'Instructor Aishwarya', role: 'S-CODERS Lead', text: 'Yes, absolutely! Use `ai.models.generateContentStream` instead of `generateContent` for real-time output streams.', time: '10:42 AM' },
+      { id: '3', sender: 'Nisha Hegde', role: 'Student, RVCE', text: 'The n8n custom WhatsApp webhook nodes worked perfectly on the sandbox. This is super fast.', time: '10:43 AM' },
+      { id: '4', sender: 'Meghana R', role: 'Intern, Dell', text: 'Do we get a certification record of attendance once we finish the final sandbox test?', time: '10:44 AM' }
+    ];
+    setChatroomMessages(mockMessages);
+  }, [selectedWorkshopId]);
+
+  // Periodic incoming mock chats
+  useEffect(() => {
+    if (!isRegistered) return;
+
+    const interval = setInterval(() => {
+      const randomChats = [
+        { sender: 'Bhuvan M', role: 'Founder, AgroSmart AI', text: 'Is anyone deploying sub-agents? What is your prompt strategy for avoiding loops?' },
+        { sender: 'Instructor Aishwarya', role: 'S-CODERS Lead', text: 'Make sure your agent has a clear exit node or a system constraint specifying: Maximum 5 loop turns.' },
+        { sender: 'Nithin Rao', role: 'Backend Dev, Zerodha', text: 'Just finished compiling the Postgres pool configurations. Working nicely!' },
+        { sender: 'Suhas Gowda', role: 'Co-Founder', text: 'Amazing work everyone. Keep experimenting with the n8n webhook nodes!' }
+      ];
+
+      const chosen = randomChats[Math.floor(Math.random() * randomChats.length)];
+      const newMessage: ChatMessage = {
+        id: Date.now().toString(),
+        sender: chosen.sender,
+        role: chosen.role,
+        text: chosen.text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setChatroomMessages(prev => [...prev, newMessage]);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isRegistered]);
+
+  // Send message
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      sender: currentUser?.name || 'You (Developer)',
+      role: currentUser?.role === 'admin' ? 'System Administrator' : 'Attendee Builder',
+      text: chatInput.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSelf: true
+    };
+
+    setChatroomMessages(prev => [...prev, newMessage]);
+    setChatInput('');
+  };
+
+  // Scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatroomMessages]);
+
+  const handlePostComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorName.trim() || !content.trim()) return;
+
+    const newComment: WorkshopComment = {
+      id: Date.now().toString(),
+      workshopId: selectedWorkshopId,
+      authorName: authorName.trim(),
+      role: role.trim(),
+      content: content.trim(),
+      timestamp: new Date().toISOString().split('T')[0],
+      rating: rating,
+    };
+
+    const updated = [newComment, ...comments];
+    setComments(updated);
+    localStorage.setItem('scoders_comments', JSON.stringify(updated));
+
+    // Reset Form
+    setAuthorName('');
+    setRole('Attendee');
+    setContent('');
+    setRating(5);
+    setSubmitSuccess(true);
+    setTimeout(() => setSubmitSuccess(false), 3000);
+  };
+
+  return (
+    <section id="workshops" className="py-24 bg-brand-dark relative overflow-hidden">
+      {/* Ambient background glow */}
+      <div className="absolute left-0 bottom-1/4 w-[400px] h-[400px] ambient-glow rounded-full pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>COMMUNITY BUILDING</span>
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-white tracking-tight mb-6">
+            Workshops & Classroom Portal
+          </h2>
+          <p className="text-gray-400 font-sans font-light text-lg">
+            Bharath Tech Developers is heavily active in Bengaluru's academic and development circles. View our seminars, register to access live sandboxes, and download blueprints.
+          </p>
+        </div>
+
+        {/* Selected Workshop Visual Showcase Billboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16 items-start">
+          
+          {/* LEFT: Workshop selector buttons & brief timeline */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2 pl-2">Select Workshop Event</div>
+            {workshops.map((w) => (
+              <button
+                key={w.id}
+                onClick={() => setSelectedWorkshopId(w.id)}
+                className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col cursor-pointer ${
+                  selectedWorkshopId === w.id
+                    ? 'bg-brand-card border-brand-teal/40 shadow-lg shadow-brand-teal/5'
+                    : 'bg-brand-card/40 border-white/5 hover:border-white/10 hover:bg-brand-card/60'
+                }`}
+              >
+                {selectedWorkshopId === w.id && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-teal" />
+                )}
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest">{w.category}</span>
+                  {registeredKeys[w.id] ? (
+                    <span className="text-[8px] font-mono px-1.5 py-0.5 bg-brand-teal/10 border border-brand-teal/20 text-brand-teal rounded-full font-bold uppercase animate-pulse">Unlocked</span>
+                  ) : (
+                    <span className="text-[8px] font-mono px-1.5 py-0.5 bg-amber-400/10 border border-amber-400/20 text-amber-400 rounded-full font-bold uppercase">Locked</span>
+                  )}
+                </div>
+                <span className="font-display font-bold text-white text-base leading-snug mb-2 group-hover:text-brand-teal transition-colors">
+                  {w.title}
+                </span>
+                <div className="flex items-center gap-3 text-xs text-gray-500 font-mono mt-auto">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-brand-coral" />
+                    {w.date}
+                  </span>
+                </div>
+              </button>
+            ))}
+            {workshops.length === 0 && (
+              <p className="text-gray-500 text-xs font-mono p-4">No active workshops found.</p>
+            )}
+          </div>
+
+          {/* RIGHT: High-fidelity active workshop details billboard */}
+          <div className="lg:col-span-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeWorkshop.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="glass-panel rounded-3xl border border-white/5 overflow-hidden shadow-xl"
+              >
+                {/* Visual Header Image */}
+                <div className="h-64 sm:h-80 overflow-hidden relative">
+                  <img
+                    src={activeWorkshop.photo}
+                    alt={activeWorkshop.title}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover object-center"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/95 via-brand-dark/30 to-transparent" />
+                  
+                  {/* Badge & Meta overlay */}
+                  <div className="absolute bottom-6 left-6 right-6 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 text-xs font-mono text-white">
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-white/10">
+                        <MapPin className="w-3.5 h-3.5 text-brand-coral" />
+                        {activeWorkshop.location}
+                      </span>
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-white/10 text-brand-teal">
+                        <Users className="w-3.5 h-3.5" />
+                        {activeWorkshop.attendees}+ Attendees
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event Summary Details */}
+                <div className="p-8 sm:p-10">
+                  <span className="text-xs font-mono text-brand-teal uppercase tracking-widest block mb-2">{activeWorkshop.category}</span>
+                  <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white tracking-tight mb-4">
+                    {activeWorkshop.title}
+                  </h3>
+                  <p className="text-gray-300 font-sans font-light text-base leading-relaxed mb-8">
+                    {activeWorkshop.summary}
+                  </p>
+
+                  {/* Achievements Checklist */}
+                  <div className="space-y-4">
+                    <h4 className="font-display font-bold text-sm uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-brand-teal" />
+                      Milestones & Key Moments
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {activeWorkshop.achievements && activeWorkshop.achievements.map((ach, idx) => (
+                        <div key={idx} className="flex gap-3 bg-white/5 border border-white/5 p-4 rounded-xl items-start">
+                          <CheckCircle className="w-4 h-4 text-brand-teal shrink-0 mt-0.5" />
+                          <p className="text-gray-300 text-xs sm:text-sm font-sans font-light leading-relaxed">{ach}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* GATE CONTROL: If registered, reveal interactive classroom. If not, show Register banner */}
+                  {isRegistered ? (
+                    <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
+                      <div className="bg-brand-dark/80 p-5 rounded-2xl border border-brand-teal/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20">
+                            <Shield className="w-5 h-5 animate-pulse" />
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Keychain Active</span>
+                            <h4 className="text-sm font-bold text-white font-sans">Attending Live Session</h4>
+                            <p className="text-[11px] text-gray-500 font-mono mt-0.5">Secure Key: {activeRegInfo.key}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCopyKey(activeRegInfo.key)}
+                            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-all cursor-pointer border border-white/5"
+                            title="Copy Key"
+                          >
+                            {copiedKey ? <Check className="w-4 h-4 text-brand-teal" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleRemovePass(activeWorkshop.id)}
+                            className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl font-mono text-[10px] uppercase font-bold transition-all cursor-pointer border border-red-500/15"
+                          >
+                            Revoke Pass
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* --- HIGH FIDELITY CLASSROOM TABBED CONTAINER --- */}
+                      <div className="bg-brand-dark/35 border border-white/5 rounded-2xl overflow-hidden mt-6">
+                        {/* Tab Headers */}
+                        <div className="grid grid-cols-3 bg-brand-dark/80 border-b border-white/5 p-1">
+                          {[
+                            { id: 'sandbox', label: 'Sandbox IDE', icon: Code },
+                            { id: 'resources', label: 'Downloads', icon: Download },
+                            { id: 'discussion', label: 'Discussion Live', icon: MessageCircle },
+                          ].map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => setActiveTab(t.id as any)}
+                              className={`py-2 px-2.5 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                activeTab === t.id
+                                  ? 'bg-brand-teal text-brand-dark'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <t.icon className="w-3.5 h-3.5 shrink-0" />
+                              <span className="hidden sm:inline">{t.label}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Tab Panels */}
+                        <div className="p-5 min-h-[35vh]">
+                          
+                          {/* TAB 1: SANDBOX IDE */}
+                          {activeTab === 'sandbox' && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between text-[10px] font-mono text-gray-500">
+                                <span>main.ts (Read-Write Environment)</span>
+                                <span className="text-brand-teal">Interactive Sandbox Core</span>
+                              </div>
+                              <div className="border border-white/5 rounded-xl overflow-hidden bg-brand-dark/95">
+                                <textarea
+                                  value={sandboxCode}
+                                  onChange={(e) => setSandboxCode(e.target.value)}
+                                  className="w-full bg-transparent text-xs p-4 text-emerald-300 font-mono focus:outline-none h-44 resize-none leading-relaxed"
+                                  placeholder="// Write your custom workspace code here..."
+                                />
+                              </div>
+
+                              <div className="flex justify-between items-center gap-3">
+                                <button
+                                  onClick={handleRunSandbox}
+                                  disabled={isCompiling}
+                                  className="px-5 py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  {isCompiling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+                                  Run Code Sandbox
+                                </button>
+                                <span className="text-[10px] text-gray-500 font-mono">Status: Connected</span>
+                              </div>
+
+                              {/* Terminal Display */}
+                              {terminalLogs.length > 0 && (
+                                <div className="bg-[#010309] border border-white/5 rounded-xl p-4 font-mono text-[10px] space-y-1.5 text-emerald-400 max-h-36 overflow-y-auto">
+                                  {terminalLogs.map((log, i) => (
+                                    <div key={i} className={log.includes('📟') ? 'text-white' : log.includes('✅') ? 'text-emerald-300 font-extrabold' : ''}>
+                                      {log}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* TAB 2: DOWNLOADS TRACKER */}
+                          {activeTab === 'resources' && (
+                            <div className="space-y-3">
+                              <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block font-bold mb-1">Developer Assets Locker</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {[
+                                  { id: 'json', title: 'n8n Workflow Blueprints', type: 'JSON Specification', size: '24 KB' },
+                                  { id: 'pdf_prompt', title: 'Gemini System Prompts', type: 'System Cheat-sheet PDF', size: '180 KB' },
+                                  { id: 'zip', title: 'SaaS Multitenant Boilerplate', type: 'TypeScript React Zip', size: '1.4 MB' },
+                                  { id: 'pdf_slides', title: 'Session Deck & Exercises', type: 'Slide Presentation PDF', size: '3.6 MB' },
+                                ].map(item => (
+                                  <div key={item.id} className="bg-brand-dark/40 border border-white/5 rounded-xl p-4 flex items-center justify-between gap-4">
+                                    <div className="overflow-hidden">
+                                      <p className="text-xs font-semibold text-white truncate">{item.title}</p>
+                                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">{item.type} • {item.size}</p>
+                                    </div>
+
+                                    {downloadingItem === item.id ? (
+                                      <div className="w-20 text-right space-y-1">
+                                        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                                          <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                                        </div>
+                                        <span className="text-[8px] font-mono text-brand-teal">{downloadProgress}%</span>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleDownloadResource(item.id)}
+                                        className="p-2 bg-white/5 hover:bg-brand-teal/20 text-gray-400 hover:text-brand-teal rounded-lg transition-all border border-white/5 cursor-pointer"
+                                        title="Download"
+                                      >
+                                        <Download className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* TAB 3: DISCUSSION LIVE CHATROOM */}
+                          {activeTab === 'discussion' && (
+                            <div className="flex flex-col h-[40vh] justify-between space-y-4">
+                              <div className="flex-grow bg-[#010309] border border-white/5 rounded-xl p-4 overflow-y-auto space-y-3 max-h-56">
+                                {chatroomMessages.map((msg, idx) => (
+                                  <div key={msg.id || idx} className={`flex flex-col max-w-[85%] ${msg.isSelf ? 'ml-auto items-end' : 'items-start'}`}>
+                                    <div className="flex items-center gap-1.5 text-[9px] font-mono text-gray-500 mb-0.5">
+                                      <span className={msg.isSelf ? 'text-brand-teal font-bold' : 'text-gray-300 font-medium'}>{msg.sender}</span>
+                                      <span>•</span>
+                                      <span>{msg.role}</span>
+                                    </div>
+                                    <div className={`p-2.5 rounded-2xl text-xs ${msg.isSelf ? 'bg-brand-teal text-brand-dark rounded-tr-none font-medium' : 'bg-white/5 text-gray-300 rounded-tl-none'}`}>
+                                      {msg.text}
+                                    </div>
+                                    <span className="text-[8px] font-mono text-gray-600 mt-0.5">{msg.time}</span>
+                                  </div>
+                                ))}
+                                <div ref={chatEndRef} />
+                              </div>
+
+                              <form onSubmit={handleSendChat} className="flex gap-2 font-mono">
+                                <input
+                                  type="text"
+                                  value={chatInput}
+                                  onChange={(e) => setChatInput(e.target.value)}
+                                  placeholder="Type question or comment to the live community..."
+                                  className="flex-grow bg-brand-dark/70 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                                />
+                                <button
+                                  type="submit"
+                                  className="p-2 bg-brand-teal hover:bg-white text-brand-dark rounded-xl transition-colors cursor-pointer shrink-0"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              </form>
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
+
+                    </div>
+                  ) : (
+                    <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
+                      <div className="bg-amber-400/5 border border-amber-400/20 rounded-2xl p-6 text-center space-y-3">
+                        <div className="w-10 h-10 bg-amber-400/10 rounded-full flex items-center justify-center mx-auto text-amber-400 border border-amber-400/20">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <h4 className="font-display font-bold text-white text-base">Classroom & Deliverables Locked</h4>
+                        <p className="text-gray-400 text-xs font-sans max-w-md mx-auto leading-relaxed">
+                          Developer sandboxes, session codes, slides, and simulated attendee discussion streams are restricted. Please register to obtain your session key.
+                        </p>
+                        
+                        <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+                          <button
+                            onClick={() => {
+                              setShowRegModal(true);
+                              setRegMode('register');
+                              setRegSuccessKey(null);
+                              setPayTicketsCount(seatCount);
+                            }}
+                            className="px-5 py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <Key className="w-4 h-4" />
+                            Register to Join Workshop
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowRegModal(true);
+                              setRegMode('enterKey');
+                              setRegSuccessKey(null);
+                            }}
+                            className="px-4 py-2.5 bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl font-mono text-xs uppercase font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Enter Existing Pass Key
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Standard Invoice Pass Booking Display for pricing */}
+                  {!isRegistered && (
+                    <div className="pt-8 mt-8 border-t border-white/5 space-y-4">
+                      <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Standard Pass Booking (INR)</span>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 text-xs">
+                        <div>
+                          <p className="font-bold text-white text-sm">₹{(activeWorkshop.price ?? 1499).toLocaleString()} per Seat</p>
+                          <p className="text-gray-500 mt-0.5">Includes physical seat invitation and session snacks.</p>
+                        </div>
+                        <div className="flex items-center gap-3 bg-brand-dark border border-white/10 px-3 py-1.5 rounded-lg">
+                          <span className="font-mono text-gray-400">Seats:</span>
+                          <button onClick={() => setSeatCount(prev => Math.max(1, prev - 1))} className="p-1 text-gray-500 hover:text-white cursor-pointer"><Minus className="w-3 h-3" /></button>
+                          <span className="font-mono font-bold text-white px-1">{seatCount}</span>
+                          <button onClick={() => setSeatCount(prev => prev + 1)} className="p-1 text-gray-500 hover:text-white cursor-pointer"><Plus className="w-3 h-3" /></button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-brand-teal/5 border border-brand-teal/15 p-4 rounded-2xl">
+                        <div className="text-left w-full sm:w-auto">
+                          <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Total Pass Due</span>
+                          <p className="font-display font-bold text-white text-base">₹{( (activeWorkshop.price ?? 1499) * seatCount ).toLocaleString()}</p>
+                        </div>
+                        <button
+                          onClick={() => onBookWorkshop && onBookWorkshop({
+                            workshopId: activeWorkshop.id,
+                            title: activeWorkshop.title,
+                            seats: seatCount,
+                            totalAmount: (activeWorkshop.price ?? 1499) * seatCount
+                          })}
+                          className="w-full sm:w-auto px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          Book Tickets Online
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+        </div>
+
+        {/* SOCIAL PROOF: Dynamic comments section below the active workshop detail billboard */}
+        <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-white/5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 ambient-glow opacity-30 rounded-full translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+          
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="p-2 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-xl text-white">Attendee Reviews & Feedback</h3>
+                <p className="text-gray-500 text-xs font-sans">Verified testimonials for "{activeWorkshop.title}"</p>
+              </div>
+            </div>
+
+            {/* List of active workshop comments */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+              <AnimatePresence mode="popLayout">
+                {activeWorkshopComments.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="col-span-2 text-center py-8 bg-white/5 border border-white/5 rounded-2xl"
+                  >
+                    <p className="text-gray-500 text-sm font-sans font-light">No feedback left for this session yet. Be the first to share your learning experience!</p>
+                  </motion.div>
+                ) : (
+                  activeWorkshopComments.map((comment) => (
+                    <motion.div
+                      key={comment.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="bg-brand-dark/40 border border-white/5 p-6 rounded-2xl flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Rating stars display */}
+                        <div className="flex gap-1 text-brand-teal mb-3">
+                          {Array.from({ length: comment.rating }).map((_, i) => (
+                            <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                          ))}
+                        </div>
+                        <p className="text-gray-300 text-sm font-sans font-light italic leading-relaxed mb-4">
+                          "{comment.content}"
+                        </p>
+                      </div>
+
+                      {/* Author Details */}
+                      <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+                        <div className="w-8 h-8 rounded-full bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center text-brand-teal text-xs font-bold font-mono">
+                          {comment.authorName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold text-white">{comment.authorName}</div>
+                          <div className="text-[10px] font-mono text-gray-500">{comment.role}</div>
+                        </div>
+                        <span className="text-[10px] font-mono text-gray-600 ml-auto">{comment.timestamp}</span>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Post a feedback review form */}
+            <div className="bg-brand-dark/40 border border-white/5 rounded-2xl p-6 sm:p-8">
+              <h4 className="font-display font-bold text-base text-white mb-2">Have you attended S-CODERS sessions? Leave Feedback!</h4>
+              <p className="text-gray-500 text-xs font-sans mb-6">Your reviews help us design better-tailored technical workshops and guides.</p>
+
+              <form onSubmit={handlePostComment} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Your Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={authorName}
+                      onChange={(e) => setAuthorName(e.target.value)}
+                      placeholder="e.g. Suhas Gowda"
+                      className="w-full bg-brand-dark/60 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Your Professional Role / College</label>
+                    <input
+                      type="text"
+                      required
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      placeholder="e.g. Student, RVCE / Backend Developer"
+                      className="w-full bg-brand-dark/60 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Rating out of 5</label>
+                    <div className="flex gap-1 py-1 text-gray-600">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className={`p-1 hover:scale-110 transition-all cursor-pointer ${
+                            rating >= star ? 'text-brand-teal' : 'text-gray-700'
+                          }`}
+                        >
+                          <Star className="w-5 h-5 fill-current" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Describe Your Feedback / Experience</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="Describe what you learned or built during the workshop. Mention any specific modules or tools (n8n, Gemini) that helped!"
+                    className="w-full bg-brand-dark/60 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark font-bold rounded-lg transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    Send Testimonial
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              {submitSuccess && (
+                <div className="mt-4 p-3 bg-brand-teal/10 rounded-lg border border-brand-teal/20 text-xs text-brand-teal text-center font-semibold">
+                  Feedback logged successfully! It has been posted to our local community review board.
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      {/* --- WORKSHOP REGISTRATION MODAL --- */}
+      <AnimatePresence>
+        {showRegModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { 
+                setShowRegModal(false); 
+                setPaymentStep(false); 
+                setOtpVerificationStep(false); 
+                setUpiPendingStep(false); 
+                setUpiVerified(false);
+                setUpiVerifying(false);
+                setIsPaymentVerified(false);
+                setGeneratedWorkshopKey(null);
+                setRegSuccessKey(null);
+              }}
+              className="absolute inset-0 bg-brand-dark/85 backdrop-blur-md"
+            />
+
+            {/* Modal Container */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-brand-card border border-brand-teal/20 rounded-3xl p-5 sm:p-6 shadow-2xl relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              {/* Glow filter */}
+              <div className="absolute top-0 right-0 w-48 h-48 bg-brand-teal/5 blur-3xl rounded-full pointer-events-none" />
+
+              {/* Sticky Top Header with Close Button */}
+              <div className="flex justify-between items-center pb-4 border-b border-white/5 mb-4 shrink-0 relative z-20">
+                <div className="flex items-center gap-2">
+                  <Key className="w-4 h-4 text-brand-teal" />
+                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Session Pass Gateway</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { 
+                    setShowRegModal(false); 
+                    setPaymentStep(false); 
+                    setOtpVerificationStep(false); 
+                    setUpiPendingStep(false); 
+                    setUpiVerified(false);
+                    setUpiVerifying(false);
+                    setIsPaymentVerified(false);
+                    setGeneratedWorkshopKey(null);
+                    setRegSuccessKey(null);
+                  }}
+                  className="p-1.5 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer relative z-20"
+                  id="close-workshop-modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Modal Content */}
+              <div className="overflow-y-auto flex-1 pr-1 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
+                {regSuccessKey ? (
+                  // SUCCESS STATE
+                  <div className="text-center py-4 font-sans">
+                    <div className="w-14 h-14 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-teal">
+                      <Sparkles className="w-7 h-7 animate-pulse" />
+                    </div>
+                    <h3 className="text-xl font-display font-extrabold text-white mb-2">Registration Complete!</h3>
+                    <p className="text-gray-400 text-xs font-light max-w-sm mx-auto mb-5 leading-relaxed">
+                      Your attendance pass for <strong className="text-white font-semibold">{activeWorkshop.title}</strong> has been secured.
+                    </p>
+
+                    {/* WhatsApp Group Link Section */}
+                    <div className="bg-brand-teal/5 border border-brand-teal/20 p-4 rounded-2xl flex flex-col items-center gap-3 text-center mb-5 max-w-sm mx-auto">
+                      <div className="p-2 bg-[#25D366]/10 rounded-full text-[#25D366] border border-[#25D366]/20">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Join S-CODERS Announcements Group</h4>
+                        <p className="text-gray-400 text-[10px] mt-1 leading-normal">
+                          Click below to join the official read-only S-CODERS WhatsApp channel. The live Zoom meeting link, schedules, and code files will be shared there.
+                        </p>
+                      </div>
+                      <a 
+                        href="https://chat.whatsapp.com/dummy-scoders-group"
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={() => setWhatsappJoined(true)}
+                        className="w-full py-2 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-[11px] uppercase font-bold tracking-wider rounded-xl transition-all block text-center"
+                      >
+                        Join S-CODERS WhatsApp Channel
+                      </a>
+                    </div>
+
+                    <div className="bg-brand-dark/95 border border-brand-teal/20 rounded-2xl p-4 mb-6 max-w-sm mx-auto text-center space-y-1 relative">
+                      <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Your Unique Attendance Key</span>
+                      <span className="font-mono text-sm font-black text-brand-teal select-all block py-1.5 truncate">{regSuccessKey}</span>
+                      <button
+                        onClick={() => handleCopyKey(regSuccessKey)}
+                        className="absolute right-2 top-2 p-1 bg-white/5 hover:bg-brand-teal/20 rounded text-gray-400 hover:text-brand-teal transition-all flex items-center gap-1 text-[9px] font-mono cursor-pointer border border-white/5"
+                      >
+                        {copiedKey ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copiedKey ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => { setShowRegModal(false); setPaymentStep(false); }}
+                      className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                    >
+                      Enter Classroom Workspace
+                    </button>
+                  </div>
+                ) : otpVerificationStep ? (
+                  // BANK OTP SECURITY STEP
+                  <form onSubmit={handleVerifyOtpAndComplete} className="space-y-4 font-sans py-2">
+                    <div className="text-center space-y-2 mb-4">
+                      <div className="w-12 h-12 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto text-brand-teal">
+                        <Lock className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <h4 className="text-base font-extrabold text-white">Bank Security Verification</h4>
+                      <p className="text-gray-400 text-xs leading-relaxed max-w-xs mx-auto">
+                        A secure 6-digit passcode has been transmitted by your card's issuing bank to your authenticated mobile number.
+                      </p>
+                    </div>
+
+                    <div className="bg-brand-dark/40 border border-white/5 p-4 rounded-xl text-center text-xs space-y-1">
+                      <p className="text-gray-400">Total Charged Amount:</p>
+                      <p className="text-lg font-black text-brand-teal">₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()}</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest text-center">Enter 6-Digit bank OTP code</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        value={otpValue}
+                        onChange={(e) => {
+                          setOtpValue(e.target.value.replace(/\D/g, ''));
+                          setOtpError(null);
+                        }}
+                        placeholder="e.g. 123456"
+                        className="w-full text-center tracking-widest text-lg font-mono bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                      />
+                      <p className="text-center text-[10px] text-brand-teal/70 font-mono mt-1">Hint: For simulation testing, type the secure code <strong className="text-white">123456</strong></p>
+                    </div>
+
+                    {otpError && (
+                      <p className="text-red-400 text-xs text-center font-mono">{otpError}</p>
+                    )}
+
+                    <div className="flex gap-4 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setOtpVerificationStep(false); setPaymentStep(true); }}
+                        className="w-1/3 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-xs font-mono uppercase font-bold transition-all"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={paymentSimulating}
+                        className="flex-grow py-3 bg-brand-teal text-brand-dark hover:bg-white rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        {paymentSimulating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Confirm Payment'}
+                      </button>
+                    </div>
+
+                    <div className="text-center text-[10px] text-gray-500 font-mono mt-2">
+                      Resend code in {otpCountdown > 0 ? `${otpCountdown}s` : <span className="text-brand-teal hover:underline cursor-pointer" onClick={() => { setOtpCountdown(60); setOtpValue(''); }}>Resend OTP</span>}
+                    </div>
+                  </form>
+                ) : upiPendingStep ? (
+                  // UPI PENDING CLEARANCE STEP
+                  <div className="space-y-6 text-center py-4 font-sans">
+                    <div className="w-16 h-16 bg-brand-teal/10 border border-brand-teal/30 rounded-full flex items-center justify-center mx-auto animate-pulse text-brand-teal">
+                      <ShieldCheck className="w-8 h-8" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[10px] font-mono uppercase tracking-wider font-bold">
+                        Awaiting Gateway Authorization
+                      </span>
+                      <h4 className="text-lg font-display font-black text-white">
+                        Ruy Pay Secure Connection Active
+                      </h4>
+                      <p className="text-gray-400 text-xs max-w-md mx-auto leading-relaxed">
+                        {selectedUpiApp === 'generic' 
+                          ? 'Your default system UPI application has been invoked with the pre-filled parameters.'
+                          : `Ruy Secure Link has launched the ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : selectedUpiApp === 'paytm' ? 'Paytm' : 'BHIM UPI'} application on your device.`
+                        } Please authorize the payment of <strong className="text-brand-teal font-bold">₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()}</strong> inside your app.
+                      </p>
+                    </div>
+
+                    {/* Premium PhonePe Merchant Scanner Card (Matching User Image) */}
+                    <div className="bg-white text-black p-5 rounded-[2rem] shadow-2xl border border-gray-100 max-w-xs w-full mx-auto relative overflow-hidden flex flex-col items-center my-2">
+                      {/* Header: Bank of Baroda branding */}
+                      <div className="flex items-center gap-3 w-full mb-4 border-b border-gray-100 pb-3 justify-center">
+                        {/* Bank of Baroda Logo */}
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shadow-md shrink-0">
+                          <span className="text-white font-sans font-black text-[9px] tracking-tighter">BOB</span>
+                        </div>
+                        <div className="text-left">
+                          <span className="text-[8px] font-mono text-gray-400 block uppercase font-bold tracking-wider leading-none">Settlement Bank</span>
+                          <span className="text-xs font-sans font-bold text-gray-800">Bank Of Baroda - 2145</span>
+                        </div>
+                      </div>
+
+                      {/* QR Code Container */}
+                      <div className="relative p-1.5 bg-white rounded-2xl border border-gray-100 shadow-inner group">
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                            `upi://pay?pa=scoders@ybl&pn=S-CODERS%20Technologies&am=${(activeWorkshop.price ?? 1499) * payTicketsCount}&cu=INR&tn=${encodeURIComponent(`S-CODERS Workshop: ${activeWorkshop.title}`)}`
+                          )}`}
+                          alt="UPI Payment QR Code"
+                          className="w-40 h-40 object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                        
+                        {/* PhonePe logo in the absolute center of the QR code */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-9 h-9 rounded-full bg-[#5f259f] border-2 border-white flex items-center justify-center shadow-md">
+                            <span className="text-white font-sans text-xs font-black tracking-tighter">पे</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer: View UPI details */}
+                      <div className="mt-4 text-center">
+                        <span className="text-[#5f259f] hover:text-[#4b1c7f] font-sans font-extrabold text-xs tracking-tight flex items-center gap-1 transition-colors cursor-pointer justify-center">
+                          View UPI details
+                        </span>
+                        <span className="text-[8px] font-mono text-gray-400 block mt-1 uppercase tracking-widest font-bold">Merchant ID: scoders@ybl</span>
+                      </div>
+                    </div>
+
+                    {/* Timer details */}
+                    <div className="bg-brand-dark/40 border border-white/5 rounded-2xl p-4 max-w-xs mx-auto text-center space-y-1">
+                      <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block">Checkout Session Timer</span>
+                      <span className="font-mono text-2xl font-black text-brand-teal block">
+                        {Math.floor(ruyTimer / 60)}:{(ruyTimer % 60).toString().padStart(2, '0')}
+                      </span>
+                      <span className="text-[9px] text-gray-400 block">Do not refresh or close this modal</span>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="grid grid-cols-1 gap-3 max-w-sm mx-auto pt-4">
+                      {!upiVerified ? (
+                        <>
+                          {upiVerifying ? (
+                            <div className="py-3 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-center gap-2.5 text-xs font-mono text-amber-400">
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Confirming transaction signature...</span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleSimulateUpiSuccess}
+                              className="w-full py-4 bg-brand-teal text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all shadow-lg shadow-brand-teal/10 cursor-pointer flex items-center justify-center gap-2"
+                            >
+                              Simulate Instant Ruy Pay Settle
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="py-2.5 px-3.5 bg-emerald-400/10 border border-emerald-400/20 rounded-2xl text-emerald-400 font-mono text-xs inline-flex items-center gap-2 mx-auto justify-center w-full">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                            <span>Payment Received & Verified!</span>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={handleVerifyUpiPaymentAndComplete}
+                            disabled={paymentSimulating}
+                            className="w-full py-4 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-lg shadow-brand-teal/10"
+                          >
+                            {paymentSimulating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Verify Payment & Mint Key'}
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUpiPendingStep(false);
+                          setPaymentStep(true);
+                          setUpiVerified(false);
+                          setUpiVerifying(false);
+                        }}
+                        className="w-full py-2 bg-transparent text-gray-500 hover:text-white font-mono text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
+                      >
+                        ← Choose different app / Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : paymentStep ? (
+                  // PAYMENT STEP STATE
+                  <div>
+                    {/* Header bar matching Payments.tsx secure gateway */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5 mb-5 font-sans">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-brand-teal/10 border border-brand-teal/20 rounded-2xl text-brand-teal">
+                          <ShieldCheck className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest block font-bold leading-none">Ruy Pay Integrated Platform</span>
+                          <h3 className="font-display font-black text-xl text-white mt-1">Workshop Booking Payment</h3>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 shrink-0 w-fit">
+                        <Lock className="w-3.5 h-3.5 text-brand-teal" />
+                        <span className="text-[10px] font-mono text-gray-400">SSL 256-Bit Encrypted</span>
+                      </div>
+                    </div>
+
+                    {paymentSimulating ? (
+                      <div className="text-center py-12 space-y-4 font-sans">
+                        <RefreshCw className="w-10 h-10 text-brand-teal animate-spin mx-auto" />
+                        <p className="text-white font-sans font-semibold text-sm">Locking Transaction Ledger...</p>
+                        <p className="text-gray-400 text-xs max-w-xs mx-auto leading-relaxed">
+                          Securing transaction blocks, creating permanent cryptographic record keys, and notifying attendee registry.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-5 font-sans">
+                        {/* Selected Workshop details review */}
+                        <div className="bg-white/5 p-4 rounded-2xl border border-white/5 text-[11px] text-gray-300 space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 font-mono">WORKSHOP:</span>
+                            <span className="text-white font-bold text-right truncate max-w-[200px]">{activeWorkshop.title}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 font-mono">ATTENDEE:</span>
+                            <span className="text-white font-bold">{regName}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 font-mono">EMAIL ID:</span>
+                            <span className="text-white font-mono truncate max-w-[150px]">{regEmail}</span>
+                          </div>
+                        </div>
+
+                        {/* Number of Seats Ajuster & Pricing */}
+                        <div className="bg-brand-dark/40 border border-white/5 p-4 rounded-2xl space-y-3.5">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="block text-xs font-bold text-white font-display">Number of Reserved Seats</span>
+                              <span className="text-[9px] text-gray-400 font-sans block">Adjust seats for you or teammates</span>
+                            </div>
+                            <div className="flex items-center gap-3 bg-brand-dark border border-white/10 px-2.5 py-1.5 rounded-lg">
+                              <button 
+                                type="button" 
+                                onClick={() => setPayTicketsCount(prev => Math.max(1, prev - 1))} 
+                                className="p-1 text-gray-400 hover:text-white cursor-pointer transition-colors"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="font-mono font-bold text-white text-xs min-w-[12px] text-center">{payTicketsCount}</span>
+                              <button 
+                                type="button" 
+                                onClick={() => setPayTicketsCount(prev => prev + 1)} 
+                                className="p-1 text-gray-400 hover:text-white cursor-pointer transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between border-t border-white/5 pt-3 text-[11px]">
+                            <span className="text-gray-400 font-mono">Total Price Due:</span>
+                            <span className="text-brand-teal font-black text-base">₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Payment Method Selector Grid - Matches Payments.tsx */}
+                        <div className="grid grid-cols-3 bg-brand-dark/50 border border-white/5 rounded-xl overflow-hidden font-display font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('upi')}
+                            className={`py-3 text-center border-r border-white/5 text-[11px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                              paymentMethod === 'upi'
+                                ? 'bg-brand-card text-brand-teal shadow-inner'
+                                : 'text-gray-500 hover:text-white'
+                            }`}
+                          >
+                            <Shield className="w-4 h-4" />
+                            Ruy UPI
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('card')}
+                            className={`py-3 text-center border-r border-white/5 text-[11px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                              paymentMethod === 'card'
+                                ? 'bg-brand-card text-brand-teal shadow-inner'
+                                : 'text-gray-500 hover:text-white'
+                            }`}
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            Ruy Card
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('bank')}
+                            className={`py-3 text-center text-[11px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                              paymentMethod === 'bank'
+                                ? 'bg-brand-card text-brand-teal shadow-inner'
+                                : 'text-gray-500 hover:text-white'
+                            }`}
+                          >
+                            <Wallet className="w-4 h-4" />
+                            NetBanking
+                          </button>
+                        </div>
+
+                        {/* Method A: UPI */}
+                        {paymentMethod === 'upi' && (
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest text-center">Select active Ruy Secured UPI application</p>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { id: 'phonepe', name: 'PhonePe (Ruy)' },
+                                { id: 'gpay', name: 'Google Pay (Ruy)' },
+                                { id: 'paytm', name: 'Paytm (Ruy)' },
+                                { id: 'bhim', name: 'BHIM UPI (Ruy)' }
+                              ].map((app) => (
+                                <button
+                                  type="button"
+                                  key={app.id}
+                                  onClick={() => handleInitiateUpiPayment(app.id as any)}
+                                  className="py-3 px-2 bg-white/5 hover:bg-brand-teal/20 hover:border-brand-teal/40 border border-white/5 rounded-xl text-xs font-mono uppercase font-bold text-gray-300 hover:text-white transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
+                                >
+                                  {app.name}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Divider with QR/Address backup */}
+                            <div className="flex items-center gap-3 py-2">
+                              <div className="h-px bg-white/5 flex-grow" />
+                              <span className="text-[8px] font-mono text-gray-600 uppercase tracking-widest">or pay using scan card</span>
+                              <div className="h-px bg-white/5 flex-grow" />
+                            </div>
+
+                            {/* Small quick layout BOB Card */}
+                            <div className="bg-white text-black p-4 rounded-2xl border border-gray-100 max-w-[240px] w-full mx-auto relative overflow-hidden flex flex-col items-center shadow-lg">
+                              <div className="flex items-center gap-2 w-full mb-2 border-b border-gray-100 pb-2 justify-center">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shrink-0">
+                                  <span className="text-white font-sans font-black text-[6px]">BOB</span>
+                                </div>
+                                <span className="text-[9px] font-sans font-extrabold text-gray-800">Bank Of Baroda QR</span>
+                              </div>
+                              <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                                  `upi://pay?pa=scoders@ybl&pn=S-CODERS%20Technologies&am=${(activeWorkshop.price ?? 1499) * payTicketsCount}&cu=INR&tn=${encodeURIComponent(`S-CODERS Workshop: ${activeWorkshop.title}`)}`
+                                )}`}
+                                alt="UPI Payment QR Code"
+                                className="w-28 h-28 object-contain"
+                                referrerPolicy="no-referrer"
+                              />
+                              <span className="text-[7px] font-mono text-gray-400 mt-1 uppercase tracking-wider block">Merchant: scoders@ybl</span>
+                            </div>
+
+                            {/* UPI ID Details manual copy */}
+                            <div className="bg-brand-dark/50 border border-white/5 rounded-xl p-3 flex items-center justify-between">
+                              <div className="text-left">
+                                <span className="text-[9px] font-mono text-gray-500 block">RUY VIRTUAL PAYMENT ADDRESS</span>
+                                <span className="text-xs font-mono font-bold text-white block">scoders@ybl</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy('scoders@ybl', 'upi')}
+                                className="p-2 bg-white/5 border border-white/10 hover:border-brand-teal text-gray-400 hover:text-white rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedField === 'upi' ? (
+                                  <Check className="w-3.5 h-3.5 text-brand-teal" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Manual Settle fallback button */}
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleInitiateUpiPayment('generic')}
+                                className="w-full py-3 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/50 text-brand-teal font-display text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+                              >
+                                Settle with Generic UPI App
+                                <ArrowRight className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Method B: Interactive Card Form */}
+                        {paymentMethod === 'card' && (
+                          <form onSubmit={handleInitiateCardPayment} className="space-y-4">
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 font-bold">Card Number</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={cardNo}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, '').substring(0, 16);
+                                    const formatted = val.replace(/(\d{4})(?=\d)/g, '$1 ');
+                                    setCardNo(formatted);
+                                  }}
+                                  placeholder="4111 2222 3333 4444"
+                                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 font-bold">Expiry Date</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={cardExpiry}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                                      if (val.length >= 2) {
+                                        setCardExpiry(`${val.substring(0, 2)}/${val.substring(2, 4)}`);
+                                      } else {
+                                        setCardExpiry(val);
+                                      }
+                                    }}
+                                    placeholder="MM/YY"
+                                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 font-bold">CVV</label>
+                                  <input
+                                    type="password"
+                                    required
+                                    maxLength={3}
+                                    value={cardCvv}
+                                    onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="123"
+                                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="submit"
+                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              Pay ₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} Securely
+                            </button>
+                          </form>
+                        )}
+
+                        {/* Method C: Ruy NetBanking wire / transfer - Matches Payments.tsx */}
+                        {paymentMethod === 'bank' && (
+                          <form onSubmit={handleInitiateBankPayment} className="space-y-4">
+                            <div className="text-center max-w-md mx-auto space-y-1">
+                              <h4 className="font-display font-bold text-xs text-white uppercase tracking-wider">Direct NEFT / IMPS Bank Transfer</h4>
+                              <p className="text-gray-500 text-[10px]">
+                                Settle tickets balance via corporate wire. Then, upload or simulate receipt scan to secure pass key instantly.
+                              </p>
+                            </div>
+
+                            {/* Bank details grid */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="bg-brand-dark/50 border border-white/5 p-3 rounded-xl flex flex-col justify-between">
+                                <div>
+                                  <span className="text-[7px] font-mono text-gray-500 block uppercase">BANK NAME</span>
+                                  <span className="text-[10px] font-display font-bold text-white block mt-0.5">HDFC Bank Ltd</span>
+                                </div>
+                                <div className="flex justify-between items-center mt-2.5">
+                                  <span className="text-[7px] font-mono text-gray-500 block">BRANCH</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy('HDFC Bank, Koramangala Bengaluru', 'branch')}
+                                    className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                                  >
+                                    {copiedField === 'branch' ? <Check className="w-3 h-3 text-brand-teal" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="bg-brand-dark/50 border border-white/5 p-3 rounded-xl flex flex-col justify-between">
+                                <div>
+                                  <span className="text-[7px] font-mono text-gray-500 block uppercase">ACCOUNT NO</span>
+                                  <span className="text-[10px] font-mono font-bold text-white block mt-0.5">50200088994433</span>
+                                </div>
+                                <div className="flex justify-between items-center mt-2.5">
+                                  <div>
+                                    <span className="text-[7px] font-mono text-gray-500 block uppercase">IFSC CODE</span>
+                                    <span className="text-[9px] font-mono text-brand-teal block">HDFC0000104</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy('50200088994433', 'acc')}
+                                    className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                                  >
+                                    {copiedField === 'acc' ? <Check className="w-3 h-3 text-brand-teal" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Receipt upload box simulator */}
+                            <div className="border border-dashed border-white/10 rounded-xl p-5 text-center bg-brand-dark/20 space-y-3">
+                              <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto text-gray-400">
+                                <Upload className="w-4 h-4" />
+                              </div>
+                              
+                              {receiptFile ? (
+                                <div>
+                                  <span className="text-xs font-mono text-brand-teal block font-semibold truncate max-w-[200px] mx-auto">{receiptName}</span>
+                                  <span className="text-[9px] text-gray-500 block mt-1">Receipt scanned and uploaded successfully.</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReceiptFile(null);
+                                      setReceiptName('');
+                                    }}
+                                    className="text-[9px] text-brand-coral font-mono hover:underline mt-1.5 cursor-pointer"
+                                  >
+                                    Remove file
+                                  </button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="text-[11px] text-gray-400 font-sans leading-normal">
+                                    Drag your wire transfer receipt, or{' '}
+                                    <button
+                                      type="button"
+                                      onClick={handleReceiptMockUpload}
+                                      className="text-brand-teal font-medium hover:underline cursor-pointer"
+                                    >
+                                      click to browse simulator
+                                    </button>
+                                  </p>
+                                  <span className="text-[8px] text-gray-600 block mt-0.5 font-mono">Supports PNG, JPG, PDF up to 5MB</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={!receiptFile}
+                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                            >
+                              Verify Wire Logs & Complete pass key
+                            </button>
+                          </form>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setPaymentStep(false)}
+                          className="w-full text-center text-[10px] font-mono text-gray-500 hover:text-white transition-colors py-1.5 uppercase tracking-wider block cursor-pointer"
+                        >
+                          ← Back to registration details
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // FORM STATE
+                  <div>
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="p-2 bg-brand-teal/10 rounded-2xl border border-brand-teal/20 text-brand-teal">
+                        <Key className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Session Pass Gateway</span>
+                        <h3 className="font-display font-extrabold text-lg text-white">Join "{activeWorkshop.category}"</h3>
+                      </div>
+                    </div>
+
+                    {/* Toggle Modes */}
+                    <div className="grid grid-cols-2 bg-brand-dark/50 p-1 rounded-xl mb-5 border border-white/5">
+                      <button
+                        onClick={() => { setRegMode('register'); setManualKeyError(null); }}
+                        className={`py-1.5 text-[11px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                          regMode === 'register' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Register New Pass
+                      </button>
+                      <button
+                        onClick={() => { setRegMode('enterKey'); setManualKeyError(null); }}
+                        className={`py-1.5 text-[11px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                          regMode === 'enterKey' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Enter Existing Pass
+                      </button>
+                    </div>
+
+                    {regMode === 'register' ? (
+                      <form onSubmit={handleRegisterWorkshop} className="space-y-3.5">
+                        {currentUser && (
+                          <div className="bg-brand-teal/5 border border-brand-teal/20 rounded-xl p-2.5 text-[10px] text-brand-teal flex items-center gap-2 mb-1 font-mono">
+                            <Check className="w-3.5 h-3.5 shrink-0" />
+                            <span>Pre-authenticating from active user session.</span>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            disabled={!!currentUser}
+                            value={regName}
+                            onChange={(e) => setRegName(e.target.value)}
+                            placeholder="e.g. Suhas Gowda"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Email Address *</label>
+                          <input
+                            type="email"
+                            required
+                            disabled={!!currentUser}
+                            value={regEmail}
+                            onChange={(e) => setRegEmail(e.target.value)}
+                            placeholder="e.g. student@college.edu"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Your Technical Role / College (or Workplace) *</label>
+                          <input
+                            type="text"
+                            required
+                            value={regRole}
+                            onChange={(e) => setRegRole(e.target.value)}
+                            placeholder="e.g. Student, PESU / SDE-1, Swiggy"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                          />
+                        </div>
+
+                        <div className="pt-1">
+                          <button
+                            type="submit"
+                            className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Sparkles className="w-4 h-4 fill-current animate-pulse" />
+                            Proceed to Payment Securely
+                          </button>
+                        </div>
+                      </form>
+                    ) : isPaymentVerified ? (
+                      <div className="space-y-4 font-sans py-2">
+                        {!generatedWorkshopKey ? (
+                          <div className="text-center py-4 space-y-4">
+                            <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto text-emerald-400">
+                              <Check className="w-7 h-7" />
+                            </div>
+                            <div>
+                              <h3 className="text-base font-extrabold text-white">Payment Verified Successfully!</h3>
+                              <p className="text-gray-400 text-xs mt-1 max-w-xs mx-auto leading-relaxed">
+                                Your payment is fully cleared. Click below to enter this option and mint your unique, personalized Workshop Access Key.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleGenerateUniqueKey}
+                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/20"
+                            >
+                              <Sparkles className="w-4 h-4 fill-current animate-pulse" />
+                              Generate Unique Workshop Access Key
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-5">
+                            <div className="text-center">
+                              <div className="w-12 h-12 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto mb-2 text-brand-teal">
+                                <Sparkles className="w-6 h-6 animate-pulse" />
+                              </div>
+                              <h3 className="text-base font-extrabold text-white">Access Key Minted!</h3>
+                              <p className="text-gray-400 text-[11px] mt-0.5">
+                                Every participant receives a different, unique crypt-signed access key.
+                              </p>
+                            </div>
+
+                            {/* Generated Key Card */}
+                            <div className="bg-brand-dark/90 border border-brand-teal/20 rounded-2xl p-4 text-center space-y-1 relative">
+                              <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Your Unique Attendance Key</span>
+                              <span className="font-mono text-xs font-black text-brand-teal select-all block py-1 truncate">{generatedWorkshopKey}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyKey(generatedWorkshopKey)}
+                                className="absolute right-2 top-2 p-1.5 bg-white/5 hover:bg-brand-teal/20 rounded text-gray-400 hover:text-brand-teal transition-all flex items-center gap-1 text-[9px] font-mono cursor-pointer border border-white/5"
+                              >
+                                {copiedKey ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                {copiedKey ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+
+                            {/* WhatsApp Group Box */}
+                            <div className="bg-[#25D366]/5 border border-[#25D366]/20 p-4 rounded-2xl space-y-3">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#25D366]/10 rounded-xl text-[#25D366] border border-[#25D366]/20 shrink-0">
+                                  <Users className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-xs font-bold text-white">Official WhatsApp Announcement Group</h4>
+                                  <p className="text-gray-400 text-[10px] mt-0.5 leading-normal">
+                                    Join our read-only channel to receive Zoom schedules and resources.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Alert details for Group settings */}
+                              <div className="bg-brand-dark/40 border border-white/5 p-2.5 rounded-xl text-[9px] font-mono text-gray-400 leading-normal">
+                                <span className="text-amber-400 font-bold">📢 Group Policy:</span> This group is configured as <strong>announcement-only (Admins Only can post)</strong>. Participants can join and view updates, but cannot write messages. This ensures zero spam.
+                              </div>
+
+                              <a 
+                                href="https://chat.whatsapp.com/dummy-scoders-group"
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={() => setWhatsappJoined(true)}
+                                className="w-full py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-xs uppercase font-extrabold tracking-wider rounded-xl transition-all block text-center cursor-pointer shadow-md shadow-[#25D366]/10"
+                              >
+                                Join S-CODERS WhatsApp Channel
+                              </a>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowRegModal(false);
+                                setPaymentStep(false);
+                                setIsPaymentVerified(false);
+                                setGeneratedWorkshopKey(null);
+                              }}
+                              className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center block"
+                            >
+                              Enter Classroom Workspace
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <form onSubmit={handleVerifyManualKey} className="space-y-3.5 font-sans">
+                        <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-[10px] text-gray-400 space-y-1">
+                          <p className="font-bold text-gray-300">Format Guide:</p>
+                          <p>Session passes follow our unique crypt-signature layout:</p>
+                          <code className="block p-1 bg-brand-dark/75 rounded text-brand-teal font-mono text-[9px] truncate">
+                            BTD-WKSP-{activeWorkshop.id.toUpperCase()}-XXXX-XXXX
+                          </code>
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Enter Session Pass Key *</label>
+                          <input
+                            type="text"
+                            required
+                            value={manualKey}
+                            onChange={(e) => {
+                              setManualKey(e.target.value);
+                              setManualKeyError(null);
+                            }}
+                            placeholder="Type or paste your unique pass key"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
+                          />
+                        </div>
+
+                        {manualKeyError && (
+                          <p className="text-red-400 text-[11px] font-mono">{manualKeyError}</p>
+                        )}
+
+                        <div className="pt-1">
+                          <button
+                            type="submit"
+                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                            Verify & Unlock Session
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}

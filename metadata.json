@@ -1,0 +1,6 @@
+{
+  "name": "S-CODERS",
+  "description": "Official website of S-CODERS (Bharath Tech Developers), representing our journey, team, premium AI and software development services, workshops, and startup community highlights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
