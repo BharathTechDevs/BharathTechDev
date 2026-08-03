@@ -1,16 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   
-  --color-brand-dark: #090d16; /* Professional midnight tech-slate background */
-  --color-brand-card: #121824; /* Refined high-contrast card slate */
-  --color-brand-teal: #06b6d4; /* Cyber Cyan */
-  --color-brand-coral: #6366f1; /* Electric Indigo */
-  --color-brand-accent: #3b82f6; /* Premium cobalt blue */
+  --color-brand-dark: #011425; /* Dark Midnight Navy / Abyss Blue */
+  --color-brand-card: #1F4959; /* Deep Ocean Teal Slate */
+  --color-brand-teal: #5C7C89; /* Muted Slate Blue / Dusty Teal */
+  --color-brand-accent: #5C7C89; /* Muted Slate Accent */
+  --color-brand-coral: #1F4959; /* Deep Ocean Teal Accent */
+  --color-brand-charcoal: #242424; /* Dark Charcoal */
+  --color-brand-slate: #5C7C89; /* Dusty Slate */
+  --color-brand-abyss: #011425; /* Midnight Navy */
 }
 
 /* Custom scrollbar styling */
@@ -18,59 +22,83 @@
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #011425;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b; /* Dark slate gray scrollbar thumb */
+  background: #1F4959;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155; /* Darker slate on hover */
+  background: #5C7C89;
 }
 
 html {
   scroll-behavior: smooth;
-  background-color: #090d16;
-  color: #f8fafc; /* Crisp professional slate off-white */
+  background-color: #011425;
+  color: #FFFFFF;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #090d16;
+  background-color: #011425;
+  color: #FFFFFF;
 }
 
 .font-display {
   font-family: var(--font-display);
 }
 
-/* Ambient glow effects with beautiful premium opacity */
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* Architectural Arch Frame Styling inspired by the visual theme */
+.arch-frame {
+  border-top-left-radius: 120px;
+  border-top-right-radius: 120px;
+}
+
+.arch-frame-sm {
+  border-top-left-radius: 60px;
+  border-top-right-radius: 60px;
+}
+
+.arch-card {
+  border-top-left-radius: 40px;
+  border-top-right-radius: 40px;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+}
+
+/* Ambient glow effects with architectural slate & ocean blue tones */
 .ambient-glow {
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
-  filter: blur(50px);
+  background: radial-gradient(circle, rgba(92, 124, 137, 0.22) 0%, rgba(31, 73, 89, 0.1) 50%, rgba(1, 20, 37, 0) 100%);
+  filter: blur(60px);
 }
 
 .ambient-coral-glow {
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(236, 72, 153, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
-  filter: blur(50px);
+  background: radial-gradient(circle, rgba(31, 73, 89, 0.3) 0%, rgba(36, 36, 36, 0.15) 50%, rgba(1, 20, 37, 0) 100%);
+  filter: blur(60px);
 }
 
-/* Glassmorphism utility with enhanced shadow and ultra-thin translucent border */
+/* Glassmorphism panel with deep ocean & slate translucency */
 .glass-panel {
-  background: rgba(11, 15, 25, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+  background: rgba(31, 73, 89, 0.45);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(92, 124, 137, 0.25);
+  box-shadow: 0 16px 40px -12px rgba(1, 20, 37, 0.6);
 }
 
 .glass-panel-hover:hover {
-  border-color: rgba(6, 182, 212, 0.3);
-  box-shadow: 0 0 30px rgba(6, 182, 212, 0.08);
+  border-color: rgba(92, 124, 137, 0.5);
+  box-shadow: 0 0 35px rgba(92, 124, 137, 0.15);
+  background: rgba(31, 73, 89, 0.6);
 }
 
-/* Subtle dot-grid pattern for modern developer aesthetic */
+/* Subtle architectural line grid pattern */
 .bg-grid-pattern {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(circle, rgba(92, 124, 137, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 /* Smooth fade in animation utility */
@@ -83,33 +111,33 @@ body {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
-/* Forms inputs */
+/* Form inputs styling */
 input, select, textarea {
-  background-color: rgba(11, 15, 25, 0.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  color: #ffffff !important;
+  background-color: rgba(1, 20, 37, 0.85) !important;
+  border: 1px solid rgba(92, 124, 137, 0.25) !important;
+  color: #FFFFFF !important;
   transition: all 0.2s ease-in-out;
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: #06b6d4 !important;
+  border-color: #5C7C89 !important;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15) !important;
+  box-shadow: 0 0 0 2px rgba(92, 124, 137, 0.3) !important;
 }
 
 input::placeholder, textarea::placeholder {
-  color: rgba(156, 163, 175, 0.5) !important;
+  color: rgba(148, 163, 184, 0.6) !important;
 }
 
-/* Extra premium gradients */
+/* Extra architectural gradients */
 .text-gradient-cyan-blue {
-  background: linear-gradient(135deg, #00f5ff 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #FFFFFF 0%, #5C7C89 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-purple-coral {
-  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #5C7C89 0%, #1F4959 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

@@ -85,13 +85,13 @@ export default function Contact() {
         <div className="text-center max-w-3xl mx-auto mb-20">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
             <Mail className="w-3.5 h-3.5" />
-            <span>CONNECT WITH BHARATH TECH DEVELOPERS</span>
+            <span>CONNECT WITH S-CODERS • BHARATH TECH DEVELOPERS</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-white tracking-tight mb-6">
             Let’s Engineer Your <span className="text-brand-teal">Next Breakthrough</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            Have an application concept, a custom automation criteria, or want to host a coding session? Reach out to Suhas & the Bharath Tech Developers team.
+            Have an application concept, a custom automation criteria, or want to host a coding session? Reach out to Suhas & the S-CODERS • Bharath Tech Developers team.
           </p>
         </div>
 
@@ -106,15 +106,15 @@ export default function Contact() {
               <div className="absolute top-0 right-0 p-6 text-brand-teal/10">
                 <Sparkles className="w-16 h-16" />
               </div>
-              <h3 className="font-display font-bold text-xl text-white mb-4">BHARATH TECH DEVELOPERS HQ</h3>
+              <h3 className="font-display font-bold text-xl text-white mb-4">S-CODERS • BHARATH TECH HQ</h3>
               <p className="text-gray-400 font-sans font-light text-sm sm:text-base leading-relaxed mb-6">
-                Based out of the tech capital of India, Bharath Tech Developers operates inside Bengaluru’s vibrant startup network.
+                Based out of the tech capital of India, S-CODERS • Bharath Tech Developers operates inside Bengaluru’s vibrant startup network.
               </p>
               
               <div className="space-y-4">
                 <div className="flex gap-3 text-sm font-sans font-light text-gray-300">
                   <MapPin className="w-5 h-5 text-brand-teal shrink-0 mt-0.5" />
-                  <span>Koramangala Startups Hub, Bengaluru, Karnataka, India</span>
+                  <span>Bengaluru, Karnataka, India</span>
                 </div>
                 <div className="flex gap-3 text-sm font-sans font-light text-gray-300">
                   <Mail className="w-5 h-5 text-brand-coral shrink-0 mt-0.5" />
@@ -160,7 +160,7 @@ export default function Contact() {
                   </div>
                   <h3 className="font-display font-extrabold text-white text-2xl mb-3">Enquiry Registered!</h3>
                   <p className="text-gray-400 text-sm font-sans font-light max-w-md mx-auto mb-6">
-                    Your request has been successfully saved to our Bengaluru dispatch database. Suhas Gowda or a Bharath Tech Developers lead coordinator will reach out to you within 24 hours.
+                    Your request has been successfully saved to our Bengaluru dispatch database. Suhas Gowda or an S-CODERS • Bharath Tech Developers lead coordinator will reach out to you within 24 hours.
                   </p>
                   <button
                     onClick={() => setSubmitted(false)}

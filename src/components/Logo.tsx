@@ -61,25 +61,21 @@ export default function Logo({
 
   const currentSize = sizeClasses[size];
 
-  // Color selections based on light/dark background with intense custom neon glowing effects
+  // Color selections based on exact user brand guidelines & reference photo
   const sColor = lightBg 
-    ? 'text-[#1e00c8] drop-shadow-[0_0_1.5px_rgba(30,0,200,0.3)]' 
-    : 'text-[#2e37ff] drop-shadow-[0_0_10px_rgba(46,55,255,0.85)] drop-shadow-[0_0_25px_rgba(46,55,255,0.5)]';
+    ? 'text-[#1200A5] font-black drop-shadow-sm' 
+    : 'text-[#1200A5] dark:text-[#2510E5] font-black drop-shadow-[0_0_10px_rgba(37,16,229,0.7)]'; // Exact deep dark navy/indigo blue for "S" as in reference image
   
-  const linkColor = lightBg ? '#1e00c8' : '#2e37ff'; // Neon royal blue/indigo matching reference
-  const bridgeColor = lightBg ? '#1e00c8' : '#ffffff'; // contrasting middle link bridge
+  const linkColor = '#2563EB'; // Royal blue for chain link (-)
+  const bridgeColor = '#2563EB'; // Matching royal blue bridge
   
-  const codersColor = lightBg 
-    ? 'text-[#3FA9F5] drop-shadow-[0_0_1.5px_rgba(63,169,245,0.3)]' 
-    : 'text-[#3FA9F5] drop-shadow-[0_0_10px_rgba(63,169,245,0.95)] drop-shadow-[0_0_25px_rgba(63,169,245,0.5)]';
+  const codersColor = 'text-[#38BDF8] font-black drop-shadow-sm'; // Sky Blue for "CODERS"
     
   const subtitleColor = lightBg 
-    ? 'text-[#0C1574] font-bold' 
-    : 'text-[#0df5e3] drop-shadow-[0_0_8px_rgba(13,245,227,0.85)] drop-shadow-[0_0_20px_rgba(13,245,227,0.45)]'; // Neon Teal "Bharath Tech Developers"
+    ? 'text-[#1E293B] font-semibold' 
+    : 'text-slate-200 font-medium'; // "Bharath Tech Developers"
     
-  const sparkleColor = lightBg 
-    ? 'text-black' 
-    : 'text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.9)] drop-shadow-[0_0_25px_rgba(251,191,36,0.5)]';
+  const sparkleColor = 'text-black'; // Black 4-point star as per reference image
 
   return (
     <div 
@@ -113,32 +109,32 @@ export default function Logo({
 
         {/* Link / Socket Symmetrical Icon */}
         <svg
-          viewBox="0 0 40 22"
+          viewBox="0 0 42 22"
           className={`${currentSize.linkSvg} shrink-0 transition-transform duration-300 group-hover:scale-110 ${
-            !lightBg ? 'drop-shadow-[0_0_10px_rgba(46,55,255,0.8)]' : ''
+            !lightBg ? 'drop-shadow-[0_0_8px_rgba(37,99,235,0.6)]' : ''
           }`}
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           {/* Left Link Capsule */}
           <path
-            d="M17 6H10C6.5 6 3.5 8.5 3.5 12C3.5 15.5 6.5 18 10 18H17"
+            d="M18 5H10C6.13401 5 3 8.13401 3 12C3 15.866 6.13401 19 10 19H18"
             stroke={linkColor}
-            strokeWidth="3.2"
+            strokeWidth="3.6"
             strokeLinecap="round"
           />
           {/* Right Link Capsule */}
           <path
-            d="M23 6H30C33.5 6 36.5 8.5 36.5 12C36.5 15.5 33.5 18 30 18H23"
+            d="M24 5H32C37.866 5 41 8.13401 41 12C41 15.866 37.866 19 32 19H24"
             stroke={linkColor}
-            strokeWidth="3.2"
+            strokeWidth="3.6"
             strokeLinecap="round"
           />
           {/* Connecting bridge */}
           <path
-            d="M14 12H26"
+            d="M13 12H29"
             stroke={bridgeColor}
-            strokeWidth="3.2"
+            strokeWidth="3.6"
             strokeLinecap="round"
           />
         </svg>
@@ -153,10 +149,14 @@ export default function Logo({
           <div className={`absolute ${currentSize.sparkleOffset} ${sparkleColor} animate-pulse`}>
             <svg
               viewBox="0 0 24 24"
-              fill="currentColor"
               className={`${currentSize.sparkleSvg} shrink-0 transition-transform duration-500 hover:rotate-90`}
             >
-              <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+              <path 
+                d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" 
+                fill="#000000"
+                stroke={!lightBg ? "#ffffff" : "none"}
+                strokeWidth={!lightBg ? "1.5" : "0"}
+              />
             </svg>
           </div>
         </div>
@@ -168,7 +168,7 @@ export default function Logo({
           {horizontal && (
             <div className={`h-4.5 w-px mr-1 shrink-0 ${lightBg ? 'bg-slate-300' : 'bg-white/20'}`} />
           )}
-          <span className={`font-sans font-bold tracking-wide uppercase transition-colors duration-300 whitespace-nowrap ${subtitleColor} ${
+          <span className={`font-sans font-semibold transition-colors duration-300 whitespace-nowrap ${subtitleColor} ${
             horizontal 
               ? 'text-[11px] sm:text-xs md:text-[13px]' 
               : currentSize.subtitle

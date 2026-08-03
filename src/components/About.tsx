@@ -7,7 +7,7 @@ export default function About() {
     {
       year: '2025',
       title: 'The Spark & Genesis',
-      description: 'Bharath Tech Developers (operating as S-CODERS) was registered and launched in Bengaluru by Suhas Gowda as a high-velocity software engineering agency, initially delivering custom websites and web applications.',
+      description: 'S-CODERS (Bharath Tech Developers) was registered and launched in Bengaluru by Suhas Gowda as a high-velocity software engineering agency, initially delivering custom websites and web applications.',
     },
     {
       year: '2026 (Q1-Q2)',
@@ -43,7 +43,7 @@ export default function About() {
             Pioneering the Future of <span className="text-brand-teal">Software & AI</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            Bharath Tech Developers is an elite software engineering and AI design studio based in Bengaluru. Under our high-fidelity S-CODERS operations, we build actual software systems that optimize workflow pipelines, automate decision loops, and build credible digital authority for high-growth ventures.
+            S-CODERS (Bharath Tech Developers) is an elite software engineering and AI design studio based in Bengaluru. Under our high-fidelity operations, we build actual software systems that optimize workflow pipelines, automate decision loops, and build credible digital authority for high-growth ventures.
           </p>
         </div>
 
@@ -86,7 +86,7 @@ export default function About() {
         <div className="mb-24">
           <div className="text-center mb-12">
             <h3 className="font-display font-bold text-2xl sm:text-3xl text-white mb-2">Our Operating Values</h3>
-            <p className="text-gray-500 text-sm font-mono uppercase tracking-wider">The principles guiding Bharath Tech Developers daily deliverables</p>
+            <p className="text-gray-500 text-sm font-mono uppercase tracking-wider">The principles guiding S-CODERS • Bharath Tech Developers daily deliverables</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {COMPANY_VALUES.map((value, idx) => (

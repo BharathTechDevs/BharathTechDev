@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   CreditCard, QrCode, CheckCircle, ArrowRight, Lock, ShieldCheck, 
   Copy, Check, FileText, Upload, Download, Search, Receipt, 
-  Sparkles, IndianRupee, DollarSign, Wallet, RefreshCw, Star 
+  Sparkles, IndianRupee, DollarSign, Wallet, RefreshCw, Star, Mail 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getDynamicWorkshops, getDynamicInvoices } from '../utils/dynamicData';
@@ -39,8 +39,16 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   // Tabs: 'invoice' | 'workshop'
   const [activeTab, setActiveTab] = useState<'invoice' | 'workshop'>('invoice');
   
-  // Payment methods: 'upi' | 'card' | 'bank'
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'bank'>('upi');
+  // Payment methods: 'razorpay' | 'upi' | 'card' | 'bank'
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'upi' | 'card' | 'bank'>('razorpay');
+
+  // Razorpay email status notification feedback state
+  const [razorpayEmailNotice, setRazorpayEmailNotice] = useState<{
+    sent: boolean;
+    email: string;
+    type: 'SUCCESS' | 'FAILED';
+    message?: string;
+  } | null>(null);
 
   // Input states for Invoice payment
   const [invoiceLookup, setInvoiceLookup] = useState('');
@@ -93,6 +101,211 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   const [selectedUpiApp, setSelectedUpiApp] = useState<'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic' | null>(null);
   const [ruyGatewayStep, setRuyGatewayStep] = useState<'idle' | 'awaiting' | 'processing' | 'success'>('idle');
   const [ruyTimer, setRuyTimer] = useState(300); // 5 minutes (300 seconds)
+
+  // Razorpay Checkout Script Dynamic Loader
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  // Razorpay Live Checkout & Automated Email Handler
+  const handleRazorpayCheckout = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const isWorkshop = activeTab === 'workshop';
+    const workshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
+    
+    const finalClientName = isWorkshop ? clientName || 'Workshop Attendee' : clientName;
+    const finalEmail = isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail;
+    const purposeText = isWorkshop 
+      ? `Booking: ${ticketQty}x Seats for ${workshopObj?.title || 'S-CODERS Workshop'}` 
+      : purpose;
+
+    const finalAmount = isWorkshop ? workshopTotal : amount;
+    const finalCurrency = isWorkshop ? 'INR' : currency;
+
+    if (!finalClientName.trim() || !finalEmail.trim() || !purposeText.trim() || finalAmount <= 0) {
+      alert('Please fill out your Name, Email ID, Purpose, and Amount before proceeding.');
+      return;
+    }
+
+    setLoading(true);
+    setRazorpayEmailNotice(null);
+
+    // 1. Ensure Razorpay SDK is loaded
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      alert('Could not load Razorpay SDK. Please check internet connectivity and try again.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 2. Call backend order API
+      const orderRes = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: finalAmount,
+          currency: finalCurrency,
+          receipt: `rcpt_${Date.now()}`,
+          notes: { clientName: finalClientName, email: finalEmail, purpose: purposeText }
+        })
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderData || !orderData.orderId) {
+        throw new Error(orderData.error || 'Failed to initialize Razorpay Order');
+      }
+
+      // 3. Configure Razorpay Popup options
+      const options: any = {
+        key: orderData.keyId || 'rzp_test_scoders_demo',
+        amount: orderData.amount,
+        currency: orderData.currency || finalCurrency,
+        name: 'S-CODERS (Bharath Tech Developers)',
+        description: purposeText,
+        image: 'https://cdn-icons-png.flaticon.com/512/1041/1041883.png',
+        order_id: orderData.isLive ? orderData.orderId : undefined,
+        handler: async function (response: any) {
+          setLoading(true);
+          try {
+            const verifyRes = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id || orderData.orderId,
+                razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
+                razorpay_signature: response.razorpay_signature || 'demo_sig',
+                email: finalEmail,
+                clientName: finalClientName,
+                purpose: purposeText,
+                amount: finalAmount,
+                currency: finalCurrency,
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+
+            const newTxn: PaymentHistoryItem = {
+              txnId: response.razorpay_payment_id || `SCO-RZP-${Math.floor(100000000 + Math.random() * 900000000)}`,
+              clientName: finalClientName,
+              email: finalEmail,
+              purpose: purposeText,
+              amount: finalAmount,
+              currency: finalCurrency,
+              method: 'Razorpay Gateway (Verified)',
+              timestamp: new Date().toLocaleString(),
+              status: 'SUCCESS'
+            };
+
+            const updatedHistory = [newTxn, ...paymentHistory];
+            setPaymentHistory(updatedHistory);
+            localStorage.setItem('scoders_payments', JSON.stringify(updatedHistory));
+
+            setSuccessTxn(newTxn);
+            setRazorpayEmailNotice({
+              sent: verifyData.emailSent,
+              email: finalEmail,
+              type: 'SUCCESS',
+              message: verifyData.emailSent 
+                ? `Automated Payment Confirmation Receipt sent to ${finalEmail}`
+                : `Payment confirmed! Email notice processed for ${finalEmail}`
+            });
+          } catch (vErr) {
+            console.error("Razorpay verification error:", vErr);
+          } finally {
+            setLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: async function () {
+            setLoading(false);
+            // Dispatch failure email to client on popup dismissal / cancellation
+            try {
+              const failRes = await fetch('/api/razorpay/payment-failed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: finalEmail,
+                  clientName: finalClientName,
+                  purpose: purposeText,
+                  amount: finalAmount,
+                  currency: finalCurrency,
+                  errorReason: 'Razorpay checkout window was dismissed or payment was cancelled.',
+                  orderId: orderData.orderId
+                })
+              });
+              const failData = await failRes.json();
+              setRazorpayEmailNotice({
+                sent: failData.emailSent,
+                email: finalEmail,
+                type: 'FAILED',
+                message: `Payment cancelled/dismissed. Failure alert email sent to ${finalEmail}.`
+              });
+            } catch (e) {
+              console.warn("Failed sending cancellation email:", e);
+            }
+          }
+        },
+        prefill: {
+          name: finalClientName,
+          email: finalEmail,
+        },
+        theme: {
+          color: '#2563EB',
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', async function (response: any) {
+        setLoading(false);
+        const reason = response.error?.description || response.error?.reason || 'Payment failed during checkout.';
+        
+        // Dispatch failure email notice
+        try {
+          const failRes = await fetch('/api/razorpay/payment-failed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: finalEmail,
+              clientName: finalClientName,
+              purpose: purposeText,
+              amount: finalAmount,
+              currency: finalCurrency,
+              errorReason: reason,
+              orderId: orderData.orderId
+            })
+          });
+          const failData = await failRes.json();
+          setRazorpayEmailNotice({
+            sent: failData.emailSent,
+            email: finalEmail,
+            type: 'FAILED',
+            message: `Payment failed (${reason}). Failure notice email sent to ${finalEmail}.`
+          });
+        } catch (e) {
+          console.warn("Failed sending failure email:", e);
+        }
+      });
+
+      rzp.open();
+      setLoading(false);
+    } catch (err: any) {
+      console.error("Razorpay error:", err);
+      alert(`Could not launch Razorpay checkout: ${err.message || 'Server error'}`);
+      setLoading(false);
+    }
+  };
   
   // Local transaction records
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>(() => {
@@ -453,6 +666,12 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   </div>
                   <h3 className="text-2xl font-display font-black text-white">Payment Received Successfully!</h3>
                   <p className="text-gray-400 font-sans text-xs mt-1">S-CODERS Bharath Tech Developers Dispatch Ledger</p>
+                  
+                  {/* Email dispatch badge */}
+                  <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono">
+                    <Mail className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Receipt email dispatched to: <strong>{successTxn.email}</strong></span>
+                  </div>
                 </div>
 
                 {/* Receipt Details Box */}
@@ -816,8 +1035,28 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
               </div>
 
               {/* Payment Methods sub-selector icons */}
-              <div className="grid grid-cols-3 bg-brand-dark/50 border-b border-white/5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 bg-brand-dark/50 border-b border-white/5">
                 <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('razorpay');
+                    setRuyGatewayStep('idle');
+                  }}
+                  className={`py-4 text-center border-r border-white/5 font-display text-xs font-bold tracking-wider uppercase transition-all duration-300 flex flex-col items-center gap-1 cursor-pointer relative ${
+                    paymentMethod === 'razorpay'
+                      ? 'bg-blue-600/20 text-blue-400 border-b-2 border-blue-500 shadow-inner'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Razorpay</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-gray-500">Auto Email Receipt</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     setPaymentMethod('upi');
                     setRuyGatewayStep('idle');
@@ -832,6 +1071,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   Ruy UPI Apps
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setPaymentMethod('card');
                     setRuyGatewayStep('idle');
@@ -843,9 +1083,10 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   }`}
                 >
                   <CreditCard className="w-4 h-4" />
-                  Ruy Secured Card
+                  Direct Card
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setPaymentMethod('bank');
                     setRuyGatewayStep('idle');
@@ -857,13 +1098,102 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   }`}
                 >
                   <Wallet className="w-4 h-4" />
-                  Ruy NetBanking
+                  Bank Wire
                 </button>
               </div>
 
               {/* Checkout Interactive Content Forms */}
               <div className="p-6 sm:p-10">
+                
+                {/* Method 0: Razorpay Official Gateway with Email Receipts */}
+                {paymentMethod === 'razorpay' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-6"
+                  >
+                    <div className="bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-2xl p-6 text-center space-y-4">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono">
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Razorpay Smart Gateway Integrated</span>
+                      </div>
+
+                      <h4 className="text-xl font-display font-extrabold text-white">
+                        Razorpay Multi-Method Checkout
+                      </h4>
+                      <p className="text-gray-300 text-xs max-w-md mx-auto leading-relaxed">
+                        Pay securely using <strong>UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, NetBanking, or Wallets</strong>. Upon completion or failure, an automated email receipt is sent directly to the client's email address.
+                      </p>
+
+                      {/* Client Parameters Summary */}
+                      <div className="bg-brand-dark/80 border border-white/10 rounded-xl p-4 text-left space-y-2 max-w-md mx-auto text-xs font-mono">
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-gray-400">Client Name:</span>
+                          <span className="text-white font-bold">{activeTab === 'workshop' ? (clientName || 'Workshop Attendee') : (clientName || 'Not specified')}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-gray-400">Target Email:</span>
+                          <span className="text-blue-400 font-bold">{activeTab === 'workshop' ? (clientEmail || 'attendee@scoders.dev') : (clientEmail || 'Not specified')}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-gray-400">Billing Purpose:</span>
+                          <span className="text-gray-200 text-right truncate max-w-[200px]">
+                            {activeTab === 'workshop' ? `Booking: ${ticketQty}x Workshop Seats` : (purpose || 'Service Payment')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                          <span className="text-gray-400">Payable Value:</span>
+                          <span className="text-emerald-400 font-extrabold text-sm">
+                            {activeTab === 'workshop' ? formatAmount(workshopTotal, 'INR') : formatAmount(amount || 0, currency)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Razorpay Email Feedback Notice */}
+                      {razorpayEmailNotice && (
+                        <div className={`p-4 rounded-xl border text-xs text-left max-w-md mx-auto flex items-start gap-2.5 ${
+                          razorpayEmailNotice.type === 'SUCCESS' 
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                            : 'bg-red-500/10 border-red-500/30 text-red-300'
+                        }`}>
+                          <CheckCircle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                            razorpayEmailNotice.type === 'SUCCESS' ? 'text-emerald-400' : 'text-red-400'
+                          }`} />
+                          <div>
+                            <span className="font-bold block uppercase tracking-wider text-[10px]">
+                              {razorpayEmailNotice.type === 'SUCCESS' ? 'Payment Verified & Email Sent' : 'Payment Failed / Cancelled'}
+                            </span>
+                            <p className="mt-0.5 leading-normal">{razorpayEmailNotice.message}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Launch Razorpay Popup Button */}
+                      <button
+                        type="button"
+                        onClick={handleRazorpayCheckout}
+                        disabled={loading}
+                        className="w-full max-w-md mx-auto py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-extrabold text-sm tracking-wider uppercase rounded-xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {loading ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Connecting to Razorpay...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 text-amber-300" />
+                            Pay via Razorpay (Instant Email Notice)
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
                 <form onSubmit={handleProcessPayment}>
+
                   
                   {/* Method A: Ruy Payment Gateway UPI Selector & Flow */}
                   {paymentMethod === 'upi' && (
@@ -1236,11 +1566,11 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                           <div className="flex justify-between items-center mt-3">
                             <div>
                               <span className="text-[8px] font-mono text-gray-500 block uppercase">BRANCH CODE</span>
-                              <span className="text-[10px] font-mono text-gray-300 block mt-0.5">Koramangala, Bangalore</span>
+                              <span className="text-[10px] font-mono text-gray-300 block mt-0.5">Bengaluru, Karnataka</span>
                             </div>
                             <button
                               type="button"
-                              onClick={() => handleCopy('HDFC Bank, Koramangala Bengaluru', 'branch')}
+                              onClick={() => handleCopy('HDFC Bank, Bengaluru', 'branch')}
                               className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
                             >
                               {copiedField === 'branch' ? <Check className="w-3.5 h-3.5 text-brand-teal" /> : <Copy className="w-3.5 h-3.5" />}

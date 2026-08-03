@@ -104,13 +104,22 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0, y: 50, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 50, scale: 0.95 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-          className="fixed bottom-6 right-6 w-full max-w-md h-[550px] bg-brand-card/95 border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden backdrop-blur-xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm"
         >
-          {/* Header branding */}
+          {/* Backdrop click to close */}
+          <div className="absolute inset-0" onClick={onClose} />
+
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+            className="relative w-full max-w-lg h-[85vh] max-h-[600px] bg-brand-card/98 border border-white/10 rounded-2xl shadow-2xl flex flex-col z-10 overflow-hidden backdrop-blur-xl"
+          >
+            {/* Header branding */}
           <div className="p-4 bg-brand-dark/80 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 bg-brand-teal/10 rounded-lg text-brand-teal border border-brand-teal/20 animate-pulse">
@@ -221,7 +230,8 @@ export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
             </form>
           </div>
         </motion.div>
-      )}
-    </AnimatePresence>
+      </motion.div>
+    )}
+  </AnimatePresence>
   );
 }

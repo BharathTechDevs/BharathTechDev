@@ -43,7 +43,11 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       key: string;
       name: string;
       email: string;
-      purpose: string;
+      purpose?: string;
+      role?: string;
+      requirements?: string;
+      budget?: string;
+      timeline?: string;
       timestamp: string;
     }
   }>(() => {
@@ -113,6 +117,91 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     saveDynamicServices(updated);
     setEditingServiceId(null);
     window.dispatchEvent(new Event('scoders_data_change'));
+  };
+
+  // Feedback state initialized from localStorage / DatabaseEngine with fallback
+  const [feedbacks, setFeedbacks] = useState(() => {
+    try {
+      const saved = localStorage.getItem('scoders_feedbacks');
+      if (saved) return JSON.parse(saved);
+      const dbFeeds = DatabaseEngine.getFeedbacks();
+      if (dbFeeds && dbFeeds.length > 0) return dbFeeds;
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      {
+        id: 'FDB-SVC-01',
+        type: 'service',
+        clientName: 'AgroSmart Billing',
+        clientEmail: 'billing@agrosmart.in',
+        registrationId: 'REG-SVC-1001',
+        rating: 5,
+        review: 'The AI orchestration built by S-CODERS has completely optimized our diagnosis turnaround. Incredible expertise in the Gemini SDK and stateful agents!',
+        submissionDate: '2026-07-14'
+      },
+      {
+        id: 'FDB-SVC-02',
+        type: 'service',
+        clientName: 'EdVantage LMS Group',
+        clientEmail: 'contact@edvantage.io',
+        registrationId: 'REG-SVC-1002',
+        rating: 5,
+        review: 'S-CODERS delivered our Next.js multi-tenant platform in under 3 weeks. Prathiksha and Suhas ensured top-tier UI fidelity and seamless database integration.',
+        submissionDate: '2026-07-20'
+      },
+      {
+        id: 'FDB-SVC-03',
+        type: 'service',
+        clientName: 'Ketan Deshmukh',
+        clientEmail: 'ketan@ruralagritech.org',
+        registrationId: 'REG-SVC-1003',
+        rating: 5,
+        review: 'Working with Suhas and the team was an absolute pleasure. High communication, clean architecture, and transparent milestone updates.',
+        submissionDate: '2026-07-28'
+      }
+    ];
+  });
+
+  // Feedback form states
+  const [feedAuthorName, setFeedAuthorName] = useState('');
+  const [feedRole, setFeedRole] = useState('Client Partner');
+  const [feedContent, setFeedContent] = useState('');
+  const [feedRating, setFeedRating] = useState<number>(5);
+  const [feedSubmitSuccess, setFeedSubmitSuccess] = useState(false);
+
+  const handlePostServiceFeedback = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedAuthorName.trim() || !feedContent.trim()) return;
+
+    const newFeed = {
+      id: 'FDB-SVC-' + Date.now().toString(),
+      type: 'service' as const,
+      clientName: feedAuthorName.trim(),
+      clientEmail: currentUser?.email || `${feedAuthorName.toLowerCase().replace(/\s+/g, '')}@client.in`,
+      registrationId: 'REG-SVC-' + Date.now().toString().slice(-4),
+      rating: feedRating,
+      review: feedContent.trim(),
+      submissionDate: new Date().toISOString().split('T')[0]
+    };
+
+    const updated = [newFeed, ...feedbacks];
+    setFeedbacks(updated);
+    localStorage.setItem('scoders_feedbacks', JSON.stringify(updated));
+
+    try {
+      DatabaseEngine.saveFeedbacks(updated);
+    } catch (err) {
+      console.error("Failed to save feedback to DatabaseEngine:", err);
+    }
+
+    // Reset Form
+    setFeedAuthorName('');
+    setFeedRole('Client Partner');
+    setFeedContent('');
+    setFeedRating(5);
+    setFeedSubmitSuccess(true);
+    setTimeout(() => setFeedSubmitSuccess(false), 4000);
   };
   
   const [formSubmitted, setFormSubmitted] = useState<boolean>(false);
@@ -411,7 +500,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             Elite Capabilities, <span className="text-brand-teal">Custom Engineered</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            Bharath Tech Developers translates complex software architectures and agent logic into elegant commercial assets. Explore our solutions.
+            S-CODERS • Bharath Tech Developers translates complex software architectures and agent logic into elegant commercial assets. Explore our solutions.
           </p>
         </div>
 
@@ -576,6 +665,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                             setRegisteringService(service);
                             setModalMode('register');
                             setRegSuccessKey(null);
+                            setInputtedKey('');
+                            setKeyError(null);
                           }
                         }}
                         className="w-full py-2.5 bg-white/5 hover:bg-brand-teal/10 text-gray-300 hover:text-brand-teal border border-white/10 hover:border-brand-teal/30 font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer"
@@ -604,10 +695,10 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-10">
               <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white mb-2">
-                Browse Shipped Projects & Request Yours
+                Shipped Systems & Portfolio Showcase
               </h3>
               <p className="text-gray-400 text-sm font-sans font-light max-w-2xl mx-auto">
-                Select a software category below to view live custom systems built previously by S-CODERS, then write down your criteria directly below to initiate a rapid blueprint quotation!
+                Explore custom software systems engineered and delivered by S-CODERS • Bharath Tech Developers across mobile, web, and single-page architectures.
               </p>
             </div>
 
@@ -691,173 +782,168 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               </AnimatePresence>
             </div>
 
-            {/* Integrated Requirement Form right below the project cards */}
+            {/* Feedback section replacing the redundant bottom app registration form */}
             <div className="bg-brand-dark/40 border border-white/5 rounded-2xl p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20">
-                  <ClipboardCheck className="w-5 h-5" />
+                  <MessageSquare className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="font-display font-bold text-lg text-white">
-                    Submit a {activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Web Platform' : 'Landing Page'} Project Brief
+                    Client Feedback & Service Reviews
                   </h4>
-                  <p className="text-gray-500 text-xs font-sans">Get an S-CODERS cost and technical estimation draft within 24 hours.</p>
+                  <p className="text-gray-500 text-xs font-sans">
+                    Verified testimonials and reviews from clients and partners using S-CODERS services.
+                  </p>
                 </div>
               </div>
 
-              {formSubmitted ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-brand-teal/5 border border-brand-teal/20 rounded-xl p-6 text-center font-sans"
-                >
-                  <div className="w-12 h-12 bg-brand-teal/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-brand-teal/20">
-                    <CheckCircle className="w-6 h-6 text-brand-teal" />
-                  </div>
-                  <h5 className="font-display font-bold text-white text-lg mb-2">Requirements Logged Successfully!</h5>
-                  <p className="text-gray-400 text-sm font-sans font-light max-w-md mx-auto mb-4 leading-relaxed">
-                    Thank you <span className="text-white font-bold">{clientName}</span>. Suhas Gowda and the Bharath Tech Developers team have received your {activeTab} outline. We will review the specs and connect with you shortly!
-                  </p>
-
-                  {/* Immediate payment integration */}
-                  <div className="my-6 p-5 bg-brand-dark/50 border border-white/5 rounded-2xl max-w-md mx-auto text-left space-y-3">
-                    <div className="flex items-center gap-2 text-brand-teal font-mono text-[10px] font-bold tracking-widest uppercase">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      FAST-TRACK YOUR QUEUE
-                    </div>
-                    <h6 className="font-display font-bold text-white text-sm">Secure Your Dev Queue Slot</h6>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Initialize an immediate Project Startup Deposit to elevate your queue ranking and immediately lock in Suhas's engineering band for this {activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Web Platform' : 'Landing Page'}.
-                    </p>
-                    
-                    <div className="bg-white/5 p-3 rounded-lg border border-white/5 space-y-1">
-                      <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest font-bold">Specify Deposit Amount (₹)</label>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-mono text-brand-teal font-bold">₹</span>
-                        <input
-                          type="number"
-                          value={depositAmount}
-                          onChange={(e) => setDepositAmount(Number(e.target.value))}
-                          className="w-full bg-transparent text-sm text-white focus:outline-none font-mono font-bold"
-                          placeholder="10000"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => onPayDeposit && onPayDeposit({
-                        clientName,
-                        email,
-                        category: activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Web Platform' : 'Landing Page',
-                        amount: depositAmount
-                      })}
-                      className="w-full py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              {/* List of existing service reviews */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <AnimatePresence mode="popLayout">
+                  {feedbacks.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="col-span-2 text-center py-8 bg-white/5 border border-white/5 rounded-2xl"
                     >
-                      Pay Startup Deposit of ₹{depositAmount.toLocaleString()} Online
-                      <ArrowUpRight className="w-4 h-4" />
-                    </button>
-                  </div>
+                      <p className="text-gray-500 text-sm font-sans font-light">
+                        No service feedback logged yet. Be the first client to share your project experience!
+                      </p>
+                    </motion.div>
+                  ) : (
+                    feedbacks.map((fb: any) => (
+                      <motion.div
+                        key={fb.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-brand-dark/60 border border-white/5 p-5 rounded-2xl flex flex-col justify-between"
+                      >
+                        <div>
+                          {/* Rating stars display */}
+                          <div className="flex gap-1 text-brand-teal mb-2.5">
+                            {Array.from({ length: fb.rating || 5 }).map((_, i) => (
+                              <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                            ))}
+                          </div>
+                          <p className="text-gray-300 text-xs sm:text-sm font-sans font-light italic leading-relaxed mb-4">
+                            "{fb.review}"
+                          </p>
+                        </div>
 
-                  <button
-                    onClick={() => setFormSubmitted(false)}
-                    className="px-5 py-2.5 bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 font-bold text-xs rounded-full font-mono uppercase tracking-wider transition-colors cursor-pointer"
-                  >
-                    Submit Another Option
-                  </button>
-                </motion.div>
-              ) : (
-                <form onSubmit={handleFormSubmit} className="space-y-4">
+                        {/* Author Details */}
+                        <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+                          <div className="w-8 h-8 rounded-full bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center text-brand-teal text-xs font-bold font-mono">
+                            {(fb.clientName || 'C').charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-white">{fb.clientName}</div>
+                            <div className="text-[10px] font-mono text-gray-500">{fb.registrationId || 'Verified Client'}</div>
+                          </div>
+                          <span className="text-[10px] font-mono text-gray-600 ml-auto">{fb.submissionDate}</span>
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Feedback Form */}
+              <div className="bg-brand-dark/60 border border-white/5 rounded-xl p-5 sm:p-6">
+                <h5 className="font-display font-bold text-sm sm:text-base text-white mb-1">
+                  Have you worked with S-CODERS? Share Your Feedback!
+                </h5>
+                <p className="text-gray-400 text-xs font-sans mb-5">
+                  Your feedback helps us continuously elevate our AI, Web, and Mobile software engineering standards.
+                </p>
+
+                <form onSubmit={handlePostServiceFeedback} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[11px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Your Name *</label>
+                      <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">
+                        Your Name *
+                      </label>
                       <input
                         type="text"
                         required
-                        value={clientName}
-                        onChange={(e) => setClientName(e.target.value)}
-                        placeholder="e.g. Suhas M"
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                        value={feedAuthorName}
+                        onChange={(e) => setFeedAuthorName(e.target.value)}
+                        placeholder="e.g. Suhas M or Company Name"
+                        className="w-full bg-brand-dark/80 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Your Email *</label>
+                      <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">
+                        Role / Designation *
+                      </label>
                       <input
-                        type="email"
+                        type="text"
                         required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. customer@domain.com"
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                        value={feedRole}
+                        onChange={(e) => setFeedRole(e.target.value)}
+                        placeholder="e.g. Client Partner / Product Owner"
+                        className="w-full bg-brand-dark/80 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Describe Your Requirements *</label>
+                    <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">
+                      Rating out of 5 Stars *
+                    </label>
+                    <div className="flex gap-1 py-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setFeedRating(star)}
+                          className={`p-1 hover:scale-110 transition-all cursor-pointer ${
+                            feedRating >= star ? 'text-brand-teal' : 'text-gray-700'
+                          }`}
+                        >
+                          <Star className="w-5 h-5 fill-current" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">
+                      Describe Your Service Feedback / Experience *
+                    </label>
                     <textarea
                       required
                       rows={3}
-                      value={requirements}
-                      onChange={(e) => setRequirements(e.target.value)}
-                      placeholder={`What are the main features you want inside your ${activeTab}? Any specific AI integrations, APIs, or database preferences?`}
-                      className="w-full bg-brand-dark/50 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors resize-none"
+                      value={feedContent}
+                      onChange={(e) => setFeedContent(e.target.value)}
+                      placeholder="Share details about the service delivered by S-CODERS (e.g. AI Agent, Mobile App, Website performance, communication)..."
+                      className="w-full bg-brand-dark/80 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors resize-none"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Approximate Budget (Optional)</label>
-                      <input
-                        type="text"
-                        value={budget}
-                        onChange={(e) => setBudget(e.target.value)}
-                        placeholder="e.g. ₹50,000 or $2,500"
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Target Timeline (Optional)</label>
-                      <input
-                        type="text"
-                        value={timeline}
-                        onChange={(e) => setTimeline(e.target.value)}
-                        placeholder="e.g. 3 Weeks / 2 Months"
-                        className="w-full bg-brand-dark/50 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-2">
+                  <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="w-full sm:w-auto px-6 py-3.5 bg-brand-teal text-brand-dark font-bold rounded-lg hover:bg-white active:scale-95 transition-all duration-300 text-sm flex items-center justify-center gap-2 group cursor-pointer"
+                      className="px-5 py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-bold rounded-lg transition-colors text-xs uppercase tracking-wider font-mono flex items-center gap-1.5 cursor-pointer"
                     >
-                      Log Project Specs
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      Send Service Testimonial
+                      <Send className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </form>
-              )}
-            </div>
 
-            {/* List saved enquiries if present for high-fidelity confirmation */}
-            {savedEnquiries.length > 0 && (
-              <div className="mt-8 pt-8 border-t border-white/5">
-                <div className="text-xs font-mono text-gray-500 uppercase tracking-wider mb-3">Your Session's Logged Enquiries ({savedEnquiries.length})</div>
-                <div className="space-y-3 max-h-32 overflow-y-auto pr-2">
-                  {savedEnquiries.map((enq) => (
-                    <div key={enq.id} className="text-xs bg-white/5 border border-white/5 p-3 rounded-lg flex items-center justify-between">
-                      <div>
-                        <span className="font-mono text-brand-teal font-bold mr-2">[{enq.category.toUpperCase()}]</span>
-                        <span className="text-gray-300 font-medium">{enq.requirements.substring(0, 60)}...</span>
-                      </div>
-                      <span className="text-gray-500 font-mono text-[10px]">{enq.timestamp}</span>
-                    </div>
-                  ))}
-                </div>
+                {feedSubmitSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 p-3 bg-brand-teal/10 rounded-lg border border-brand-teal/20 text-xs text-brand-teal text-center font-semibold"
+                  >
+                    Feedback submitted successfully! Thank you for reviewing S-CODERS services.
+                  </motion.div>
+                )}
               </div>
-            )}
+            </div>
 
           </div>
         </div>
@@ -962,7 +1048,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                     <div className="grid grid-cols-2 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20">
                       <button
                         type="button"
-                        onClick={() => { setModalMode('register'); setKeyError(null); }}
+                        onClick={() => { setModalMode('register'); setKeyError(null); setInputtedKey(''); }}
                         className={`py-2 text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
                           modalMode === 'register' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
@@ -971,7 +1057,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setModalMode('enterKey'); setKeyError(null); }}
+                        onClick={() => { setModalMode('enterKey'); setKeyError(null); setInputtedKey(''); }}
                         className={`py-2 text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
                           modalMode === 'enterKey' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
@@ -1076,14 +1162,6 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       </form>
                     ) : (
                       <form onSubmit={handleVerifyKey} className="space-y-4 font-sans">
-                        <div className="bg-white/5 p-4 rounded-xl border border-white/5 text-xs text-gray-400 space-y-1.5">
-                          <p className="font-bold text-gray-300">Format Guide:</p>
-                          <p>Access keys for this service follow a unique crypt-signature layout:</p>
-                          <code className="block p-1.5 bg-brand-dark/75 rounded text-brand-teal font-mono">
-                            BTD-SERV-{registeringService.id.substring(0, 4).toUpperCase()}-XXXX-XXXX
-                          </code>
-                        </div>
-
                         <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Enter Dispatch Key *</label>
                           <input
@@ -1126,7 +1204,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       <AnimatePresence>
         {activeWorkspaceService && (() => {
           const serviceId = activeWorkspaceService.id;
-          const regInfo = registeredKeys[serviceId] || { key: 'BTD-SERV-DEMO-KEY', name: 'Developer Mode' };
+          const regInfo = registeredKeys[serviceId] || { key: 'ENTER-KEY-TO-VERIFY', name: currentUser?.name || 'Authorized Client' };
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1880,7 +1958,7 @@ function ApiClientPlayground() {
           status: 'success',
           usersCount: 4,
           results: [
-            { id: 'usr_879a', name: 'Bhuvan M', role: 'Premium Client', company: 'Bharath Tech Developers' },
+            { id: 'usr_879a', name: 'Bhuvan M', role: 'Premium Client', company: 'S-CODERS • Bharath Tech Developers' },
             { id: 'usr_102d', name: 'Suhas Gowda', role: 'System Admin', company: 'S-CODERS HQ' },
             { id: 'usr_443c', name: 'Aishwarya S', role: 'Instructor Lead', company: 'Microsoft Reactor' },
             { id: 'usr_901e', name: 'Manoj Kumar', role: 'Developer Lead', company: 'S-CODERS Core' }
@@ -2192,7 +2270,7 @@ function ConsultancyAdvisorPlayground() {
 
 ---
 
-*Prepared by Suhas Gowda & the Bharath Tech Developers technical board.*`;
+*Prepared by Suhas Gowda & the S-CODERS • Bharath Tech Developers technical board.*`;
 
     let cursor = 0;
     const interval = setInterval(() => {

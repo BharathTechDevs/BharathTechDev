@@ -3,7 +3,7 @@ import {
   Calendar, MapPin, Users, Award, Sparkles, MessageSquare, 
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
-  ShieldCheck, CreditCard, Wallet, Upload
+  ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { INITIAL_COMMENTS } from '../data';
@@ -820,7 +820,7 @@ export default function TenantDashboard() {
             Workshops & Classroom Portal
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            Bharath Tech Developers is heavily active in Bengaluru's academic and development circles. View our seminars, register to access live sandboxes, and download blueprints.
+            S-CODERS • Bharath Tech Developers is heavily active in Bengaluru's academic and development circles. View our seminars, register to access live sandboxes, and download blueprints.
           </p>
         </div>
 
@@ -854,10 +854,14 @@ export default function TenantDashboard() {
                 <span className="font-display font-bold text-white text-base leading-snug mb-2 group-hover:text-brand-teal transition-colors">
                   {w.title}
                 </span>
-                <div className="flex items-center gap-3 text-xs text-gray-500 font-mono mt-auto">
+                <div className="flex items-center justify-between text-xs text-gray-500 font-mono mt-auto flex-wrap gap-y-1">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-brand-coral" />
                     {w.date}
+                  </span>
+                  <span className="flex items-center gap-1 text-amber-400 font-bold text-[10px]">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    {w.startTime || '10:00 AM IST'} • {w.duration || '2 Days'}
                   </span>
                 </div>
               </button>
@@ -890,13 +894,21 @@ export default function TenantDashboard() {
                   
                   {/* Badge & Meta overlay */}
                   <div className="absolute bottom-6 left-6 right-6 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 text-xs font-mono text-white">
+                    <div className="flex items-center gap-3 text-xs font-mono text-white flex-wrap">
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-brand-teal/30 text-brand-teal font-semibold">
+                        <Calendar className="w-3.5 h-3.5 text-brand-teal" />
+                        {activeWorkshop.date}
+                      </span>
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-amber-400/30 text-amber-300 font-bold">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        Start: {activeWorkshop.startTime || '10:00 AM IST'}
+                      </span>
                       <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-white/10">
                         <MapPin className="w-3.5 h-3.5 text-brand-coral" />
                         {activeWorkshop.location}
                       </span>
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-white/10 text-brand-teal">
-                        <Users className="w-3.5 h-3.5" />
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-white/10 text-gray-300">
+                        <Users className="w-3.5 h-3.5 text-brand-teal" />
                         {activeWorkshop.attendees}+ Attendees
                       </span>
                     </div>
@@ -905,7 +917,12 @@ export default function TenantDashboard() {
 
                 {/* Event Summary Details */}
                 <div className="p-8 sm:p-10">
-                  <span className="text-xs font-mono text-brand-teal uppercase tracking-widest block mb-2">{activeWorkshop.category}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-mono text-brand-teal uppercase tracking-widest">{activeWorkshop.category}</span>
+                    <span className="text-xs font-mono text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                      Duration: {activeWorkshop.duration || '2 Days (8 Hours Total)'}
+                    </span>
+                  </div>
                   <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white tracking-tight mb-4">
                     {activeWorkshop.title}
                   </h3>
@@ -926,6 +943,57 @@ export default function TenantDashboard() {
                           <p className="text-gray-300 text-xs sm:text-sm font-sans font-light leading-relaxed">{ach}</p>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* WORKSHOP DETAILS: Tools Used & Useful Learning Outcomes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+                    {/* BEFORE YOU JOIN: INCLUDE & WHAT YOU'LL NEED */}
+                    <div className="bg-brand-dark/60 border border-white/10 rounded-2xl p-5 space-y-3">
+                      <h4 className="font-display font-bold text-xs uppercase tracking-wider text-brand-teal flex items-center gap-2">
+                        <Wrench className="w-4 h-4 text-brand-teal" />
+                        Before You Join — Include & What You'll Need
+                      </h4>
+                      <p className="text-[11px] text-gray-400 font-sans leading-relaxed">
+                        Tech stack, frameworks, & tools used during hands-on sessions:
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {(activeWorkshop.toolsUsed || ['React', 'TypeScript', 'Node.js', 'n8n', 'Gemini API']).map((tool, idx) => (
+                          <span key={idx} className="px-2.5 py-1 bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono rounded-lg flex items-center gap-1.5 font-semibold">
+                            <Cpu className="w-3 h-3 text-brand-teal shrink-0" />
+                            {tool}
+                          </span>
+                        ))}
+                      </div>
+                      {activeWorkshop.prerequisites && (
+                        <div className="pt-2 border-t border-white/5 mt-3">
+                          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block mb-1">Prerequisites Needed:</span>
+                          <p className="text-xs text-gray-300 font-sans leading-relaxed">{activeWorkshop.prerequisites}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* WHAT WILL BE USEFUL OF THE WORKSHOP */}
+                    <div className="bg-brand-dark/60 border border-white/10 rounded-2xl p-5 space-y-3">
+                      <h4 className="font-display font-bold text-xs uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-amber-400" />
+                        What Will Be Useful / Key Learning Benefits
+                      </h4>
+                      <p className="text-[11px] text-gray-400 font-sans leading-relaxed">
+                        Career growth, practical skills & outcomes you acquire:
+                      </p>
+                      <ul className="space-y-2 pt-1">
+                        {(activeWorkshop.usefulness || [
+                          'Master core full-stack software development workflows',
+                          'Build real-world production prototypes live during class',
+                          'Receive official S-CODERS • Bharath Tech Developers Certification'
+                        ]).map((outcome, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-xs text-gray-300 font-sans">
+                            <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <span>{outcome}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
 
@@ -1146,44 +1214,6 @@ export default function TenantDashboard() {
                             Enter Existing Pass Key
                           </button>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Standard Invoice Pass Booking Display for pricing */}
-                  {!isRegistered && (
-                    <div className="pt-8 mt-8 border-t border-white/5 space-y-4">
-                      <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Standard Pass Booking (INR)</span>
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 text-xs">
-                        <div>
-                          <p className="font-bold text-white text-sm">₹{(activeWorkshop.price ?? 1499).toLocaleString()} per Seat</p>
-                          <p className="text-gray-500 mt-0.5">Includes physical seat invitation and session snacks.</p>
-                        </div>
-                        <div className="flex items-center gap-3 bg-brand-dark border border-white/10 px-3 py-1.5 rounded-lg">
-                          <span className="font-mono text-gray-400">Seats:</span>
-                          <button onClick={() => setSeatCount(prev => Math.max(1, prev - 1))} className="p-1 text-gray-500 hover:text-white cursor-pointer"><Minus className="w-3 h-3" /></button>
-                          <span className="font-mono font-bold text-white px-1">{seatCount}</span>
-                          <button onClick={() => setSeatCount(prev => prev + 1)} className="p-1 text-gray-500 hover:text-white cursor-pointer"><Plus className="w-3 h-3" /></button>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-brand-teal/5 border border-brand-teal/15 p-4 rounded-2xl">
-                        <div className="text-left w-full sm:w-auto">
-                          <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Total Pass Due</span>
-                          <p className="font-display font-bold text-white text-base">₹{( (activeWorkshop.price ?? 1499) * seatCount ).toLocaleString()}</p>
-                        </div>
-                        <button
-                          onClick={() => onBookWorkshop && onBookWorkshop({
-                            workshopId: activeWorkshop.id,
-                            title: activeWorkshop.title,
-                            seats: seatCount,
-                            totalAmount: (activeWorkshop.price ?? 1499) * seatCount
-                          })}
-                          className="w-full sm:w-auto px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                        >
-                          Book Tickets Online
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   )}
@@ -1927,7 +1957,7 @@ export default function TenantDashboard() {
                                   <span className="text-[7px] font-mono text-gray-500 block">BRANCH</span>
                                   <button
                                     type="button"
-                                    onClick={() => handleCopy('HDFC Bank, Koramangala Bengaluru', 'branch')}
+                                    onClick={() => handleCopy('HDFC Bank, Bengaluru', 'branch')}
                                     className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
                                   >
                                     {copiedField === 'branch' ? <Check className="w-3 h-3 text-brand-teal" /> : <Copy className="w-3 h-3" />}
@@ -2199,14 +2229,6 @@ export default function TenantDashboard() {
                       </div>
                     ) : (
                       <form onSubmit={handleVerifyManualKey} className="space-y-3.5 font-sans">
-                        <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-[10px] text-gray-400 space-y-1">
-                          <p className="font-bold text-gray-300">Format Guide:</p>
-                          <p>Session passes follow our unique crypt-signature layout:</p>
-                          <code className="block p-1 bg-brand-dark/75 rounded text-brand-teal font-mono text-[9px] truncate">
-                            BTD-WKSP-{activeWorkshop.id.toUpperCase()}-XXXX-XXXX
-                          </code>
-                        </div>
-
                         <div>
                           <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Enter Session Pass Key *</label>
                           <input

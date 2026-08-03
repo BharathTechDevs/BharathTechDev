@@ -443,19 +443,23 @@ const SEED_WORKSHOPS_REG: WorkshopRegistration[] = [
 
 export class DatabaseEngine {
   private static getStored<T>(key: string, defaultValue: T): T {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
         return JSON.parse(saved);
-      } catch (e) {
-        console.error(`Error parsing db collection [${key}]`, e);
       }
+    } catch (e) {
+      console.error(`Error reading db collection [${key}]`, e);
     }
     return defaultValue;
   }
 
   private static setStored<T>(key: string, value: T): void {
-    localStorage.setItem(key, JSON.stringify(value));
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(`Error writing db collection [${key}]`, e);
+    }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('scoders_db_change'));
       window.dispatchEvent(new Event('scoders_data_change'));

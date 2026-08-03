@@ -1,4 +1,4 @@
-import { Service, WorkshopEvent, ServiceEnquiry, GeneralMessage, NetworkingAchievement } from '../types';
+import { Service, WorkshopEvent, NetworkingAchievement } from '../types';
 import { SERVICES, WORKSHOP_EVENTS } from '../data';
 
 export interface DynamicInvoice {
@@ -33,19 +33,23 @@ const DEFAULT_INVOICES: DynamicInvoice[] = [
 ];
 
 export function getDynamicServices(): Service[] {
-  const saved = localStorage.getItem('scoders_dynamic_services');
-  if (saved) {
-    try {
+  try {
+    const saved = localStorage.getItem('scoders_dynamic_services');
+    if (saved) {
       return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
     }
+  } catch (e) {
+    console.error('Error loading dynamic services:', e);
   }
   return SERVICES;
 }
 
 export function saveDynamicServices(services: Service[]): void {
-  localStorage.setItem('scoders_dynamic_services', JSON.stringify(services));
+  try {
+    localStorage.setItem('scoders_dynamic_services', JSON.stringify(services));
+  } catch (e) {
+    console.error('Error saving dynamic services:', e);
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
     window.dispatchEvent(new Event('scoders_data_change'));
@@ -53,19 +57,23 @@ export function saveDynamicServices(services: Service[]): void {
 }
 
 export function getDynamicWorkshops(): WorkshopEvent[] {
-  const saved = localStorage.getItem('scoders_dynamic_workshops');
-  if (saved) {
-    try {
+  try {
+    const saved = localStorage.getItem('scoders_dynamic_workshops');
+    if (saved) {
       return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
     }
+  } catch (e) {
+    console.error('Error loading dynamic workshops:', e);
   }
   return WORKSHOP_EVENTS;
 }
 
 export function saveDynamicWorkshops(workshops: WorkshopEvent[]): void {
-  localStorage.setItem('scoders_dynamic_workshops', JSON.stringify(workshops));
+  try {
+    localStorage.setItem('scoders_dynamic_workshops', JSON.stringify(workshops));
+  } catch (e) {
+    console.error('Error saving dynamic workshops:', e);
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
     window.dispatchEvent(new Event('scoders_data_change'));
@@ -73,19 +81,23 @@ export function saveDynamicWorkshops(workshops: WorkshopEvent[]): void {
 }
 
 export function getDynamicInvoices(): DynamicInvoice[] {
-  const saved = localStorage.getItem('scoders_dynamic_invoices');
-  if (saved) {
-    try {
+  try {
+    const saved = localStorage.getItem('scoders_dynamic_invoices');
+    if (saved) {
       return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
     }
+  } catch (e) {
+    console.error('Error loading dynamic invoices:', e);
   }
   return DEFAULT_INVOICES;
 }
 
 export function saveDynamicInvoices(invoices: DynamicInvoice[]): void {
-  localStorage.setItem('scoders_dynamic_invoices', JSON.stringify(invoices));
+  try {
+    localStorage.setItem('scoders_dynamic_invoices', JSON.stringify(invoices));
+  } catch (e) {
+    console.error('Error saving dynamic invoices:', e);
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
     window.dispatchEvent(new Event('scoders_data_change'));
@@ -98,7 +110,7 @@ const DEFAULT_NETWORKING_ACHIEVEMENTS: NetworkingAchievement[] = [
     title: 'Generative AI Hackathon Showcase',
     eventDate: 'June 25, 2026',
     type: 'conducted',
-    location: 'Koramangala Innovators Hub, Bengaluru',
+    location: 'Bengaluru Tech Hub, Bengaluru',
     description: 'Suhas Gowda demonstrating autonomous AI pipelines using the Gemini 3.5 Flash model during our weekly developers breakout session.',
     image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500',
     attendeesCount: 120,
@@ -144,21 +156,24 @@ const DEFAULT_NETWORKING_ACHIEVEMENTS: NetworkingAchievement[] = [
 ];
 
 export function getDynamicNetworking(): NetworkingAchievement[] {
-  const saved = localStorage.getItem('scoders_dynamic_networking');
-  if (saved) {
-    try {
+  try {
+    const saved = localStorage.getItem('scoders_dynamic_networking');
+    if (saved) {
       return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
     }
+  } catch (e) {
+    console.error('Error loading dynamic networking:', e);
   }
   return DEFAULT_NETWORKING_ACHIEVEMENTS;
 }
 
 export function saveDynamicNetworking(items: NetworkingAchievement[]): void {
-  localStorage.setItem('scoders_dynamic_networking', JSON.stringify(items));
+  try {
+    localStorage.setItem('scoders_dynamic_networking', JSON.stringify(items));
+  } catch (e) {
+    console.error('Error saving dynamic networking:', e);
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
   }
 }
-

@@ -3,7 +3,7 @@ import {
   Camera, Calendar, MapPin, Users, Sparkles, Check, Trophy, 
   Plus, Award, ShieldCheck, Image as ImageIcon, Upload, Filter, ArrowRight, Eye
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Variants } from 'motion/react';
 import { getDynamicNetworking, saveDynamicNetworking } from '../utils/dynamicData';
 import { NetworkingAchievement } from '../types';
 
@@ -121,7 +121,7 @@ export default function Networking() {
   });
 
   // Tasteful minimal animation definitions
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -132,14 +132,14 @@ export default function Networking() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 12 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
         duration: 0.4,
-        ease: [0.215, 0.61, 0.355, 1.0] // Clean easeOutCubic
+        ease: "easeOut"
       }
     }
   };
@@ -164,7 +164,7 @@ export default function Networking() {
               Live Credibility Engine
             </div>
             <h2 className="font-display font-black text-white text-4xl sm:text-5xl leading-tight tracking-tight">
-              Networking & <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-teal to-white">Achievements</span>
+              Networking & <span className="text-brand-teal drop-shadow-[0_0_20px_rgba(34,211,238,0.4)] font-black">Achievements</span>
             </h2>
             <p className="text-gray-400 text-sm sm:text-base font-sans font-light leading-relaxed">
               We attend, speak, and host developer chapters across Bangalore's premier technology accelerators. Here is our unaltered, real-time photographic ledger building transparent client trust.

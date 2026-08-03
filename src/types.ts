@@ -35,6 +35,7 @@ export interface WorkshopEvent {
   id: string;
   title: string;
   date: string;
+  startTime?: string;
   location: string;
   summary: string;
   achievements: string[];
@@ -42,6 +43,10 @@ export interface WorkshopEvent {
   category: string;
   attendees: number;
   price?: number;
+  duration?: string;
+  toolsUsed?: string[];
+  usefulness?: string[];
+  prerequisites?: string;
 }
 
 export interface StartupCommunity {

@@ -85,7 +85,7 @@ export default function Header({
       id="app-header"
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-[#0B0C10]/95 backdrop-blur-md border-b border-white/5 py-4 shadow-lg'
+          ? 'bg-[#011425]/90 backdrop-blur-md border-b border-[#5C7C89]/20 py-4 shadow-xl'
           : 'bg-transparent py-6'
       }`}
     >
@@ -111,8 +111,8 @@ export default function Header({
               onClick={() => { onViewChange('home'); window.scrollTo(0, 0); }}
               className={`px-4 py-2 rounded-xl text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
                 currentView === 'home'
-                  ? 'text-brand-teal bg-white/5 border border-white/5'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  ? 'text-white bg-[#1F4959] border border-[#5C7C89]/30'
+                  : 'text-slate-300 hover:text-white hover:bg-[#1F4959]/50'
               }`}
             >
               Home
@@ -132,12 +132,12 @@ export default function Header({
                   <button
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
                       isOpen || groupActive
-                        ? 'text-brand-teal bg-white/5 border border-white/5'
-                        : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        ? 'text-white bg-[#1F4959] border border-[#5C7C89]/30'
+                        : 'text-slate-300 hover:text-white hover:bg-[#1F4959]/50'
                     }`}
                   >
                     <span>{group.label}</span>
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isOpen ? 'rotate-180 text-brand-teal' : 'text-gray-500'}`} />
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isOpen ? 'rotate-180 text-[#5C7C89]' : 'text-slate-400'}`} />
                   </button>
  
                   {/* High-Fidelity Dropdown Sub-menu */}
@@ -148,9 +148,9 @@ export default function Header({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         transition={{ duration: 0.15, ease: 'easeOut' }}
-                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 bg-brand-card border border-white/10 rounded-2xl p-4 shadow-2xl z-50 backdrop-blur-xl"
+                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 bg-[#1F4959] border border-[#5C7C89]/30 rounded-2xl p-4 shadow-2xl z-50 backdrop-blur-xl"
                       >
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-2.5 h-2.5 rotate-45 bg-brand-card border-t border-l border-white/10" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-2.5 h-2.5 rotate-45 bg-[#1F4959] border-t border-l border-[#5C7C89]/30" />
                         
                         <div className="space-y-1 relative z-10">
                           {group.items.map((item) => {

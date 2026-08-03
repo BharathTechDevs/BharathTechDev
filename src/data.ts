@@ -192,6 +192,7 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
     id: 'w-1',
     title: 'Building Real-world AI Agents with n8n & Gemini',
     date: 'June 18, 2026',
+    startTime: '10:00 AM IST',
     location: 'Microsoft Reactor, Bangalore',
     summary: 'A fully hands-on developer session detailing how to map intricate multi-agent pipelines with n8n workflow systems, integrate Gemini API models, and trigger actions over Slack and Gmail.',
     achievements: [
@@ -202,12 +203,22 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
     photo: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500',
     category: 'AI / Automation',
     attendees: 154,
-    price: 1499
+    price: 1499,
+    duration: '2 Days (8 Hours Total)',
+    toolsUsed: ['n8n Orchestrator', 'Gemini 2.5 Flash API', 'React & TypeScript', 'Docker Containers', 'Webhooks & Slack Bots'],
+    usefulness: [
+      'Master building multi-agent AI systems and autonomous workflows without recurring SaaS fees',
+      'Integrate LLM API calls directly into full-stack web and mobile applications',
+      'Automate lead triage, customer dispatch, and automated email/slack notifications',
+      'Receive the S-CODERS Certified AI Developer Badge and source code blueprints'
+    ],
+    prerequisites: 'Basic understanding of API concepts, JavaScript/TypeScript fundamentals, and a laptop with Node.js & Git installed.'
   },
   {
     id: 'w-2',
     title: 'Full-Stack React Native Masterclass',
     date: 'May 10, 2026',
+    startTime: '09:30 AM IST',
     location: 'RV College of Engineering, Bengaluru',
     summary: 'A fast-paced masterclass covering local state optimization in React Native, building offline-first databases with SQLite, and deploying seamless animations using Reanimated.',
     achievements: [
@@ -218,13 +229,23 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
     photo: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=800&h=500',
     category: 'Mobile Dev',
     attendees: 260,
-    price: 999
+    price: 999,
+    duration: '3 Days (12 Hours Total)',
+    toolsUsed: ['React Native', 'Expo CLI', 'SQLite Mobile DB', 'Reanimated 3', 'Tailwind / NativeWind'],
+    usefulness: [
+      'Build cross-platform iOS & Android mobile applications from scratch',
+      'Implement offline-first persistent database state management using local SQLite',
+      'Create silky-smooth 60fps animations and gesture handlers',
+      'Publish active mobile prototypes directly to GitHub and app store sandboxes'
+    ],
+    prerequisites: 'Familiarity with React components, state hooks, and standard JavaScript syntax.'
   },
   {
     id: 'w-3',
     title: 'SaaS Hackathon: Idea to MVP in 48 Hours',
     date: 'April 04, 2026',
-    location: 'eChai Ventures Hub, Koramangala',
+    startTime: '10:00 AM IST',
+    location: 'eChai Ventures Hub, Bengaluru',
     summary: 'A high-intensity, collaborative coding sprints bootcamp designed to assist founders in mapping out functional MVPs, configuring fast databases, and implementing standard payment processors.',
     achievements: [
       '12 startup teams participated directly under S-CODERS mentorship',
@@ -234,7 +255,16 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
     photo: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=800&h=500',
     category: 'Startup / Scaling',
     attendees: 85,
-    price: 1999
+    price: 1999,
+    duration: '2 Days (16 Hours Sprint)',
+    toolsUsed: ['Vite + React', 'Node.js Express', 'PostgreSQL / Firestore', 'Razorpay & Stripe SDK', 'Tailwind CSS'],
+    usefulness: [
+      'Transform rough product ideas into fully functional production MVPs in 48 hours',
+      'Implement secure authentication, user roles, and database persistence',
+      'Integrate payment gateways for immediate product monetisation and billing',
+      'Pitch live to Bengaluru angel investors, mentors, and technical advisors'
+    ],
+    prerequisites: 'Full-stack web development interest and willingness to collaborate in a high-speed sprint team.'
   }
 ];
 

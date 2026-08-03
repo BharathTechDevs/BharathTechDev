@@ -9,18 +9,18 @@ import Hero from './components/Hero';
 import Logo from './components/Logo';
 import { AppUser } from './types';
 
-const About = lazy(() => import('./components/About'));
-const Team = lazy(() => import('./components/Team'));
-const Services = lazy(() => import('./components/Services'));
-const Workshops = lazy(() => import('./components/Workshops'));
-const Communities = lazy(() => import('./components/Communities'));
-const Payments = lazy(() => import('./components/Payments'));
-const Contact = lazy(() => import('./components/Contact'));
-const AIAssistant = lazy(() => import('./components/AIAssistant'));
-const AdminConsole = lazy(() => import('./components/AdminConsole'));
-const Networking = lazy(() => import('./components/Networking'));
-const AuthPortal = lazy(() => import('./components/AuthPortal'));
-const Policies = lazy(() => import('./components/Policies'));
+import About from './components/About';
+import Team from './components/Team';
+import Services from './components/Services';
+import Workshops from './components/Workshops';
+import Communities from './components/Communities';
+import Payments from './components/Payments';
+import Contact from './components/Contact';
+import AIAssistant from './components/AIAssistant';
+import AdminConsole from './components/AdminConsole';
+import Networking from './components/Networking';
+import AuthPortal from './components/AuthPortal';
+import Policies from './components/Policies';
 
 const ViewLoader = () => (
   <div className="flex flex-col items-center justify-center py-24 min-h-[40vh] w-full">
@@ -131,8 +131,12 @@ export default function App() {
 
   // Authenticated user state
   const [user, setUser] = useState<AppUser | null>(() => {
-    const saved = localStorage.getItem('scoders_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('scoders_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   // Load registered items from localStorage to check if returning client has sessions
@@ -205,8 +209,12 @@ export default function App() {
   // Keep user sync in multi-panel interactions
   useEffect(() => {
     const handleSyncAuth = () => {
-      const saved = localStorage.getItem('scoders_user');
-      setUser(saved ? JSON.parse(saved) : null);
+      try {
+        const saved = localStorage.getItem('scoders_user');
+        setUser(saved ? JSON.parse(saved) : null);
+      } catch (err) {
+        console.error('Error syncing auth', err);
+      }
     };
     window.addEventListener('scoders_auth_change', handleSyncAuth);
     return () => window.removeEventListener('scoders_auth_change', handleSyncAuth);
@@ -589,7 +597,7 @@ export default function App() {
               <div className="hover:scale-102 transition-transform duration-200">
                 <Logo 
                   size="sm" 
-                  showSubtitle={false} 
+                  showSubtitle={true} 
                   lightBg={false}
                   onClick={() => { setCurrentView('home'); window.scrollTo(0,0); }} 
                 />

@@ -45,7 +45,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
             Rules & <span className="text-brand-teal">Policies</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-base sm:text-lg">
-            Review the official legal framework, business guidelines, and digital products terms of service for Bharath Tech Developers.
+            Review the official legal framework, business guidelines, and digital products terms of service for S-CODERS • Bharath Tech Developers.
           </p>
         </div>
 
@@ -105,7 +105,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
 
                 <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
                   <p className="italic text-gray-400">
-                    This website is operated by Bharath Tech Developers (S-CODERS). Welcome to our platform! These terms and conditions outline the rules and regulations for using our digital products, services, custom engineering tools, and masterclasses.
+                    This website is operated by S-CODERS (Bharath Tech Developers). Welcome to our platform! These terms and conditions outline the rules and regulations for using our digital products, services, custom engineering tools, and masterclasses.
                   </p>
 
                   <div className="space-y-4">
@@ -122,8 +122,8 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                       <span className="text-brand-teal font-mono text-sm">2.</span> Corporate Parameters
                     </h4>
                     <div className="pl-6 space-y-1">
-                      <p><strong className="text-gray-300">Trade Name:</strong> Bharath Tech Developers</p>
-                      <p><strong className="text-gray-300">Platform Identity:</strong> S-CODERS</p>
+                      <p><strong className="text-gray-300">Trade Name & Identity:</strong> S-CODERS • Bharath Tech Developers</p>
+                      <p><strong className="text-gray-300">Legal Name:</strong> Bharath Tech Developers (S-CODERS)</p>
                       <p><strong className="text-gray-300">Founder & Chief Architect:</strong> Suhas Gowda</p>
                       <p><strong className="text-gray-300">Service Category:</strong> Software Development, AI Orchestration, Tech Training, & Automation Systems</p>
                     </div>
@@ -134,7 +134,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                       <span className="text-brand-teal font-mono text-sm">3.</span> Custom Engineering Scope
                     </h4>
                     <p className="text-gray-400 pl-6">
-                      All custom software architectures, full-stack React Native apps, n8n integrations, or automated systems engineered by Bharath Tech Developers are subject to individual Statement of Work (SOW) guidelines. Key generation triggers a dedicated client workspace where dynamic invoices can be tracked.
+                      All custom software architectures, full-stack React Native apps, n8n integrations, or automated systems engineered by S-CODERS • Bharath Tech Developers are subject to individual Statement of Work (SOW) guidelines. Key generation triggers a dedicated client workspace where dynamic invoices can be tracked.
                     </p>
                   </div>
 
@@ -144,7 +144,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                     </h4>
                     <div className="text-gray-400 pl-6 space-y-3">
                       <p>
-                        Unless explicitly specified under written client agreements, all course material, proprietary automation frameworks, workshop templates, and custom toolsets published by S-CODERS are intellectual properties of Bharath Tech Developers:
+                        Unless explicitly specified under written client agreements, all course material, proprietary automation frameworks, workshop templates, and custom toolsets published by S-CODERS are intellectual properties of S-CODERS • Bharath Tech Developers:
                       </p>
                       <ul className="list-disc list-inside space-y-1.5 pl-2 text-gray-300">
                         <li>You <strong className="text-brand-coral">may NOT</strong> duplicate, redistribute, or resell S-CODERS masterclass curriculum.</li>
@@ -204,7 +204,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
 
                 <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
                   <p className="italic text-gray-400">
-                    At Bharath Tech Developers, accessible from S-CODERS portals, one of our main priorities is protecting client source code, project parameters, and personal contact details. This Privacy Policy details the metrics we compile, save, and defend.
+                    At S-CODERS (Bharath Tech Developers), accessible from S-CODERS portals, one of our main priorities is protecting client source code, project parameters, and personal contact details. This Privacy Policy details the metrics we compile, save, and defend.
                   </p>
 
                   <div className="space-y-4">
@@ -383,7 +383,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
 
                 <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
                   <p className="italic text-gray-400">
-                    Bharath Tech Developers deals exclusively in digital architectures, custom source codes, API keys, and live technical coaching. S-CODERS has no physical merchandise shipping requirements.
+                    S-CODERS • Bharath Tech Developers deals exclusively in digital architectures, custom source codes, API keys, and live technical coaching. S-CODERS has no physical merchandise shipping requirements.
                   </p>
 
                   <div className="space-y-4">
@@ -448,7 +448,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                   <div className="space-y-3">
                     <h4 className="font-display font-bold text-base text-white">Who We Are</h4>
                     <p className="text-gray-400">
-                      <strong className="text-white">Bharath Tech Developers (S-CODERS)</strong> is an elite software development consultancy and technical training firm based in the heart of Bengaluru, India. Directed by <strong className="text-white">Suhas Gowda</strong>, our team designs production-grade software architectures, automates legacy processes using AI orchestrators, and hosts deep-tech masterclasses for modern engineers and tech businesses.
+                      <strong className="text-white">S-CODERS • Bharath Tech Developers</strong> is an elite software development consultancy and technical training firm based in the heart of Bengaluru, India. Directed by <strong className="text-white">Suhas Gowda</strong>, our team designs production-grade software architectures, automates legacy processes using AI orchestrators, and hosts deep-tech masterclasses for modern engineers and tech businesses.
                     </p>
                   </div>
 
@@ -506,8 +506,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         <h4 className="font-display font-bold text-sm text-white">Registered Office</h4>
                       </div>
                       <div className="text-xs text-gray-400 space-y-1">
-                        <p><strong className="text-gray-300">Company:</strong> Bharath Tech Developers</p>
-                        <p><strong className="text-gray-300">Identity:</strong> S-CODERS</p>
+                        <p><strong className="text-gray-300">Trade Name & Company:</strong> S-CODERS • Bharath Tech Developers</p>
                         <p><strong className="text-gray-300">Headquarters:</strong> Bengaluru, Karnataka, India</p>
                       </div>
                     </div>

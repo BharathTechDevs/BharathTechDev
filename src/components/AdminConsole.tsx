@@ -188,12 +188,17 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   // Form fields for Workshop Add/Edit
   const [workshopTitle, setWorkshopTitle] = useState('');
   const [workshopDate, setWorkshopDate] = useState('');
+  const [workshopStartTime, setWorkshopStartTime] = useState('');
   const [workshopLocation, setWorkshopLocation] = useState('');
   const [workshopSummary, setWorkshopSummary] = useState('');
   const [workshopCategory, setWorkshopCategory] = useState('');
   const [workshopAttendees, setWorkshopAttendees] = useState<number>(100);
   const [workshopPrice, setWorkshopPrice] = useState<number>(1499);
   const [workshopPhoto, setWorkshopPhoto] = useState('');
+  const [workshopDuration, setWorkshopDuration] = useState('');
+  const [workshopTools, setWorkshopTools] = useState('');
+  const [workshopUsefulness, setWorkshopUsefulness] = useState('');
+  const [workshopPrerequisites, setWorkshopPrerequisites] = useState('');
   const [workshopAch1, setWorkshopAch1] = useState('');
   const [workshopAch2, setWorkshopAch2] = useState('');
   const [workshopAch3, setWorkshopAch3] = useState('');
@@ -405,6 +410,8 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     if (!workshopTitle || !workshopDate || !workshopLocation) return;
 
     const achievements = [workshopAch1, workshopAch2, workshopAch3].map(a => a.trim()).filter(Boolean);
+    const parsedTools = workshopTools.split(',').map(t => t.trim()).filter(Boolean);
+    const parsedUsefulness = workshopUsefulness.split('\n').map(u => u.trim()).filter(Boolean);
 
     let updatedWorkshops: WorkshopEvent[] = [];
     if (editingId) {
@@ -412,12 +419,17 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         ...w,
         title: workshopTitle,
         date: workshopDate,
+        startTime: workshopStartTime || '10:00 AM IST',
         location: workshopLocation,
         summary: workshopSummary,
         category: workshopCategory || 'Tech Workshop',
         attendees: workshopAttendees,
         price: workshopPrice,
         photo: workshopPhoto || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500',
+        duration: workshopDuration || '2 Days (8 Hours Total)',
+        toolsUsed: parsedTools.length > 0 ? parsedTools : ['React', 'TypeScript', 'Node.js'],
+        usefulness: parsedUsefulness.length > 0 ? parsedUsefulness : ['Master core developer concepts', 'Receive S-CODERS Verified Certification'],
+        prerequisites: workshopPrerequisites || 'Basic programming knowledge & laptop with Node.js',
         achievements: achievements.length > 0 ? achievements : ['Completed workshop successfully', 'High engagement rated', 'Built practical code logs']
       } : w);
     } else {
@@ -425,12 +437,17 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         id: 'w-' + Date.now().toString(),
         title: workshopTitle,
         date: workshopDate,
+        startTime: workshopStartTime || '10:00 AM IST',
         location: workshopLocation,
         summary: workshopSummary || 'Hands-on advanced developer sessions centered on modern stack scalability.',
         category: workshopCategory || 'Tech Workshop',
         attendees: workshopAttendees || 120,
         price: workshopPrice,
         photo: workshopPhoto || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500',
+        duration: workshopDuration || '2 Days (8 Hours Total)',
+        toolsUsed: parsedTools.length > 0 ? parsedTools : ['React', 'TypeScript', 'Node.js'],
+        usefulness: parsedUsefulness.length > 0 ? parsedUsefulness : ['Master core developer concepts', 'Receive S-CODERS Verified Certification'],
+        prerequisites: workshopPrerequisites || 'Basic programming knowledge & laptop with Node.js',
         achievements: achievements.length > 0 ? achievements : ['S-CODERS live certified bootcamp', 'Built dynamic stack prototypes', 'Awarded outstanding contribution tags']
       };
       updatedWorkshops = [...workshops, newWorkshop];
@@ -446,12 +463,17 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setEditingId(w.id);
     setWorkshopTitle(w.title);
     setWorkshopDate(w.date);
+    setWorkshopStartTime(w.startTime || '10:00 AM IST');
     setWorkshopLocation(w.location);
     setWorkshopSummary(w.summary);
     setWorkshopCategory(w.category);
     setWorkshopAttendees(w.attendees);
     setWorkshopPrice(w.price ?? 1499);
     setWorkshopPhoto(w.photo);
+    setWorkshopDuration(w.duration || '2 Days (8 Hours Total)');
+    setWorkshopTools(w.toolsUsed ? w.toolsUsed.join(', ') : '');
+    setWorkshopUsefulness(w.usefulness ? w.usefulness.join('\n') : '');
+    setWorkshopPrerequisites(w.prerequisites || '');
     setWorkshopAch1(w.achievements[0] || '');
     setWorkshopAch2(w.achievements[1] || '');
     setWorkshopAch3(w.achievements[2] || '');
@@ -470,12 +492,17 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setEditingId(null);
     setWorkshopTitle('');
     setWorkshopDate('');
+    setWorkshopStartTime('');
     setWorkshopLocation('');
     setWorkshopSummary('');
     setWorkshopCategory('');
     setWorkshopAttendees(100);
     setWorkshopPrice(1499);
     setWorkshopPhoto('');
+    setWorkshopDuration('');
+    setWorkshopTools('');
+    setWorkshopUsefulness('');
+    setWorkshopPrerequisites('');
     setWorkshopAch1('');
     setWorkshopAch2('');
     setWorkshopAch3('');
@@ -1263,7 +1290,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                                 .some(field => field?.toLowerCase().includes(dbSearchQuery.toLowerCase()));
                               const matchF = dbFilterStatus === 'ALL' || 
                                 (dbFilterStatus === 'ACTIVE' && enq.replyStatus === 'Pending') ||
-                                (dbFilterStatus === 'COMPLETED' && enq.replyStatus === 'Replied');
+                                (dbFilterStatus === 'COMPLETED' && enq.replyStatus === 'Responded');
                               return matchQ && matchF;
                             })
                             .map((enq) => (
@@ -1277,7 +1304,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                                 <div className="flex items-center justify-between">
                                   <span className="font-mono text-[10px] text-brand-teal font-bold">{enq.id}</span>
                                   <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded uppercase ${
-                                    enq.replyStatus === 'Replied' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'
+                                    enq.replyStatus === 'Responded' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'
                                   }`}>{enq.replyStatus}</span>
                                 </div>
                                 <h4 className="text-sm font-bold text-white mt-1">{enq.subject}</h4>
@@ -1929,7 +1956,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Event Date *</label>
                           <input
@@ -1942,13 +1969,24 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                           />
                         </div>
                         <div>
+                          <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Start Time *</label>
+                          <input
+                            type="text"
+                            required
+                            value={workshopStartTime}
+                            onChange={(e) => setWorkshopStartTime(e.target.value)}
+                            placeholder="10:00 AM IST"
+                            className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                          />
+                        </div>
+                        <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Event Location *</label>
                           <input
                             type="text"
                             required
                             value={workshopLocation}
                             onChange={(e) => setWorkshopLocation(e.target.value)}
-                            placeholder="Microsoft Reactor, Bangalore"
+                            placeholder="Microsoft Reactor, Bengaluru"
                             className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                           />
                         </div>
@@ -1997,6 +2035,50 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                           onChange={(e) => setWorkshopSummary(e.target.value)}
                           placeholder="High level overview of student learning curriculum..."
                           className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors resize-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Workshop Duration / Time Needed *</label>
+                        <input
+                          type="text"
+                          value={workshopDuration}
+                          onChange={(e) => setWorkshopDuration(e.target.value)}
+                          placeholder="e.g. 2 Days (8 Hours Total) or 3 Days Masterclass"
+                          className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Tools & Tech Stack Used (Comma separated) *</label>
+                        <input
+                          type="text"
+                          value={workshopTools}
+                          onChange={(e) => setWorkshopTools(e.target.value)}
+                          placeholder="e.g. n8n, Gemini 2.5 API, React, Docker, Node.js"
+                          className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Usefulness & Key Learning Benefits (One per line) *</label>
+                        <textarea
+                          rows={3}
+                          value={workshopUsefulness}
+                          onChange={(e) => setWorkshopUsefulness(e.target.value)}
+                          placeholder={"Build automated multi-agent AI pipelines\nIntegrate LLM APIs into full-stack web/mobile apps\nReceive S-CODERS Certified AI Developer Badge"}
+                          className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors resize-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Prerequisites & Preparation *</label>
+                        <input
+                          type="text"
+                          value={workshopPrerequisites}
+                          onChange={(e) => setWorkshopPrerequisites(e.target.value)}
+                          placeholder="e.g. Basic API concepts, JS/TS knowledge & laptop with Node.js"
+                          className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                         />
                       </div>
 
@@ -2070,10 +2152,25 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                             className="w-20 h-20 rounded-lg object-cover bg-brand-card shrink-0"
                           />
                           <div className="space-y-1 flex-grow">
-                            <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest">{w.category}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest">{w.category}</span>
+                              <span className="text-[9px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">{w.duration || '2 Days'}</span>
+                            </div>
                             <h4 className="text-sm font-display font-bold text-white leading-tight">{w.title}</h4>
-                            <p className="text-gray-500 text-[10px] font-mono">{w.date} • {w.location}</p>
+                            <p className="text-gray-500 text-[10px] font-mono">{w.date} {w.startTime ? `• ${w.startTime}` : ''} • {w.location}</p>
                             <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mt-1">{w.summary}</p>
+                            {w.toolsUsed && w.toolsUsed.length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {w.toolsUsed.slice(0, 4).map((tool, idx) => (
+                                  <span key={idx} className="text-[8px] font-mono bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-gray-300">
+                                    {tool}
+                                  </span>
+                                ))}
+                                {w.toolsUsed.length > 4 && (
+                                  <span className="text-[8px] font-mono text-gray-500">+{w.toolsUsed.length - 4} more</span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex gap-2 shrink-0">
