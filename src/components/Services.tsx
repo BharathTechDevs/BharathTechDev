@@ -2510,13 +2510,13 @@ export function ServiceProjectSpaceDashboard({
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
-                <a href="tel:+919876543210" className="py-1.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark rounded text-brand-teal transition-all flex items-center justify-center gap-1">
+                <a href="tel:+918310463417" className="py-1.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark rounded text-brand-teal transition-all flex items-center justify-center gap-1">
                   <Phone className="w-3 h-3" /> Call
                 </a>
-                <a href="mailto:suhas@scoders.com" className="py-1.5 bg-white/5 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
+                <a href="mailto:scoders82@gmail.com" className="py-1.5 bg-white/5 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
                   <Mail className="w-3 h-3" /> Email
                 </a>
-                <a href="https://wa.me/919876543210" target="_blank" rel="noopener noreferrer" className="py-1.5 bg-[#25D366]/15 hover:bg-[#25D366] hover:text-[#0c0d14] rounded text-[#25D366] transition-all flex items-center justify-center gap-1">
+                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-1.5 bg-[#25D366]/15 hover:bg-[#25D366] hover:text-[#0c0d14] rounded text-[#25D366] transition-all flex items-center justify-center gap-1">
                   <MessageSquare className="w-3 h-3" /> WhatsApp
                 </a>
               </div>
@@ -2531,13 +2531,13 @@ export function ServiceProjectSpaceDashboard({
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
-                <a href="tel:+918765432109" className="py-1.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark rounded text-brand-teal transition-all flex items-center justify-center gap-1">
+                <a href="tel:+918310463417" className="py-1.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark rounded text-brand-teal transition-all flex items-center justify-center gap-1">
                   <Phone className="w-3 h-3" /> Call
                 </a>
-                <a href="mailto:bhuvan@scoders.com" className="py-1.5 bg-white/5 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
+                <a href="mailto:scoders82@gmail.com" className="py-1.5 bg-white/5 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
                   <Mail className="w-3 h-3" /> Email
                 </a>
-                <a href="https://wa.me/918765432109" target="_blank" rel="noopener noreferrer" className="py-1.5 bg-[#25D366]/15 hover:bg-[#25D366] hover:text-[#0c0d14] rounded text-[#25D366] transition-all flex items-center justify-center gap-1">
+                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-1.5 bg-[#25D366]/15 hover:bg-[#25D366] hover:text-[#0c0d14] rounded text-[#25D366] transition-all flex items-center justify-center gap-1">
                   <MessageSquare className="w-3 h-3" /> WhatsApp
                 </a>
               </div>

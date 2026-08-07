@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Mail, MessageSquare, Send, CheckCircle, ChevronDown, ChevronUp,
-  Instagram, MessageCircle, Youtube, Twitter, Linkedin, Github, MapPin, 
+  Instagram, MessageCircle, Youtube, Twitter, Linkedin, MapPin, 
   Sparkles, ShieldCheck 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -57,12 +57,11 @@ export default function Contact() {
   };
 
   const socialLinks = [
-    { name: 'Instagram', icon: <Instagram className="w-5 h-5" />, href: 'https://instagram.com/s_coders', color: 'hover:text-[#e4405f] hover:border-[#e4405f]' },
-    { name: 'WhatsApp', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/919999999999', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
-    { name: 'YouTube', icon: <Youtube className="w-5 h-5" />, href: 'https://youtube.com/@scoders', color: 'hover:text-[#ff0000] hover:border-[#ff0000]' },
-    { name: 'Twitter / X', icon: <Twitter className="w-5 h-5" />, href: 'https://twitter.com/s_coders', color: 'hover:text-[#1da1f2] hover:border-[#1da1f2]' },
+    { name: 'Instagram', icon: <Instagram className="w-5 h-5" />, href: 'https://www.instagram.com/scoders2025?igsh=Ym1jcG01czR1MHdj', color: 'hover:text-[#e4405f] hover:border-[#e4405f]' },
+    { name: 'WhatsApp', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/918310463417', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
+    { name: 'YouTube', icon: <Youtube className="w-5 h-5" />, href: 'https://www.youtube.com/@S-CODERS', color: 'hover:text-[#ff0000] hover:border-[#ff0000]' },
+    { name: 'Twitter / X', icon: <Twitter className="w-5 h-5" />, href: 'https://x.com/SCODERSozws', color: 'hover:text-[#1da1f2] hover:border-[#1da1f2]' },
     { name: 'LinkedIn', icon: <Linkedin className="w-5 h-5" />, href: 'https://linkedin.com/company/scoders', color: 'hover:text-[#0a66c2] hover:border-[#0a66c2]' },
-    { name: 'GitHub', icon: <Github className="w-5 h-5" />, href: 'https://github.com/s-coders', color: 'hover:text-[#f0f6fc] hover:border-[#f0f6fc]' },
   ];
 
   const interestOptions = [

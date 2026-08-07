@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, RefreshCcw, Truck, FileText, Lock, Info, Mail, 
-  Building, Phone, Youtube, Twitter, Instagram, ChevronRight, Clock, ClipboardCheck,
-  Globe, Cpu, GraduationCap, CheckCircle
+  Building, Phone, Youtube, Twitter, Instagram, Clock, ClipboardCheck,
+  Globe, Cpu, GraduationCap, AlertTriangle, CheckCircle2, HelpCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -18,18 +18,18 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
   }, [initialTab]);
 
   const tabs = [
-    { id: 'terms', label: 'Terms & Conditions', icon: FileText, desc: 'Usage rights, project codes, and intellectual property' },
-    { id: 'privacy', label: 'Privacy Policy', icon: Lock, desc: 'Data security, storage, and partner confidentiality' },
-    { id: 'refund', label: 'Return & Refund', icon: RefreshCcw, desc: 'Software sprints, deposits, and workshop seats transfer' },
-    { id: 'cancellation', label: 'Cancellation Policy', icon: ShieldAlert, desc: 'Project milestone holds and scheduling guidelines' },
-    { id: 'shipping', label: 'Delivery Policy', icon: Truck, desc: 'Digital repository transfers and live workshop access' },
-    { id: 'about-brand', label: 'About BTD', icon: Info, desc: 'Founder info, engineering values, and our vision' },
-    { id: 'contact-info', label: 'Corporate & Contact', icon: Mail, desc: 'Official company coordinates and support SLA' }
+    { id: 'about-brand', label: '🏢 About Us & Info', icon: Info, desc: 'Trade Name, Legal Name, and Business Scope' },
+    { id: 'terms', label: '📜 Terms & Conditions', icon: FileText, desc: 'Website rules, licenses, and intellectual property' },
+    { id: 'privacy', label: '🔒 Privacy Policy', icon: Lock, desc: 'Data security, storage, and customer confidentiality' },
+    { id: 'refund', label: '💸 Return & Refund Policy', icon: RefreshCcw, desc: 'Services non-refundability & 3-day workshop rules' },
+    { id: 'cancellation', label: '🚫 Cancellation Policy', icon: ShieldAlert, desc: 'Order cancellations and duplicate payment resolution' },
+    { id: 'shipping', label: '🚚 Delivery Policy', icon: Truck, desc: 'Instant email delivery & digital asset handoffs' },
+    { id: 'contact-info', label: '📞 Corporate & Contact', icon: Mail, desc: 'Official company details, email support & SLA' }
   ];
 
   return (
     <section className="py-20 bg-brand-dark/95 relative overflow-hidden min-h-screen">
-      {/* Lights & Effects */}
+      {/* Background Lights & Glows */}
       <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-brand-teal/5 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-1/4 left-0 w-[400px] h-[400px] bg-brand-coral/5 blur-[120px] rounded-full pointer-events-none" />
 
@@ -39,13 +39,13 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
             <ClipboardCheck className="w-3.5 h-3.5" />
-            <span>LEGAL CENTER</span>
+            <span>LEGAL & POLICY CENTER</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-white tracking-tight mb-4">
-            Rules & <span className="text-brand-teal">Policies</span>
+            Rules & <span className="text-brand-teal">Policies</span> ⚖️
           </h2>
           <p className="text-gray-400 font-sans font-light text-base sm:text-lg">
-            Review the official legal framework, business guidelines, and digital products terms of service for S-CODERS • Bharath Tech Developers.
+            Review the official business guidelines, terms of service, payment policies, and refund frameworks for <strong className="text-white">S-CODERS</strong>.
           </p>
         </div>
 
@@ -53,26 +53,20 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Sidebar Tabs Selector */}
-          <div className="lg:col-span-4 space-y-3 bg-brand-card/40 border border-white/5 p-4 rounded-3xl backdrop-blur-md">
+          <div className="lg:col-span-4 space-y-2 bg-brand-card/40 border border-white/5 p-4 rounded-3xl backdrop-blur-md">
             <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider pl-2 mb-2">POLICIES INDEX</p>
             {tabs.map((tab) => {
-              const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-300 focus:outline-none cursor-pointer group ${
+                  className={`w-full flex items-start gap-3 p-3.5 rounded-2xl text-left transition-all duration-300 focus:outline-none cursor-pointer group ${
                     isActive 
                       ? 'bg-brand-teal/10 border border-brand-teal/20 text-white' 
                       : 'border border-transparent hover:bg-white/[2%] text-gray-400 hover:text-white'
                   }`}
                 >
-                  <div className={`p-2 rounded-xl transition-colors shrink-0 ${
-                    isActive ? 'bg-brand-teal/20 text-brand-teal' : 'bg-white/5 text-gray-500 group-hover:text-gray-300'
-                  }`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
                   <div>
                     <h4 className="font-display font-bold text-sm tracking-wide">{tab.label}</h4>
                     <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">{tab.desc}</p>
@@ -85,337 +79,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
           {/* Active Policy Content Panel */}
           <div className="lg:col-span-8 bg-brand-card/30 border border-white/5 rounded-3xl p-6 sm:p-10 backdrop-blur-md relative min-h-[500px]">
             
-            {activeTab === 'terms' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
-                  <div>
-                    <h3 className="font-display font-bold text-2xl text-white">Terms & Conditions</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Official BTD Engineering Terms of Service</p>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
-                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>Last Updated: July 18, 2026</span>
-                  </div>
-                </div>
-
-                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
-                  <p className="italic text-gray-400">
-                    This website is operated by S-CODERS (Bharath Tech Developers). Welcome to our platform! These terms and conditions outline the rules and regulations for using our digital products, services, custom engineering tools, and masterclasses.
-                  </p>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">1.</span> Acceptance of Terms
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      By accessing this website, booking masterclass workshops, or registering client workspace keys for S-CODERS software services, you accept and agree to be bound by these Terms & Conditions. If you do not agree to all of the terms stated on this page, please do not continue using our services.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">2.</span> Corporate Parameters
-                    </h4>
-                    <div className="pl-6 space-y-1">
-                      <p><strong className="text-gray-300">Trade Name & Identity:</strong> S-CODERS • Bharath Tech Developers</p>
-                      <p><strong className="text-gray-300">Legal Name:</strong> Bharath Tech Developers (S-CODERS)</p>
-                      <p><strong className="text-gray-300">Founder & Chief Architect:</strong> Suhas Gowda</p>
-                      <p><strong className="text-gray-300">Service Category:</strong> Software Development, AI Orchestration, Tech Training, & Automation Systems</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">3.</span> Custom Engineering Scope
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      All custom software architectures, full-stack React Native apps, n8n integrations, or automated systems engineered by S-CODERS • Bharath Tech Developers are subject to individual Statement of Work (SOW) guidelines. Key generation triggers a dedicated client workspace where dynamic invoices can be tracked.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">4.</span> Intellectual Property Ownership
-                    </h4>
-                    <div className="text-gray-400 pl-6 space-y-3">
-                      <p>
-                        Unless explicitly specified under written client agreements, all course material, proprietary automation frameworks, workshop templates, and custom toolsets published by S-CODERS are intellectual properties of S-CODERS • Bharath Tech Developers:
-                      </p>
-                      <ul className="list-disc list-inside space-y-1.5 pl-2 text-gray-300">
-                        <li>You <strong className="text-brand-coral">may NOT</strong> duplicate, redistribute, or resell S-CODERS masterclass curriculum.</li>
-                        <li>Source codes delivered for custom client projects are governed by individual repository transfer agreements.</li>
-                        <li>You <strong className="text-brand-teal">may modify</strong> templates and training models for internal personal or business use.</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">5.</span> Client Accounts & Key Registrations
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Clients registering services or masterclasses are issued secure system keys (`BTD-SERV-...` or `BTD-WKSH-...`). You are fully responsible for preserving the confidentiality of your workspace credentials and key keys.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">6.</span> Payment Gateways
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Payments for tech consulting, milestone deposits, and masterclass seats are securely processed through verified, UPI-enabled payment gateways or direct bank transfer logs. All prices are listed in Indian Rupees (INR) unless designated otherwise.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">7.</span> Governing Law
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      These Terms & Conditions are governed by the laws of India. Any disputes or resolutions shall be subject to the exclusive jurisdiction of the courts located in <strong className="text-white">Bengaluru, Karnataka</strong>.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'privacy' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
-                  <div>
-                    <h3 className="font-display font-bold text-2xl text-white">Privacy Policy</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">S-CODERS Data & Privacy Shield</p>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
-                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>Last Updated: July 18, 2026</span>
-                  </div>
-                </div>
-
-                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
-                  <p className="italic text-gray-400">
-                    At S-CODERS (Bharath Tech Developers), accessible from S-CODERS portals, one of our main priorities is protecting client source code, project parameters, and personal contact details. This Privacy Policy details the metrics we compile, save, and defend.
-                  </p>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">1.</span> Information We Collect & Guard
-                    </h4>
-                    <div className="pl-6 space-y-4 text-gray-400">
-                      <p>We process the following info strictly to ensure seamless software delivery and billing integrity:</p>
-                      <ul className="space-y-3">
-                        <li>
-                          <strong className="text-gray-200 block mb-1">● Personal & Corporate Details:</strong>
-                          Your legal name, active business email, contact phone number, company name, and project specifications when you file a service request or register an interactive workspace.
-                        </li>
-                        <li>
-                          <strong className="text-gray-200 block mb-1">● Custom Credentials & Workspace Data:</strong>
-                          Client estimation formulas, project milestone targets, dynamic invoice histories, and team contact details mapped to your unique system keys.
-                        </li>
-                        <li>
-                          <strong className="text-gray-200 block mb-1">● Financial Integrity:</strong>
-                          All invoice transactions are logged strictly using secure UPI, Razorpay, or direct banking receipt audits. S-CODERS never retains or views your credit card PINs, bank credentials, or secure UPI authentication parameters.
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">2.</span> How S-CODERS Employs Data
-                    </h4>
-                    <div className="pl-6 space-y-2 text-gray-400">
-                      <p>Collected coordinates are used exclusively to:</p>
-                      <ul className="list-disc list-inside space-y-1.5 text-gray-300">
-                        <li>Construct and provision your custom client workspaces on demand.</li>
-                        <li>Verify deposit milestones and approve dynamic financial invoices.</li>
-                        <li>Fulfill live digital workshop registrations and issue masterclass access.</li>
-                        <li>Provide premium developer support and debug custom integration systems.</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">3.</span> Enterprise Security Safeguards
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      All client databases, invoice tables, and secure keys are housed in certified, high-encryption environments. We execute strict security matrices—including end-to-end TLS encryption, secure database partitioning, and tokenized session logins—to insulate your confidential systems.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'refund' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
-                  <div>
-                    <h3 className="font-display font-bold text-2xl text-white">Return & Refund Policy</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Service Deposits & Seat Cancellations</p>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
-                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>Last Updated: July 18, 2026</span>
-                  </div>
-                </div>
-
-                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
-                  <p className="font-semibold text-white">
-                    Thank you for choosing S-CODERS for your advanced engineering requirements.
-                  </p>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">1.</span> Custom Software Milestone Deposits
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      All startup deposits, initial sprint payments, or contract milestone settlements paid toward custom software architectures, n8n automations, and full-stack app configurations are <strong className="text-brand-coral">non-refundable</strong> once engineering sprints, schema designs, or repository allocations have commenced.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">2.</span> Why Are Software Sprints Non-Refundable?
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Software engineering represents dedicated cognitive, technical, and resource allocations (including custom cloud infrastructure provisioning, API endpoints, and system architecture mapping). Therefore, completed sprints and custom code pipelines are non-refundable.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">3.</span> S-CODERS Live Masterclasses & Workshops
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Payments for masterclass bookings (such as n8n, Gemini API, or React Native sessions) are final. S-CODERS <strong className="text-brand-coral">does not issue cash refunds</strong> for no-shows or last-minute cancellations. However, we offer highly accommodating client-centric options:
-                    </p>
-                    <ul className="list-disc list-inside space-y-1.5 pl-6 text-gray-400">
-                      <li><strong className="text-brand-teal">Seat Transfer:</strong> You may transfer your active seat coordinates to a colleague or teammate at any point before the session starts.</li>
-                      <li><strong className="text-brand-teal">Future Credit:</strong> You can apply your payment as credit toward any subsequent S-CODERS tech cohort or interactive workshop upon notifying our desk at least 48 hours prior.</li>
-                    </ul>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'cancellation' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
-                  <div>
-                    <h3 className="font-display font-bold text-2xl text-white">Cancellation Policy</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Project holds and masterclass rescheduling</p>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
-                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>Last Updated: July 18, 2026</span>
-                  </div>
-                </div>
-
-                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">1.</span> Engineering Milestone Cancellations
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Clients wish to pause, hold, or cancel active software engineering contracts must issue a written request to S-CODERS. Work completed up to the date of cancellation will be billed accordingly based on active SOW sprint milestones.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">2.</span> Live Workshop Rescheduling
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      To cancel or reschedule your attendance in an active S-CODERS masterclass, please contact us at least <strong className="text-white">48 hours</strong> before the scheduled kick-off time. This enables us to reallocate the seat to waitlisted developers.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">3.</span> S-CODERS Right to Cancel
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      In the rare event of severe network disruptions, technical outages, or force majeure events preventing S-CODERS from hosting a scheduled masterclass, we will immediately communicate with registered developers and offer choice of an alternative slot or direct fee resolution.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'shipping' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
-                  <div>
-                    <h3 className="font-display font-bold text-2xl text-white">Delivery Policy</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Digital Delivery, Repo Transfers & Credentials</p>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
-                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>Last Updated: July 18, 2026</span>
-                  </div>
-                </div>
-
-                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
-                  <p className="italic text-gray-400">
-                    S-CODERS • Bharath Tech Developers deals exclusively in digital architectures, custom source codes, API keys, and live technical coaching. S-CODERS has no physical merchandise shipping requirements.
-                  </p>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">1.</span> Custom Software Delivery Speed
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Custom software builds are delivered online via private GitHub/GitLab repository handoffs, secure AWS/Google Cloud deployments, and digital transfers of documentation assets. Delivery schedules are mapped to the milestones agreed upon in the contract.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">2.</span> Live Tech Masterclasses Access
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Upon a successful workshop booking, your enrollment is validated instantly. S-CODERS automatically dispatches the live room access links (Google Meet / Zoom), pre-class materials, and calendar invites directly to your email address within <strong className="text-white">5 to 10 minutes</strong>.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
-                      <span className="text-brand-teal font-mono text-sm">3.</span> Instant Key Allocation
-                    </h4>
-                    <p className="text-gray-400 pl-6">
-                      Client registered workspace keys are assigned instantly through the interface upon registering a service contract. This allows immediate client login and dashboard access without any system delay.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
+            {/* ABOUT US & BUSINESS INFO */}
             {activeTab === 'about-brand' && (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
@@ -425,57 +89,90 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
                   <div>
-                    <h3 className="font-display font-bold text-2xl text-white">About S-CODERS</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Our engineering footprint and leader</p>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      🏢 About Us & Business Information
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">S-CODERS Official Business Identity</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
+                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>Last Updated: August 2026</span>
                   </div>
                 </div>
 
                 <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-brand-dark/40 p-6 rounded-2xl border border-white/5">
-                    <div>
-                      <h4 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">FOUNDER & CHIEF ARCHITECT</h4>
-                      <h5 className="font-display font-extrabold text-white text-lg">Suhas Gowda</h5>
-                      <p className="text-brand-teal text-xs font-mono mt-0.5">Bengaluru, India</p>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-1">OUR MANDATE</h4>
-                      <p className="text-gray-300 text-xs">
-                        Democratizing complex n8n workflows, full-stack builds, customized LLMs, and custom AI agents.
-                      </p>
+                  {/* Business Card */}
+                  <div className="bg-brand-dark/50 border border-white/10 p-5 rounded-2xl space-y-3">
+                    <h4 className="text-xs font-mono text-brand-teal uppercase tracking-widest font-bold">🏢 Official Business Parameters</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-500 block font-mono uppercase text-[10px]">Trade Name:</span>
+                        <strong className="text-white text-sm">S-CODERS</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block font-mono uppercase text-[10px]">Legal Name:</span>
+                        <strong className="text-white text-sm">Shreyas.M</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block font-mono uppercase text-[10px]">Business Category:</span>
+                        <strong className="text-white text-sm">Digital Products & Services</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block font-mono uppercase text-[10px]">Website URL:</span>
+                        <a href="https://www.s-coders.com" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-mono font-bold hover:underline text-sm">
+                          www.s-coders.com
+                        </a>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="font-display font-bold text-base text-white">Who We Are</h4>
-                    <p className="text-gray-400">
-                      <strong className="text-white">S-CODERS • Bharath Tech Developers</strong> is an elite software development consultancy and technical training firm based in the heart of Bengaluru, India. Directed by <strong className="text-white">Suhas Gowda</strong>, our team designs production-grade software architectures, automates legacy processes using AI orchestrators, and hosts deep-tech masterclasses for modern engineers and tech businesses.
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span>👋 Who We Are</span>
+                    </h4>
+                    <p className="text-gray-400 leading-relaxed">
+                      <strong className="text-white">S-CODERS</strong> is a high-velocity software engineering studio and digital products platform founded in Bengaluru, India. Directed by tech-savvy engineers, we specialize in building modern web platforms, mobile applications, AI agent systems, n8n workflow automations, and hosting live developer masterclasses.
                     </p>
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="font-display font-bold text-base text-white">Our Visual Identity</h4>
-                    <p className="text-gray-400">
-                      Our core brand, **S-CODERS**, is visually framed by the concept of **Symmetrical Sockets / Linked Capabilities** (S 🔗 CODERS), symbolizing our expertise in connecting legacy APIs to advanced AI platforms, orchestrating robust pipelines, and bridging technology with seamless operational efficiency.
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span>🎯 Our Mission</span>
+                    </h4>
+                    <p className="text-gray-400 leading-relaxed">
+                      We believe that powerful software tools should be elegant, high-performing, and accessible. Our mission is to engineer robust software architectures, automate complex workflows, and deliver hands-on technical masterclasses that help creators, students, and businesses achieve maximum efficiency with zero friction.
                     </p>
                   </div>
 
-                  <div className="space-y-4">
-                    <h4 className="font-display font-bold text-base text-white">Our Pillars</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-white/[1%] border border-white/5 p-4 rounded-xl">
-                        <Cpu className="w-5 h-5 text-brand-teal mb-2" />
-                        <h5 className="font-display font-bold text-sm text-white mb-1.5">Elite Software</h5>
-                        <p className="text-gray-500 text-xs leading-relaxed">Developing tailored SaaS backends, custom database networks, and premium React interfaces.</p>
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span>💼 Nature of Business</span>
+                    </h4>
+                    <p className="text-gray-400 leading-relaxed">
+                      <strong className="text-white">S-CODERS</strong> deals exclusively in digital products, software engineering services, custom web/app builds, and live technical workshops delivered electronically. <strong className="text-brand-teal">No physical merchandise is sold or shipped.</strong>
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span>📦 What We Offer</span>
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl">
+                        <div className="font-bold text-white text-xs mb-1">🛠️ Software & AI Engineering Services</div>
+                        <p className="text-gray-400 text-xs">Custom Web Platforms, Mobile Apps, n8n Automation, & Gemini AI Workflows.</p>
                       </div>
-                      <div className="bg-white/[1%] border border-white/5 p-4 rounded-xl">
-                        <Globe className="w-5 h-5 text-brand-teal mb-2" />
-                        <h5 className="font-display font-bold text-sm text-white mb-1.5">AI Agents</h5>
-                        <p className="text-gray-500 text-xs leading-relaxed">Integrating Gemini models, fine-tuned vectors, and advanced multi-channel conversational nodes.</p>
+                      <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl">
+                        <div className="font-bold text-white text-xs mb-1">🎓 Tech Workshops & Masterclasses</div>
+                        <p className="text-gray-400 text-xs">Live interactive developer sessions, n8n blueprints, and hands-on coding bootcamps.</p>
                       </div>
-                      <div className="bg-white/[1%] border border-white/5 p-4 rounded-xl">
-                        <GraduationCap className="w-5 h-5 text-brand-teal mb-2" />
-                        <h5 className="font-display font-bold text-sm text-white mb-1.5">Masterclasses</h5>
-                        <p className="text-gray-500 text-xs leading-relaxed">Training developers in complex system patterns, live automation suites, and deployment tools.</p>
+                      <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl">
+                        <div className="font-bold text-white text-xs mb-1">⚡ Digital Resources & Templates</div>
+                        <p className="text-gray-400 text-xs">Starter kits, architecture diagrams, and downloadable developer starter packs.</p>
+                      </div>
+                      <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl">
+                        <div className="font-bold text-white text-xs mb-1">🌟 Dedicated Support</div>
+                        <p className="text-gray-400 text-xs">Direct technical support and step-by-step guidance for every enrolled client.</p>
                       </div>
                     </div>
                   </div>
@@ -483,6 +180,445 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
               </motion.div>
             )}
 
+            {/* TERMS & CONDITIONS */}
+            {activeTab === 'terms' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
+                  <div>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      📜 Terms & Conditions
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Official Terms of Service for S-CODERS</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
+                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>Last Updated: August 2026</span>
+                  </div>
+                </div>
+
+                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
+                  <p className="italic text-gray-400">
+                    Welcome to <strong className="text-white">S-CODERS</strong> (www.s-coders.com). These terms and conditions outline the rules and regulations for using our website, digital products, software services, and live technical workshops.
+                  </p>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">1.</span> Acceptance of Terms
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      By accessing this website or purchasing/booking any digital product, workshop, or software service from S-CODERS, you accept and agree to be bound by these Terms & Conditions. If you do not agree with any part, please do not continue using our website or services.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">2.</span> Corporate Parameters
+                    </h4>
+                    <div className="pl-6 space-y-1 text-xs text-gray-300 bg-white/5 p-4 rounded-xl border border-white/5">
+                      <p><strong className="text-white">Trade Name:</strong> S-CODERS</p>
+                      <p><strong className="text-white">Legal Name:</strong> Shreyas.M</p>
+                      <p><strong className="text-white">Business Category:</strong> Digital Products & Services</p>
+                      <p><strong className="text-white">Website:</strong> www.s-coders.com</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">3.</span> Intellectual Property & Licensing
+                    </h4>
+                    <div className="text-gray-400 pl-6 space-y-2">
+                      <p>
+                        Unless otherwise stated, S-CODERS owns the intellectual property rights for all material, course curriculum, automation blueprints, and digital templates on this website. Products purchased are licensed for personal or agreed commercial use only:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-gray-300 pl-2">
+                        <li>You <strong className="text-brand-coral">may NOT</strong> redistribute, resell, or share workshop templates or digital assets.</li>
+                        <li>You <strong className="text-brand-coral">may NOT</strong> claim S-CODERS templates or codebases as your uncredited original work.</li>
+                        <li>You <strong className="text-brand-teal">MAY</strong> modify purchased code or templates for your internal personal or business use.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">4.</span> User Accounts & Registrations
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      When claiming free digital resources, registering for masterclasses, or submitting project briefs, you agree to provide accurate, complete information including a valid email address and contact details.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">5.</span> Secure Payments
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      All payments are processed securely through verified payment gateways (Razorpay, UPI, PhonePe, GPay). Prices are displayed in Indian Rupees (INR) unless explicitly stated otherwise.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">6.</span> Limitation of Liability
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      S-CODERS shall not be liable for any indirect, incidental, or consequential damages arising from the use or inability to use our products, software builds, or website services.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">7.</span> Governing Law & Jurisdiction
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      These terms shall be governed by and construed in accordance with the laws of India, and any legal disputes shall be subject to the exclusive jurisdiction of the courts located in <strong className="text-white">Bengaluru, Karnataka</strong>.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* PRIVACY POLICY */}
+            {activeTab === 'privacy' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
+                  <div>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      🔒 Privacy Policy
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">S-CODERS Data Protection & Privacy Shield</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
+                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>Last Updated: August 2026</span>
+                  </div>
+                </div>
+
+                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
+                  <p className="italic text-gray-400">
+                    At <strong className="text-white">S-CODERS</strong> (accessible from www.s-coders.com), one of our main priorities is the privacy and security of our visitors and clients. This Privacy Policy explains how we collect, use, and safeguard your personal information.
+                  </p>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">1.</span> Information We Collect
+                    </h4>
+                    <div className="pl-6 space-y-3 text-gray-400">
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/5">
+                        <strong className="text-white block mb-1">👤 Personal Information:</strong>
+                        Name, email address, mobile phone number, and company name provided when claiming free templates, submitting project briefs, or making a purchase.
+                      </div>
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/5">
+                        <strong className="text-white block mb-1">💳 Payment Information:</strong>
+                        Processed securely through Razorpay / official payment gateways. <strong className="text-brand-teal">S-CODERS does not store or view your credit card details, CVV, or bank credentials.</strong>
+                      </div>
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/5">
+                        <strong className="text-white block mb-1">📊 Usage & Analytics Data:</strong>
+                        Pages visited, device type, time spent on site, and system log data used purely for performance optimization.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">2.</span> How We Use Your Information
+                    </h4>
+                    <div className="pl-6 space-y-1.5 text-gray-400">
+                      <p>We use the collected information strictly to:</p>
+                      <ul className="list-disc list-inside space-y-1 text-gray-300">
+                        <li>Process and fulfill your workshop registrations and software service orders.</li>
+                        <li>Send instant download links, access keys, and course joining credentials.</li>
+                        <li>Respond to your technical inquiries and customer support requests.</li>
+                        <li>Improve our software products, website performance, and user experience.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">3.</span> Data Storage & Security
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      Your data is stored securely on modern cloud infrastructure (Microsoft Azure / Google Cloud). We implement industry-standard security measures including SSL encryption, secure API access controls, and strict data privacy protocols.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">4.</span> Your Rights
+                    </h4>
+                    <div className="pl-6 space-y-1 text-gray-300">
+                      <p>You have the full right to:</p>
+                      <ul className="list-disc list-inside space-y-1 text-gray-400">
+                        <li>Access your personal data held by us.</li>
+                        <li>Request correction of inaccurate or outdated information.</li>
+                        <li>Request deletion of your data from our active databases.</li>
+                      </ul>
+                      <p className="pt-2 text-xs text-gray-500">To exercise these rights, email us at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* RETURN & REFUND POLICY */}
+            {activeTab === 'refund' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
+                  <div>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      💸 Return & Refund Policy
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Strict Rules for Services vs. Live Workshops</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
+                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>Last Updated: August 2026</span>
+                  </div>
+                </div>
+
+                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
+                  <p className="font-semibold text-white">
+                    Thank you for choosing S-CODERS. Please read our specific refund terms carefully prior to completing any transaction.
+                  </p>
+
+                  {/* SERVICE SECTION - STRICT NO REFUND */}
+                  <div className="bg-brand-coral/10 border border-brand-coral/30 p-5 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2 text-brand-coral font-bold text-base">
+                      <AlertTriangle className="w-5 h-5 shrink-0" />
+                      <span>🛠️ SERVICE SECTION — STRICT NO REFUND POLICY</span>
+                    </div>
+                    <p className="text-gray-300 text-xs leading-relaxed">
+                      All payments for custom software development, mobile app builds, web platform engineering, n8n automations, AI integrations, or technical consulting booked under our Service section are <strong className="text-white underline">STRICTLY NON-REFUNDABLE ONCE BOOKED</strong>.
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      <strong className="text-white">Why No Refunds for Services?</strong> Software engineering involves immediate cognitive allocation, dedicated developer hours, server environment setup, and architecture drafting immediately upon order placement. Therefore, once a service booking or startup deposit is made, <strong className="text-brand-coral">no money will be refunded under any circumstances</strong>.
+                    </p>
+                  </div>
+
+                  {/* WORKSHOP SECTION - 3-DAY NOTICE RULE */}
+                  <div className="bg-brand-teal/10 border border-brand-teal/30 p-5 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2 text-brand-teal font-bold text-base">
+                      <CheckCircle2 className="w-5 h-5 shrink-0" />
+                      <span>🎓 WORKSHOP SECTION — 3-DAY NOTICE REFUND RULE</span>
+                    </div>
+                    <p className="text-gray-300 text-xs leading-relaxed">
+                      For live workshops and developer masterclasses, money will <strong className="text-white underline">ONLY be refunded if the participant contacts or informs S-CODERS at least 3 DAYS (72 HOURS)</strong> prior to the scheduled live workshop start date and time.
+                    </p>
+                    <div className="bg-brand-dark/60 p-3.5 rounded-xl border border-white/10 space-y-2 text-xs">
+                      <p className="text-brand-coral font-bold flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        Strict Notice Limit:
+                      </p>
+                      <p className="text-gray-300">
+                        If a participant requests a cancellation/refund less than 3 days prior to the event (even if delayed by just 1 day, e.g. 2 days or 1 day before the workshop), <strong className="text-brand-coral">THEIR MONEY WILL NOT BE REFUNDED</strong>.
+                      </p>
+                      <p className="text-gray-400">
+                        <strong className="text-white">Seat Transfer Option:</strong> If you miss the 3-day notice window, you may transfer your active seat to a friend or colleague by notifying support at <span className="text-brand-teal font-mono">scoders82@gmail.com</span> prior to session kick-off.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* PAYMENT GATEWAY & TECHNICAL FAILURE RESPONSIBILITIES */}
+                  <div className="bg-brand-card/50 border border-white/10 p-5 rounded-2xl space-y-4">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      💳 Payment Gateways & Failure Responsibilities
+                    </h4>
+
+                    {/* Case A: Debit on PhonePe/GPay but S-CODERS hasn't received */}
+                    <div className="space-y-1.5 bg-white/5 p-4 rounded-xl border border-white/5">
+                      <h5 className="font-bold text-xs text-brand-coral flex items-center gap-1.5">
+                        <span>📱 Case 1: Amount Debited on PhonePe / GPay / Bank App but NOT Received by S-CODERS</span>
+                      </h5>
+                      <p className="text-gray-300 text-xs leading-relaxed">
+                        If your PhonePe, Google Pay, PayTM, UPI, or Bank app shows that the amount is debited/paid, but <strong className="text-white">S-CODERS has NOT received the payment</strong> in our merchant dashboard (e.g. money stuck in bank clearance or pending gateway hold):
+                      </p>
+                      <p className="text-brand-coral text-xs font-bold pt-1">
+                        👉 This is the customer's and their issuing bank / payment provider's responsibility, NOT S-CODERS'.
+                      </p>
+                      <p className="text-gray-400 text-[11px]">
+                        S-CODERS cannot issue refunds or grant access for transactions where funds have not settled into our official account. In such cases, please contact your issuing bank or UPI app support with the UTR number for an automatic banking reversal.
+                      </p>
+                    </div>
+
+                    {/* Case B: Unable to pay on website */}
+                    <div className="space-y-1.5 bg-white/5 p-4 rounded-xl border border-white/5">
+                      <h5 className="font-bold text-xs text-brand-teal flex items-center gap-1.5">
+                        <span>🌐 Case 2: Technical Payment Failure On Our Website Itself</span>
+                      </h5>
+                      <p className="text-gray-300 text-xs leading-relaxed">
+                        If you are <strong className="text-white">unable to complete the payment on the website itself</strong> due to a website bug, portal breakdown, or checkout error:
+                      </p>
+                      <p className="text-brand-teal text-xs font-bold pt-1">
+                        👉 Please reach out to Customer Care (`scoders82@gmail.com`). In this scenario, S-CODERS takes FULL RESPONSIBILITY.
+                      </p>
+                      <p className="text-gray-400 text-[11px]">
+                        Our customer care team will verify your account details, guide you through an alternate verified booking channel, or ensure your seat/service is logged without any extra charge.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <h4 className="font-display font-bold text-sm text-white">Need Assistance With a Booking?</h4>
+                    <p className="text-gray-400 text-xs">
+                      For any questions regarding our return and refund policy, email us with your order/claim ID at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* CANCELLATION POLICY */}
+            {activeTab === 'cancellation' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
+                  <div>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      🚫 Cancellation Policy
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Cancellation Windows & Duplicate Order Guidelines</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
+                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>Last Updated: August 2026</span>
+                  </div>
+                </div>
+
+                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">1.</span> Service Order Cancellations
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      Because our custom software development services begin immediate resource allocation and architecture drafting upon payment, <strong className="text-brand-coral">service orders cannot be cancelled for a refund once processed</strong>.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">2.</span> Workshop Cancellations Duration
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      Workshop cancellations must be submitted <strong className="text-white">at least 3 days (72 hours) before the event</strong> to qualify for a full refund. Cancellation requests received within 3 days of the workshop start time cannot be processed or refunded.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">3.</span> Duplicate Orders
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      If you accidentally place a duplicate order for the exact same workshop or digital product, please contact us immediately at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong> with your transaction receipts and claim IDs within 24 hours for a duplicate payment reversal.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">4.</span> Contact Before Purchase
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      Please ensure you review your selection, course topics, or project scope carefully before completing payment. For pre-purchase clarifications, reach out to <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* DELIVERY POLICY */}
+            {activeTab === 'shipping' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
+                  <div>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      🚚 Delivery Policy
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Instant Electronic Handoff & Zero Shipping Fees</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-mono text-[10px] w-fit">
+                    <Clock className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>Last Updated: August 2026</span>
+                  </div>
+                </div>
+
+                <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
+                  <p className="italic text-gray-400">
+                    <strong className="text-white">S-CODERS</strong> deals exclusively in digital goods, software architectures, downloadable assets, and live technical coaching. Zero physical merchandise shipping is required.
+                  </p>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">1.</span> Delivery Method
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      All products and workshop accesses are delivered digitally via email or direct repository transfer. Upon successful payment or claim, you receive an email containing:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 pl-8">
+                      <li>A secure, verified access or download link / joining credential</li>
+                      <li>Detailed instructions for accessing your workshop live room or code assets</li>
+                      <li>Your official order/claim ID for future reference</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">2.</span> Delivery Duration
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      <strong className="text-white">Instant Electronic Delivery:</strong> Most customers receive their workshop confirmation email and access links within <strong className="text-brand-teal">5 to 10 minutes</strong> of a successful transaction.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">3.</span> Zero Shipping Costs
+                    </h4>
+                    <p className="text-gray-400 pl-6">
+                      Since all products and services are 100% digital, there are <strong className="text-white">zero shipping costs</strong> associated with any purchase on our website.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">4.</span> Help With Electronic Delivery
+                    </h4>
+                    <div className="text-gray-400 pl-6 space-y-2">
+                      <p>If you don't receive your access email within 15 minutes of payment:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-gray-300 pl-2">
+                        <li>Check your email spam/junk folder.</li>
+                        <li>Verify that the email address entered during checkout was correct.</li>
+                        <li>Contact us at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong> with your order ID or payment screenshot for immediate manual dispatch.</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* CORPORATE & CONTACT */}
             {activeTab === 'contact-info' && (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
@@ -492,75 +628,117 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-6 border-b border-white/5">
                   <div>
-                    <h3 className="font-display font-bold text-2xl text-white">Contact & Corporate Information</h3>
-                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Official Coordinates & Channels</p>
+                    <h3 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+                      📞 Corporate Information & Contact Us
+                    </h3>
+                    <p className="text-brand-teal font-mono text-[11px] tracking-widest uppercase mt-1">Official Coordinates & Support Desk</p>
                   </div>
                 </div>
 
                 <div className="text-gray-300 font-sans text-sm leading-relaxed space-y-6">
                   
+                  {/* Corporate Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="bg-brand-dark/40 border border-white/5 p-5 rounded-2xl space-y-3">
-                      <div className="flex items-center gap-3 text-brand-teal">
+                    <div className="bg-brand-dark/50 border border-white/10 p-5 rounded-2xl space-y-3">
+                      <div className="flex items-center gap-2 text-brand-teal">
                         <Building className="w-5 h-5 shrink-0" />
-                        <h4 className="font-display font-bold text-sm text-white">Registered Office</h4>
+                        <h4 className="font-display font-bold text-sm text-white">📍 Business Information</h4>
                       </div>
-                      <div className="text-xs text-gray-400 space-y-1">
-                        <p><strong className="text-gray-300">Trade Name & Company:</strong> S-CODERS • Bharath Tech Developers</p>
-                        <p><strong className="text-gray-300">Headquarters:</strong> Bengaluru, Karnataka, India</p>
+                      <div className="text-xs text-gray-300 space-y-1.5 font-mono">
+                        <p><span className="text-gray-500 uppercase">Trade Name:</span> S-CODERS</p>
+                        <p><span className="text-gray-500 uppercase">Legal Name:</span> Shreyas.M</p>
+                        <p><span className="text-gray-500 uppercase">Category:</span> Digital Products & Services</p>
+                        <p><span className="text-gray-500 uppercase">Website:</span> www.s-coders.com</p>
+                        <p><span className="text-gray-500 uppercase">Location:</span> Bengaluru, Karnataka, India</p>
                       </div>
                     </div>
 
-                    <div className="bg-brand-dark/40 border border-white/5 p-5 rounded-2xl space-y-3">
-                      <div className="flex items-center gap-3 text-brand-teal">
-                        <Phone className="w-5 h-5 shrink-0" />
-                        <h4 className="font-display font-bold text-sm text-white">Support Channels</h4>
+                    <div className="bg-brand-dark/50 border border-white/10 p-5 rounded-2xl space-y-3">
+                      <div className="flex items-center gap-2 text-brand-teal">
+                        <Mail className="w-5 h-5 shrink-0" />
+                        <h4 className="font-display font-bold text-sm text-white">📧 Get In Touch</h4>
                       </div>
-                      <div className="text-xs text-gray-400 space-y-1">
-                        <p><strong className="text-gray-300">Communications:</strong> <a href="mailto:connect@bharathtechdevelopers.com" className="hover:underline text-brand-teal font-mono">connect@bharathtechdevelopers.com</a></p>
-                        <p><strong className="text-gray-300">Support SLA:</strong> <a href="mailto:support@bharathtechdevelopers.com" className="hover:underline text-brand-teal font-mono">support@bharathtechdevelopers.com</a></p>
-                        <p><strong className="text-gray-300">Inquiries:</strong> 24 to 48 hours resolution SLA</p>
+                      <div className="text-xs text-gray-300 space-y-1.5 font-mono">
+                        <p>
+                          <span className="text-gray-500 uppercase block">Official Email:</span>
+                          <a href="mailto:scoders82@gmail.com" className="text-brand-teal font-bold hover:underline">scoders82@gmail.com</a>
+                        </p>
+                        <p>
+                          <span className="text-gray-500 uppercase block">Response Time:</span>
+                          <span className="text-white">Within 24 business hours</span>
+                        </p>
+                        <p>
+                          <span className="text-gray-500 uppercase block">WhatsApp Support:</span>
+                          <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-bold hover:underline">+91 8310463417</a>
+                        </p>
+                        <p>
+                          <span className="text-gray-500 uppercase block">YouTube Channel:</span>
+                          <a href="https://www.youtube.com/@S-CODERS" target="_blank" rel="noopener noreferrer" className="text-white hover:text-brand-teal">@S-CODERS</a>
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <h4 className="font-display font-bold text-base text-white">SLA Resolution Commitment</h4>
-                    <p className="text-gray-400">
-                      We value our client workflows and engineering pipelines. S-CODERS developer relations staff aim to resolve active portal key concerns, masterclass seat transfers, or client billing receipt audits within <strong className="text-white">24 business hours</strong>.
-                    </p>
+                  {/* Checklist Before Contacting */}
+                  <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-3">
+                    <h4 className="font-display font-bold text-sm text-white flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-brand-teal" />
+                      📋 Before Contacting Us For Support
+                    </h4>
+                    <p className="text-xs text-gray-400">For faster resolution of your inquiry, please include:</p>
+                    <ul className="list-disc list-inside text-xs text-gray-300 space-y-1 pl-2">
+                      <li>Your Order or Claim ID (if applicable)</li>
+                      <li>Email address used during purchase/checkout</li>
+                      <li>Clear description of your question or issue (with screenshot if payment related)</li>
+                    </ul>
                   </div>
 
-                  {/* Social Handles */}
-                  <div className="pt-6 border-t border-white/5">
-                    <h4 className="font-display font-bold text-sm text-white mb-3">Our Verified Channels</h4>
-                    <div className="flex flex-wrap gap-4">
+                  {/* Verified Social Handles */}
+                  <div className="pt-4 border-t border-white/5">
+                    <h4 className="font-display font-bold text-sm text-white mb-3">Verified S-CODERS Channels</h4>
+                    <div className="flex flex-wrap gap-3">
                       <a 
-                        href="https://youtube.com/@scoders" 
+                        href="https://www.youtube.com/@S-CODERS" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
                       >
                         <Youtube className="w-4 h-4 text-red-500" />
-                        <span>YouTube</span>
+                        <span>YouTube (@S-CODERS)</span>
                       </a>
                       <a 
-                        href="https://twitter.com/s_coders" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
-                      >
-                        <Twitter className="w-4 h-4 text-sky-400" />
-                        <span>Twitter / X</span>
-                      </a>
-                      <a 
-                        href="https://instagram.com/s_coders" 
+                        href="https://www.instagram.com/scoders2025?igsh=Ym1jcG01czR1MHdj" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
                       >
                         <Instagram className="w-4 h-4 text-pink-500" />
-                        <span>Instagram</span>
+                        <span>Instagram (@scoders2025)</span>
+                      </a>
+                      <a 
+                        href="https://x.com/SCODERSozws" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
+                      >
+                        <Twitter className="w-4 h-4 text-sky-400" />
+                        <span>X / Twitter (@SCODERSozws)</span>
+                      </a>
+                      <a 
+                        href="https://wa.me/918310463417" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
+                      >
+                        <Phone className="w-4 h-4 text-emerald-400" />
+                        <span>WhatsApp (8310463417)</span>
+                      </a>
+                      <a 
+                        href="mailto:scoders82@gmail.com" 
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300 text-white"
+                      >
+                        <Mail className="w-4 h-4 text-brand-teal" />
+                        <span>scoders82@gmail.com</span>
                       </a>
                     </div>
                   </div>
