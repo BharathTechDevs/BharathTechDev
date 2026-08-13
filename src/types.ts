@@ -137,6 +137,7 @@ export interface SCODERSEvent {
 }
 
 export interface EventTicket {
+  id?: string;
   ticketCode: string;
   eventId: string;
   eventName: string;

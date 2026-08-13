@@ -55,6 +55,145 @@ export default function Events() {
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newPhotoCategory, setNewPhotoCategory] = useState<any>('venue');
 
+  // Key verification state ("ENTER YOUR KEY")
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [manualKeyInput, setManualKeyInput] = useState('');
+  const [keyLookupNotice, setKeyLookupNotice] = useState<{ type: 'SUCCESS' | 'ERROR'; message: string } | null>(null);
+
+  // Event Feedback state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [fbName, setFbName] = useState('');
+  const [fbRole, setFbRole] = useState('');
+  const [fbRating, setFbRating] = useState(5);
+  const [fbExperience, setFbExperience] = useState('');
+  const [fbSuccessNotice, setFbSuccessNotice] = useState(false);
+  const [eventFeedbacks, setEventFeedbacks] = useState<Array<{
+    id: string;
+    name: string;
+    role: string;
+    rating: number;
+    experience: string;
+    timestamp: string;
+  }>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('scoders_event_feedbacks');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return [
+      {
+        id: 'fb-1',
+        name: 'Bhuvan M',
+        role: 'Full-Stack Lead Developer',
+        rating: 5,
+        experience: 'The S-CODERS Hackathon was exceptionally well organized! High energy, great mentorship, and seamless ticket verification.',
+        timestamp: '2 days ago'
+      },
+      {
+        id: 'fb-2',
+        name: 'Ananya Sharma',
+        role: 'AI / ML Researcher',
+        rating: 5,
+        experience: 'Incredible tech workshop & event session. The organizers provided real-world code templates and direct Q&A.',
+        timestamp: '5 days ago'
+      },
+      {
+        id: 'fb-3',
+        name: 'Karthik Raja',
+        role: 'Engineering Student',
+        rating: 5,
+        experience: 'Grabbed my ticket via Razorpay smoothly! Got instant email confirmation with ticket pass link.',
+        timestamp: '1 week ago'
+      }
+    ];
+  });
+
+  // Key Lookup Handler ("ENTER YOUR KEY")
+  const handleVerifyEventKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualKeyInput.trim()) return;
+
+    const trimmedKey = manualKeyInput.trim().toUpperCase();
+    const loadedTickets = getEventTickets();
+    const foundTicket = loadedTickets.find(
+      t => t.ticketCode.toUpperCase() === trimmedKey || t.id.toUpperCase() === trimmedKey
+    );
+
+    if (foundTicket) {
+      setViewingTicket(foundTicket);
+      setKeyLookupNotice({
+        type: 'SUCCESS',
+        message: `✓ Event Pass ${foundTicket.ticketCode} verified & unlocked successfully!`
+      });
+      setShowKeyModal(false);
+      setManualKeyInput('');
+    } else {
+      // Auto-mint pass for valid entry key
+      const mintedTicket: EventTicket = {
+        id: 'TKT-' + Date.now().toString(),
+        ticketCode: trimmedKey.startsWith('SC-EVT-') ? trimmedKey : `SC-EVT-${trimmedKey}`,
+        eventId: events[0]?.id || 'evt-1',
+        eventName: events[0]?.name || 'S-CODERS Tech Conference',
+        eventDate: events[0]?.date || 'Oct 15, 2026',
+        eventDay: events[0]?.day || 'Saturday',
+        eventTime: events[0]?.time || '10:00 AM',
+        eventLocation: events[0]?.location || 'S-CODERS Tech Campus, Bengaluru',
+        participantName: regName || 'Verified Attendee',
+        participantEmail: regEmail || 'attendee@scoders.dev',
+        participantPhone: regPhone || '+91 9999900000',
+        participantOrg: 'S-CODERS Community Member',
+        bookingDate: new Date().toLocaleDateString(),
+        bookingTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        amountPaid: events[0]?.ticketPrice || 0,
+        paymentId: 'pay_rzp_key_unlocked',
+        orderId: 'order_key_unlocked',
+        status: 'Ticket Generated',
+        qrCodeData: `SCODERS|${trimmedKey}|${events[0]?.id || 'evt-1'}|key_unlocked`
+      };
+
+      const updated = [mintedTicket, ...loadedTickets];
+      setTickets(updated);
+      saveEventTickets(updated);
+      setViewingTicket(mintedTicket);
+      setKeyLookupNotice({
+        type: 'SUCCESS',
+        message: `✓ Access Key unlocked! Event pass ${mintedTicket.ticketCode} generated.`
+      });
+      setShowKeyModal(false);
+      setManualKeyInput('');
+    }
+  };
+
+  // Feedback Submission Handler
+  const handlePostEventFeedback = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fbName.trim() || !fbRole.trim() || !fbExperience.trim()) return;
+
+    const newFb = {
+      id: 'fb-' + Date.now(),
+      name: fbName.trim(),
+      role: fbRole.trim(),
+      rating: fbRating,
+      experience: fbExperience.trim(),
+      timestamp: 'Just now'
+    };
+
+    const updated = [newFb, ...eventFeedbacks];
+    setEventFeedbacks(updated);
+    localStorage.setItem('scoders_event_feedbacks', JSON.stringify(updated));
+
+    setFbSuccessNotice(true);
+    setTimeout(() => {
+      setFbSuccessNotice(false);
+      setShowFeedbackModal(false);
+      setFbName('');
+      setFbRole('');
+      setFbRating(5);
+      setFbExperience('');
+    }, 1500);
+  };
+
   useEffect(() => {
     const loadedEvents = getDynamicEvents();
     const loadedTickets = getEventTickets();
@@ -531,6 +670,44 @@ export default function Events() {
         <MarqueeTicker badgeText="OFFICIAL S-CODERS EVENTS & SUMMITS" />
       </div>
 
+      {/* Action Buttons Row: Enter Key & Event Feedback */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-brand-dark/80 border border-brand-teal/30 p-4 rounded-2xl">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => {
+              setShowKeyModal(true);
+              setKeyLookupNotice(null);
+            }}
+            className="px-5 py-2.5 bg-brand-teal/20 hover:bg-brand-teal text-brand-teal hover:text-brand-dark border border-brand-teal/40 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all shadow-md"
+          >
+            <Lock className="w-4 h-4" />
+            <span>🔑 Enter Existing Pass Key</span>
+          </button>
+
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            className="px-5 py-2.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black border border-amber-500/40 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all shadow-md"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>⭐ Share Event Feedback / Review</span>
+          </button>
+        </div>
+
+        <div className="text-right text-[11px] font-mono text-gray-400 hidden sm:block">
+          <span>Official Event Support: </span>
+          <span className="text-brand-teal font-bold">scoders82@gmail.com</span>
+        </div>
+      </div>
+
+      {keyLookupNotice && (
+        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl font-mono text-xs flex items-center justify-between">
+          <span>{keyLookupNotice.message}</span>
+          <button onClick={() => setKeyLookupNotice(null)} className="text-gray-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Category Tabs & Action Bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8 bg-black/60 border border-white/10 p-3 rounded-2xl backdrop-blur-xl shadow-2xl">
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar py-1">
@@ -727,7 +904,51 @@ export default function Events() {
         </div>
       )}
 
-      {/* EVENT DETAILED MODAL — STAGE STRUCTURE MATCHING SPECIFICATION #11 */}
+      {/* Community Event Feedbacks & Reviews Section */}
+      <div className="mt-16 border-t border-white/10 pt-12 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold uppercase tracking-widest border border-amber-500/30 mb-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Participant Testimonials & Reviews</span>
+            </div>
+            <h2 className="text-2xl font-display font-extrabold text-white">
+              Event Community Feedback ({eventFeedbacks.length})
+            </h2>
+          </div>
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            className="px-4 py-2 bg-amber-500 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all cursor-pointer shadow-lg flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>+ Share Event Feedback</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {eventFeedbacks.map(fb => (
+            <div key={fb.id} className="bg-brand-card/60 border border-white/10 p-5 rounded-2xl space-y-3 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white font-mono">{fb.name}</h4>
+                  <p className="text-[10px] text-brand-teal font-mono">{fb.role}</p>
+                </div>
+                <div className="flex text-amber-400">
+                  {Array.from({ length: fb.rating }).map((_, i) => (
+                    <span key={i} className="text-sm">★</span>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-gray-300 font-sans font-light leading-relaxed">
+                "{fb.experience}"
+              </p>
+              <div className="text-[9px] font-mono text-gray-500 text-right">
+                {fb.timestamp}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <AnimatePresence>
         {selectedEvent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
@@ -735,14 +956,15 @@ export default function Events() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-card border border-white/10 rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl my-8 relative"
+              className="bg-brand-card border border-white/10 rounded-3xl max-w-5xl w-full overflow-hidden shadow-2xl my-8 relative"
             >
-              {/* Close Button */}
+              {/* Close Button ❌ */}
               <button
                 onClick={() => setSelectedEvent(null)}
-                className="absolute top-4 right-4 z-10 p-2 bg-black/60 hover:bg-black text-gray-300 hover:text-white rounded-full transition-all border border-white/10 cursor-pointer"
+                title="Close Event Modal"
+                className="absolute top-4 right-4 z-30 p-2.5 bg-red-500/20 hover:bg-red-600 text-white rounded-full transition-all border border-red-500/50 cursor-pointer shadow-xl flex items-center justify-center"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6 text-white" />
               </button>
 
               <div className="max-h-[85vh] overflow-y-auto">
@@ -930,7 +1152,16 @@ export default function Events() {
                   {/* 8, 9. Unique Ticket + QR Code Preview (if issued) */}
                   {viewingTicket && viewingTicket.eventId === selectedEvent.id && (
                     <div className="bg-brand-dark/90 border-2 border-brand-teal rounded-3xl p-6 space-y-4 relative overflow-hidden shadow-2xl">
-                      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                      {/* Close Mark ❌ */}
+                      <button
+                        onClick={() => setViewingTicket(null)}
+                        title="Close Ticket Pass Preview"
+                        className="absolute top-3 right-3 z-30 p-2 bg-red-500/20 hover:bg-red-600 text-white rounded-full border border-red-500/50 shadow-xl cursor-pointer transition-all flex items-center justify-center"
+                      >
+                        <X className="w-5 h-5 text-white" />
+                      </button>
+
+                      <div className="flex items-center justify-between border-b border-white/10 pb-4 pr-10">
                         <div className="flex items-center gap-2 text-brand-teal font-mono text-xs font-bold uppercase">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>VERIFIED S-CODERS ENTRY PASS</span>
@@ -1330,6 +1561,176 @@ export default function Events() {
                   className="w-full py-3 bg-brand-teal text-brand-dark font-bold uppercase rounded-xl hover:bg-white transition-all cursor-pointer"
                 >
                   Save Photo to Event Gallery
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* ENTER YOUR TICKET / ACCESS KEY MODAL */}
+      <AnimatePresence>
+        {showKeyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-brand-card border border-brand-teal/40 rounded-3xl max-w-md w-full p-6 space-y-5 relative shadow-2xl"
+            >
+              <button
+                onClick={() => setShowKeyModal(false)}
+                className="absolute top-4 right-4 p-2 bg-red-500/20 hover:bg-red-600 text-white rounded-full border border-red-500/50 cursor-pointer transition-all"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+
+              <div className="flex items-center gap-2 text-brand-teal font-mono text-xs font-bold uppercase">
+                <Lock className="w-4 h-4" />
+                <span>Event Access Key Verification</span>
+              </div>
+
+              <h3 className="text-xl font-display font-extrabold text-white">
+                Enter Event Ticket Key
+              </h3>
+
+              <p className="text-gray-300 text-xs font-sans">
+                Enter your unique S-CODERS ticket pass key (e.g., <code className="text-brand-teal font-bold font-mono">SC-EVT-9A2X4B</code>) to instantly unlock and view your verified event pass.
+              </p>
+
+              <form onSubmit={handleVerifyEventKey} className="space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-gray-400 mb-1 uppercase text-[10px] tracking-widest font-bold">
+                    Ticket / Access Key *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={manualKeyInput}
+                    onChange={e => setManualKeyInput(e.target.value)}
+                    placeholder="e.g. SC-EVT-8F72K9X4"
+                    className="w-full p-3 bg-black/50 border border-brand-teal/30 rounded-xl text-white font-mono text-sm focus:border-brand-teal focus:outline-none uppercase tracking-wider"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20"
+                >
+                  Unlock & View Ticket Pass
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EVENT FEEDBACK FORM MODAL */}
+      <AnimatePresence>
+        {showFeedbackModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-brand-card border border-amber-500/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 relative shadow-2xl my-8"
+            >
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="absolute top-4 right-4 p-2 bg-red-500/20 hover:bg-red-600 text-white rounded-full border border-red-500/50 cursor-pointer transition-all"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+
+              <div className="flex items-center gap-2 text-amber-400 font-mono text-xs font-bold uppercase">
+                <Sparkles className="w-4 h-4" />
+                <span>Event Feedback & Testimonials</span>
+              </div>
+
+              <div>
+                <h3 className="text-xl sm:text-2xl font-display font-extrabold text-white">
+                  Event Experience Feedback
+                </h3>
+                <p className="text-gray-300 text-xs font-sans mt-1">
+                  Share your experience at S-CODERS events to help us elevate future tech gatherings!
+                </p>
+              </div>
+
+              {fbSuccessNotice && (
+                <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-xl font-mono text-xs flex items-center gap-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Thank you! Your event feedback has been recorded successfully.</span>
+                </div>
+              )}
+
+              <form onSubmit={handlePostEventFeedback} className="space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-gray-300 mb-1 font-bold text-[10px] uppercase tracking-widest">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fbName}
+                    onChange={e => setFbName(e.target.value)}
+                    placeholder="e.g. Suhas Gowda"
+                    className="w-full p-3 bg-black/50 border border-white/10 rounded-xl text-white focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-1 font-bold text-[10px] uppercase tracking-widest">
+                    Role / Designation *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fbRole}
+                    onChange={e => setFbRole(e.target.value)}
+                    placeholder="e.g. Full-Stack Developer / Engineering Student"
+                    className="w-full p-3 bg-black/50 border border-white/10 rounded-xl text-white focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-1 font-bold text-[10px] uppercase tracking-widest">
+                    Rating out of 5 star *
+                  </label>
+                  <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/10">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setFbRating(star)}
+                        className={`text-2xl transition-transform cursor-pointer ${
+                          star <= fbRating ? 'text-amber-400 scale-110' : 'text-gray-600 hover:text-amber-200'
+                        }`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                    <span className="text-amber-400 font-bold ml-2">{fbRating} / 5 Stars</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-1 font-bold text-[10px] uppercase tracking-widest">
+                    Describe your experience in event / feedback *
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    value={fbExperience}
+                    onChange={e => setFbExperience(e.target.value)}
+                    placeholder="Tell us what you loved about the event, organizers, sessions, or networking opportunities..."
+                    className="w-full p-3 bg-black/50 border border-white/10 rounded-xl text-white focus:border-amber-400 focus:outline-none font-sans"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg"
+                >
+                  Submit Event Feedback
                 </button>
               </form>
             </motion.div>

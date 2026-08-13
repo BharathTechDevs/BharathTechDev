@@ -277,6 +277,21 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       console.error("Database Engine Enquiry Save Error:", dbErr);
     }
 
+    // Trigger email notification for project idea registration (from scoders82@gmail.com)
+    try {
+      fetch('/api/email/service-accepted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          clientName: clientName.trim(),
+          serviceTitle: `S-CODERS Custom ${activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Next.js Website' : 'Single Webpage'}`,
+          uniqueKey: `BTD-PROJ-${Date.now().toString(36).toUpperCase()}`,
+          actionUrl: `${window.location.origin}/?view=services`
+        })
+      }).catch(err => console.warn("Project idea email send notice:", err));
+    } catch (e) {}
+
     setFormSubmitted(true);
   };
 

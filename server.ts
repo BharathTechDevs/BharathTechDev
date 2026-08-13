@@ -27,7 +27,7 @@ function getServiceAcceptanceEmailHtml({
     <html>
     <head>
       <meta charset="utf-8">
-      <title>S-CODERS Project Profile Accepted</title>
+      <title>S-CODERS Project Idea Registered</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
@@ -42,9 +42,9 @@ function getServiceAcceptanceEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 24px 32px; text-align: center;">
-                  <div style="display: inline-block; padding: 8px 20px; border-radius: 9999px; background-color: rgba(34, 211, 238, 0.15); border: 1px solid #22D3EE;">
-                    <span style="font-size: 13px; font-weight: 700; color: #22D3EE; text-transform: uppercase; tracking-wider;">
-                      ✓ YOUR PROJECT PROFILE IS ACCEPTED SUCCESSFULLY
+                  <div style="display: inline-block; padding: 10px 24px; border-radius: 9999px; background-color: rgba(34, 211, 238, 0.15); border: 1px solid #22D3EE;">
+                    <span style="font-size: 13px; font-weight: 800; color: #22D3EE; text-transform: uppercase;">
+                      ✓ PROJECT IDEA REGISTERED SUCCESSFULLY
                     </span>
                   </div>
                 </td>
@@ -52,8 +52,11 @@ function getServiceAcceptanceEmailHtml({
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
-                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0;">
-                    Your project profile for <strong>${serviceTitle}</strong> has been reviewed and accepted successfully by the S-CODERS engineering team.
+                  <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
+                    Your project idea has been got registered and our team will contact you within 24hrs thank you for choosing S-CODERS Bharath tech developers.
+                  </p>
+                  <p style="font-size: 13px; color: #94A3B8; margin: 0;">
+                    Project Scope: <strong>${serviceTitle}</strong>
                   </p>
                 </td>
               </tr>
@@ -61,7 +64,7 @@ function getServiceAcceptanceEmailHtml({
                 <td style="padding: 0 32px 30px 32px;">
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px; text-align: center;">
                     <tr>
-                      <td style="font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace; letter-spacing: 1px;">Your Unique Project Access Key</td>
+                      <td style="font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace; letter-spacing: 1px;">Your Unique Service Registration Key</td>
                     </tr>
                     <tr>
                       <td style="padding: 12px 0; font-size: 22px; font-weight: 900; color: #22D3EE; font-family: monospace; letter-spacing: 2px;">
@@ -70,7 +73,7 @@ function getServiceAcceptanceEmailHtml({
                     </tr>
                     <tr>
                       <td style="padding-top: 10px; font-size: 13px; color: #CBD5E1;">
-                        Click the button below to open our website and enter your unique key to unlock your project dashboard, chat workspace, and source code specifications.
+                        You can enter this access key on our website anytime to track your project progress and communicate with our engineering team.
                       </td>
                     </tr>
                     <tr>
@@ -85,7 +88,7 @@ function getServiceAcceptanceEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -144,7 +147,7 @@ function getWorkshopEmailHtml({
                 <td style="padding: 24px 32px; text-align: center;">
                   <div style="display: inline-block; padding: 8px 20px; border-radius: 9999px; background-color: ${isSuccess ? 'rgba(34, 211, 238, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; border: 1px solid ${isSuccess ? '#22D3EE' : '#EF4444'};">
                     <span style="font-size: 13px; font-weight: 700; color: ${isSuccess ? '#22D3EE' : '#FCA5A5'}; text-transform: uppercase;">
-                      ${isSuccess ? '✓ YOUR PAYMENT HAS BEEN DONE SUCCESSFULLY' : '✕ YOUR PAYMENT GOT FAILED'}
+                      ${isSuccess ? '✓ PAYMENT DONE SUCCESSFULLY' : '✕ PAYMENT FAILED'}
                     </span>
                   </div>
                 </td>
@@ -152,10 +155,17 @@ function getWorkshopEmailHtml({
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
-                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0;">
-                    ${isSuccess
-                      ? `Your payment of <strong>${formattedAmount} ${currency}</strong> for the workshop masterclass <strong>"${workshopTitle}"</strong> has been completed successfully via Razorpay.`
-                      : `Your payment attempt for <strong>"${workshopTitle}"</strong> failed. Details are listed below.`}
+                  ${isSuccess ? `
+                    <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
+                      Your payment has been done successfully and thank you for choosing S-CODERS Bharath tech developers and you can continue with the workshop session.
+                    </p>
+                  ` : `
+                    <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
+                      Your payment has been failed so kindly try once again for payment.
+                    </p>
+                  `}
+                  <p style="font-size: 13px; color: #94A3B8; margin: 0;">
+                    Workshop Title: <strong>${workshopTitle}</strong> (Amount: ${formattedAmount} ${currency})
                   </p>
                 </td>
               </tr>
@@ -165,22 +175,22 @@ function getWorkshopEmailHtml({
                     ${isSuccess ? `
                       <tr>
                         <td style="padding-bottom: 8px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Your Unique Workshop Access Key</td>
-                        <td align="right" style="padding-bottom: 8px; font-size: 16px; font-weight: 900; color: #22D3EE; font-family: monospace;">${uniqueKey}</td>
+                        <td align="right" style="padding-bottom: 8px; font-size: 16px; font-weight: 900; color: #22D3EE; font-family: monospace;">${uniqueKey || 'BTD-WKSH-PASS'}</td>
                       </tr>
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Razorpay Payment ID:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${paymentId}</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${paymentId || 'pay_rzp_scoders'}</td>
                       </tr>
                     ` : `
                       <tr>
-                        <td style="padding: 6px 0; font-size: 13px; color: #EF4444; font-weight: 700;">Failure Reason:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${reason || 'Payment cancelled or declined.'}</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #EF4444; font-weight: 700;">Failure Details:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${reason || 'Payment was declined or interrupted.'}</td>
                       </tr>
                     `}
                     <tr>
                       <td colspan="2" align="center" style="padding-top: 20px;">
                         <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: ${isSuccess ? '#22D3EE' : '#EF4444'}; color: ${isSuccess ? '#0B0F17' : '#FFFFFF'}; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                          ${isSuccess ? 'Open Website & Enter Unique Key →' : 'Retry Payment on Website →'}
+                          ${isSuccess ? 'Open Website & Access Workshop Session →' : 'Retry Payment on Website →'}
                         </a>
                       </td>
                     </tr>
@@ -189,7 +199,7 @@ function getWorkshopEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -248,7 +258,7 @@ function getEventEmailHtml({
                 <td style="padding: 24px 32px; text-align: center;">
                   <div style="display: inline-block; padding: 8px 20px; border-radius: 9999px; background-color: ${isSuccess ? 'rgba(34, 211, 238, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; border: 1px solid ${isSuccess ? '#22D3EE' : '#EF4444'};">
                     <span style="font-size: 13px; font-weight: 700; color: ${isSuccess ? '#22D3EE' : '#FCA5A5'}; text-transform: uppercase;">
-                      ${isSuccess ? '✓ YOUR PAYMENT HAS BEEN DONE SUCCESSFULLY' : '✕ YOUR PAYMENT GOT FAILED'}
+                      ${isSuccess ? '✓ PAYMENT DONE SUCCESSFULLY' : '✕ PAYMENT METHOD FAILED'}
                     </span>
                   </div>
                 </td>
@@ -256,10 +266,17 @@ function getEventEmailHtml({
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
-                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0;">
-                    ${isSuccess
-                      ? `Your ticket payment of <strong>${formattedAmount} ${currency}</strong> for <strong>"${eventTitle}"</strong> has been completed successfully.`
-                      : `Your event ticket payment attempt for <strong>"${eventTitle}"</strong> failed.`}
+                  ${isSuccess ? `
+                    <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
+                      Your payment has been done successfully so here are your tickets just grab it!
+                    </p>
+                  ` : `
+                    <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
+                      Your payment method has been failed so try once again.
+                    </p>
+                  `}
+                  <p style="font-size: 13px; color: #94A3B8; margin: 0;">
+                    Event: <strong>${eventTitle}</strong> (${formattedAmount} ${currency})
                   </p>
                 </td>
               </tr>
@@ -268,23 +285,28 @@ function getEventEmailHtml({
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
                     ${isSuccess ? `
                       <tr>
-                        <td style="padding-bottom: 8px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Your Verified Event Pass Code</td>
-                        <td align="right" style="padding-bottom: 8px; font-size: 16px; font-weight: 900; color: #22D3EE; font-family: monospace;">${ticketCode}</td>
+                        <td style="padding-bottom: 8px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Verified Event Pass Code</td>
+                        <td align="right" style="padding-bottom: 8px; font-size: 18px; font-weight: 900; color: #22D3EE; font-family: monospace;">${ticketCode}</td>
                       </tr>
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Payment Txn ID:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${paymentId}</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${paymentId || 'pay_rzp_scoders'}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 14px; font-size: 12px; color: #94A3B8; border-top: 1px solid #1E293B;">
+                          You can view your ticket pass both right here in this email and on our website by clicking the link below:
+                        </td>
                       </tr>
                     ` : `
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #EF4444; font-weight: 700;">Failure Reason:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${reason || 'Payment cancelled or declined.'}</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${reason || 'Payment method failed or was declined.'}</td>
                       </tr>
                     `}
                     <tr>
                       <td colspan="2" align="center" style="padding-top: 20px;">
                         <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: ${isSuccess ? '#22D3EE' : '#EF4444'}; color: ${isSuccess ? '#0B0F17' : '#FFFFFF'}; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                          ${isSuccess ? 'View Your Booked Ticket Pass →' : 'Retry Ticket Booking →'}
+                          ${isSuccess ? 'Click Here to View Ticket on Website →' : 'Retry Payment Method on Website →'}
                         </a>
                       </td>
                     </tr>
@@ -293,7 +315,7 @@ function getEventEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -454,7 +476,7 @@ async function sendEmailNotification({
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const port = Number(process.env.SMTP_PORT) || 587;
-  const from = process.env.SMTP_FROM || '"S-CODERS Billing" <billing@scoders.dev>';
+  const from = process.env.SMTP_FROM || '"S-CODERS (Bharath Tech Developers)" <scoders82@gmail.com>';
 
   let transporter;
   if (host && user && pass) {
