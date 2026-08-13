@@ -115,4 +115,46 @@ export interface AppUser {
   createdAt: string;
 }
 
+export interface SCODERSEvent {
+  id: string;
+  name: string;
+  bannerImage: string;
+  date: string;
+  day: string;
+  time: string;
+  location: string;
+  description: string;
+  category: 'hackathon' | 'networking' | 'workshop' | 'ai' | 'developer' | 'community' | 'founder';
+  ticketPrice: number;
+  status: 'upcoming' | 'ongoing' | 'completed';
+  featured?: boolean;
+  eventPhotos: {
+    id: string;
+    caption: string;
+    imageUrl: string;
+    category?: 'venue' | 'speakers' | 'participants' | 'activities' | 'highlights' | 'behind_the_scenes';
+  }[];
+}
+
+export interface EventTicket {
+  ticketCode: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  eventDay: string;
+  eventTime: string;
+  eventLocation: string;
+  participantName: string;
+  participantEmail: string;
+  participantPhone: string;
+  participantOrg?: string;
+  bookingDate: string;
+  bookingTime: string;
+  amountPaid: number;
+  paymentId: string;
+  orderId: string;
+  status: 'Payment Pending' | 'Payment Failed' | 'Payment Successful' | 'Ticket Generated' | 'Ticket Cancelled';
+  qrCodeData: string;
+}
+
 

@@ -19,6 +19,7 @@ import Contact from './components/Contact';
 import AIAssistant from './components/AIAssistant';
 import AdminConsole from './components/AdminConsole';
 import Networking from './components/Networking';
+import Events from './components/Events';
 import AuthPortal from './components/AuthPortal';
 import Policies from './components/Policies';
 
@@ -114,7 +115,7 @@ interface PrefilledPaymentData {
 
 export default function App() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<'home' | 'about' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'portal' | 'policies'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies'>('home');
   const [activePolicyTab, setActivePolicyTab] = useState<string>('terms');
   const [prefilledPayment, setPrefilledPayment] = useState<PrefilledPaymentData | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -449,8 +450,19 @@ export default function App() {
             >
               {/* Company Origin, Roadmap & Values */}
               <Suspense fallback={<ViewLoader />}>
-                <About />
+                <About onNavigate={(v) => setCurrentView(v)} />
               </Suspense>
+            </motion.div>
+          )}
+
+          {currentView === 'crew' && (
+            <motion.div
+              key="crew"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
+            >
               {/* Team Members & Cultural blueprint */}
               <Suspense fallback={<ViewLoader />}>
                 <Team />
@@ -512,6 +524,21 @@ export default function App() {
               {/* Live photostream and credibility certificates */}
               <Suspense fallback={<ViewLoader />}>
                 <Networking />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {currentView === 'events' && (
+            <motion.div
+              key="events"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Official S-CODERS Events, Hackathons & Verified Passes */}
+              <Suspense fallback={<ViewLoader />}>
+                <Events />
               </Suspense>
             </motion.div>
           )}
@@ -627,7 +654,8 @@ export default function App() {
                 <button onClick={() => { setCurrentView('home'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Home</button>
                 <button onClick={() => { setCurrentView('services'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Services</button>
                 <button onClick={() => { setCurrentView('workshops'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Workshops</button>
-                <button onClick={() => { setCurrentView('about'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About & Crew</button>
+                <button onClick={() => { setCurrentView('about'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About Us</button>
+                <button onClick={() => { setCurrentView('crew'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">The Crew</button>
                 <button onClick={() => { setCurrentView('communities'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Communities</button>
                 <button onClick={() => { setCurrentView('networking'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Networking & Achievements</button>
                 <button onClick={() => { setCurrentView('contact'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Contact</button>

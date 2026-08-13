@@ -8,6 +8,7 @@ import {
   Phone, Mail, MessageSquare, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import MarqueeTicker from './MarqueeTicker';
 import { PROJECT_EXAMPLES } from '../data';
 import { getDynamicServices, saveDynamicServices } from '../utils/dynamicData';
 import { ServiceEnquiry, Service, AppUser } from '../types';
@@ -86,6 +87,20 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     };
     window.addEventListener('scoders_auth_change', handleSyncAuth);
     window.addEventListener('focus', handleSyncAuth);
+
+    // Check for direct service key link from email button (?key=BTD-SERV-XXXX)
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const keyParam = params.get('key') || params.get('serviceKey');
+      if (keyParam) {
+        setInputtedKey(keyParam.toUpperCase());
+        setModalMode('enterKey');
+        if (services.length > 0) {
+          setRegisteringService(services[0]);
+        }
+      }
+    } catch (e) {}
+
     return () => {
       window.removeEventListener('scoders_auth_change', handleSyncAuth);
       window.removeEventListener('focus', handleSyncAuth);
@@ -424,6 +439,23 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       console.error("Database Engine Service Registration Error:", dbErr);
     }
 
+    // Trigger automated email dispatch to user's registered email
+    try {
+      fetch('/api/email/service-accepted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regEmail,
+          clientName: regName,
+          serviceTitle: registeringService.title,
+          uniqueKey: generatedKey,
+          actionUrl: `${window.location.origin}/?view=services&key=${generatedKey}`
+        })
+      }).catch(err => console.warn("Service email send notice:", err));
+    } catch (emailErr) {
+      console.warn("Service email trigger error:", emailErr);
+    }
+
     setRegSuccessKey(generatedKey);
   };
 
@@ -513,8 +545,9 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             const isUnlocked = !!registration;
 
             return (
-              <div
+              <motion.div
                 key={service.id}
+                whileHover={{ y: -6, transition: { duration: 0.2 } }}
                 className={`glass-panel p-8 rounded-3xl border transition-all duration-300 flex flex-col justify-between group relative overflow-hidden ${
                   isUnlocked 
                     ? 'border-brand-teal/30 shadow-lg shadow-brand-teal/5 bg-brand-card/70' 
@@ -683,9 +716,14 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                     "{service.value}"
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
+        </div>
+
+        {/* Continuous Moving Animation Marquee for Options & Tech Stack */}
+        <div className="mb-12">
+          <MarqueeTicker />
         </div>
 
         {/* Interactive Case Showcase & Client Requirements Panel */}
@@ -702,22 +740,36 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               </p>
             </div>
 
-            {/* Category selection button-like tabs */}
-            <div className="flex justify-center gap-3 sm:gap-4 mb-12">
-              {(['app', 'website', 'webpage'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => handleTabChange(tab)}
-                  className={`px-6 py-3 rounded-full text-xs sm:text-sm font-mono tracking-wider uppercase border font-bold transition-all duration-300 flex items-center gap-2 cursor-pointer ${
-                    activeTab === tab
-                      ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-lg shadow-brand-teal/20 scale-105'
-                      : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/20 hover:bg-white/10'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${activeTab === tab ? 'bg-brand-dark animate-pulse' : 'bg-gray-500'}`} />
-                  {tab === 'app' ? 'Mobile Apps' : tab === 'website' ? 'Web Platforms' : 'Landing Pages'}
-                </button>
-              ))}
+            {/* Animated Category Option Tabs with Smooth Motion Pill */}
+            <div className="relative mb-12 flex justify-center">
+              <div className="flex items-center gap-2 p-1.5 bg-black/60 border border-white/10 rounded-full backdrop-blur-xl max-w-full overflow-x-auto no-scrollbar shadow-2xl">
+                {(['app', 'website', 'webpage'] as const).map((tab) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => handleTabChange(tab)}
+                      className={`relative px-6 py-3 rounded-full text-xs sm:text-sm font-mono tracking-wider uppercase font-extrabold transition-all duration-300 flex items-center gap-2.5 cursor-pointer whitespace-nowrap z-10 ${
+                        isActive
+                          ? 'text-brand-dark'
+                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeServiceTabPill"
+                          className="absolute inset-0 bg-brand-teal rounded-full shadow-lg shadow-brand-teal/30 z-0"
+                          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        />
+                      )}
+                      <span className={`relative z-10 w-2 h-2 rounded-full ${isActive ? 'bg-brand-dark animate-pulse' : 'bg-gray-500'}`} />
+                      <span className="relative z-10">
+                        {tab === 'app' ? 'Mobile Apps' : tab === 'website' ? 'Web Platforms' : 'Landing Pages'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Showcase projects list according to category tab */}

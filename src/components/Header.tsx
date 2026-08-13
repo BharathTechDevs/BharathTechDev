@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Menu, X, Terminal, ArrowRight, ChevronDown, 
   Cpu, BookOpen, Users, Globe, Receipt, Mail, Camera, Shield,
-  LogOut, Key, User, Home, ClipboardCheck
+  LogOut, Key, User, Home, ClipboardCheck, Calendar, Target, Users2, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
@@ -32,6 +32,9 @@ export default function Header({
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   
+  const navRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+
   // Mobile accordion state
   const [mobileExpandedGroup, setMobileExpandedGroup] = useState<string | null>('Solutions');
 
@@ -42,6 +45,30 @@ export default function Header({
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+      }
+      if (userRef.current && !userRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto expand active group on mobile menu open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      const activeGroup = menuGroups.find(g => g.items.some(i => i.view === currentView));
+      if (activeGroup) {
+        setMobileExpandedGroup(activeGroup.label);
+      }
+    }
+  }, [mobileMenuOpen, currentView]);
 
   const menuGroups = [
     {
@@ -54,7 +81,8 @@ export default function Header({
     {
       label: 'Company',
       items: [
-        { name: 'About & Crew', desc: 'Our engineering heritage, leadership team & roadmap', view: 'about', icon: Users },
+        { name: 'About Us', desc: 'Our engineering heritage, vision, mission & roadmap', view: 'about', icon: Target },
+        { name: 'The Crew', desc: 'Meet our leadership team & engineering brain trust', view: 'crew', icon: Users2 },
         { name: 'Communities', desc: 'Thriving developer chapters & tech networking events', view: 'communities', icon: Globe },
         { name: 'Rules & Policies', desc: 'Terms, privacy, refunds & delivery parameters', view: 'policies', icon: ClipboardCheck }
       ]
@@ -63,7 +91,7 @@ export default function Header({
       label: 'Engage',
       items: [
         { name: 'Networking & Achievements', desc: 'Live event photostream, certificates & credibility boards', view: 'networking', icon: Camera },
-        { name: 'Contact', desc: 'Get in touch with our team for consultations or questions', view: 'contact', icon: Mail }
+        { name: 'Events', desc: 'Announcements, registrations & tickets for upcoming S-CODERS events', view: 'events', icon: Calendar }
       ]
     },
     {
@@ -75,7 +103,6 @@ export default function Header({
     }
   ];
 
-  // Helper to determine if a group contains the active view
   const isGroupActive = (group: any) => {
     return group.items.some((item: any) => item.view && item.view === currentView);
   };
@@ -85,78 +112,80 @@ export default function Header({
       id="app-header"
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-[#011425]/90 backdrop-blur-md border-b border-[#5C7C89]/20 py-4 shadow-xl'
-          : 'bg-transparent py-6'
+          ? 'bg-[#011425]/95 backdrop-blur-md border-b border-[#5C7C89]/20 py-3 sm:py-4 shadow-xl'
+          : 'bg-gradient-to-b from-[#011425]/80 via-[#011425]/40 to-transparent py-4 sm:py-6'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           {/* Logo */}
-          <div className="group text-left hover:scale-102 transition-transform duration-200">
+          <div className="group text-left shrink-0">
             <Logo 
               size="sm" 
               showSubtitle={true} 
               lightBg={false}
               horizontal={false}
-              className="!items-start !text-left"
+              className="!items-start !text-left scale-90 sm:scale-100 origin-left"
               onAdminClick={() => { onViewChange('admin'); window.scrollTo(0, 0); }} 
               onClick={() => { onViewChange('home'); window.scrollTo(0, 0); }}
             />
           </div>
- 
-          {/* Desktop Dropdown Navigation System */}
-          <nav className="hidden md:flex items-center gap-1">
+
+          {/* Desktop & Laptop Navigation System (lg+) */}
+          <nav ref={navRef} className="hidden lg:flex items-center gap-1 xl:gap-2">
             {/* Home Option */}
             <button
               onClick={() => { onViewChange('home'); window.scrollTo(0, 0); }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
+              className={`px-3 xl:px-4 py-2 rounded-xl text-xs xl:text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
                 currentView === 'home'
-                  ? 'text-white bg-[#1F4959] border border-[#5C7C89]/30'
+                  ? 'text-white bg-[#1F4959] border border-[#5C7C89]/40 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-[#1F4959]/50'
               }`}
             >
               Home
             </button>
- 
+
             {menuGroups.map((group) => {
               const groupActive = isGroupActive(group);
               const isOpen = activeDropdown === group.label;
- 
+
               return (
                 <div
                   key={group.label}
-                  className="relative py-2 px-1"
+                  className="relative py-2 px-0.5"
                   onMouseEnter={() => setActiveDropdown(group.label)}
                   onMouseLeave={() => setActiveDropdown(null)}
                 >
                   <button
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
+                    onClick={() => setActiveDropdown(isOpen ? null : group.label)}
+                    className={`flex items-center gap-1 px-3 xl:px-4 py-2 rounded-xl text-xs xl:text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
                       isOpen || groupActive
-                        ? 'text-white bg-[#1F4959] border border-[#5C7C89]/30'
+                        ? 'text-white bg-[#1F4959] border border-[#5C7C89]/40'
                         : 'text-slate-300 hover:text-white hover:bg-[#1F4959]/50'
                     }`}
                   >
                     <span>{group.label}</span>
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isOpen ? 'rotate-180 text-[#5C7C89]' : 'text-slate-400'}`} />
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isOpen ? 'rotate-180 text-brand-teal' : 'text-slate-400'}`} />
                   </button>
- 
+
                   {/* High-Fidelity Dropdown Sub-menu */}
                   <AnimatePresence>
                     {isOpen && (
                       <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         transition={{ duration: 0.15, ease: 'easeOut' }}
-                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 bg-[#1F4959] border border-[#5C7C89]/30 rounded-2xl p-4 shadow-2xl z-50 backdrop-blur-xl"
+                        className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-80 bg-[#1F4959]/95 border border-[#5C7C89]/40 rounded-2xl p-3 shadow-2xl z-50 backdrop-blur-xl"
                       >
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-2.5 h-2.5 rotate-45 bg-[#1F4959] border-t border-l border-[#5C7C89]/30" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-2.5 h-2.5 rotate-45 bg-[#1F4959] border-t border-l border-[#5C7C89]/40" />
                         
                         <div className="space-y-1 relative z-10">
                           {group.items.map((item) => {
                             if ((item as any).requiresSession && !hasActiveSessions) return null;
                             const IconComponent = item.icon;
                             const itemActive = item.view ? currentView === item.view : false;
+
                             return (
                               <button
                                 key={item.name}
@@ -171,16 +200,16 @@ export default function Header({
                                   setActiveDropdown(null);
                                   window.scrollTo(0, 0);
                                 }}
-                                className={`w-full text-left p-3 rounded-xl transition-all duration-200 flex items-start gap-3 cursor-pointer group/item ${
+                                className={`w-full text-left p-2.5 rounded-xl transition-all duration-200 flex items-start gap-3 cursor-pointer group/item ${
                                   itemActive
-                                    ? 'bg-brand-teal/10 border border-brand-teal/20'
+                                    ? 'bg-brand-teal/15 border border-brand-teal/30'
                                     : 'hover:bg-white/5 border border-transparent'
                                 }`}
                               >
                                 <div className={`p-2 rounded-lg shrink-0 transition-colors ${
                                   itemActive 
                                     ? 'bg-brand-teal/20 text-brand-teal' 
-                                    : 'bg-brand-dark text-gray-500 group-hover/item:text-brand-teal group-hover/item:bg-brand-teal/10'
+                                    : 'bg-brand-dark text-gray-400 group-hover/item:text-brand-teal group-hover/item:bg-brand-teal/10'
                                 }`}>
                                   <IconComponent className="w-4 h-4" />
                                 </div>
@@ -190,7 +219,7 @@ export default function Header({
                                   }`}>
                                     {item.name}
                                   </div>
-                                  <p className="text-[10px] text-gray-400 font-sans leading-normal">
+                                  <p className="text-[10px] text-gray-300 font-sans leading-normal">
                                     {item.desc}
                                   </p>
                                 </div>
@@ -205,38 +234,45 @@ export default function Header({
               );
             })}
           </nav>
- 
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-3">
+
+          {/* Right Header Controls (Desktop & Tablet) */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick AI Consultant trigger button visible on all desktop / laptop screens */}
+            <button
+              onClick={onOpenAssistant}
+              className="hidden sm:flex items-center gap-2 px-3 sm:px-4 py-2 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 rounded-xl text-xs font-mono font-bold text-brand-teal transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">AI Consultant</span>
+            </button>
+
             {user ? (
-              /* Authenticated User Status Tab with Custom Dropdown */
-              <div className="relative">
+              /* Authenticated User Menu */
+              <div ref={userRef} className="relative">
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  onBlur={() => setTimeout(() => setUserDropdownOpen(false), 250)}
-                  className="flex items-center gap-2 px-4 py-2 border rounded-full text-xs font-mono font-bold tracking-wider uppercase transition-all duration-300 shadow shadow-brand-teal/5 cursor-pointer focus:outline-none bg-brand-card/80 border-brand-teal/30 hover:border-white text-brand-teal hover:text-white"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 border rounded-full text-xs font-mono font-bold tracking-wider uppercase transition-all duration-300 cursor-pointer focus:outline-none bg-brand-card/80 border-brand-teal/30 hover:border-white text-brand-teal hover:text-white"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-brand-teal animate-pulse" />
-                  <span>{user.name.split(' ')[0]}</span>
-                  <ChevronDown className={`w-3.5 h-3.5 opacity-50 transition-transform duration-300 ${userDropdownOpen ? 'rotate-180 text-white' : ''}`} />
+                  <span className="max-w-[80px] sm:max-w-none truncate">{user.name.split(' ')[0]}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 opacity-60 transition-transform duration-300 ${userDropdownOpen ? 'rotate-180 text-white' : ''}`} />
                 </button>
- 
+
                 <AnimatePresence>
                   {userDropdownOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-2.5 w-56 bg-brand-card border border-white/10 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl z-50 text-left"
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-56 bg-brand-card border border-white/10 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl z-50 text-left"
                     >
                       <div className="px-3 py-2 border-b border-white/5 mb-1.5">
                         <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest font-bold">Partner Account</p>
                         <p className="text-xs font-bold text-white truncate mt-0.5">{user.name}</p>
                         <p className="text-[9px] font-mono text-brand-teal truncate mt-0.5">{user.company}</p>
                       </div>
- 
+
                       <div className="space-y-0.5">
-                        {/* Unified Portal Access */}
                         <button
                           onClick={() => {
                             onViewChange('portal');
@@ -249,7 +285,6 @@ export default function Header({
                           <span>My Workspace Portal</span>
                         </button>
 
-                        {/* Logout Option */}
                         <button
                           onClick={() => {
                             onLogout();
@@ -268,60 +303,91 @@ export default function Header({
                 </AnimatePresence>
               </div>
             ) : null}
+
+            {/* Mobile / Tablet Drawer Toggle Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle Navigation Menu"
+              aria-expanded={mobileMenuOpen}
+              className="lg:hidden p-2.5 rounded-xl border border-white/10 bg-brand-card/60 hover:bg-white/10 transition-colors cursor-pointer focus:outline-none text-gray-300 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5 text-brand-teal" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
- 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg transition-colors cursor-pointer focus:outline-none text-gray-400 hover:text-white hover:bg-white/5"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
         </div>
       </div>
- 
-      {/* Mobile Menu dropdown */}
+
+      {/* Responsive Mobile / Tablet Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="md:hidden bg-[#0B0C10] border-b border-white/5 overflow-hidden"
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="lg:hidden bg-[#011425]/98 border-b border-white/10 overflow-hidden shadow-2xl backdrop-blur-2xl"
           >
-            <div className="px-4 pt-2 pb-6 space-y-4">
+            <div className="px-4 pt-3 pb-8 space-y-4 max-h-[82vh] overflow-y-auto custom-scrollbar">
               
-              {/* Categorized Collapsible Lists on Mobile */}
-              <div className="space-y-3">
-                {/* Home Option on Mobile */}
+              {/* Quick Assistant Callout on Mobile */}
+              <button
+                onClick={() => {
+                  onOpenAssistant();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full min-h-[44px] p-3 rounded-2xl bg-gradient-to-r from-brand-teal/20 via-brand-teal/10 to-transparent border border-brand-teal/30 flex items-center justify-between text-brand-teal text-xs font-mono font-bold uppercase tracking-wider cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Terminal className="w-4 h-4 text-brand-teal animate-pulse" />
+                  <span>Consult S-CODERS AI Agent</span>
+                </div>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              {/* Navigation Options */}
+              <div className="space-y-2.5">
+                {/* Home Link */}
                 <button
                   onClick={() => {
                     onViewChange('home');
                     setMobileMenuOpen(false);
                     window.scrollTo(0, 0);
                   }}
-                  className={`w-full flex items-center justify-between px-4 py-3 border rounded-2xl bg-brand-card/20 text-xs font-mono font-bold tracking-wider uppercase transition-all duration-300 cursor-pointer focus:outline-none ${
+                  className={`w-full min-h-[44px] flex items-center justify-between px-4 py-3 border rounded-2xl text-xs font-mono font-bold tracking-wider uppercase transition-all duration-300 cursor-pointer focus:outline-none ${
                     currentView === 'home'
-                      ? 'text-brand-teal border-brand-teal/20 bg-brand-teal/5'
-                      : 'text-gray-400 hover:text-white border-white/5'
+                      ? 'text-brand-teal border-brand-teal/40 bg-brand-teal/10 shadow-sm'
+                      : 'text-gray-300 hover:text-white border-white/10 bg-brand-card/30'
                   }`}
                 >
-                  <span>Home</span>
+                  <span className="flex items-center gap-2">
+                    <Home className="w-4 h-4 text-brand-teal" />
+                    Home
+                  </span>
                 </button>
- 
+
                 {menuGroups.map((group) => {
                   const isExpanded = mobileExpandedGroup === group.label;
+                  const groupContainsActive = isGroupActive(group);
+
                   return (
-                    <div key={group.label} className="border border-white/5 rounded-2xl bg-brand-card/20 overflow-hidden">
+                    <div 
+                      key={group.label} 
+                      className={`border rounded-2xl overflow-hidden transition-colors ${
+                        groupContainsActive 
+                          ? 'border-brand-teal/30 bg-brand-card/50' 
+                          : 'border-white/10 bg-brand-card/20'
+                      }`}
+                    >
                       <button
                         onClick={() => setMobileExpandedGroup(isExpanded ? null : group.label)}
-                        className="w-full flex justify-between items-center px-4 py-3 text-xs font-mono font-bold tracking-wider uppercase text-gray-400 hover:text-white focus:outline-none"
+                        className="w-full min-h-[44px] flex justify-between items-center px-4 py-3 text-xs font-mono font-bold tracking-wider uppercase text-gray-300 hover:text-white focus:outline-none cursor-pointer"
                       >
-                        <span>{group.label}</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180 text-brand-teal' : ''}`} />
+                        <span className={groupContainsActive ? 'text-brand-teal font-extrabold' : ''}>
+                          {group.label}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-brand-teal' : 'text-gray-400'}`} />
                       </button>
- 
+
                       <AnimatePresence initial={false}>
                         {isExpanded && (
                           <motion.div
@@ -335,6 +401,7 @@ export default function Header({
                               if ((item as any).requiresSession && !hasActiveSessions) return null;
                               const IconComponent = item.icon;
                               const itemActive = item.view ? currentView === item.view : false;
+
                               return (
                                 <button
                                   key={item.name}
@@ -349,18 +416,18 @@ export default function Header({
                                     setMobileMenuOpen(false);
                                     window.scrollTo(0, 0);
                                   }}
-                                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                                  className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer text-left ${
                                     itemActive
-                                      ? 'text-brand-teal bg-brand-teal/10 font-bold'
-                                      : 'text-gray-300 hover:text-brand-teal hover:bg-white/5'
+                                      ? 'text-brand-teal bg-brand-teal/15 font-bold border border-brand-teal/20'
+                                      : 'text-gray-300 hover:text-brand-teal hover:bg-white/5 border border-transparent'
                                   }`}
                                 >
-                                  <div className={`p-1.5 rounded-lg shrink-0 ${itemActive ? 'bg-brand-teal/20 text-brand-teal' : 'bg-[#0B0C10] text-gray-500'}`}>
-                                    <IconComponent className="w-3.5 h-3.5" />
+                                  <div className={`p-2 rounded-lg shrink-0 ${itemActive ? 'bg-brand-teal/20 text-brand-teal' : 'bg-brand-dark/80 text-gray-400'}`}>
+                                    <IconComponent className="w-4 h-4" />
                                   </div>
-                                  <div className="text-left">
-                                    <span className="text-xs block font-bold">{item.name}</span>
-                                    <span className="text-[9px] text-gray-500 block leading-tight font-sans">{item.desc}</span>
+                                  <div>
+                                    <span className="text-xs block font-bold text-white">{item.name}</span>
+                                    <span className="text-[10px] text-gray-400 block leading-tight font-sans mt-0.5">{item.desc}</span>
                                   </div>
                                 </button>
                               );
@@ -372,38 +439,36 @@ export default function Header({
                   );
                 })}
               </div>
- 
-              <div className="pt-4 flex flex-col gap-3">
-                {user ? (
-                  <div className="space-y-2.5">
-                    <div className="p-4 bg-brand-card rounded-2xl border border-brand-teal/20 text-center space-y-1">
-                      <p className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Partner Account ({user.role})</p>
-                      <h4 className="text-sm font-bold text-white">{user.name}</h4>
-                      <p className="text-[10px] text-gray-500 font-mono">{user.company}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        onViewChange('portal');
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full py-3 bg-brand-teal text-[#0B0C10] rounded-xl text-center text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer focus:outline-none font-bold"
-                    >
-                      Client & Team Portal
-                    </button>
-                    <button
-                      onClick={() => {
-                        onLogout();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-center text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer focus:outline-none"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                ) : null}
- 
 
-              </div>
+              {/* Mobile User Actions */}
+              {user && (
+                <div className="pt-2 space-y-2">
+                  <div className="p-3 bg-brand-card rounded-2xl border border-brand-teal/20 space-y-1">
+                    <p className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Signed in as</p>
+                    <h4 className="text-xs font-bold text-white">{user.name}</h4>
+                    <p className="text-[10px] text-gray-400 font-mono">{user.company}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onViewChange('portal');
+                      setMobileMenuOpen(false);
+                      window.scrollTo(0, 0);
+                    }}
+                    className="w-full min-h-[44px] py-2.5 bg-brand-teal text-[#011425] rounded-xl text-center text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer focus:outline-none"
+                  >
+                    Client & Team Portal
+                  </button>
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full min-h-[44px] py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-center text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer focus:outline-none"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -411,3 +476,4 @@ export default function Header({
     </header>
   );
 }
+

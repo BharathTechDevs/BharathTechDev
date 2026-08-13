@@ -33,20 +33,30 @@ export default function Communities() {
         </div>
 
         {/* Community selection Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-12">
-          {STARTUP_COMMUNITIES.map((comm) => (
-            <button
-              key={comm.id}
-              onClick={() => setSelectedCommunityId(comm.id)}
-              className={`p-4 rounded-xl border text-center font-display text-xs sm:text-sm font-semibold tracking-wide transition-all duration-300 cursor-pointer ${
-                selectedCommunityId === comm.id
-                  ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-lg shadow-brand-teal/15 scale-105 font-bold'
-                  : 'bg-brand-card/40 border-white/5 text-gray-400 hover:text-white hover:border-white/10 hover:bg-brand-card/60'
-              }`}
-            >
-              {comm.name}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-12">
+          {STARTUP_COMMUNITIES.map((comm) => {
+            const isSelected = selectedCommunityId === comm.id;
+            return (
+              <button
+                key={comm.id}
+                onClick={() => setSelectedCommunityId(comm.id)}
+                className={`relative p-4 rounded-2xl border text-center font-display text-xs sm:text-sm font-semibold tracking-wide transition-all duration-300 cursor-pointer ${
+                  isSelected
+                    ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-lg shadow-brand-teal/20 scale-105 font-bold'
+                    : 'bg-brand-card/40 border-white/5 text-gray-400 hover:text-white hover:border-white/10 hover:bg-brand-card/60'
+                }`}
+              >
+                {isSelected && (
+                  <motion.div
+                    layoutId="activeCommunityGlow"
+                    className="absolute inset-0 bg-brand-teal/20 rounded-2xl blur-sm -z-10"
+                    transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                  />
+                )}
+                <span className="relative z-10">{comm.name}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Detailed Selected Community Showcase Card */}

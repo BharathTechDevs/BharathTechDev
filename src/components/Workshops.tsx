@@ -6,6 +6,7 @@ import {
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import MarqueeTicker from './MarqueeTicker';
 import { INITIAL_COMMENTS } from '../data';
 import { getDynamicWorkshops, saveDynamicWorkshops } from '../utils/dynamicData';
 import { WorkshopComment, WorkshopEvent, AppUser } from '../types';
@@ -132,6 +133,17 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     };
     window.addEventListener('scoders_auth_change', handleSyncAuth);
     window.addEventListener('focus', handleSyncAuth);
+
+    // Check for direct key link from email button (?key=BTD-WKSP-XXXX)
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const keyParam = params.get('key') || params.get('workshopKey');
+      if (keyParam) {
+        setManualKey(keyParam.toUpperCase());
+        setRegMode('enterKey');
+      }
+    } catch (e) {}
+
     return () => {
       window.removeEventListener('scoders_auth_change', handleSyncAuth);
       window.removeEventListener('focus', handleSyncAuth);
@@ -510,6 +522,25 @@ export default function TenantDashboard() {
       console.error("Database Engine Workshop Registration Error:", dbErr);
     }
 
+    // Trigger automated success email dispatch
+    try {
+      fetch('/api/email/workshop-payment-verified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: activeClient.email,
+          clientName: activeClient.name,
+          workshopTitle: activeWorkshop.title,
+          amount: (activeWorkshop.price ?? 1499) * payTicketsCount,
+          uniqueKey: generatedKey,
+          paymentId: 'PAY_WKSP_' + Date.now().toString(36).toUpperCase(),
+          actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
+        })
+      }).catch(err => console.warn("Workshop email dispatch warning:", err));
+    } catch (emailErr) {
+      console.warn("Workshop email dispatch error:", emailErr);
+    }
+
     setGeneratedWorkshopKey(generatedKey);
   };
 
@@ -599,9 +630,48 @@ export default function TenantDashboard() {
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
       setRegSuccessKey(generatedKey);
+
+      // Trigger automated success email dispatch
+      try {
+        fetch('/api/email/workshop-payment-verified', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: regEmail,
+            clientName: regName,
+            workshopTitle: activeWorkshop.title,
+            amount: (activeWorkshop.price ?? 1499) * payTicketsCount,
+            uniqueKey: generatedKey,
+            paymentId: 'PAY_WKSP_' + Date.now().toString(36).toUpperCase(),
+            actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
+          })
+        }).catch(err => console.warn("Workshop email dispatch warning:", err));
+      } catch (emailErr) {
+        console.warn("Workshop email dispatch error:", emailErr);
+      }
+
       setPaymentSimulating(false);
       setPaymentStep(false);
     }, 2000);
+  };
+
+  const handleSimulatePaymentFailure = (reason: string = "Payment cancelled or declined by user") => {
+    try {
+      fetch('/api/email/workshop-payment-failed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regEmail || currentUser?.email || 'attendee@scoders.com',
+          clientName: regName || currentUser?.name || 'Valued Participant',
+          workshopTitle: activeWorkshop.title,
+          amount: (activeWorkshop.price ?? 1499) * payTicketsCount,
+          reason: reason,
+          actionUrl: `${window.location.origin}/?view=workshops`
+        })
+      }).catch(err => console.warn("Workshop failure email warning:", err));
+    } catch (emailErr) {
+      console.warn("Workshop failure email error:", emailErr);
+    }
   };
 
   const handleVerifyManualKey = (e: React.FormEvent) => {
@@ -824,48 +894,65 @@ export default function TenantDashboard() {
           </p>
         </div>
 
+        {/* Continuous Moving Animation Marquee for Workshop Options */}
+        <div className="mb-12">
+          <MarqueeTicker badgeText="EXPLORE WORKSHOP TOPICS & MODULES" />
+        </div>
+
         {/* Selected Workshop Visual Showcase Billboard */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16 items-start">
           
           {/* LEFT: Workshop selector buttons & brief timeline */}
           <div className="lg:col-span-4 space-y-4">
-            <div className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2 pl-2">Select Workshop Event</div>
-            {workshops.map((w) => (
-              <button
-                key={w.id}
-                onClick={() => setSelectedWorkshopId(w.id)}
-                className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col cursor-pointer ${
-                  selectedWorkshopId === w.id
-                    ? 'bg-brand-card border-brand-teal/40 shadow-lg shadow-brand-teal/5'
-                    : 'bg-brand-card/40 border-white/5 hover:border-white/10 hover:bg-brand-card/60'
-                }`}
-              >
-                {selectedWorkshopId === w.id && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-teal" />
-                )}
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest">{w.category}</span>
-                  {registeredKeys[w.id] ? (
-                    <span className="text-[8px] font-mono px-1.5 py-0.5 bg-brand-teal/10 border border-brand-teal/20 text-brand-teal rounded-full font-bold uppercase animate-pulse">Unlocked</span>
-                  ) : (
-                    <span className="text-[8px] font-mono px-1.5 py-0.5 bg-amber-400/10 border border-amber-400/20 text-amber-400 rounded-full font-bold uppercase">Locked</span>
+            <div className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2 pl-2">Select Workshop Event Option</div>
+            {workshops.map((w) => {
+              const isSelected = selectedWorkshopId === w.id;
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => setSelectedWorkshopId(w.id)}
+                  className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col cursor-pointer group ${
+                    isSelected
+                      ? 'bg-brand-card border-brand-teal/60 shadow-xl shadow-brand-teal/10 scale-[1.02]'
+                      : 'bg-brand-card/30 border-white/5 hover:border-white/20 hover:bg-brand-card/50'
+                  }`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="activeWorkshopOptionBorder"
+                      className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-teal rounded-r"
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    />
                   )}
-                </div>
-                <span className="font-display font-bold text-white text-base leading-snug mb-2 group-hover:text-brand-teal transition-colors">
-                  {w.title}
-                </span>
-                <div className="flex items-center justify-between text-xs text-gray-500 font-mono mt-auto flex-wrap gap-y-1">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-brand-coral" />
-                    {w.date}
+                  <div className="flex items-center justify-between mb-1 z-10">
+                    <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">{w.category}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30">
+                        ₹{(w.price ?? 1499).toLocaleString()}
+                      </span>
+                      {registeredKeys[w.id] ? (
+                        <span className="text-[8px] font-mono px-2 py-0.5 bg-brand-teal/10 border border-brand-teal/30 text-brand-teal rounded-full font-bold uppercase animate-pulse">Unlocked</span>
+                      ) : (
+                        <span className="text-[8px] font-mono px-2 py-0.5 bg-amber-400/10 border border-amber-400/30 text-amber-400 rounded-full font-bold uppercase">Locked</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="font-display font-bold text-white text-base sm:text-lg leading-snug mb-2 group-hover:text-brand-teal transition-colors z-10">
+                    {w.title}
                   </span>
-                  <span className="flex items-center gap-1 text-amber-400 font-bold text-[10px]">
-                    <Clock className="w-3 h-3 text-amber-400" />
-                    {w.startTime || '10:00 AM IST'} • {w.duration || '2 Days'}
-                  </span>
-                </div>
-              </button>
-            ))}
+                  <div className="flex items-center justify-between text-xs text-gray-400 font-mono mt-auto flex-wrap gap-y-1 z-10">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-brand-coral" />
+                      {w.date}
+                    </span>
+                    <span className="flex items-center gap-1 text-amber-400 font-bold text-[10px]">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      {w.startTime || '10:00 AM IST'} • {w.duration || '2 Days'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
             {workshops.length === 0 && (
               <p className="text-gray-500 text-xs font-mono p-4">No active workshops found.</p>
             )}
@@ -895,6 +982,10 @@ export default function TenantDashboard() {
                   {/* Badge & Meta overlay */}
                   <div className="absolute bottom-6 left-6 right-6 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3 text-xs font-mono text-white flex-wrap">
+                      <span className="flex items-center gap-1.5 px-3 py-1 bg-brand-dark/90 backdrop-blur-md rounded border border-emerald-400/40 text-emerald-300 font-mono font-black text-xs shadow-lg">
+                        <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                        Amount: ₹{(activeWorkshop.price ?? 1499).toLocaleString()}
+                      </span>
                       <span className="flex items-center gap-1.5 px-2.5 py-1 bg-brand-dark/80 backdrop-blur-md rounded border border-brand-teal/30 text-brand-teal font-semibold">
                         <Calendar className="w-3.5 h-3.5 text-brand-teal" />
                         {activeWorkshop.date}
@@ -918,7 +1009,12 @@ export default function TenantDashboard() {
                 {/* Event Summary Details */}
                 <div className="p-8 sm:p-10">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <span className="text-xs font-mono text-brand-teal uppercase tracking-widest">{activeWorkshop.category}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-brand-teal uppercase tracking-widest">{activeWorkshop.category}</span>
+                      <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-400/10 px-2.5 py-0.5 rounded border border-emerald-400/30">
+                        Fee: ₹{(activeWorkshop.price ?? 1499).toLocaleString()}
+                      </span>
+                    </div>
                     <span className="text-xs font-mono text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
                       Duration: {activeWorkshop.duration || '2 Days (8 Hours Total)'}
                     </span>
@@ -1188,6 +1284,15 @@ export default function TenantDashboard() {
                         <p className="text-gray-400 text-xs font-sans max-w-md mx-auto leading-relaxed">
                           Developer sandboxes, session codes, slides, and simulated attendee discussion streams are restricted. Please register to obtain your session key.
                         </p>
+
+                        {/* Workshop Amount Callout Box */}
+                        <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-2xl p-3 max-w-sm mx-auto flex items-center justify-between my-2">
+                          <div className="text-left">
+                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block font-bold">Workshop Ticket Fee</span>
+                            <span className="text-lg font-display font-black text-emerald-400">₹{(activeWorkshop.price ?? 1499).toLocaleString()} <span className="text-xs text-gray-400 font-normal font-sans">/ seat</span></span>
+                          </div>
+                          <span className="text-[10px] font-mono text-emerald-300 bg-emerald-400/20 px-2.5 py-1 rounded font-bold">All Inclusive</span>
+                        </div>
                         
                         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
                           <button
@@ -1197,10 +1302,10 @@ export default function TenantDashboard() {
                               setRegSuccessKey(null);
                               setPayTicketsCount(seatCount);
                             }}
-                            className="px-5 py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            className="px-6 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-teal/20"
                           >
                             <Key className="w-4 h-4" />
-                            Register to Join Workshop
+                            Register & Pay ₹{(activeWorkshop.price ?? 1499).toLocaleString()}
                           </button>
                           <button
                             onClick={() => {
@@ -2079,6 +2184,15 @@ export default function TenantDashboard() {
 
                     {regMode === 'register' ? (
                       <form onSubmit={handleRegisterWorkshop} className="space-y-3.5">
+                        {/* Workshop Fee summary card */}
+                        <div className="bg-emerald-400/10 border border-emerald-400/20 rounded-xl p-3 text-left flex items-center justify-between mb-2">
+                          <div>
+                            <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest block font-bold">Workshop Ticket Amount</span>
+                            <span className="text-base font-display font-black text-emerald-400">₹{(activeWorkshop.price ?? 1499).toLocaleString()} <span className="text-[10px] text-gray-400 font-sans font-normal">per seat</span></span>
+                          </div>
+                          <span className="text-[10px] font-mono text-emerald-300 bg-emerald-400/20 px-2 py-1 rounded font-bold">Verified Rate</span>
+                        </div>
+
                         {currentUser && (
                           <div className="bg-brand-teal/5 border border-brand-teal/20 rounded-xl p-2.5 text-[10px] text-brand-teal flex items-center gap-2 mb-1 font-mono">
                             <Check className="w-3.5 h-3.5 shrink-0" />
@@ -2130,7 +2244,7 @@ export default function TenantDashboard() {
                             className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <Sparkles className="w-4 h-4 fill-current animate-pulse" />
-                            Proceed to Payment Securely
+                            Proceed to Pay ₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} Securely
                           </button>
                         </div>
                       </form>

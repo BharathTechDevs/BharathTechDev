@@ -603,7 +603,7 @@ export default function Networking() {
                 </div>
                 <h4 className="font-display font-bold text-white text-lg">Outstanding Tech Community Contribution</h4>
                 <p className="text-gray-400 text-xs leading-relaxed font-sans font-light">
-                  Awarded to S-CODERS leadership by regional community groups for driving extensive AI agent architectural awareness and multi-agent systems deployment masterclasses across South India.
+                  Awarded to S-CODERS leadership by regional community groups for driving extensive AI agent architectural awareness and multi-agent systems deployment masterclasses across India.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">

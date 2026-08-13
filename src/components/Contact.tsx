@@ -57,6 +57,7 @@ export default function Contact() {
   };
 
   const socialLinks = [
+    { name: 'Email Support', icon: <Mail className="w-5 h-5" />, href: 'mailto:scoders82@gmail.com', color: 'hover:text-brand-teal hover:border-brand-teal' },
     { name: 'Instagram', icon: <Instagram className="w-5 h-5" />, href: 'https://www.instagram.com/scoders2025?igsh=Ym1jcG01czR1MHdj', color: 'hover:text-[#e4405f] hover:border-[#e4405f]' },
     { name: 'WhatsApp', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/918310463417', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
     { name: 'YouTube', icon: <Youtube className="w-5 h-5" />, href: 'https://www.youtube.com/@S-CODERS', color: 'hover:text-[#ff0000] hover:border-[#ff0000]' },
@@ -117,7 +118,7 @@ export default function Contact() {
                 </div>
                 <div className="flex gap-3 text-sm font-sans font-light text-gray-300">
                   <Mail className="w-5 h-5 text-brand-coral shrink-0 mt-0.5" />
-                  <span>consult@scoders.dev</span>
+                  <a href="mailto:scoders82@gmail.com" className="hover:text-brand-teal transition-colors">scoders82@gmail.com</a>
                 </div>
               </div>
             </div>
@@ -127,16 +128,18 @@ export default function Contact() {
               <h4 className="font-display font-bold text-sm uppercase tracking-widest text-gray-400 pl-2">Official Platforms</h4>
               <div className="grid grid-cols-2 gap-3">
                 {socialLinks.map((link, idx) => (
-                  <a
+                  <motion.a
                     key={idx}
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    whileHover={{ y: -3, scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className={`p-4 bg-brand-card/40 hover:bg-white/5 border border-white/5 rounded-2xl flex items-center gap-3 text-sm font-medium text-gray-300 transition-all duration-300 ${link.color} cursor-pointer`}
                   >
                     <div className="shrink-0">{link.icon}</div>
                     <span>{link.name}</span>
-                  </a>
+                  </motion.a>
                 ))}
               </div>
             </div>
