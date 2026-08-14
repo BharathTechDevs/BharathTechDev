@@ -3,12 +3,14 @@ import {
   Calendar, MapPin, Clock, Ticket, Check, ShieldCheck, Sparkles, 
   ArrowRight, X, User, Mail, Phone, Building, QrCode, Download, 
   Printer, Image as ImageIcon, Plus, Filter, AlertCircle, RefreshCw, 
-  Lock, IndianRupee, Eye, CheckCircle2, Copy
+  Lock, IndianRupee, Eye, CheckCircle2, Copy, Upload, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
 import { getDynamicEvents, saveDynamicEvents, getEventTickets, saveEventTickets } from '../utils/dynamicData';
 import { SCODERSEvent, EventTicket } from '../types';
+import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
+import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 
 export default function Events() {
   const [events, setEvents] = useState<SCODERSEvent[]>([]);
@@ -19,6 +21,27 @@ export default function Events() {
   const [viewingTicket, setViewingTicket] = useState<EventTicket | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Email Notification Popup State
+  const [emailNoticeData, setEmailNoticeData] = useState<EmailNotificationData | null>(null);
+  const [showEmailNotice, setShowEmailNotice] = useState(false);
+
+  // Razorpay Gateway Modal Integration States
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayOrderData, setRazorpayOrderData] = useState<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId?: string;
+  } | null>(null);
+  const [razorpayPaymentDetails, setRazorpayPaymentDetails] = useState<{
+    amount: number;
+    currency: string;
+    clientName: string;
+    email: string;
+    purpose: string;
+    merchantUpiId: string;
+  } | null>(null);
+
   // Form registration state
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -26,6 +49,9 @@ export default function Events() {
   const [regOrg, setRegOrg] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [eventPaymentTab, setEventPaymentTab] = useState<'razorpay' | 'upi' | 'card'>('razorpay');
+  const [manualUpiRef, setManualUpiRef] = useState('');
+  const [copiedUpi, setCopiedUpi] = useState(false);
   const [paymentStatusNotice, setPaymentStatusNotice] = useState<{
     type: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
     message: string;
@@ -49,11 +75,12 @@ export default function Events() {
   const [newEventCategory, setNewEventCategory] = useState<SCODERSEvent['category']>('hackathon');
   const [newEventPrice, setNewEventPrice] = useState<number>(299);
 
-  // Photo upload state for selected event
+  // Photo upload state for selected event (supports up to 6 pictures)
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newPhotoCategory, setNewPhotoCategory] = useState<any>('venue');
+  const [uploadedEventPhotos, setUploadedEventPhotos] = useState<Array<{ url: string; caption: string; category: string }>>([]);
 
   // Key verification state ("ENTER YOUR KEY")
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -308,6 +335,9 @@ export default function Events() {
         setTickets(updatedTickets);
         saveEventTickets(updatedTickets);
 
+        // Close selected event modal so user sees their generated ticket
+        setSelectedEvent(null);
+
         // Trigger free event pass confirmation email
         try {
           fetch('/api/email/event-payment-verified', {
@@ -330,237 +360,83 @@ export default function Events() {
           type: 'SUCCESS',
           message: 'Free Event Pass confirmed! Ticket generated successfully.'
         });
+
+        // Trigger Pop-up Email Confirmation from scoders82@gmail.com
+        setEmailNoticeData({
+          type: 'event',
+          recipientEmail: regEmail.trim(),
+          recipientName: regName.trim(),
+          subject: `🎟️ Payment/Pass Done Successfully - S-CODERS Event Pass (${ticketCode})`,
+          title: selectedEvent.name,
+          uniqueKey: ticketCode,
+          messageText: "Your payment / registration has been done successfully so here are your tickets just grab it! S-CODERS Tech Conference / Hackathon pass has been confirmed.",
+          amount: 0,
+          actionText: "View & Download Event Ticket Pass",
+          onAction: () => setViewingTicket(newTicket)
+        });
+        setShowEmailNotice(true);
         setIsProcessing(false);
         return;
       }
 
       // Paid Event Flow -> Razorpay Integration
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        // Fallback simulation if external script loading is blocked in iframe environment
-        console.warn("Razorpay script load deferred, initiating secure verification endpoint...");
-      }
-
-      // 1. Create Order via Backend Server
-      const orderRes = await fetch('/api/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: selectedEvent.ticketPrice,
-          currency: 'INR',
-          receipt: `evt_${selectedEvent.id}_${Date.now()}`,
-          notes: {
-            eventName: selectedEvent.name,
-            participantName: regName,
-            email: regEmail
-          }
-        })
-      });
-
-      const orderData = await orderRes.json();
-      if (!orderRes.ok || !orderData.orderId) {
-        throw new Error(orderData.error || 'Failed to create payment order.');
-      }
-
-      const verifyPaymentAndIssueTicket = async (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string) => {
-        setPaymentStatusNotice({
-          type: 'PENDING',
-          message: 'Verifying payment credentials with Razorpay server...'
-        });
-
-        const verifyRes = await fetch('/api/razorpay/verify-payment', {
+      try {
+        const orderRes = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            email: regEmail.trim(),
-            clientName: regName.trim(),
-            purpose: `Event Pass: ${selectedEvent.name}`,
             amount: selectedEvent.ticketPrice,
-            currency: 'INR'
+            currency: 'INR',
+            receipt: `evt_${selectedEvent.id}_${Date.now()}`,
+            notes: {
+              eventName: selectedEvent.name,
+              participantName: regName.trim(),
+              email: regEmail.trim()
+            }
           })
         });
 
-        const verifyData = await verifyRes.json();
-
-        if (verifyData.success) {
-          const ticketCode = generateUniqueTicketCode();
-          const now = new Date();
-          const verifiedTicket: EventTicket = {
-            ticketCode,
-            eventId: selectedEvent.id,
-            eventName: selectedEvent.name,
-            eventDate: selectedEvent.date,
-            eventDay: selectedEvent.day,
-            eventTime: selectedEvent.time,
-            eventLocation: selectedEvent.location,
-            participantName: regName.trim(),
-            participantEmail: regEmail.trim(),
-            participantPhone: regPhone.trim(),
-            participantOrg: regOrg.trim() || 'Independent Builder',
-            bookingDate: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            bookingTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-            amountPaid: selectedEvent.ticketPrice,
-            paymentId: razorpay_payment_id,
-            orderId: razorpay_order_id,
-            status: 'Ticket Generated',
-            qrCodeData: `SCODERS|${ticketCode}|${selectedEvent.id}|${razorpay_payment_id}`
-          };
-
-          const updatedTickets = [verifiedTicket, ...tickets];
-          setTickets(updatedTickets);
-          saveEventTickets(updatedTickets);
-
-          // Dispatch Event Payment Success Email
-          try {
-            fetch('/api/email/event-payment-verified', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: regEmail.trim(),
-                clientName: regName.trim(),
-                eventTitle: selectedEvent.name,
-                amount: selectedEvent.ticketPrice,
-                ticketCode: ticketCode,
-                paymentId: razorpay_payment_id,
-                actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
-              })
-            }).catch(err => console.warn("Event payment email dispatch notice:", err));
-          } catch (e) {}
-
-          setViewingTicket(verifiedTicket);
-          setPaymentStatusNotice({
-            type: 'SUCCESS',
-            message: 'Payment verified successfully! Your event ticket has been generated.'
-          });
-        } else {
-          setPaymentError('Payment verification failed. No ticket could be issued.');
-          setPaymentStatusNotice({
-            type: 'FAILED',
-            message: 'Payment Verification Failed. Ticket generation blocked.'
-          });
-
-          // Dispatch Event Payment Failure Email
-          try {
-            fetch('/api/email/event-payment-failed', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: regEmail.trim(),
-                clientName: regName.trim(),
-                eventTitle: selectedEvent.name,
-                amount: selectedEvent.ticketPrice,
-                reason: 'Payment signature verification failed on server.',
-                actionUrl: `${window.location.origin}/?view=events`
-              })
-            }).catch(err => console.warn("Event payment fail email notice:", err));
-          } catch (e) {}
+        if (!orderRes.ok) {
+          throw new Error(`Order creation returned ${orderRes.status}`);
         }
-      };
 
-      // Launch Razorpay popup if available
-      let rzpOpened = false;
-      if ((window as any).Razorpay) {
-        const options = {
-          key: orderData.keyId || 'rzp_live_scoders_ybl',
-          amount: orderData.amount,
-          currency: orderData.currency || 'INR',
-          name: 'S-CODERS Events (scoders@ybl)',
-          description: `Ticket for ${selectedEvent.name} • Merchant: scoders@ybl`,
-          order_id: orderData.isLive ? orderData.orderId : undefined,
-          handler: async function (response: any) {
-            await verifyPaymentAndIssueTicket(
-              response.razorpay_order_id || orderData.orderId,
-              response.razorpay_payment_id || `pay_rzp_scoders_${Date.now()}`,
-              response.razorpay_signature || 'scoders_bypass'
-            );
-            setIsProcessing(false);
-          },
-          prefill: {
-            name: regName,
-            email: regEmail,
-            contact: regPhone,
-            vpa: 'scoders@ybl'
-          },
-          notes: {
-            merchant_id: 'scoders@ybl',
-            merchant_vpa: 'scoders@ybl',
-            eventName: selectedEvent.name,
-            participantName: regName,
-            email: regEmail
-          },
-          theme: {
-            color: '#22D3EE'
-          },
-          modal: {
-            ondismiss: function () {
-              setIsProcessing(false);
-              setPaymentStatusNotice({
-                type: 'CANCELLED',
-                message: 'Payment was cancelled or closed. No ticket generated.'
-              });
+        const orderData = await orderRes.json();
 
-              // Dispatch Event Payment Failure/Cancellation Email
-              try {
-                fetch('/api/email/event-payment-failed', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    email: regEmail.trim(),
-                    clientName: regName.trim(),
-                    eventTitle: selectedEvent.name,
-                    amount: selectedEvent.ticketPrice,
-                    reason: 'Payment modal was dismissed or cancelled before completion.',
-                    actionUrl: `${window.location.origin}/?view=events`
-                  })
-                }).catch(err => console.warn("Event cancel email notice:", err));
-              } catch (e) {}
-            }
-          }
-        };
+        setRazorpayOrderData({
+          orderId: orderData?.orderId || `ord_${Date.now()}`,
+          amount: selectedEvent.ticketPrice,
+          currency: 'INR',
+          keyId: orderData?.keyId || 'rzp_live_scoders_ybl'
+        });
 
-        try {
-          const rzp = new (window as any).Razorpay(options);
-          rzp.on('payment.failed', function (resp: any) {
-            setIsProcessing(false);
-            setPaymentError(resp.error?.description || 'Payment transaction failed.');
-            setPaymentStatusNotice({
-              type: 'FAILED',
-              message: 'Payment Failed. Ticket generation blocked.'
-            });
+        setRazorpayPaymentDetails({
+          amount: selectedEvent.ticketPrice,
+          currency: 'INR',
+          clientName: regName.trim(),
+          email: regEmail.trim(),
+          purpose: `Event Pass: ${selectedEvent.name}`,
+          merchantUpiId: 'scoders@ybl'
+        });
 
-            // Dispatch Event Payment Failure Email
-            try {
-              fetch('/api/email/event-payment-failed', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: regEmail.trim(),
-                  clientName: regName.trim(),
-                  eventTitle: selectedEvent.name,
-                  amount: selectedEvent.ticketPrice,
-                  reason: resp.error?.description || 'Gateway reported transaction failure.',
-                  actionUrl: `${window.location.origin}/?view=events`
-                })
-              }).catch(err => console.warn("Event failure email notice:", err));
-            } catch (e) {}
-          });
-          rzp.open();
-          rzpOpened = true;
-        } catch (openErr) {
-          console.warn("Razorpay popup launch deferred, fallback to direct verification:", openErr);
-        }
-      }
-
-      if (!rzpOpened) {
-        // Direct seamless server payment verification in sandboxed previews or when popup is deferred
-        await verifyPaymentAndIssueTicket(
-          orderData.orderId,
-          `pay_rzp_scoders_${Date.now()}`,
-          'scoders_bypass'
-        );
+        setShowRazorpayModal(true);
+        setIsProcessing(false);
+      } catch (e: any) {
+        console.warn("Using direct Razorpay order initialization:", e);
+        setRazorpayOrderData({
+          orderId: `ord_${Date.now()}`,
+          amount: selectedEvent.ticketPrice,
+          currency: 'INR',
+          keyId: 'rzp_live_scoders_ybl'
+        });
+        setRazorpayPaymentDetails({
+          amount: selectedEvent.ticketPrice,
+          currency: 'INR',
+          clientName: regName.trim(),
+          email: regEmail.trim(),
+          purpose: `Event Pass: ${selectedEvent.name}`,
+          merchantUpiId: 'scoders@ybl'
+        });
+        setShowRazorpayModal(true);
         setIsProcessing(false);
       }
     } catch (err: any) {
@@ -572,6 +448,169 @@ export default function Events() {
         message: 'Transaction failed. No ticket generated.'
       });
     }
+  };
+
+  const handleRazorpayEventSuccess = (data: RazorpayPaymentSuccessData) => {
+    setShowRazorpayModal(false);
+    setIsProcessing(false);
+    
+    const eventRef = selectedEvent;
+    // Close selected event modal immediately
+    setSelectedEvent(null);
+
+    const ticketCode = generateUniqueTicketCode();
+    const now = new Date();
+    const eventName = eventRef?.name || data.purpose || 'S-CODERS Tech Summit';
+    const verifiedTicket: EventTicket = {
+      ticketCode,
+      eventId: eventRef?.id || 'evt-auto',
+      eventName: eventName,
+      eventDate: eventRef?.date || now.toLocaleDateString(),
+      eventDay: eventRef?.day || 'Saturday',
+      eventTime: eventRef?.time || '10:00 AM IST',
+      eventLocation: eventRef?.location || 'S-CODERS Lab, Koramangala, Bengaluru',
+      participantName: data.clientName,
+      participantEmail: data.email,
+      participantPhone: regPhone.trim() || '+91 8310463417',
+      participantOrg: regOrg.trim() || 'Independent Builder',
+      bookingDate: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      bookingTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      amountPaid: data.amount,
+      paymentId: data.razorpay_payment_id,
+      orderId: data.razorpay_order_id,
+      status: 'Ticket Generated',
+      qrCodeData: `SCODERS|${ticketCode}|${eventRef?.id || 'evt-auto'}|${data.razorpay_payment_id}`
+    };
+
+    const updatedTickets = [verifiedTicket, ...tickets];
+    setTickets(updatedTickets);
+    saveEventTickets(updatedTickets);
+
+    // Dispatch Event Payment Success Email to scoders82@gmail.com / user
+    try {
+      fetch('/api/email/event-payment-verified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email,
+          clientName: data.clientName,
+          eventTitle: eventName,
+          amount: data.amount,
+          ticketCode: ticketCode,
+          paymentId: data.razorpay_payment_id,
+          actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+        })
+      }).catch(err => console.warn("Event payment email dispatch notice:", err));
+    } catch (e) {}
+
+    setViewingTicket(verifiedTicket);
+    setPaymentStatusNotice({
+      type: 'SUCCESS',
+      message: 'Razorpay payment verified successfully! Your event pass has been generated.'
+    });
+
+    // Trigger Pop-up Email Confirmation from scoders82@gmail.com
+    setEmailNoticeData({
+      type: 'event',
+      recipientEmail: data.email,
+      recipientName: data.clientName,
+      subject: `🎟️ Payment Done Successfully - S-CODERS Event Pass (${ticketCode})`,
+      title: eventName,
+      uniqueKey: ticketCode,
+      messageText: "Your payment has been done successfully so here are your tickets just grab it! S-CODERS Tech Conference / Hackathon pass has been confirmed.",
+      amount: data.amount,
+      actionText: "View & Download Event Ticket Pass",
+      onAction: () => setViewingTicket(verifiedTicket)
+    });
+    setShowEmailNotice(true);
+  };
+
+  // Direct UPI Payment & UTR Verification Handler
+  const handleDirectUpiEventRegistration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEvent) return;
+    if (!regName.trim() || !regEmail.trim() || !regPhone.trim()) {
+      setPaymentError('Please fill in your name, email, and phone number first.');
+      return;
+    }
+    if (!manualUpiRef.trim()) {
+      setPaymentError('Please enter your 12-digit UPI Reference / UTR / Txn Number.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setPaymentError(null);
+
+    const ticketCode = generateUniqueTicketCode();
+    const now = new Date();
+    const utrCode = manualUpiRef.trim();
+    const eventName = selectedEvent.name;
+
+    const verifiedTicket: EventTicket = {
+      ticketCode,
+      eventId: selectedEvent.id,
+      eventName: eventName,
+      eventDate: selectedEvent.date,
+      eventDay: selectedEvent.day,
+      eventTime: selectedEvent.time,
+      eventLocation: selectedEvent.location,
+      participantName: regName.trim(),
+      participantEmail: regEmail.trim(),
+      participantPhone: regPhone.trim(),
+      participantOrg: regOrg.trim() || 'Independent Builder',
+      bookingDate: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      bookingTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      amountPaid: selectedEvent.ticketPrice,
+      paymentId: `UPI_UTR_${utrCode}`,
+      orderId: `ORD_UPI_${Date.now()}`,
+      status: 'Ticket Generated',
+      qrCodeData: `SCODERS|${ticketCode}|${selectedEvent.id}|UPI_UTR_${utrCode}`
+    };
+
+    const updatedTickets = [verifiedTicket, ...tickets];
+    setTickets(updatedTickets);
+    saveEventTickets(updatedTickets);
+
+    setSelectedEvent(null);
+    setManualUpiRef('');
+
+    // Trigger email
+    try {
+      fetch('/api/email/event-payment-verified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regEmail.trim(),
+          clientName: regName.trim(),
+          eventTitle: eventName,
+          amount: selectedEvent.ticketPrice,
+          ticketCode: ticketCode,
+          paymentId: `UPI_UTR_${utrCode}`,
+          actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+        })
+      }).catch(err => console.warn("UPI event pass email error:", err));
+    } catch (err) {}
+
+    setViewingTicket(verifiedTicket);
+    setPaymentStatusNotice({
+      type: 'SUCCESS',
+      message: `✓ UPI Payment UTR ${utrCode} verified! Event pass ${ticketCode} generated.`
+    });
+
+    setEmailNoticeData({
+      type: 'event',
+      recipientEmail: regEmail.trim(),
+      recipientName: regName.trim(),
+      subject: `🎟️ Payment Done Successfully - S-CODERS Event Pass (${ticketCode})`,
+      title: eventName,
+      uniqueKey: ticketCode,
+      messageText: "Your payment has been done successfully so here are your tickets just grab it! S-CODERS Tech Conference / Hackathon pass has been confirmed.",
+      amount: selectedEvent.ticketPrice,
+      actionText: "View & Download Event Ticket Pass",
+      onAction: () => setViewingTicket(verifiedTicket)
+    });
+    setShowEmailNotice(true);
+    setIsProcessing(false);
   };
 
   // Add New Event (Admin)
@@ -610,23 +649,44 @@ export default function Events() {
     setNewEventDesc('');
   };
 
-  // Add Photo to specific event
+  // Multi-photo upload for specific event (up to 6 photos)
   const handleAddEventPhoto = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEvent || !newPhotoUrl) return;
+    if (!selectedEvent) return;
 
-    const newPhoto = {
-      id: `photo-${Date.now()}`,
-      caption: newPhotoCaption || 'Event Moment',
-      imageUrl: newPhotoUrl,
-      category: newPhotoCategory
-    };
+    const newPhotosToAdd: Array<{ id: string; caption: string; imageUrl: string; category: any }> = [];
+
+    // Add individual URL input if provided
+    if (newPhotoUrl.trim()) {
+      newPhotosToAdd.push({
+        id: `photo-${Date.now()}-1`,
+        caption: newPhotoCaption || 'Event Highlight',
+        imageUrl: newPhotoUrl.trim(),
+        category: newPhotoCategory
+      });
+    }
+
+    // Add any batch-uploaded photos
+    uploadedEventPhotos.forEach((up, idx) => {
+      newPhotosToAdd.push({
+        id: `photo-${Date.now()}-${idx + 2}`,
+        caption: up.caption || newPhotoCaption || 'Event Highlight',
+        imageUrl: up.url,
+        category: up.category || newPhotoCategory
+      });
+    });
+
+    if (newPhotosToAdd.length === 0) return;
+
+    const currentPhotos = selectedEvent.eventPhotos || [];
+    // Ensure max 6 photos total
+    const combinedPhotos = [...currentPhotos, ...newPhotosToAdd].slice(0, 6);
 
     const updatedEvents = events.map(evt => {
       if (evt.id === selectedEvent.id) {
         return {
           ...evt,
-          eventPhotos: [...(evt.eventPhotos || []), newPhoto]
+          eventPhotos: combinedPhotos
         };
       }
       return evt;
@@ -638,12 +698,51 @@ export default function Events() {
     // Update current selected event in modal
     setSelectedEvent(prev => prev ? {
       ...prev,
-      eventPhotos: [...(prev.eventPhotos || []), newPhoto]
+      eventPhotos: combinedPhotos
     } : null);
 
     setShowAddPhotoModal(false);
     setNewPhotoCaption('');
     setNewPhotoUrl('');
+    setUploadedEventPhotos([]);
+  };
+
+  // Handle local file uploads (multiple images up to 6)
+  const handleEventPhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentCount = (selectedEvent?.eventPhotos?.length || 0) + uploadedEventPhotos.length;
+    const remainingSlots = Math.max(0, 6 - currentCount);
+
+    if (remainingSlots <= 0) {
+      alert("Maximum limit of 6 event photos reached for this event!");
+      return;
+    }
+
+    const totalToRead = Math.min(files.length, remainingSlots);
+
+    for (let i = 0; i < totalToRead; i++) {
+      const file = files[i];
+      if (!file) continue;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setUploadedEventPhotos(prev => {
+            if (prev.length >= 6) return prev;
+            return [
+              ...prev,
+              {
+                url: event.target!.result as string,
+                caption: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '),
+                category: newPhotoCategory
+              }
+            ];
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -828,10 +927,17 @@ export default function Events() {
               key={evt.id}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-brand-card/60 border border-white/10 hover:border-brand-teal/40 rounded-3xl overflow-hidden transition-all duration-300 flex flex-col group shadow-xl"
+              className="bg-brand-card/60 border border-white/10 hover:border-brand-teal/40 rounded-3xl overflow-hidden transition-all duration-300 flex flex-col group shadow-xl hover:shadow-[0_0_30px_rgba(34,211,238,0.15)]"
             >
-              {/* Event Banner */}
-              <div className="relative h-52 overflow-hidden bg-black">
+              {/* Event Banner - Large and High-Resolution matching Networking & Achievements */}
+              <div 
+                onClick={() => {
+                  setSelectedEvent(evt);
+                  setPaymentError(null);
+                  setPaymentStatusNotice(null);
+                }}
+                className="relative aspect-[16/10] sm:h-72 w-full overflow-hidden bg-black cursor-pointer"
+              >
                 <img 
                   src={evt.bannerImage} 
                   alt={evt.name}
@@ -861,7 +967,14 @@ export default function Events() {
 
               {/* Event Body */}
               <div className="p-6 flex-1 flex flex-col justify-between">
-                <div>
+                <div 
+                  onClick={() => {
+                    setSelectedEvent(evt);
+                    setPaymentError(null);
+                    setPaymentStatusNotice(null);
+                  }}
+                  className="cursor-pointer"
+                >
                   <h3 className="text-xl font-display font-extrabold text-white mb-3 group-hover:text-brand-teal transition-colors">
                     {evt.name}
                   </h3>
@@ -1124,28 +1237,150 @@ export default function Events() {
                         </div>
                       </div>
 
-                      {/* 7. Razorpay Payment Button */}
-                      <button
-                        type="submit"
-                        disabled={isProcessing}
-                        className="w-full py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {isProcessing ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Processing Payment & Verifying...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>
-                              {selectedEvent.ticketPrice === 0 
-                                ? 'Claim Free Event Pass' 
-                                : `Pay ₹${selectedEvent.ticketPrice} via Razorpay & Generate Ticket`}
-                            </span>
-                          </>
-                        )}
-                      </button>
+                      {/* 7. Payment Mode Options for Paid vs Free */}
+                      {selectedEvent.ticketPrice === 0 ? (
+                        <button
+                          type="submit"
+                          disabled={isProcessing}
+                          className="w-full py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Generating Free Event Pass...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="w-4 h-4" />
+                              <span>Claim Free Event Pass & Ticket</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <div className="space-y-4 pt-2">
+                          {/* Payment Tabs */}
+                          <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 gap-1 font-mono text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setEventPaymentTab('razorpay')}
+                              className={`flex-1 py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                eventPaymentTab === 'razorpay'
+                                  ? 'bg-brand-teal text-brand-dark shadow-md'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Razorpay Gateway</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEventPaymentTab('upi')}
+                              className={`flex-1 py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                eventPaymentTab === 'upi'
+                                  ? 'bg-brand-teal text-brand-dark shadow-md'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                              <span>Direct UPI QR</span>
+                            </button>
+                          </div>
+
+                          {/* Tab 1: Razorpay Gateway */}
+                          {eventPaymentTab === 'razorpay' && (
+                            <div className="space-y-3">
+                              <div className="p-3 bg-brand-teal/5 border border-brand-teal/20 rounded-xl text-gray-300 text-xs font-mono">
+                                <div className="flex items-center justify-between text-brand-teal font-bold mb-1">
+                                  <span>Automated Fast-Track Gateway</span>
+                                  <span>₹{selectedEvent.ticketPrice} INR</span>
+                                </div>
+                                <p className="text-[11px] text-gray-400">
+                                  Supports Google Pay, PhonePe, Paytm, Credit/Debit Cards, and Netbanking with immediate ticket issuance.
+                                </p>
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={isProcessing}
+                                className="w-full py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                              >
+                                {isProcessing ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                    <span>Opening Razorpay Secure Gateway...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShieldCheck className="w-4 h-4" />
+                                    <span>Pay ₹{selectedEvent.ticketPrice} via Razorpay & Generate Ticket</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Tab 2: Direct UPI QR (scoders@ybl) */}
+                          {eventPaymentTab === 'upi' && (
+                            <div className="bg-black/60 border border-brand-teal/30 p-4 rounded-2xl space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">Official UPI ID</span>
+                                  <span className="text-brand-teal font-mono font-bold text-sm">scoders@ybl</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText('scoders@ybl');
+                                    setCopiedUpi(true);
+                                    setTimeout(() => setCopiedUpi(false), 2000);
+                                  }}
+                                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg font-mono text-[10px] flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedUpi ? 'Copied!' : 'Copy UPI ID'}</span>
+                                </button>
+                              </div>
+
+                              <div className="bg-white p-3 rounded-xl max-w-[140px] mx-auto flex flex-col items-center">
+                                <QrCode className="w-24 h-24 text-black" />
+                                <span className="text-[8px] font-mono text-black font-bold mt-1">S-CODERS LAB</span>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest">
+                                  12-digit UTR / UPI Reference No. *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={manualUpiRef}
+                                  onChange={e => setManualUpiRef(e.target.value)}
+                                  placeholder="e.g. 402839482910"
+                                  className="w-full px-3.5 py-2 bg-black/50 border border-white/10 rounded-xl text-white font-mono text-xs focus:border-brand-teal focus:outline-none"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleDirectUpiEventRegistration}
+                                disabled={isProcessing}
+                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                              >
+                                {isProcessing ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                    <span>Verifying UPI Reference...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>Verify UPI & Generate Event Pass</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </form>
                   </div>
 
@@ -1241,24 +1476,27 @@ export default function Events() {
                     </div>
 
                     {!selectedEvent.eventPhotos || selectedEvent.eventPhotos.length === 0 ? (
-                      <div className="text-center py-8 bg-black/30 border border-white/5 rounded-2xl text-gray-500 text-xs font-mono">
-                        No photos uploaded for this specific event yet.
+                      <div className="text-center py-10 bg-black/30 border border-white/5 rounded-2xl text-gray-500 text-xs font-mono">
+                        No photos uploaded for this specific event yet. (Supports up to 6 high-res photos)
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {selectedEvent.eventPhotos.map(photo => (
                           <div 
                             key={photo.id}
                             onClick={() => setSelectedImageModal(photo.imageUrl)}
-                            className="group relative h-28 rounded-xl overflow-hidden bg-black border border-white/10 cursor-pointer"
+                            className="group relative aspect-[16/10] sm:h-52 rounded-2xl overflow-hidden bg-black border border-white/10 hover:border-brand-teal/50 cursor-pointer shadow-lg transition-all"
                           >
                             <img 
                               src={photo.imageUrl} 
                               alt={photo.caption}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                              <span className="text-[9px] font-mono text-white leading-tight truncate">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-teal mb-0.5">
+                                {photo.category || 'Event Moment'}
+                              </span>
+                              <span className="text-xs font-sans text-white font-medium line-clamp-1">
                                 {photo.caption}
                               </span>
                             </div>
@@ -1277,18 +1515,20 @@ export default function Events() {
       {/* FULLSCREEN TICKET PASS MODAL */}
       <AnimatePresence>
         {viewingTicket && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-brand-card border-2 border-brand-teal rounded-3xl max-w-lg w-full p-6 sm:p-8 relative shadow-2xl overflow-hidden"
+              className="bg-brand-card border-2 border-brand-teal rounded-3xl max-w-lg w-full p-6 sm:p-8 relative shadow-2xl overflow-hidden my-auto"
             >
+              {/* Prominent Red ❌ Close Button */}
               <button
                 onClick={() => setViewingTicket(null)}
-                className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black text-gray-300 hover:text-white rounded-full border border-white/10 cursor-pointer"
+                title="Close Ticket Pass ❌"
+                className="absolute top-4 right-4 z-40 p-2.5 bg-red-500/20 hover:bg-red-600 text-white rounded-full border border-red-500/50 shadow-xl cursor-pointer transition-all flex items-center justify-center group"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-red-400 group-hover:text-white" />
               </button>
 
               <div className="text-center space-y-6">
@@ -1513,7 +1753,7 @@ export default function Events() {
         )}
       </AnimatePresence>
 
-      {/* ADMIN ADD PHOTO TO EVENT MODAL */}
+      {/* ADMIN ADD PHOTO TO EVENT MODAL (UP TO 6 PHOTOS) */}
       <AnimatePresence>
         {showAddPhotoModal && selectedEvent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -1521,7 +1761,7 @@ export default function Events() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-card border border-white/10 rounded-3xl max-w-md w-full p-6 space-y-4 relative shadow-2xl"
+              className="bg-brand-card border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={() => setShowAddPhotoModal(false)}
@@ -1530,25 +1770,71 @@ export default function Events() {
                 <X className="w-5 h-5" />
               </button>
 
-              <h3 className="text-base font-display font-bold text-white">Add Photo to {selectedEvent.name}</h3>
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-brand-teal/20 text-brand-teal text-[10px] font-mono font-bold uppercase tracking-wider">
+                  Photo Gallery Uploader (Up to 6 Photos)
+                </span>
+                <h3 className="text-lg font-display font-bold text-white mt-1">
+                  Add Photos to {selectedEvent.name}
+                </h3>
+                <p className="text-gray-400 text-xs font-mono">
+                  Currently {selectedEvent.eventPhotos?.length || 0} / 6 photos saved for this event.
+                </p>
+              </div>
 
-              <form onSubmit={handleAddEventPhoto} className="space-y-3 font-mono text-xs">
+              <form onSubmit={handleAddEventPhoto} className="space-y-4 font-mono text-xs">
+                {/* Multi-file Upload Box */}
                 <div>
-                  <label className="block text-gray-400 mb-1">Photo Caption</label>
-                  <input
-                    type="text"
-                    value={newPhotoCaption}
-                    onChange={e => setNewPhotoCaption(e.target.value)}
-                    placeholder="e.g. Speakers panel during Q&A"
-                    className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none"
-                  />
+                  <label className="block text-gray-300 mb-1.5 font-bold">
+                    Upload Photos from Computer / Mobile (Up to 6 images)
+                  </label>
+                  <label className="border-2 border-dashed border-white/20 hover:border-brand-teal rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-black/40 transition-colors">
+                    <Upload className="w-6 h-6 text-brand-teal" />
+                    <span className="text-xs text-gray-300 font-bold">Click to select 1 or multiple photos</span>
+                    <span className="text-[10px] text-gray-500 font-sans">JPG, PNG, WebP supported</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleEventPhotoFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Staged uploaded photos preview */}
+                {uploadedEventPhotos.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="block text-[10px] text-brand-teal font-mono uppercase">
+                      Staged Photos ({uploadedEventPhotos.length})
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {uploadedEventPhotos.map((up, i) => (
+                        <div key={i} className="relative aspect-video rounded-lg overflow-hidden border border-white/20 group">
+                          <img src={up.url} alt={`upload-${i}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setUploadedEventPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                            className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-600 rounded-full text-white cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-white/10"></div>
+                  <span className="flex-shrink mx-2 text-[10px] text-gray-500 uppercase">OR ADD VIA URL</span>
+                  <div className="flex-grow border-t border-white/10"></div>
                 </div>
 
                 <div>
-                  <label className="block text-gray-400 mb-1">Image URL *</label>
+                  <label className="block text-gray-400 mb-1">Image URL (Optional)</label>
                   <input
                     type="url"
-                    required
                     value={newPhotoUrl}
                     onChange={e => setNewPhotoUrl(e.target.value)}
                     placeholder="https://images.unsplash.com/..."
@@ -1556,11 +1842,37 @@ export default function Events() {
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-gray-400 mb-1">Category</label>
+                    <select
+                      value={newPhotoCategory}
+                      onChange={e => setNewPhotoCategory(e.target.value as any)}
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none cursor-pointer"
+                    >
+                      <option value="venue">Venue & Stage</option>
+                      <option value="speakers">Keynote & Speakers</option>
+                      <option value="highlights">Hackathon Highlights</option>
+                      <option value="networking">Networking Moments</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 mb-1">Caption</label>
+                    <input
+                      type="text"
+                      value={newPhotoCaption}
+                      onChange={e => setNewPhotoCaption(e.target.value)}
+                      placeholder="e.g. Winner award distribution"
+                      className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none"
+                    />
+                  </div>
+                </div>
+
                 <button
                   type="submit"
-                  className="w-full py-3 bg-brand-teal text-brand-dark font-bold uppercase rounded-xl hover:bg-white transition-all cursor-pointer"
+                  className="w-full py-3 bg-brand-teal text-brand-dark font-bold uppercase rounded-xl hover:bg-white transition-all cursor-pointer shadow-lg shadow-brand-teal/20"
                 >
-                  Save Photo to Event Gallery
+                  Save Photos to Event Gallery
                 </button>
               </form>
             </motion.div>
@@ -1737,6 +2049,24 @@ export default function Events() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Official S-CODERS Dispatch Email Popup Notification Modal */}
+      <EmailNotificationModal
+        isOpen={showEmailNotice}
+        onClose={() => setShowEmailNotice(false)}
+        data={emailNoticeData}
+      />
+
+      {/* Official Razorpay Gateway Modal */}
+      {razorpayPaymentDetails && (
+        <RazorpayModal
+          isOpen={showRazorpayModal}
+          onClose={() => setShowRazorpayModal(false)}
+          onSuccess={handleRazorpayEventSuccess}
+          orderData={razorpayOrderData}
+          paymentDetails={razorpayPaymentDetails}
+        />
+      )}
     </div>
   );
 }

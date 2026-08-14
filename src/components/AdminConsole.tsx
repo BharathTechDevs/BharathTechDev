@@ -219,6 +219,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [netLocation, setNetLocation] = useState('');
   const [netDescription, setNetDescription] = useState('');
   const [netImage, setNetImage] = useState('');
+  const [netImages, setNetImages] = useState<string[]>([]);
   const [netAttendees, setNetAttendees] = useState<number>(45);
   const [netTags, setNetTags] = useState('');
   const [netFeatured, setNetFeatured] = useState(false);
@@ -331,7 +332,8 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     if (!netTitle || !netLocation || !netDescription) return;
 
     const parsedTags = netTags.split(',').map(t => t.trim()).filter(Boolean);
-    const finalImage = netImage.trim() || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500';
+    const finalImage = netImage.trim() || netImages[0] || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500';
+    const finalImagesList = netImages.length > 0 ? netImages : [finalImage];
 
     let updatedList: NetworkingAchievement[] = [];
     if (editingId) {
@@ -343,6 +345,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         location: netLocation,
         description: netDescription,
         image: finalImage,
+        images: finalImagesList.slice(0, 8),
         attendeesCount: Number(netAttendees) || undefined,
         tags: parsedTags,
         featured: netFeatured
@@ -356,6 +359,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         location: netLocation,
         description: netDescription,
         image: finalImage,
+        images: finalImagesList.slice(0, 8),
         attendeesCount: Number(netAttendees) || undefined,
         tags: parsedTags.length ? parsedTags : ['Startup Circle', 'Live Sync'],
         featured: netFeatured
@@ -377,6 +381,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setNetLocation(m.location);
     setNetDescription(m.description);
     setNetImage(m.image);
+    setNetImages(m.images && m.images.length > 0 ? m.images : (m.image ? [m.image] : []));
     setNetAttendees(m.attendeesCount || 45);
     setNetTags(m.tags?.join(', ') || '');
     setNetFeatured(m.featured || false);
@@ -399,6 +404,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setNetLocation('');
     setNetDescription('');
     setNetImage('');
+    setNetImages([]);
     setNetAttendees(45);
     setNetTags('');
     setNetFeatured(false);
@@ -2579,69 +2585,102 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5 font-bold">Upload Event Photo / Snapshot</label>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest font-bold">
+                            Event Photos (Up to 8 Photos)
+                          </label>
+                          <span className="text-[10px] font-mono text-brand-teal font-bold">
+                            {netImages.length} / 8 Photos
+                          </span>
+                        </div>
                         
                         <div className="space-y-3">
-                          {/* File Uploader with Live Base64 Preview */}
-                          <div className="flex items-center gap-4">
-                            {netImage ? (
-                              <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-brand-teal bg-brand-dark shrink-0 group">
-                                <img src={netImage} alt="Uploaded preview" className="w-full h-full object-cover" />
-                                <button
-                                  type="button"
-                                  onClick={() => setNetImage('')}
-                                  className="absolute inset-0 bg-brand-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-brand-coral text-[9px] font-mono uppercase font-bold"
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="w-16 h-16 rounded-xl border border-dashed border-white/10 bg-brand-dark flex items-center justify-center text-gray-600 shrink-0">
-                                <Camera className="w-5 h-5" />
-                              </div>
-                            )}
-                            
-                            <label className="flex-1 cursor-pointer">
-                              <div className="flex flex-col items-center justify-center border border-dashed border-white/10 hover:border-brand-teal/40 bg-brand-dark/30 rounded-xl py-3 px-3 text-center transition-all">
-                                <Upload className="w-3.5 h-3.5 text-brand-teal mb-1" />
-                                <span className="text-[9px] font-mono text-gray-300 font-bold uppercase">Upload local photo</span>
-                                <span className="text-[7px] text-gray-500 font-mono mt-0.5">Click to choose image file</span>
-                              </div>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
+                          {/* Staged photos list */}
+                          {netImages.length > 0 && (
+                            <div className="grid grid-cols-4 gap-2 p-2 bg-black/40 rounded-xl border border-white/5">
+                              {netImages.map((imgUrl, idx) => (
+                                <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border border-brand-teal/40 group bg-black">
+                                  <img src={imgUrl} alt={`Moment ${idx}`} className="w-full h-full object-cover" />
+                                  <button
+                                    type="button"
+                                    onClick={() => setNetImages(prev => prev.filter((_, i) => i !== idx))}
+                                    className="absolute inset-0 bg-red-600/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[8px] font-mono uppercase font-bold"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* File Uploader for multiple files */}
+                          <label className="cursor-pointer block">
+                            <div className="flex flex-col items-center justify-center border border-dashed border-white/10 hover:border-brand-teal/40 bg-brand-dark/30 rounded-xl py-3 px-3 text-center transition-all">
+                              <Upload className="w-4 h-4 text-brand-teal mb-1" />
+                              <span className="text-[9px] font-mono text-gray-300 font-bold uppercase">
+                                Upload Photos (Select up to 8 images)
+                              </span>
+                              <span className="text-[7px] text-gray-500 font-mono mt-0.5">Click to choose image files from computer</span>
+                            </div>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = e.target.files;
+                                if (files && files.length > 0) {
+                                  const remaining = Math.max(0, 8 - netImages.length);
+                                  const totalToRead = Math.min(files.length, remaining);
+                                  for (let i = 0; i < totalToRead; i++) {
+                                    const file = files[i];
+                                    if (!file) continue;
                                     const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      if (event.target?.result) {
-                                        setNetImage(event.target.result as string);
+                                    reader.onload = (ev) => {
+                                      if (ev.target?.result) {
+                                        setNetImages(prev => {
+                                          if (prev.length >= 8) return prev;
+                                          return [...prev, ev.target!.result as string];
+                                        });
                                       }
                                     };
                                     reader.readAsDataURL(file);
                                   }
-                                }}
-                              />
-                            </label>
-                          </div>
+                                }
+                              }}
+                            />
+                          </label>
 
                           <div className="flex items-center gap-3">
                             <div className="h-px bg-white/5 flex-1" />
-                            <span className="text-[9px] font-mono text-gray-600 uppercase">OR PASTE EXTERNAL URL</span>
+                            <span className="text-[9px] font-mono text-gray-600 uppercase">OR ADD PHOTO VIA URL</span>
                             <div className="h-px bg-white/5 flex-1" />
                           </div>
 
-                          <input
-                            type="url"
-                            value={netImage}
-                            onChange={(e) => setNetImage(e.target.value)}
-                            placeholder="https://images.unsplash.com/photo-..."
-                            className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4.5 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="url"
+                              value={netImage}
+                              onChange={(e) => setNetImage(e.target.value)}
+                              placeholder="https://images.unsplash.com/photo-..."
+                              className="flex-1 bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal text-xs transition-colors"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (netImage.trim() && netImages.length < 8) {
+                                  setNetImages(prev => [...prev, netImage.trim()]);
+                                  setNetImage('');
+                                }
+                              }}
+                              disabled={!netImage.trim() || netImages.length >= 8}
+                              className="px-4 py-2.5 bg-brand-teal/20 hover:bg-brand-teal text-brand-teal hover:text-brand-dark rounded-xl font-mono text-xs font-bold transition-all disabled:opacity-30 cursor-pointer"
+                            >
+                              Add
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-[9px] text-gray-500 font-mono mt-1">Leave empty to use standard tech-meetup placeholder.</p>
+                        <p className="text-[9px] text-gray-500 font-mono mt-1">Upload up to 8 photos for in-card sliding and full-screen lightbox viewing.</p>
                       </div>
 
                       <div>

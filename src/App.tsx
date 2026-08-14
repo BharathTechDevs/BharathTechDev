@@ -115,7 +115,17 @@ interface PrefilledPaymentData {
 
 export default function App() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies'>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('view');
+      const validViews = ['home', 'about', 'crew', 'services', 'workshops', 'communities', 'payments', 'contact', 'admin', 'networking', 'events', 'portal', 'policies'];
+      if (v && validViews.includes(v)) {
+        return v as any;
+      }
+    } catch (e) {}
+    return 'home';
+  });
   const [activePolicyTab, setActivePolicyTab] = useState<string>('terms');
   const [prefilledPayment, setPrefilledPayment] = useState<PrefilledPaymentData | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);

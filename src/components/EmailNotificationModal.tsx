@@ -1,0 +1,209 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Mail, CheckCircle2, Copy, Check, ExternalLink, X, ShieldCheck, Sparkles, Clock, ArrowRight } from 'lucide-react';
+
+export interface EmailNotificationData {
+  type: 'event' | 'service' | 'workshop';
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  title: string;
+  uniqueKey: string;
+  messageText: string;
+  amount?: number;
+  actionText: string;
+  onAction?: () => void;
+}
+
+interface EmailNotificationModalProps {
+  data: EmailNotificationData | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function EmailNotificationModal({ data, isOpen, onClose }: EmailNotificationModalProps) {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen || !data) return null;
+
+  const handleCopyKey = () => {
+    navigator.clipboard.writeText(data.uniqueKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const formattedAmount = data.amount !== undefined 
+    ? (data.amount === 0 ? 'FREE PASS' : `₹${data.amount.toLocaleString('en-IN')}`)
+    : null;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.92, y: 20 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          className="bg-[#0B0F17] border-2 border-brand-teal/40 rounded-3xl max-w-xl w-full p-6 sm:p-8 relative shadow-[0_0_50px_rgba(34,211,238,0.25)] my-8 overflow-hidden text-white font-sans"
+        >
+          {/* Prominent Red Circular Close Button (❌) */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 bg-red-500/20 hover:bg-red-600 text-white rounded-full border border-red-500/50 cursor-pointer transition-all duration-200 shadow-lg z-20"
+            title="Close Email Notification"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Top Incoming Mail Header Badge */}
+          <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 rounded-full text-emerald-400 font-mono text-[11px] font-bold uppercase tracking-wider">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>New Official Email Dispatched</span>
+            </div>
+            <span className="text-[10px] font-mono text-gray-500 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-brand-teal" />
+              Just now
+            </span>
+          </div>
+
+          {/* Simulated Email Client Envelope Card */}
+          <div className="bg-[#131A29] border border-white/10 rounded-2xl p-4 sm:p-5 mb-6 space-y-3 font-mono text-xs shadow-inner">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2.5 gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 font-semibold">From:</span>
+                <span className="text-brand-teal font-bold flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5" />
+                  scoders82@gmail.com
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded">
+                S-CODERS Bharath Tech Developers
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2.5 gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 font-semibold">To:</span>
+                <span className="text-white font-bold">{data.recipientEmail}</span>
+              </div>
+              <span className="text-[10px] text-gray-400 font-sans">
+                ({data.recipientName})
+              </span>
+            </div>
+
+            <div className="pt-1">
+              <span className="text-gray-400 font-semibold block text-[10px] uppercase tracking-wider mb-0.5">Subject:</span>
+              <span className="text-amber-300 font-bold font-sans text-sm">
+                {data.subject}
+              </span>
+            </div>
+          </div>
+
+          {/* Email Body Template Content */}
+          <div className="space-y-4">
+            {/* S-CODERS Branding Ribbon */}
+            <div className="p-4 bg-gradient-to-r from-[#0F172A] to-[#1E293B] border-t-2 border-brand-teal rounded-2xl flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-display font-black text-white tracking-wide flex items-center gap-1.5">
+                  <span>S</span>
+                  <span className="text-brand-teal">⚡</span>
+                  <span>CODERS</span>
+                </h4>
+                <p className="text-[9px] font-mono text-gray-400 uppercase tracking-wider">
+                  Bharath Tech Developers • Bengaluru, India
+                </p>
+              </div>
+              <div className="p-2 bg-brand-teal/15 rounded-xl border border-brand-teal/30 text-brand-teal">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+            </div>
+
+            {/* Success Message Banner */}
+            <div className="p-4 bg-emerald-500/10 border-l-4 border-emerald-400 rounded-xl">
+              <p className="text-xs sm:text-sm text-emerald-300 font-medium leading-relaxed font-sans">
+                {data.messageText}
+              </p>
+            </div>
+
+            {/* Scope / Item Details */}
+            <div className="bg-[#0F172A] border border-white/10 rounded-xl p-3.5 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-gray-400 text-[10px] block uppercase">
+                  {data.type === 'event' ? 'Event Name' : data.type === 'service' ? 'Project Service Scope' : 'Workshop Masterclass'}
+                </span>
+                <span className="text-white font-bold">{data.title}</span>
+              </div>
+              {formattedAmount && (
+                <div className="sm:text-right">
+                  <span className="text-gray-400 text-[10px] block uppercase">Amount</span>
+                  <span className="text-emerald-400 font-bold">{formattedAmount}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Unique Key Box with Direct Copy */}
+            <div className="bg-[#0F172A] border-2 border-dashed border-brand-teal/40 rounded-2xl p-4 text-center space-y-2">
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">
+                {data.type === 'event' ? 'Your Unique Event Ticket Pass Key' : 'Your Unique Registration & Access Key'}
+              </span>
+              
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-lg sm:text-xl font-mono font-black text-brand-teal tracking-widest bg-black/60 px-4 py-2 rounded-xl border border-brand-teal/30 select-all">
+                  {data.uniqueKey}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyKey}
+                  className="p-2.5 bg-brand-teal hover:bg-white text-brand-dark rounded-xl transition-all cursor-pointer shadow-md"
+                  title="Copy Key"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-900" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {copied && (
+                <span className="text-[10px] font-mono text-emerald-400 block font-bold">
+                  ✓ Pass key copied to clipboard!
+                </span>
+              )}
+            </div>
+
+            {/* Actions Bar */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              {data.onAction && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    data.onAction?.();
+                    onClose();
+                  }}
+                  className="flex-1 py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/20"
+                >
+                  <span>{data.actionText}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="py-3.5 px-6 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-mono text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer text-center"
+              >
+                Done
+              </button>
+            </div>
+
+            {/* Footer */}
+            <p className="text-[10px] text-center text-gray-500 font-mono pt-2">
+              Email sent from <strong className="text-gray-400">scoders82@gmail.com</strong> • Keep your pass key safe for entry verification.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}

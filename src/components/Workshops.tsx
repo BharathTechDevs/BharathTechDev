@@ -11,6 +11,8 @@ import { INITIAL_COMMENTS } from '../data';
 import { getDynamicWorkshops, saveDynamicWorkshops } from '../utils/dynamicData';
 import { WorkshopComment, WorkshopEvent, AppUser } from '../types';
 import { DatabaseEngine, WorkshopRegistration, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
+import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
+import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -81,7 +83,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   // New Payment States inside Workshops Modal
   const [paymentStep, setPaymentStep] = useState(false);
   const [payTicketsCount, setPayTicketsCount] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'bank'>('upi');
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'upi' | 'card' | 'bank'>('razorpay');
   const [selectedUpiApp, setSelectedUpiApp] = useState<'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic' | null>(null);
   const [cardNo, setCardNo] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -101,6 +103,27 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<any>(null);
   const [receiptName, setReceiptName] = useState('');
+
+  // Razorpay Gateway Modal Integration States
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayOrderData, setRazorpayOrderData] = useState<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId?: string;
+  } | null>(null);
+  const [razorpayPaymentDetails, setRazorpayPaymentDetails] = useState<{
+    amount: number;
+    currency: string;
+    clientName: string;
+    email: string;
+    purpose: string;
+    merchantUpiId: string;
+  } | null>(null);
+
+  // Email Notification Modal State (scoders82@gmail.com)
+  const [showEmailNotice, setShowEmailNotice] = useState(false);
+  const [emailNoticeData, setEmailNoticeData] = useState<EmailNotificationData | null>(null);
 
   // Active Workshop Classroom States
   const [activeTab, setActiveTab] = useState<'sandbox' | 'resources' | 'discussion'>('sandbox');
@@ -542,6 +565,205 @@ export default function TenantDashboard() {
     }
 
     setGeneratedWorkshopKey(generatedKey);
+  };
+
+  const handleInitiateRazorpayWorkshop = async () => {
+    const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+    try {
+      const orderRes = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: totalAmount,
+          currency: 'INR',
+          receipt: `wksp_${activeWorkshop.id}_${Date.now()}`,
+          notes: {
+            workshopTitle: activeWorkshop.title,
+            participantName: regName.trim(),
+            email: regEmail.trim(),
+            tickets: payTicketsCount
+          }
+        })
+      });
+
+      const orderData = await orderRes.json();
+
+      setRazorpayOrderData({
+        orderId: orderData?.orderId || `ord_${Date.now()}`,
+        amount: totalAmount,
+        currency: 'INR',
+        keyId: orderData?.keyId || 'rzp_live_scoders_ybl'
+      });
+
+      setRazorpayPaymentDetails({
+        amount: totalAmount,
+        currency: 'INR',
+        clientName: regName.trim(),
+        email: regEmail.trim(),
+        purpose: `Workshop Pass: ${activeWorkshop.title}`,
+        merchantUpiId: 'scoders@ybl'
+      });
+
+      setShowRazorpayModal(true);
+    } catch (err) {
+      console.warn("Offline fallback for workshop razorpay order:", err);
+      setRazorpayOrderData({
+        orderId: `ord_${Date.now()}`,
+        amount: totalAmount,
+        currency: 'INR',
+        keyId: 'rzp_live_scoders_ybl'
+      });
+      setRazorpayPaymentDetails({
+        amount: totalAmount,
+        currency: 'INR',
+        clientName: regName.trim(),
+        email: regEmail.trim(),
+        purpose: `Workshop Pass: ${activeWorkshop.title}`,
+        merchantUpiId: 'scoders@ybl'
+      });
+      setShowRazorpayModal(true);
+    }
+  };
+
+  const handleRazorpayWorkshopSuccess = (data: RazorpayPaymentSuccessData) => {
+    setShowRazorpayModal(false);
+    
+    // Auto-login client if needed
+    let activeClient = currentUser;
+    if (!activeClient) {
+      const newClient: AppUser = {
+        uid: 'client-' + Date.now().toString(),
+        name: data.clientName,
+        email: data.email,
+        role: 'client',
+        company: 'Independent Client',
+        phone: 'Not Specified',
+        createdAt: new Date().toISOString()
+      };
+      
+      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
+      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
+      if (!clients.some(c => c.email.toLowerCase() === data.email.toLowerCase().trim())) {
+        clients.push(newClient);
+        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
+      }
+
+      localStorage.setItem('scoders_user', JSON.stringify(newClient));
+      setCurrentUser(newClient);
+      activeClient = newClient;
+      window.dispatchEvent(new Event('scoders_auth_change'));
+    }
+
+    const code = activeWorkshop.id.toUpperCase();
+    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
+    const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+
+    const newKeys = {
+      ...registeredKeys,
+      [activeWorkshop.id]: {
+        key: generatedKey,
+        name: data.clientName,
+        email: data.email,
+        role: regRole,
+        tickets: payTicketsCount,
+        totalPaid: data.amount,
+        timestamp: new Date().toLocaleDateString()
+      }
+    };
+
+    setRegisteredKeys(newKeys);
+    localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
+    setRegSuccessKey(generatedKey);
+    setGeneratedWorkshopKey(generatedKey);
+    setIsPaymentVerified(true);
+    setRegMode('enterKey');
+
+    // Save DB records
+    try {
+      const regId = 'reg-wksp-' + Date.now();
+      const mockPdfId = 'file-pdf-' + Date.now();
+      const mockSrcId = 'file-src-' + Date.now();
+      const mockChatId = 'chat-wksp-' + Date.now();
+
+      const dbRegistration: WorkshopRegistration = {
+        id: regId,
+        participantProfile: {
+          name: data.clientName,
+          email: data.email,
+          phone: '+91 99999 00000',
+          role: regRole || 'Registered Developer'
+        },
+        workshopId: activeWorkshop.id,
+        workshopTitle: activeWorkshop.title,
+        paymentStatus: 'Successful',
+        amountPaid: data.amount,
+        paymentMethod: 'Razorpay PG',
+        paymentDate: new Date().toISOString().split('T')[0],
+        transactionId: data.razorpay_payment_id || ('TXN-' + Date.now()),
+        uniqueAccessKey: generatedKey,
+        materialsFileIds: [mockPdfId, mockSrcId],
+        chatId: mockChatId,
+        feedbackId: null
+      };
+      const currentRegs = DatabaseEngine.getWorkshopRegistrations();
+      DatabaseEngine.saveWorkshopRegistrations([dbRegistration, ...currentRegs]);
+
+      const dbTx: PaymentTransaction = {
+        id: data.razorpay_payment_id || ('TXN-' + Date.now()),
+        clientId: data.email,
+        clientName: data.clientName,
+        clientEmail: data.email,
+        amount: data.amount,
+        paymentMethod: 'Razorpay PG',
+        status: 'Successful',
+        timestamp: new Date().toISOString(),
+        reference: `Workshop Pass: ${activeWorkshop.title}`,
+        interrupted: false,
+        failureReason: null
+      };
+      const currentTxs = DatabaseEngine.getPayments();
+      DatabaseEngine.savePayments([dbTx, ...currentTxs]);
+    } catch (err) {
+      console.warn("DB engine save error:", err);
+    }
+
+    // Trigger automated email dispatch
+    try {
+      fetch('/api/email/workshop-payment-verified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email,
+          clientName: data.clientName,
+          workshopTitle: activeWorkshop.title,
+          amount: data.amount,
+          uniqueKey: generatedKey,
+          paymentId: data.razorpay_payment_id,
+          actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
+        })
+      }).catch(err => console.warn("Workshop email dispatch warning:", err));
+    } catch (emailErr) {
+      console.warn("Workshop email dispatch error:", emailErr);
+    }
+
+    // Trigger Pop-up Email Confirmation from scoders82@gmail.com
+    setEmailNoticeData({
+      type: 'workshop',
+      recipientEmail: data.email,
+      recipientName: data.clientName,
+      subject: `🎓 Payment Done Successfully - S-CODERS Workshop Key (${generatedKey})`,
+      title: activeWorkshop.title,
+      uniqueKey: generatedKey,
+      messageText: "Your payment has been done successfully so here are your access tickets/key just grab it! S-CODERS Classroom and Workshop sandbox unlocked.",
+      amount: data.amount,
+      actionText: "Enter Workshop & Sandbox",
+      onAction: () => {
+        setShowRegModal(false);
+        setPaymentStep(false);
+      }
+    });
+    setShowEmailNotice(true);
   };
 
   const handleVerifyOtpAndComplete = (e: React.FormEvent) => {
@@ -1858,11 +2080,23 @@ export default function TenantDashboard() {
                         </div>
 
                         {/* Payment Method Selector Grid - Matches Payments.tsx */}
-                        <div className="grid grid-cols-3 bg-brand-dark/50 border border-white/5 rounded-xl overflow-hidden font-display font-bold">
+                        <div className="grid grid-cols-4 bg-brand-dark/50 border border-white/5 rounded-xl overflow-hidden font-display font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('razorpay')}
+                            className={`py-3 text-center border-r border-white/5 text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                              paymentMethod === 'razorpay'
+                                ? 'bg-brand-card text-brand-teal shadow-inner'
+                                : 'text-gray-500 hover:text-white'
+                            }`}
+                          >
+                            <Sparkles className="w-4 h-4 text-cyan-400" />
+                            Razorpay
+                          </button>
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('upi')}
-                            className={`py-3 text-center border-r border-white/5 text-[11px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                            className={`py-3 text-center border-r border-white/5 text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
                               paymentMethod === 'upi'
                                 ? 'bg-brand-card text-brand-teal shadow-inner'
                                 : 'text-gray-500 hover:text-white'
@@ -1874,19 +2108,19 @@ export default function TenantDashboard() {
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('card')}
-                            className={`py-3 text-center border-r border-white/5 text-[11px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                            className={`py-3 text-center border-r border-white/5 text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
                               paymentMethod === 'card'
                                 ? 'bg-brand-card text-brand-teal shadow-inner'
                                 : 'text-gray-500 hover:text-white'
                             }`}
                           >
                             <CreditCard className="w-4 h-4" />
-                            Ruy Card
+                            Card
                           </button>
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('bank')}
-                            className={`py-3 text-center text-[11px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                            className={`py-3 text-center text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
                               paymentMethod === 'bank'
                                 ? 'bg-brand-card text-brand-teal shadow-inner'
                                 : 'text-gray-500 hover:text-white'
@@ -1896,6 +2130,33 @@ export default function TenantDashboard() {
                             NetBanking
                           </button>
                         </div>
+
+                        {/* Method 0: Razorpay Fast Checkout */}
+                        {paymentMethod === 'razorpay' && (
+                          <div className="space-y-4">
+                            <div className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-xl text-center space-y-2">
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="font-black text-cyan-400 text-sm">RAZORPAY</span>
+                                <span className="text-white text-xs font-mono font-bold">Smart Gateway (scoders@ybl)</span>
+                              </div>
+                              <p className="text-[11px] text-gray-300">
+                                Instant auto-verified pass keys & immediate ticket generation. Supports UPI QR, Cards, NetBanking, and Wallets.
+                              </p>
+                              <div className="text-[10px] font-mono text-cyan-300">
+                                Merchant: <strong>scoders@ybl</strong> • Instant Dispatch from <strong>scoders82@gmail.com</strong>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleInitiateRazorpayWorkshop}
+                              className="w-full py-3.5 bg-cyan-400 hover:bg-cyan-300 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              Pay ₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} with Razorpay
+                            </button>
+                          </div>
+                        )}
 
                         {/* Method A: UPI */}
                         {paymentMethod === 'upi' && (
@@ -2380,6 +2641,24 @@ export default function TenantDashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Official S-CODERS Dispatch Email Popup Notification Modal */}
+      <EmailNotificationModal
+        isOpen={showEmailNotice}
+        onClose={() => setShowEmailNotice(false)}
+        data={emailNoticeData}
+      />
+
+      {/* Official Razorpay Gateway Modal */}
+      {razorpayPaymentDetails && (
+        <RazorpayModal
+          isOpen={showRazorpayModal}
+          onClose={() => setShowRazorpayModal(false)}
+          onSuccess={handleRazorpayWorkshopSuccess}
+          orderData={razorpayOrderData}
+          paymentDetails={razorpayPaymentDetails}
+        />
+      )}
     </section>
   );
 }

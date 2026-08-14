@@ -99,7 +99,8 @@ export interface NetworkingAchievement {
   type: 'attended' | 'conducted';
   location: string;
   description: string;
-  image: string; // Captured live picture URL or custom uploaded photo
+  image: string; // Primary captured live picture URL or custom uploaded photo
+  images?: string[]; // Up to 8 photos for gallery / photostream carousel
   attendeesCount?: number;
   tags?: string[];
   featured?: boolean;
