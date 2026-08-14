@@ -1699,7 +1699,24 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
         {razorpayPaymentDetails && (
           <RazorpayModal
             isOpen={showRazorpayModal}
-            onClose={() => setShowRazorpayModal(false)}
+            onClose={() => {
+              setShowRazorpayModal(false);
+              setRazorpayEmailNotice({
+                sent: false,
+                email: '',
+                type: 'FAILED',
+                message: 'Payment was cancelled or not completed. No receipt was generated.'
+              });
+            }}
+            onFailure={(reason) => {
+              setShowRazorpayModal(false);
+              setRazorpayEmailNotice({
+                sent: false,
+                email: '',
+                type: 'FAILED',
+                message: reason || 'Payment was cancelled or not completed.'
+              });
+            }}
             onSuccess={handleRazorpaySuccess}
             orderData={razorpayOrderData}
             paymentDetails={razorpayPaymentDetails}

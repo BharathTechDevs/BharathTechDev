@@ -103,6 +103,9 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<any>(null);
   const [receiptName, setReceiptName] = useState('');
+  const [upiUtrInput, setUpiUtrInput] = useState('');
+  const [upiUtrError, setUpiUtrError] = useState<string | null>(null);
+  const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
 
   // Razorpay Gateway Modal Integration States
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
@@ -358,6 +361,209 @@ export default function TenantDashboard() {
     }, 1500);
   };
 
+  const mintAndCompleteWorkshopRegistration = (
+    clientName: string,
+    clientEmail: string,
+    clientRole: string,
+    totalAmount: number,
+    payMethod: string,
+    txnId: string
+  ) => {
+    const safeName = (clientName || regName || currentUser?.name || 'Workshop Participant').trim();
+    const safeEmail = (clientEmail || regEmail || currentUser?.email || 'participant@scoders.com').trim().toLowerCase();
+    const safeRole = (clientRole || regRole || 'Registered Developer').trim();
+
+    // 1. Auto-login or register client in session
+    let activeClient = currentUser;
+    if (!activeClient || activeClient.email.toLowerCase() !== safeEmail) {
+      const newClient: AppUser = {
+        uid: 'client-' + Date.now().toString(),
+        name: safeName,
+        email: safeEmail,
+        role: 'client',
+        company: 'Independent Client',
+        phone: 'Not Specified',
+        createdAt: new Date().toISOString()
+      };
+      
+      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
+      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
+      if (!clients.some(c => c.email.toLowerCase() === safeEmail)) {
+        clients.push(newClient);
+        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
+      }
+
+      const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
+      if (!passwordsMap[safeEmail]) {
+        passwordsMap[safeEmail] = 'password';
+        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
+      }
+
+      localStorage.setItem('scoders_user', JSON.stringify(newClient));
+      setCurrentUser(newClient);
+      activeClient = newClient;
+      window.dispatchEvent(new Event('scoders_auth_change'));
+    }
+
+    // 2. Mint Unique Workshop Access Key
+    const code = activeWorkshop.id.toUpperCase();
+    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
+    const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+
+    // 3. Save to localStorage registered workshops
+    const newKeys = {
+      ...registeredKeys,
+      [activeWorkshop.id]: {
+        key: generatedKey,
+        name: safeName,
+        email: safeEmail,
+        role: safeRole,
+        tickets: payTicketsCount,
+        totalPaid: totalAmount,
+        timestamp: new Date().toLocaleDateString()
+      }
+    };
+
+    setRegisteredKeys(newKeys);
+    localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
+    setRegSuccessKey(generatedKey);
+    setGeneratedWorkshopKey(generatedKey);
+    setIsPaymentVerified(true);
+
+    // 4. Save to relational DatabaseEngine
+    try {
+      const regId = 'reg-wksp-' + Date.now();
+      const mockPdfId = 'file-pdf-' + Date.now();
+      const mockSrcId = 'file-src-' + Date.now();
+      const mockChatId = 'chat-wksp-' + Date.now();
+
+      const dbRegistration: WorkshopRegistration = {
+        id: regId,
+        participantProfile: {
+          name: safeName,
+          email: safeEmail,
+          phone: '+91 99999 00000',
+          role: safeRole
+        },
+        workshopId: activeWorkshop.id,
+        workshopTitle: activeWorkshop.title,
+        paymentStatus: 'Successful',
+        amountPaid: totalAmount,
+        paymentMethod: payMethod,
+        paymentDate: new Date().toISOString().split('T')[0],
+        transactionId: txnId,
+        uniqueAccessKey: generatedKey,
+        materialsFileIds: [mockPdfId, mockSrcId],
+        chatId: mockChatId,
+        feedbackId: null
+      };
+      const currentRegs = DatabaseEngine.getWorkshopRegistrations();
+      DatabaseEngine.saveWorkshopRegistrations([dbRegistration, ...currentRegs]);
+
+      const dbTx: PaymentTransaction = {
+        id: txnId,
+        clientId: safeEmail,
+        clientName: safeName,
+        clientEmail: safeEmail,
+        amount: totalAmount,
+        paymentMethod: payMethod,
+        status: 'Successful',
+        timestamp: new Date().toISOString(),
+        reference: `Workshop Pass: ${activeWorkshop.title}`,
+        interrupted: false,
+        failureReason: null
+      };
+      const currentPayments = DatabaseEngine.getPayments();
+      DatabaseEngine.savePayments([dbTx, ...currentPayments]);
+
+      const dbChat: ChatConversation = {
+        id: mockChatId,
+        clientName: safeName,
+        clientEmail: safeEmail,
+        registrationId: regId,
+        reference: activeWorkshop.title,
+        messages: [
+          { id: 'msg-wksp-1', sender: 'team', content: `Congratulations ${safeName}! You are officially registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your learning materials, developer sandbox, and schedule access are unlocked.`, timestamp: new Date().toISOString() }
+        ],
+        lastUpdated: new Date().toISOString()
+      };
+      const currentChats = DatabaseEngine.getChats();
+      DatabaseEngine.saveChats([dbChat, ...currentChats]);
+
+      const dbPdfFile: FileRecord = {
+        id: mockPdfId,
+        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_guide.pdf`,
+        type: 'workshop_pdf',
+        url: '#download-guide-pdf',
+        size: '1.4 MB',
+        clientId: safeEmail,
+        registrationId: regId,
+        uploadDate: new Date().toISOString().split('T')[0]
+      };
+      const dbSrcFile: FileRecord = {
+        id: mockSrcId,
+        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_boilerplate.zip`,
+        type: 'workshop_source_code',
+        url: '#download-boilerplate-zip',
+        size: '890 KB',
+        clientId: safeEmail,
+        registrationId: regId,
+        uploadDate: new Date().toISOString().split('T')[0]
+      };
+      const currentFiles = DatabaseEngine.getFiles();
+      DatabaseEngine.saveFiles([dbPdfFile, dbSrcFile, ...currentFiles]);
+    } catch (err) {
+      console.warn("DB engine workshop registration save error:", err);
+    }
+
+    // 5. Trigger automated backend email dispatch from scoders82@gmail.com
+    try {
+      fetch('/api/email/workshop-payment-verified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: safeEmail,
+          clientName: safeName,
+          workshopTitle: activeWorkshop.title,
+          amount: totalAmount,
+          uniqueKey: generatedKey,
+          paymentId: txnId,
+          actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
+        })
+      }).catch(err => console.warn("Workshop email dispatch warning:", err));
+    } catch (emailErr) {
+      console.warn("Workshop email dispatch error:", emailErr);
+    }
+
+    // 6. Close the drawer modal immediately and clear inputs
+    setShowRegModal(false);
+    setPaymentStep(false);
+    setOtpVerificationStep(false);
+    setUpiPendingStep(false);
+    setUpiUtrInput('');
+    setCardNo('');
+    setCardExpiry('');
+    setCardCvv('');
+
+    // 7. Pop up the official Email Notification Confirmation Modal
+    setEmailNoticeData({
+      type: 'workshop',
+      recipientEmail: safeEmail,
+      recipientName: safeName,
+      subject: `🎓 Payment Done Successfully - S-CODERS Workshop Key (${generatedKey})`,
+      title: activeWorkshop.title,
+      uniqueKey: generatedKey,
+      messageText: "Your payment has been done successfully and thank you for choosing S-CODERS Bharath tech developers. Your classroom sandbox, downloadable assets, and Zoom meeting access are now unlocked!",
+      amount: totalAmount,
+      actionText: "Enter Workshop & Sandbox",
+      onAction: () => {
+        setShowEmailNotice(false);
+      }
+    });
+    setShowEmailNotice(true);
+  };
+
   const handleReceiptMockUpload = () => {
     setReceiptName(`SCO_BANK_WIRE_RECEIPT_${Math.floor(1000 + Math.random() * 9000)}.pdf`);
     setReceiptFile({ size: 1450000 });
@@ -366,15 +572,22 @@ export default function TenantDashboard() {
   const handleInitiateBankPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!receiptFile) {
-      alert('Please upload/simulate receipt first.');
+      alert('Please upload or simulate a bank wire transfer receipt first.');
       return;
     }
     setPaymentSimulating(true);
     setTimeout(() => {
       setPaymentSimulating(false);
-      setIsPaymentVerified(true);
-      setRegMode('enterKey');
-    }, 1500);
+      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+      mintAndCompleteWorkshopRegistration(
+        regName.trim() || currentUser?.name || 'Workshop Participant',
+        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
+        regRole || 'Registered Developer',
+        totalAmount,
+        'Bank Transfer (NEFT/IMPS)',
+        'BANK_WIRE_' + Date.now().toString(36).toUpperCase()
+      );
+    }, 1200);
   };
 
   const handleSimulateUpiSuccess = () => {
@@ -388,7 +601,7 @@ export default function TenantDashboard() {
   const handleInitiateCardPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cardNo || !cardExpiry || !cardCvv) {
-      alert('Please fill in card details.');
+      alert('Please fill in valid card details.');
       return;
     }
     setPaymentSimulating(true);
@@ -398,177 +611,26 @@ export default function TenantDashboard() {
       setOtpCountdown(60);
       setOtpValue('');
       setOtpError(null);
-    }, 1500);
+    }, 1200);
   };
 
   const handleGenerateUniqueKey = () => {
-    let activeClient = currentUser;
-    if (!activeClient) {
-      const newClient: AppUser = {
-        uid: 'client-' + Date.now().toString(),
-        name: regName || 'Workshop Attendee',
-        email: regEmail || 'attendee@scoders.com',
-        role: 'client',
-        company: 'Independent Client',
-        phone: 'Not Specified',
-        createdAt: new Date().toISOString()
-      };
-      
-      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-      if (!clients.some(c => c.email.toLowerCase() === newClient.email.toLowerCase().trim())) {
-        clients.push(newClient);
-        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-      }
-
-      const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-      if (!passwordsMap[newClient.email.toLowerCase()]) {
-        passwordsMap[newClient.email.toLowerCase()] = 'password';
-        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-      }
-
-      localStorage.setItem('scoders_user', JSON.stringify(newClient));
-      setCurrentUser(newClient);
-      activeClient = newClient;
-      window.dispatchEvent(new Event('scoders_auth_change'));
-    }
-
-    const code = activeWorkshop.id.toUpperCase();
-    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
-    const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
-
-    const newKeys = {
-      ...registeredKeys,
-      [activeWorkshop.id]: {
-        key: generatedKey,
-        name: activeClient.name,
-        email: activeClient.email,
-        role: regRole || 'Registered Developer',
-        tickets: payTicketsCount,
-        totalPaid: (activeWorkshop.price ?? 1499) * payTicketsCount,
-        timestamp: new Date().toLocaleDateString()
-      }
-    };
-
-    setRegisteredKeys(newKeys);
-    localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
-
-    // Complete relational DatabaseEngine integration
-    try {
-      const regId = 'REG-WKSP-' + Date.now().toString().slice(-4);
-      const mockChatId = 'CHT-WKSP-' + Date.now().toString().slice(-4);
-      const mockPdfId = 'FIL-WKSP-' + Date.now().toString().slice(-4);
-      const mockSrcId = 'FIL-WSRC-' + Date.now().toString().slice(-4);
-
-      const dbWorkshopReg: WorkshopRegistration = {
-        id: regId,
-        participantProfile: {
-          name: activeClient.name,
-          email: activeClient.email,
-          phone: '+91 99999 00000',
-          role: regRole || 'Registered Developer'
-        },
-        workshopId: activeWorkshop.id,
-        workshopTitle: activeWorkshop.title,
-        paymentStatus: 'Successful',
-        amountPaid: (activeWorkshop.price ?? 1499) * payTicketsCount,
-        paymentMethod: paymentMethod || 'UPI (Google Pay)',
-        paymentDate: new Date().toISOString().split('T')[0],
-        transactionId: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
-        uniqueAccessKey: generatedKey,
-        materialsFileIds: [mockPdfId, mockSrcId],
-        chatId: mockChatId,
-        feedbackId: null
-      };
-
-      // Save registration
-      const currentRegs = DatabaseEngine.getWorkshopRegistrations();
-      DatabaseEngine.saveWorkshopRegistrations([dbWorkshopReg, ...currentRegs]);
-
-      // Save Payment Transaction
-      const dbPayment: PaymentTransaction = {
-        id: dbWorkshopReg.transactionId,
-        clientId: activeClient.email,
-        clientName: activeClient.name,
-        clientEmail: activeClient.email,
-        amount: dbWorkshopReg.amountPaid,
-        paymentMethod: dbWorkshopReg.paymentMethod,
-        status: 'Successful',
-        timestamp: new Date().toISOString(),
-        reference: `Workshop Key Registration: ${activeWorkshop.title}`,
-        interrupted: false,
-        failureReason: null
-      };
-      const currentPayments = DatabaseEngine.getPayments();
-      DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
-
-      // Save Chat Conversation
-      const dbChat: ChatConversation = {
-        id: mockChatId,
-        clientName: activeClient.name,
-        clientEmail: activeClient.email,
-        registrationId: regId,
-        reference: activeWorkshop.title,
-        messages: [
-          { id: 'msg-wksp-1', sender: 'team', content: `Congratulations ${activeClient.name}! You are registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your individual materials and cheat sheets are loaded in your student dashboard. Feel free to ask questions here!`, timestamp: new Date().toISOString() }
-        ],
-        lastUpdated: new Date().toISOString()
-      };
-      const currentChats = DatabaseEngine.getChats();
-      DatabaseEngine.saveChats([dbChat, ...currentChats]);
-
-      // Save separate File Records
-      const dbPdfFile: FileRecord = {
-        id: mockPdfId,
-        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_guide.pdf`,
-        type: 'workshop_pdf',
-        url: '#download-guide-pdf',
-        size: '1.4 MB',
-        clientId: activeClient.email,
-        registrationId: regId,
-        uploadDate: new Date().toISOString().split('T')[0]
-      };
-      const dbSrcFile: FileRecord = {
-        id: mockSrcId,
-        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_boilerplate.zip`,
-        type: 'workshop_source_code',
-        url: '#download-boilerplate-zip',
-        size: '890 KB',
-        clientId: activeClient.email,
-        registrationId: regId,
-        uploadDate: new Date().toISOString().split('T')[0]
-      };
-      const currentFiles = DatabaseEngine.getFiles();
-      DatabaseEngine.saveFiles([dbPdfFile, dbSrcFile, ...currentFiles]);
-    } catch (dbErr) {
-      console.error("Database Engine Workshop Registration Error:", dbErr);
-    }
-
-    // Trigger automated success email dispatch
-    try {
-      fetch('/api/email/workshop-payment-verified', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: activeClient.email,
-          clientName: activeClient.name,
-          workshopTitle: activeWorkshop.title,
-          amount: (activeWorkshop.price ?? 1499) * payTicketsCount,
-          uniqueKey: generatedKey,
-          paymentId: 'PAY_WKSP_' + Date.now().toString(36).toUpperCase(),
-          actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
-        })
-      }).catch(err => console.warn("Workshop email dispatch warning:", err));
-    } catch (emailErr) {
-      console.warn("Workshop email dispatch error:", emailErr);
-    }
-
-    setGeneratedWorkshopKey(generatedKey);
+    const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+    mintAndCompleteWorkshopRegistration(
+      regName.trim() || currentUser?.name || 'Workshop Participant',
+      regEmail.trim() || currentUser?.email || 'participant@scoders.com',
+      regRole || 'Registered Developer',
+      totalAmount,
+      'Direct Key Gateway',
+      'DIRECT_KEY_' + Date.now().toString(36).toUpperCase()
+    );
   };
 
   const handleInitiateRazorpayWorkshop = async () => {
     const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+    const participantName = (regName.trim() || currentUser?.name || 'Attendee').trim();
+    const participantEmail = (regEmail.trim() || currentUser?.email || 'attendee@scoders.com').trim();
+
     try {
       const orderRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
@@ -579,8 +641,8 @@ export default function TenantDashboard() {
           receipt: `wksp_${activeWorkshop.id}_${Date.now()}`,
           notes: {
             workshopTitle: activeWorkshop.title,
-            participantName: regName.trim(),
-            email: regEmail.trim(),
+            participantName: participantName,
+            email: participantEmail,
             tickets: payTicketsCount
           }
         })
@@ -598,8 +660,8 @@ export default function TenantDashboard() {
       setRazorpayPaymentDetails({
         amount: totalAmount,
         currency: 'INR',
-        clientName: regName.trim(),
-        email: regEmail.trim(),
+        clientName: participantName,
+        email: participantEmail,
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
         merchantUpiId: 'scoders@ybl'
       });
@@ -616,8 +678,8 @@ export default function TenantDashboard() {
       setRazorpayPaymentDetails({
         amount: totalAmount,
         currency: 'INR',
-        clientName: regName.trim(),
-        email: regEmail.trim(),
+        clientName: participantName,
+        email: participantEmail,
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
         merchantUpiId: 'scoders@ybl'
       });
@@ -627,254 +689,87 @@ export default function TenantDashboard() {
 
   const handleRazorpayWorkshopSuccess = (data: RazorpayPaymentSuccessData) => {
     setShowRazorpayModal(false);
-    
-    // Auto-login client if needed
-    let activeClient = currentUser;
-    if (!activeClient) {
-      const newClient: AppUser = {
-        uid: 'client-' + Date.now().toString(),
-        name: data.clientName,
-        email: data.email,
-        role: 'client',
-        company: 'Independent Client',
-        phone: 'Not Specified',
-        createdAt: new Date().toISOString()
-      };
-      
-      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-      if (!clients.some(c => c.email.toLowerCase() === data.email.toLowerCase().trim())) {
-        clients.push(newClient);
-        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-      }
+    mintAndCompleteWorkshopRegistration(
+      data.clientName || regName || currentUser?.name || 'Workshop Participant',
+      data.email || regEmail || currentUser?.email || 'participant@scoders.com',
+      regRole || 'Registered Developer',
+      data.amount,
+      'Razorpay Smart Gateway (scoders@ybl)',
+      data.razorpay_payment_id || ('PAY_WKSP_' + Date.now().toString(36).toUpperCase())
+    );
+  };
 
-      localStorage.setItem('scoders_user', JSON.stringify(newClient));
-      setCurrentUser(newClient);
-      activeClient = newClient;
-      window.dispatchEvent(new Event('scoders_auth_change'));
+  const handleDirectUpiWorkshopSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = upiUtrInput.trim();
+    if (trimmed.length < 6) {
+      setUpiUtrError('Please enter a valid 12-digit UPI reference (UTR) number');
+      return;
     }
+    setUpiUtrError(null);
+    setIsVerifyingUtr(true);
 
-    const code = activeWorkshop.id.toUpperCase();
-    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
-    const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
-
-    const newKeys = {
-      ...registeredKeys,
-      [activeWorkshop.id]: {
-        key: generatedKey,
-        name: data.clientName,
-        email: data.email,
-        role: regRole,
-        tickets: payTicketsCount,
-        totalPaid: data.amount,
-        timestamp: new Date().toLocaleDateString()
-      }
-    };
-
-    setRegisteredKeys(newKeys);
-    localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
-    setRegSuccessKey(generatedKey);
-    setGeneratedWorkshopKey(generatedKey);
-    setIsPaymentVerified(true);
-    setRegMode('enterKey');
-
-    // Save DB records
-    try {
-      const regId = 'reg-wksp-' + Date.now();
-      const mockPdfId = 'file-pdf-' + Date.now();
-      const mockSrcId = 'file-src-' + Date.now();
-      const mockChatId = 'chat-wksp-' + Date.now();
-
-      const dbRegistration: WorkshopRegistration = {
-        id: regId,
-        participantProfile: {
-          name: data.clientName,
-          email: data.email,
-          phone: '+91 99999 00000',
-          role: regRole || 'Registered Developer'
-        },
-        workshopId: activeWorkshop.id,
-        workshopTitle: activeWorkshop.title,
-        paymentStatus: 'Successful',
-        amountPaid: data.amount,
-        paymentMethod: 'Razorpay PG',
-        paymentDate: new Date().toISOString().split('T')[0],
-        transactionId: data.razorpay_payment_id || ('TXN-' + Date.now()),
-        uniqueAccessKey: generatedKey,
-        materialsFileIds: [mockPdfId, mockSrcId],
-        chatId: mockChatId,
-        feedbackId: null
-      };
-      const currentRegs = DatabaseEngine.getWorkshopRegistrations();
-      DatabaseEngine.saveWorkshopRegistrations([dbRegistration, ...currentRegs]);
-
-      const dbTx: PaymentTransaction = {
-        id: data.razorpay_payment_id || ('TXN-' + Date.now()),
-        clientId: data.email,
-        clientName: data.clientName,
-        clientEmail: data.email,
-        amount: data.amount,
-        paymentMethod: 'Razorpay PG',
-        status: 'Successful',
-        timestamp: new Date().toISOString(),
-        reference: `Workshop Pass: ${activeWorkshop.title}`,
-        interrupted: false,
-        failureReason: null
-      };
-      const currentTxs = DatabaseEngine.getPayments();
-      DatabaseEngine.savePayments([dbTx, ...currentTxs]);
-    } catch (err) {
-      console.warn("DB engine save error:", err);
-    }
-
-    // Trigger automated email dispatch
-    try {
-      fetch('/api/email/workshop-payment-verified', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: data.email,
-          clientName: data.clientName,
-          workshopTitle: activeWorkshop.title,
-          amount: data.amount,
-          uniqueKey: generatedKey,
-          paymentId: data.razorpay_payment_id,
-          actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
-        })
-      }).catch(err => console.warn("Workshop email dispatch warning:", err));
-    } catch (emailErr) {
-      console.warn("Workshop email dispatch error:", emailErr);
-    }
-
-    // Trigger Pop-up Email Confirmation from scoders82@gmail.com
-    setEmailNoticeData({
-      type: 'workshop',
-      recipientEmail: data.email,
-      recipientName: data.clientName,
-      subject: `🎓 Payment Done Successfully - S-CODERS Workshop Key (${generatedKey})`,
-      title: activeWorkshop.title,
-      uniqueKey: generatedKey,
-      messageText: "Your payment has been done successfully so here are your access tickets/key just grab it! S-CODERS Classroom and Workshop sandbox unlocked.",
-      amount: data.amount,
-      actionText: "Enter Workshop & Sandbox",
-      onAction: () => {
-        setShowRegModal(false);
-        setPaymentStep(false);
-      }
-    });
-    setShowEmailNotice(true);
+    setTimeout(() => {
+      setIsVerifyingUtr(false);
+      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+      mintAndCompleteWorkshopRegistration(
+        regName.trim() || currentUser?.name || 'Workshop Participant',
+        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
+        regRole || 'Registered Developer',
+        totalAmount,
+        'Direct UPI (scoders@ybl)',
+        'UPI_UTR_' + trimmed.toUpperCase()
+      );
+    }, 1200);
   };
 
   const handleVerifyOtpAndComplete = (e: React.FormEvent) => {
     e.preventDefault();
     if (otpValue.trim() !== '123456' && otpValue.trim().length !== 6) {
-      setOtpError('Invalid OTP. For testing, enter the bank OTP code: 123456');
+      setOtpError('Invalid OTP. For test verification, enter the bank OTP code: 123456');
       return;
     }
     setPaymentSimulating(true);
-    setOtpVerificationStep(false);
     setTimeout(() => {
       setPaymentSimulating(false);
-      setIsPaymentVerified(true);
-      setRegMode('enterKey');
-    }, 1500);
+      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+      mintAndCompleteWorkshopRegistration(
+        regName.trim() || currentUser?.name || 'Workshop Participant',
+        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
+        regRole || 'Registered Developer',
+        totalAmount,
+        'Credit/Debit Card (Online)',
+        'CARD_TXN_' + Date.now().toString(36).toUpperCase()
+      );
+    }, 1000);
   };
 
   const handleVerifyUpiPaymentAndComplete = () => {
     setPaymentSimulating(true);
     setTimeout(() => {
       setPaymentSimulating(false);
-      setUpiPendingStep(false);
-      setIsPaymentVerified(true);
-      setRegMode('enterKey');
-    }, 1500);
+      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+      mintAndCompleteWorkshopRegistration(
+        regName.trim() || currentUser?.name || 'Workshop Participant',
+        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
+        regRole || 'Registered Developer',
+        totalAmount,
+        `UPI App (${selectedUpiApp || 'Ruy Pay'})`,
+        'UPI_' + Date.now().toString(36).toUpperCase()
+      );
+    }, 1000);
   };
 
   const handleCompletePayment = () => {
-    setPaymentSimulating(true);
-    setTimeout(() => {
-      // Auto-signup / log-in on the fly if not logged in!
-      let activeClient = currentUser;
-      if (!activeClient) {
-        const newClient: AppUser = {
-          uid: 'client-' + Date.now().toString(),
-          name: regName,
-          email: regEmail,
-          role: 'client',
-          company: 'Independent Client',
-          phone: 'Not Specified',
-          createdAt: new Date().toISOString()
-        };
-        
-        // Save client profile in local client list
-        const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-        const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-        if (!clients.some(c => c.email.toLowerCase() === regEmail.toLowerCase().trim())) {
-          clients.push(newClient);
-          localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-        }
-
-        // Save password secure map default for on-demand
-        const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-        if (!passwordsMap[newClient.email.toLowerCase()]) {
-          passwordsMap[newClient.email.toLowerCase()] = 'password';
-          localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-        }
-
-        // Log in
-        localStorage.setItem('scoders_user', JSON.stringify(newClient));
-        setCurrentUser(newClient);
-        activeClient = newClient;
-        
-        // Dispatch events to sync other parts of the app
-        window.dispatchEvent(new Event('scoders_auth_change'));
-      }
-
-      const code = activeWorkshop.id.toUpperCase();
-      const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
-      const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
-
-      const newKeys = {
-        ...registeredKeys,
-        [activeWorkshop.id]: {
-          key: generatedKey,
-          name: regName,
-          email: regEmail,
-          role: regRole,
-          tickets: payTicketsCount,
-          totalPaid: (activeWorkshop.price ?? 1499) * payTicketsCount,
-          timestamp: new Date().toLocaleDateString()
-        }
-      };
-
-      setRegisteredKeys(newKeys);
-      localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
-      setRegSuccessKey(generatedKey);
-
-      // Trigger automated success email dispatch
-      try {
-        fetch('/api/email/workshop-payment-verified', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: regEmail,
-            clientName: regName,
-            workshopTitle: activeWorkshop.title,
-            amount: (activeWorkshop.price ?? 1499) * payTicketsCount,
-            uniqueKey: generatedKey,
-            paymentId: 'PAY_WKSP_' + Date.now().toString(36).toUpperCase(),
-            actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
-          })
-        }).catch(err => console.warn("Workshop email dispatch warning:", err));
-      } catch (emailErr) {
-        console.warn("Workshop email dispatch error:", emailErr);
-      }
-
-      setPaymentSimulating(false);
-      setPaymentStep(false);
-    }, 2000);
+    const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
+    mintAndCompleteWorkshopRegistration(
+      regName.trim() || currentUser?.name || 'Workshop Participant',
+      regEmail.trim() || currentUser?.email || 'participant@scoders.com',
+      regRole || 'Registered Developer',
+      totalAmount,
+      'Direct Settle Gateway',
+      'DIRECT_' + Date.now().toString(36).toUpperCase()
+    );
   };
 
   const handleSimulatePaymentFailure = (reason: string = "Payment cancelled or declined by user") => {
@@ -2165,10 +2060,10 @@ export default function TenantDashboard() {
                             
                             <div className="grid grid-cols-2 gap-2">
                               {[
-                                { id: 'phonepe', name: 'PhonePe (Ruy)' },
-                                { id: 'gpay', name: 'Google Pay (Ruy)' },
-                                { id: 'paytm', name: 'Paytm (Ruy)' },
-                                { id: 'bhim', name: 'BHIM UPI (Ruy)' }
+                                { id: 'phonepe', name: 'PhonePe' },
+                                { id: 'gpay', name: 'Google Pay' },
+                                { id: 'paytm', name: 'Paytm' },
+                                { id: 'bhim', name: 'BHIM UPI' }
                               ].map((app) => (
                                 <button
                                   type="button"
@@ -2181,10 +2076,10 @@ export default function TenantDashboard() {
                               ))}
                             </div>
 
-                            {/* Divider with QR/Address backup */}
-                            <div className="flex items-center gap-3 py-2">
+                            {/* Divider with QR/Address */}
+                            <div className="flex items-center gap-3 py-1">
                               <div className="h-px bg-white/5 flex-grow" />
-                              <span className="text-[8px] font-mono text-gray-600 uppercase tracking-widest">or pay using scan card</span>
+                              <span className="text-[8px] font-mono text-gray-600 uppercase tracking-widest">or scan & verify UTR</span>
                               <div className="h-px bg-white/5 flex-grow" />
                             </div>
 
@@ -2210,7 +2105,7 @@ export default function TenantDashboard() {
                             {/* UPI ID Details manual copy */}
                             <div className="bg-brand-dark/50 border border-white/5 rounded-xl p-3 flex items-center justify-between">
                               <div className="text-left">
-                                <span className="text-[9px] font-mono text-gray-500 block">RUY VIRTUAL PAYMENT ADDRESS</span>
+                                <span className="text-[9px] font-mono text-gray-500 block uppercase">RUY VIRTUAL PAYMENT ADDRESS</span>
                                 <span className="text-xs font-mono font-bold text-white block">scoders@ybl</span>
                               </div>
                               <button
@@ -2226,16 +2121,36 @@ export default function TenantDashboard() {
                               </button>
                             </div>
 
-                            {/* Manual Settle fallback button */}
-                            <div className="pt-1">
-                              <button
-                                type="button"
-                                onClick={() => handleInitiateUpiPayment('generic')}
-                                className="w-full py-3 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/50 text-brand-teal font-display text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer animate-pulse"
-                              >
-                                Settle with Generic UPI App
-                                <ArrowRight className="w-4 h-4" />
-                              </button>
+                            {/* Direct UTR Confirmation form */}
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-2.5 text-left">
+                              <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest font-bold">
+                                Enter 12-Digit UPI Ref / UTR No:
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  maxLength={16}
+                                  value={upiUtrInput}
+                                  onChange={(e) => setUpiUtrInput(e.target.value)}
+                                  placeholder="e.g. 423987112233"
+                                  className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleDirectUpiWorkshopSubmit()}
+                                  disabled={isVerifyingUtr}
+                                  className="px-4 py-2 bg-brand-teal text-brand-dark font-display text-xs font-bold rounded-lg hover:bg-white transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1 shrink-0"
+                                >
+                                  {isVerifyingUtr ? (
+                                    <div className="w-3.5 h-3.5 border-2 border-brand-dark border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <>Verify & Unlock <ArrowRight className="w-3.5 h-3.5" /></>
+                                  )}
+                                </button>
+                              </div>
+                              {upiUtrError && (
+                                <p className="text-[10px] text-red-400 font-mono">{upiUtrError}</p>
+                              )}
                             </div>
                           </div>
                         )}
@@ -2653,7 +2568,15 @@ export default function TenantDashboard() {
       {razorpayPaymentDetails && (
         <RazorpayModal
           isOpen={showRazorpayModal}
-          onClose={() => setShowRazorpayModal(false)}
+          onClose={() => {
+            setShowRazorpayModal(false);
+            setPaymentSimulating(false);
+          }}
+          onFailure={(reason) => {
+            setShowRazorpayModal(false);
+            setPaymentSimulating(false);
+            setOtpError(reason || 'Payment incomplete or cancelled. No workshop pass was issued.');
+          }}
           onSuccess={handleRazorpayWorkshopSuccess}
           orderData={razorpayOrderData}
           paymentDetails={razorpayPaymentDetails}

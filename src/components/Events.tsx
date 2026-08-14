@@ -2061,7 +2061,20 @@ export default function Events() {
       {razorpayPaymentDetails && (
         <RazorpayModal
           isOpen={showRazorpayModal}
-          onClose={() => setShowRazorpayModal(false)}
+          onClose={() => {
+            setShowRazorpayModal(false);
+            setPaymentStatusNotice({
+              type: 'FAILED',
+              message: 'Payment cancelled or not completed. No event pass was generated.'
+            });
+          }}
+          onFailure={(reason) => {
+            setShowRazorpayModal(false);
+            setPaymentStatusNotice({
+              type: 'FAILED',
+              message: reason || 'Payment incomplete or cancelled. No ticket pass generated.'
+            });
+          }}
           onSuccess={handleRazorpayEventSuccess}
           orderData={razorpayOrderData}
           paymentDetails={razorpayPaymentDetails}
