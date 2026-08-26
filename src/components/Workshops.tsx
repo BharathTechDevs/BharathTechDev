@@ -79,35 +79,11 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [manualKey, setManualKey] = useState('');
   const [manualKeyError, setManualKeyError] = useState<string | null>(null);
   const [regMode, setRegMode] = useState<'register' | 'enterKey'>('register');
-
-  // New Payment States inside Workshops Modal
-  const [paymentStep, setPaymentStep] = useState(false);
   const [payTicketsCount, setPayTicketsCount] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'upi' | 'card' | 'bank'>('razorpay');
-  const [selectedUpiApp, setSelectedUpiApp] = useState<'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic' | null>(null);
-  const [cardNo, setCardNo] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  const [paymentSimulating, setPaymentSimulating] = useState(false);
-  const [whatsappJoined, setWhatsappJoined] = useState(false);
-  const [otpVerificationStep, setOtpVerificationStep] = useState(false);
-  const [otpValue, setOtpValue] = useState('');
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [upiPendingStep, setUpiPendingStep] = useState(false);
-  const [upiVerified, setUpiVerified] = useState(false);
-  const [upiVerifying, setUpiVerifying] = useState(false);
-  const [otpCountdown, setOtpCountdown] = useState(60);
-  const [isPaymentVerified, setIsPaymentVerified] = useState(false);
-  const [generatedWorkshopKey, setGeneratedWorkshopKey] = useState<string | null>(null);
-  const [ruyTimer, setRuyTimer] = useState(300);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [receiptFile, setReceiptFile] = useState<any>(null);
-  const [receiptName, setReceiptName] = useState('');
-  const [upiUtrInput, setUpiUtrInput] = useState('');
-  const [upiUtrError, setUpiUtrError] = useState<string | null>(null);
-  const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Razorpay Gateway Modal Integration States
+  // Razorpay Gateway Modal Integration States (Active Payment Method)
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayOrderData, setRazorpayOrderData] = useState<{
     orderId: string;
@@ -183,36 +159,6 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
       setRegEmail(currentUser.email || '');
     }
   }, [currentUser, showRegModal]);
-
-  // OTP Countdown Timer
-  useEffect(() => {
-    let timer: any;
-    if (otpVerificationStep && otpCountdown > 0) {
-      timer = setInterval(() => {
-        setOtpCountdown(prev => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [otpVerificationStep, otpCountdown]);
-
-  // Ruy Gateway Timer
-  useEffect(() => {
-    let interval: any;
-    if (upiPendingStep && ruyTimer > 0) {
-      interval = setInterval(() => {
-        setRuyTimer((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [upiPendingStep, ruyTimer]);
 
   // Listen to external database changes
   useEffect(() => {
@@ -292,73 +238,11 @@ export default function TenantDashboard() {
     setTerminalLogs([]);
   }, [selectedWorkshopId]);
 
-  // Handle key creation & registration (starts payment flow)
+  // Handle key creation & registration (starts Razorpay payment flow)
   const handleRegisterWorkshop = (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName || !regEmail || !regRole) return;
-    setPaymentStep(true);
-  };
-
-  // Helper to generate the most robust device-specific UPI deep link
-  const getUpiDeviceLink = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic', address: string, name: string, amount: number, note: string) => {
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    
-    const encodedName = encodeURIComponent(name);
-    const encodedNote = encodeURIComponent(note);
-    const params = `pa=${address}&pn=${encodedName}&am=${amount}&cu=INR&tn=${encodedNote}`;
-    
-    if (isAndroid) {
-      if (app === 'phonepe') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
-      } else if (app === 'gpay') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-      } else if (app === 'paytm') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
-      } else if (app === 'bhim') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
-      }
-      return `upi://pay?${params}`;
-    } else if (isIOS) {
-      if (app === 'phonepe') {
-        return `phonepe://pay?${params}`;
-      } else if (app === 'gpay') {
-        return `gpay://upi/pay?${params}`;
-      } else if (app === 'paytm') {
-        return `paytmmp://pay?${params}`;
-      }
-      return `upi://pay?${params}`;
-    } else {
-      return `upi://pay?${params}`;
-    }
-  };
-
-  const handleInitiateUpiPayment = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic') => {
-    setSelectedUpiApp(app);
-    setPaymentSimulating(true);
-    setUpiVerified(false);
-    setUpiVerifying(false);
-    setRuyTimer(300); // 5 minutes
-    
-    // Construct real UPI URI
-    const payeeAddress = 'scoders@ybl';
-    const payeeName = 'S-CODERS Technologies';
-    const payAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-    const note = `Workshop Pass: ${activeWorkshop.title.substring(0, 20)}`;
-    
-    const intentUri = getUpiDeviceLink(app, payeeAddress, payeeName, payAmount, note);
-
-    // Try launching the deep link immediately
-    try {
-      window.location.href = intentUri;
-    } catch (err) {
-      console.warn("Could not launch custom deep link automatically:", err);
-    }
-
-    setTimeout(() => {
-      setPaymentSimulating(false);
-      setUpiPendingStep(true);
-    }, 1500);
+    handleInitiateRazorpayWorkshop();
   };
 
   const mintAndCompleteWorkshopRegistration = (
@@ -428,8 +312,6 @@ export default function TenantDashboard() {
     setRegisteredKeys(newKeys);
     localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
     setRegSuccessKey(generatedKey);
-    setGeneratedWorkshopKey(generatedKey);
-    setIsPaymentVerified(true);
 
     // 4. Save to relational DatabaseEngine
     try {
@@ -536,15 +418,8 @@ export default function TenantDashboard() {
       console.warn("Workshop email dispatch error:", emailErr);
     }
 
-    // 6. Close the drawer modal immediately and clear inputs
+    // 6. Close the drawer modal immediately
     setShowRegModal(false);
-    setPaymentStep(false);
-    setOtpVerificationStep(false);
-    setUpiPendingStep(false);
-    setUpiUtrInput('');
-    setCardNo('');
-    setCardExpiry('');
-    setCardCvv('');
 
     // 7. Pop up the official Email Notification Confirmation Modal
     setEmailNoticeData({
@@ -564,69 +439,9 @@ export default function TenantDashboard() {
     setShowEmailNotice(true);
   };
 
-  const handleReceiptMockUpload = () => {
-    setReceiptName(`SCO_BANK_WIRE_RECEIPT_${Math.floor(1000 + Math.random() * 9000)}.pdf`);
-    setReceiptFile({ size: 1450000 });
-  };
-
-  const handleInitiateBankPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!receiptFile) {
-      alert('Please upload or simulate a bank wire transfer receipt first.');
-      return;
-    }
-    setPaymentSimulating(true);
-    setTimeout(() => {
-      setPaymentSimulating(false);
-      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-      mintAndCompleteWorkshopRegistration(
-        regName.trim() || currentUser?.name || 'Workshop Participant',
-        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
-        regRole || 'Registered Developer',
-        totalAmount,
-        'Bank Transfer (NEFT/IMPS)',
-        'BANK_WIRE_' + Date.now().toString(36).toUpperCase()
-      );
-    }, 1200);
-  };
-
-  const handleSimulateUpiSuccess = () => {
-    setUpiVerifying(true);
-    setTimeout(() => {
-      setUpiVerifying(false);
-      setUpiVerified(true);
-    }, 1500);
-  };
-
-  const handleInitiateCardPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cardNo || !cardExpiry || !cardCvv) {
-      alert('Please fill in valid card details.');
-      return;
-    }
-    setPaymentSimulating(true);
-    setTimeout(() => {
-      setPaymentSimulating(false);
-      setOtpVerificationStep(true);
-      setOtpCountdown(60);
-      setOtpValue('');
-      setOtpError(null);
-    }, 1200);
-  };
-
-  const handleGenerateUniqueKey = () => {
-    const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-    mintAndCompleteWorkshopRegistration(
-      regName.trim() || currentUser?.name || 'Workshop Participant',
-      regEmail.trim() || currentUser?.email || 'participant@scoders.com',
-      regRole || 'Registered Developer',
-      totalAmount,
-      'Direct Key Gateway',
-      'DIRECT_KEY_' + Date.now().toString(36).toUpperCase()
-    );
-  };
-
   const handleInitiateRazorpayWorkshop = async () => {
+    setIsProcessing(true);
+    setPaymentError(null);
     const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
     const participantName = (regName.trim() || currentUser?.name || 'Attendee').trim();
     const participantEmail = (regEmail.trim() || currentUser?.email || 'attendee@scoders.com').trim();
@@ -666,6 +481,7 @@ export default function TenantDashboard() {
         merchantUpiId: 'scoders@ybl'
       });
 
+      setIsProcessing(false);
       setShowRazorpayModal(true);
     } catch (err) {
       console.warn("Offline fallback for workshop razorpay order:", err);
@@ -683,6 +499,7 @@ export default function TenantDashboard() {
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
         merchantUpiId: 'scoders@ybl'
       });
+      setIsProcessing(false);
       setShowRazorpayModal(true);
     }
   };
@@ -696,79 +513,6 @@ export default function TenantDashboard() {
       data.amount,
       'Razorpay Smart Gateway (scoders@ybl)',
       data.razorpay_payment_id || ('PAY_WKSP_' + Date.now().toString(36).toUpperCase())
-    );
-  };
-
-  const handleDirectUpiWorkshopSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmed = upiUtrInput.trim();
-    if (trimmed.length < 6) {
-      setUpiUtrError('Please enter a valid 12-digit UPI reference (UTR) number');
-      return;
-    }
-    setUpiUtrError(null);
-    setIsVerifyingUtr(true);
-
-    setTimeout(() => {
-      setIsVerifyingUtr(false);
-      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-      mintAndCompleteWorkshopRegistration(
-        regName.trim() || currentUser?.name || 'Workshop Participant',
-        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
-        regRole || 'Registered Developer',
-        totalAmount,
-        'Direct UPI (scoders@ybl)',
-        'UPI_UTR_' + trimmed.toUpperCase()
-      );
-    }, 1200);
-  };
-
-  const handleVerifyOtpAndComplete = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpValue.trim() !== '123456' && otpValue.trim().length !== 6) {
-      setOtpError('Invalid OTP. For test verification, enter the bank OTP code: 123456');
-      return;
-    }
-    setPaymentSimulating(true);
-    setTimeout(() => {
-      setPaymentSimulating(false);
-      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-      mintAndCompleteWorkshopRegistration(
-        regName.trim() || currentUser?.name || 'Workshop Participant',
-        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
-        regRole || 'Registered Developer',
-        totalAmount,
-        'Credit/Debit Card (Online)',
-        'CARD_TXN_' + Date.now().toString(36).toUpperCase()
-      );
-    }, 1000);
-  };
-
-  const handleVerifyUpiPaymentAndComplete = () => {
-    setPaymentSimulating(true);
-    setTimeout(() => {
-      setPaymentSimulating(false);
-      const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-      mintAndCompleteWorkshopRegistration(
-        regName.trim() || currentUser?.name || 'Workshop Participant',
-        regEmail.trim() || currentUser?.email || 'participant@scoders.com',
-        regRole || 'Registered Developer',
-        totalAmount,
-        `UPI App (${selectedUpiApp || 'Ruy Pay'})`,
-        'UPI_' + Date.now().toString(36).toUpperCase()
-      );
-    }, 1000);
-  };
-
-  const handleCompletePayment = () => {
-    const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-    mintAndCompleteWorkshopRegistration(
-      regName.trim() || currentUser?.name || 'Workshop Participant',
-      regEmail.trim() || currentUser?.email || 'participant@scoders.com',
-      regRole || 'Registered Developer',
-      totalAmount,
-      'Direct Settle Gateway',
-      'DIRECT_' + Date.now().toString(36).toUpperCase()
     );
   };
 
@@ -1608,14 +1352,10 @@ export default function TenantDashboard() {
               exit={{ opacity: 0 }}
               onClick={() => { 
                 setShowRegModal(false); 
-                setPaymentStep(false); 
-                setOtpVerificationStep(false); 
-                setUpiPendingStep(false); 
-                setUpiVerified(false);
-                setUpiVerifying(false);
-                setIsPaymentVerified(false);
-                setGeneratedWorkshopKey(null);
                 setRegSuccessKey(null);
+                setManualKeyError(null);
+                setIsProcessing(false);
+                setPaymentError(null);
               }}
               className="absolute inset-0 bg-brand-dark/85 backdrop-blur-md"
             />
@@ -1640,14 +1380,10 @@ export default function TenantDashboard() {
                   type="button"
                   onClick={() => { 
                     setShowRegModal(false); 
-                    setPaymentStep(false); 
-                    setOtpVerificationStep(false); 
-                    setUpiPendingStep(false); 
-                    setUpiVerified(false);
-                    setUpiVerifying(false);
-                    setIsPaymentVerified(false);
-                    setGeneratedWorkshopKey(null);
                     setRegSuccessKey(null);
+                    setManualKeyError(null);
+                    setIsProcessing(false);
+                    setPaymentError(null);
                   }}
                   className="p-1.5 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer relative z-20"
                   id="close-workshop-modal"
@@ -1681,11 +1417,11 @@ export default function TenantDashboard() {
                         </p>
                       </div>
                       <a 
-                        href="https://chat.whatsapp.com/dummy-scoders-group"
+                        href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
                         target="_blank" 
                         rel="noopener noreferrer"
                         onClick={() => setWhatsappJoined(true)}
-                        className="w-full py-2 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-[11px] uppercase font-bold tracking-wider rounded-xl transition-all block text-center"
+                        className="w-full py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-[11px] uppercase font-bold tracking-wider rounded-xl transition-all block text-center shadow-md shadow-[#25D366]/20"
                       >
                         Join S-CODERS WhatsApp Channel
                       </a>
@@ -1704,626 +1440,11 @@ export default function TenantDashboard() {
                     </div>
 
                     <button
-                      onClick={() => { setShowRegModal(false); setPaymentStep(false); }}
+                      onClick={() => setShowRegModal(false)}
                       className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
                     >
                       Enter Classroom Workspace
                     </button>
-                  </div>
-                ) : otpVerificationStep ? (
-                  // BANK OTP SECURITY STEP
-                  <form onSubmit={handleVerifyOtpAndComplete} className="space-y-4 font-sans py-2">
-                    <div className="text-center space-y-2 mb-4">
-                      <div className="w-12 h-12 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto text-brand-teal">
-                        <Lock className="w-6 h-6 animate-pulse" />
-                      </div>
-                      <h4 className="text-base font-extrabold text-white">Bank Security Verification</h4>
-                      <p className="text-gray-400 text-xs leading-relaxed max-w-xs mx-auto">
-                        A secure 6-digit passcode has been transmitted by your card's issuing bank to your authenticated mobile number.
-                      </p>
-                    </div>
-
-                    <div className="bg-brand-dark/40 border border-white/5 p-4 rounded-xl text-center text-xs space-y-1">
-                      <p className="text-gray-400">Total Charged Amount:</p>
-                      <p className="text-lg font-black text-brand-teal">₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()}</p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest text-center">Enter 6-Digit bank OTP code</label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        value={otpValue}
-                        onChange={(e) => {
-                          setOtpValue(e.target.value.replace(/\D/g, ''));
-                          setOtpError(null);
-                        }}
-                        placeholder="e.g. 123456"
-                        className="w-full text-center tracking-widest text-lg font-mono bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
-                      />
-                      <p className="text-center text-[10px] text-brand-teal/70 font-mono mt-1">Hint: For simulation testing, type the secure code <strong className="text-white">123456</strong></p>
-                    </div>
-
-                    {otpError && (
-                      <p className="text-red-400 text-xs text-center font-mono">{otpError}</p>
-                    )}
-
-                    <div className="flex gap-4 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => { setOtpVerificationStep(false); setPaymentStep(true); }}
-                        className="w-1/3 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-xs font-mono uppercase font-bold transition-all"
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={paymentSimulating}
-                        className="flex-grow py-3 bg-brand-teal text-brand-dark hover:bg-white rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-                      >
-                        {paymentSimulating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Confirm Payment'}
-                      </button>
-                    </div>
-
-                    <div className="text-center text-[10px] text-gray-500 font-mono mt-2">
-                      Resend code in {otpCountdown > 0 ? `${otpCountdown}s` : <span className="text-brand-teal hover:underline cursor-pointer" onClick={() => { setOtpCountdown(60); setOtpValue(''); }}>Resend OTP</span>}
-                    </div>
-                  </form>
-                ) : upiPendingStep ? (
-                  // UPI PENDING CLEARANCE STEP
-                  <div className="space-y-6 text-center py-4 font-sans">
-                    <div className="w-16 h-16 bg-brand-teal/10 border border-brand-teal/30 rounded-full flex items-center justify-center mx-auto animate-pulse text-brand-teal">
-                      <ShieldCheck className="w-8 h-8" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[10px] font-mono uppercase tracking-wider font-bold">
-                        Awaiting Gateway Authorization
-                      </span>
-                      <h4 className="text-lg font-display font-black text-white">
-                        Ruy Pay Secure Connection Active
-                      </h4>
-                      <p className="text-gray-400 text-xs max-w-md mx-auto leading-relaxed">
-                        {selectedUpiApp === 'generic' 
-                          ? 'Your default system UPI application has been invoked with the pre-filled parameters.'
-                          : `Ruy Secure Link has launched the ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : selectedUpiApp === 'paytm' ? 'Paytm' : 'BHIM UPI'} application on your device.`
-                        } Please authorize the payment of <strong className="text-brand-teal font-bold">₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()}</strong> inside your app.
-                      </p>
-                    </div>
-
-                    {/* Premium PhonePe Merchant Scanner Card (Matching User Image) */}
-                    <div className="bg-white text-black p-5 rounded-[2rem] shadow-2xl border border-gray-100 max-w-xs w-full mx-auto relative overflow-hidden flex flex-col items-center my-2">
-                      {/* Header: Bank of Baroda branding */}
-                      <div className="flex items-center gap-3 w-full mb-4 border-b border-gray-100 pb-3 justify-center">
-                        {/* Bank of Baroda Logo */}
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shadow-md shrink-0">
-                          <span className="text-white font-sans font-black text-[9px] tracking-tighter">BOB</span>
-                        </div>
-                        <div className="text-left">
-                          <span className="text-[8px] font-mono text-gray-400 block uppercase font-bold tracking-wider leading-none">Settlement Bank</span>
-                          <span className="text-xs font-sans font-bold text-gray-800">Bank Of Baroda - 2145</span>
-                        </div>
-                      </div>
-
-                      {/* QR Code Container */}
-                      <div className="relative p-1.5 bg-white rounded-2xl border border-gray-100 shadow-inner group">
-                        <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                            `upi://pay?pa=scoders@ybl&pn=S-CODERS%20Technologies&am=${(activeWorkshop.price ?? 1499) * payTicketsCount}&cu=INR&tn=${encodeURIComponent(`S-CODERS Workshop: ${activeWorkshop.title}`)}`
-                          )}`}
-                          alt="UPI Payment QR Code"
-                          className="w-40 h-40 object-contain"
-                          referrerPolicy="no-referrer"
-                        />
-                        
-                        {/* PhonePe logo in the absolute center of the QR code */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="w-9 h-9 rounded-full bg-[#5f259f] border-2 border-white flex items-center justify-center shadow-md">
-                            <span className="text-white font-sans text-xs font-black tracking-tighter">पे</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Footer: View UPI details */}
-                      <div className="mt-4 text-center">
-                        <span className="text-[#5f259f] hover:text-[#4b1c7f] font-sans font-extrabold text-xs tracking-tight flex items-center gap-1 transition-colors cursor-pointer justify-center">
-                          View UPI details
-                        </span>
-                        <span className="text-[8px] font-mono text-gray-400 block mt-1 uppercase tracking-widest font-bold">Merchant ID: scoders@ybl</span>
-                      </div>
-                    </div>
-
-                    {/* Timer details */}
-                    <div className="bg-brand-dark/40 border border-white/5 rounded-2xl p-4 max-w-xs mx-auto text-center space-y-1">
-                      <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block">Checkout Session Timer</span>
-                      <span className="font-mono text-2xl font-black text-brand-teal block">
-                        {Math.floor(ruyTimer / 60)}:{(ruyTimer % 60).toString().padStart(2, '0')}
-                      </span>
-                      <span className="text-[9px] text-gray-400 block">Do not refresh or close this modal</span>
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="grid grid-cols-1 gap-3 max-w-sm mx-auto pt-4">
-                      {!upiVerified ? (
-                        <>
-                          {upiVerifying ? (
-                            <div className="py-3 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-center gap-2.5 text-xs font-mono text-amber-400">
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Confirming transaction signature...</span>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleSimulateUpiSuccess}
-                              className="w-full py-4 bg-brand-teal text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all shadow-lg shadow-brand-teal/10 cursor-pointer flex items-center justify-center gap-2"
-                            >
-                              Simulate Instant Ruy Pay Settle
-                              <Check className="w-4 h-4" />
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="py-2.5 px-3.5 bg-emerald-400/10 border border-emerald-400/20 rounded-2xl text-emerald-400 font-mono text-xs inline-flex items-center gap-2 mx-auto justify-center w-full">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                            <span>Payment Received & Verified!</span>
-                          </div>
-                          
-                          <button
-                            type="button"
-                            onClick={handleVerifyUpiPaymentAndComplete}
-                            disabled={paymentSimulating}
-                            className="w-full py-4 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-lg shadow-brand-teal/10"
-                          >
-                            {paymentSimulating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Verify Payment & Mint Key'}
-                          </button>
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUpiPendingStep(false);
-                          setPaymentStep(true);
-                          setUpiVerified(false);
-                          setUpiVerifying(false);
-                        }}
-                        className="w-full py-2 bg-transparent text-gray-500 hover:text-white font-mono text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
-                      >
-                        ← Choose different app / Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : paymentStep ? (
-                  // PAYMENT STEP STATE
-                  <div>
-                    {/* Header bar matching Payments.tsx secure gateway */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5 mb-5 font-sans">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-brand-teal/10 border border-brand-teal/20 rounded-2xl text-brand-teal">
-                          <ShieldCheck className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest block font-bold leading-none">Ruy Pay Integrated Platform</span>
-                          <h3 className="font-display font-black text-xl text-white mt-1">Workshop Booking Payment</h3>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 shrink-0 w-fit">
-                        <Lock className="w-3.5 h-3.5 text-brand-teal" />
-                        <span className="text-[10px] font-mono text-gray-400">SSL 256-Bit Encrypted</span>
-                      </div>
-                    </div>
-
-                    {paymentSimulating ? (
-                      <div className="text-center py-12 space-y-4 font-sans">
-                        <RefreshCw className="w-10 h-10 text-brand-teal animate-spin mx-auto" />
-                        <p className="text-white font-sans font-semibold text-sm">Locking Transaction Ledger...</p>
-                        <p className="text-gray-400 text-xs max-w-xs mx-auto leading-relaxed">
-                          Securing transaction blocks, creating permanent cryptographic record keys, and notifying attendee registry.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-5 font-sans">
-                        {/* Selected Workshop details review */}
-                        <div className="bg-white/5 p-4 rounded-2xl border border-white/5 text-[11px] text-gray-300 space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-gray-400 font-mono">WORKSHOP:</span>
-                            <span className="text-white font-bold text-right truncate max-w-[200px]">{activeWorkshop.title}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400 font-mono">ATTENDEE:</span>
-                            <span className="text-white font-bold">{regName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400 font-mono">EMAIL ID:</span>
-                            <span className="text-white font-mono truncate max-w-[150px]">{regEmail}</span>
-                          </div>
-                        </div>
-
-                        {/* Number of Seats Ajuster & Pricing */}
-                        <div className="bg-brand-dark/40 border border-white/5 p-4 rounded-2xl space-y-3.5">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="block text-xs font-bold text-white font-display">Number of Reserved Seats</span>
-                              <span className="text-[9px] text-gray-400 font-sans block">Adjust seats for you or teammates</span>
-                            </div>
-                            <div className="flex items-center gap-3 bg-brand-dark border border-white/10 px-2.5 py-1.5 rounded-lg">
-                              <button 
-                                type="button" 
-                                onClick={() => setPayTicketsCount(prev => Math.max(1, prev - 1))} 
-                                className="p-1 text-gray-400 hover:text-white cursor-pointer transition-colors"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="font-mono font-bold text-white text-xs min-w-[12px] text-center">{payTicketsCount}</span>
-                              <button 
-                                type="button" 
-                                onClick={() => setPayTicketsCount(prev => prev + 1)} 
-                                className="p-1 text-gray-400 hover:text-white cursor-pointer transition-colors"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between border-t border-white/5 pt-3 text-[11px]">
-                            <span className="text-gray-400 font-mono">Total Price Due:</span>
-                            <span className="text-brand-teal font-black text-base">₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()}</span>
-                          </div>
-                        </div>
-
-                        {/* Payment Method Selector Grid - Matches Payments.tsx */}
-                        <div className="grid grid-cols-4 bg-brand-dark/50 border border-white/5 rounded-xl overflow-hidden font-display font-bold">
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('razorpay')}
-                            className={`py-3 text-center border-r border-white/5 text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                              paymentMethod === 'razorpay'
-                                ? 'bg-brand-card text-brand-teal shadow-inner'
-                                : 'text-gray-500 hover:text-white'
-                            }`}
-                          >
-                            <Sparkles className="w-4 h-4 text-cyan-400" />
-                            Razorpay
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('upi')}
-                            className={`py-3 text-center border-r border-white/5 text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                              paymentMethod === 'upi'
-                                ? 'bg-brand-card text-brand-teal shadow-inner'
-                                : 'text-gray-500 hover:text-white'
-                            }`}
-                          >
-                            <Shield className="w-4 h-4" />
-                            Ruy UPI
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('card')}
-                            className={`py-3 text-center border-r border-white/5 text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                              paymentMethod === 'card'
-                                ? 'bg-brand-card text-brand-teal shadow-inner'
-                                : 'text-gray-500 hover:text-white'
-                            }`}
-                          >
-                            <CreditCard className="w-4 h-4" />
-                            Card
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('bank')}
-                            className={`py-3 text-center text-[10px] font-bold tracking-wider uppercase transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                              paymentMethod === 'bank'
-                                ? 'bg-brand-card text-brand-teal shadow-inner'
-                                : 'text-gray-500 hover:text-white'
-                            }`}
-                          >
-                            <Wallet className="w-4 h-4" />
-                            NetBanking
-                          </button>
-                        </div>
-
-                        {/* Method 0: Razorpay Fast Checkout */}
-                        {paymentMethod === 'razorpay' && (
-                          <div className="space-y-4">
-                            <div className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-xl text-center space-y-2">
-                              <div className="flex items-center justify-center gap-2">
-                                <span className="font-black text-cyan-400 text-sm">RAZORPAY</span>
-                                <span className="text-white text-xs font-mono font-bold">Smart Gateway (scoders@ybl)</span>
-                              </div>
-                              <p className="text-[11px] text-gray-300">
-                                Instant auto-verified pass keys & immediate ticket generation. Supports UPI QR, Cards, NetBanking, and Wallets.
-                              </p>
-                              <div className="text-[10px] font-mono text-cyan-300">
-                                Merchant: <strong>scoders@ybl</strong> • Instant Dispatch from <strong>scoders82@gmail.com</strong>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={handleInitiateRazorpayWorkshop}
-                              className="w-full py-3.5 bg-cyan-400 hover:bg-cyan-300 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
-                            >
-                              <Sparkles className="w-4 h-4" />
-                              Pay ₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} with Razorpay
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Method A: UPI */}
-                        {paymentMethod === 'upi' && (
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest text-center">Select active Ruy Secured UPI application</p>
-                            
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { id: 'phonepe', name: 'PhonePe' },
-                                { id: 'gpay', name: 'Google Pay' },
-                                { id: 'paytm', name: 'Paytm' },
-                                { id: 'bhim', name: 'BHIM UPI' }
-                              ].map((app) => (
-                                <button
-                                  type="button"
-                                  key={app.id}
-                                  onClick={() => handleInitiateUpiPayment(app.id as any)}
-                                  className="py-3 px-2 bg-white/5 hover:bg-brand-teal/20 hover:border-brand-teal/40 border border-white/5 rounded-xl text-xs font-mono uppercase font-bold text-gray-300 hover:text-white transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
-                                >
-                                  {app.name}
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Divider with QR/Address */}
-                            <div className="flex items-center gap-3 py-1">
-                              <div className="h-px bg-white/5 flex-grow" />
-                              <span className="text-[8px] font-mono text-gray-600 uppercase tracking-widest">or scan & verify UTR</span>
-                              <div className="h-px bg-white/5 flex-grow" />
-                            </div>
-
-                            {/* Small quick layout BOB Card */}
-                            <div className="bg-white text-black p-4 rounded-2xl border border-gray-100 max-w-[240px] w-full mx-auto relative overflow-hidden flex flex-col items-center shadow-lg">
-                              <div className="flex items-center gap-2 w-full mb-2 border-b border-gray-100 pb-2 justify-center">
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shrink-0">
-                                  <span className="text-white font-sans font-black text-[6px]">BOB</span>
-                                </div>
-                                <span className="text-[9px] font-sans font-extrabold text-gray-800">Bank Of Baroda QR</span>
-                              </div>
-                              <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                                  `upi://pay?pa=scoders@ybl&pn=S-CODERS%20Technologies&am=${(activeWorkshop.price ?? 1499) * payTicketsCount}&cu=INR&tn=${encodeURIComponent(`S-CODERS Workshop: ${activeWorkshop.title}`)}`
-                                )}`}
-                                alt="UPI Payment QR Code"
-                                className="w-28 h-28 object-contain"
-                                referrerPolicy="no-referrer"
-                              />
-                              <span className="text-[7px] font-mono text-gray-400 mt-1 uppercase tracking-wider block">Merchant: scoders@ybl</span>
-                            </div>
-
-                            {/* UPI ID Details manual copy */}
-                            <div className="bg-brand-dark/50 border border-white/5 rounded-xl p-3 flex items-center justify-between">
-                              <div className="text-left">
-                                <span className="text-[9px] font-mono text-gray-500 block uppercase">RUY VIRTUAL PAYMENT ADDRESS</span>
-                                <span className="text-xs font-mono font-bold text-white block">scoders@ybl</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleCopy('scoders@ybl', 'upi')}
-                                className="p-2 bg-white/5 border border-white/10 hover:border-brand-teal text-gray-400 hover:text-white rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedField === 'upi' ? (
-                                  <Check className="w-3.5 h-3.5 text-brand-teal" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
-
-                            {/* Direct UTR Confirmation form */}
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-2.5 text-left">
-                              <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest font-bold">
-                                Enter 12-Digit UPI Ref / UTR No:
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  maxLength={16}
-                                  value={upiUtrInput}
-                                  onChange={(e) => setUpiUtrInput(e.target.value)}
-                                  placeholder="e.g. 423987112233"
-                                  className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleDirectUpiWorkshopSubmit()}
-                                  disabled={isVerifyingUtr}
-                                  className="px-4 py-2 bg-brand-teal text-brand-dark font-display text-xs font-bold rounded-lg hover:bg-white transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1 shrink-0"
-                                >
-                                  {isVerifyingUtr ? (
-                                    <div className="w-3.5 h-3.5 border-2 border-brand-dark border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <>Verify & Unlock <ArrowRight className="w-3.5 h-3.5" /></>
-                                  )}
-                                </button>
-                              </div>
-                              {upiUtrError && (
-                                <p className="text-[10px] text-red-400 font-mono">{upiUtrError}</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Method B: Interactive Card Form */}
-                        {paymentMethod === 'card' && (
-                          <form onSubmit={handleInitiateCardPayment} className="space-y-4">
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 font-bold">Card Number</label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={cardNo}
-                                  onChange={(e) => {
-                                    const val = e.target.value.replace(/\D/g, '').substring(0, 16);
-                                    const formatted = val.replace(/(\d{4})(?=\d)/g, '$1 ');
-                                    setCardNo(formatted);
-                                  }}
-                                  placeholder="4111 2222 3333 4444"
-                                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 font-bold">Expiry Date</label>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={cardExpiry}
-                                    onChange={(e) => {
-                                      const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                                      if (val.length >= 2) {
-                                        setCardExpiry(`${val.substring(0, 2)}/${val.substring(2, 4)}`);
-                                      } else {
-                                        setCardExpiry(val);
-                                      }
-                                    }}
-                                    placeholder="MM/YY"
-                                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1 font-bold">CVV</label>
-                                  <input
-                                    type="password"
-                                    required
-                                    maxLength={3}
-                                    value={cardCvv}
-                                    onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
-                                    placeholder="123"
-                                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <button
-                              type="submit"
-                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                            >
-                              Pay ₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} Securely
-                            </button>
-                          </form>
-                        )}
-
-                        {/* Method C: Ruy NetBanking wire / transfer - Matches Payments.tsx */}
-                        {paymentMethod === 'bank' && (
-                          <form onSubmit={handleInitiateBankPayment} className="space-y-4">
-                            <div className="text-center max-w-md mx-auto space-y-1">
-                              <h4 className="font-display font-bold text-xs text-white uppercase tracking-wider">Direct NEFT / IMPS Bank Transfer</h4>
-                              <p className="text-gray-500 text-[10px]">
-                                Settle tickets balance via corporate wire. Then, upload or simulate receipt scan to secure pass key instantly.
-                              </p>
-                            </div>
-
-                            {/* Bank details grid */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="bg-brand-dark/50 border border-white/5 p-3 rounded-xl flex flex-col justify-between">
-                                <div>
-                                  <span className="text-[7px] font-mono text-gray-500 block uppercase">BANK NAME</span>
-                                  <span className="text-[10px] font-display font-bold text-white block mt-0.5">HDFC Bank Ltd</span>
-                                </div>
-                                <div className="flex justify-between items-center mt-2.5">
-                                  <span className="text-[7px] font-mono text-gray-500 block">BRANCH</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopy('HDFC Bank, Bengaluru', 'branch')}
-                                    className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
-                                  >
-                                    {copiedField === 'branch' ? <Check className="w-3 h-3 text-brand-teal" /> : <Copy className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="bg-brand-dark/50 border border-white/5 p-3 rounded-xl flex flex-col justify-between">
-                                <div>
-                                  <span className="text-[7px] font-mono text-gray-500 block uppercase">ACCOUNT NO</span>
-                                  <span className="text-[10px] font-mono font-bold text-white block mt-0.5">50200088994433</span>
-                                </div>
-                                <div className="flex justify-between items-center mt-2.5">
-                                  <div>
-                                    <span className="text-[7px] font-mono text-gray-500 block uppercase">IFSC CODE</span>
-                                    <span className="text-[9px] font-mono text-brand-teal block">HDFC0000104</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopy('50200088994433', 'acc')}
-                                    className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
-                                  >
-                                    {copiedField === 'acc' ? <Check className="w-3 h-3 text-brand-teal" /> : <Copy className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Receipt upload box simulator */}
-                            <div className="border border-dashed border-white/10 rounded-xl p-5 text-center bg-brand-dark/20 space-y-3">
-                              <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto text-gray-400">
-                                <Upload className="w-4 h-4" />
-                              </div>
-                              
-                              {receiptFile ? (
-                                <div>
-                                  <span className="text-xs font-mono text-brand-teal block font-semibold truncate max-w-[200px] mx-auto">{receiptName}</span>
-                                  <span className="text-[9px] text-gray-500 block mt-1">Receipt scanned and uploaded successfully.</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setReceiptFile(null);
-                                      setReceiptName('');
-                                    }}
-                                    className="text-[9px] text-brand-coral font-mono hover:underline mt-1.5 cursor-pointer"
-                                  >
-                                    Remove file
-                                  </button>
-                                </div>
-                              ) : (
-                                <div>
-                                  <p className="text-[11px] text-gray-400 font-sans leading-normal">
-                                    Drag your wire transfer receipt, or{' '}
-                                    <button
-                                      type="button"
-                                      onClick={handleReceiptMockUpload}
-                                      className="text-brand-teal font-medium hover:underline cursor-pointer"
-                                    >
-                                      click to browse simulator
-                                    </button>
-                                  </p>
-                                  <span className="text-[8px] text-gray-600 block mt-0.5 font-mono">Supports PNG, JPG, PDF up to 5MB</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <button
-                              type="submit"
-                              disabled={!receiptFile}
-                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-                            >
-                              Verify Wire Logs & Complete pass key
-                            </button>
-                          </form>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => setPaymentStep(false)}
-                          className="w-full text-center text-[10px] font-mono text-gray-500 hover:text-white transition-colors py-1.5 uppercase tracking-wider block cursor-pointer"
-                        >
-                          ← Back to registration details
-                        </button>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   // FORM STATE

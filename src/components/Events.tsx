@@ -57,6 +57,26 @@ export default function Events() {
     message: string;
   } | null>(null);
 
+  // Ticket Deletion States
+  const [ticketToDelete, setTicketToDelete] = useState<EventTicket | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [ticketActionNotice, setTicketActionNotice] = useState<string | null>(null);
+
+  const confirmDeleteTicket = () => {
+    if (!ticketToDelete) return;
+    const updated = tickets.filter(t => t.ticketCode !== ticketToDelete.ticketCode);
+    setTickets(updated);
+    saveEventTickets(updated);
+    if (viewingTicket?.ticketCode === ticketToDelete.ticketCode) {
+      setViewingTicket(null);
+    }
+    const deletedCode = ticketToDelete.ticketCode;
+    setTicketToDelete(null);
+    setShowDeleteConfirmModal(false);
+    setTicketActionNotice(`Ticket #${deletedCode} deleted permanently. As per Privacy Policy, ticket deletion is the user's sole responsibility.`);
+    setTimeout(() => setTicketActionNotice(null), 5000);
+  };
+
   // Admin state for adding event / photo
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -861,6 +881,13 @@ export default function Events() {
             <span>My Verified Event Passes</span>
           </h2>
 
+          {ticketActionNotice && (
+            <div className="p-4 bg-amber-500/10 border-l-4 border-amber-400 rounded-xl text-amber-300 font-mono text-xs flex items-center justify-between">
+              <span>{ticketActionNotice}</span>
+              <button onClick={() => setTicketActionNotice(null)} className="text-gray-400 hover:text-white">✕</button>
+            </div>
+          )}
+
           {tickets.length === 0 ? (
             <div className="text-center py-16 bg-brand-card/20 border border-white/5 rounded-3xl p-8">
               <Ticket className="w-12 h-12 text-gray-600 mx-auto mb-3" />
@@ -880,40 +907,55 @@ export default function Events() {
               {tickets.map(t => (
                 <div 
                   key={t.ticketCode}
-                  className="bg-brand-card/80 border border-brand-teal/30 rounded-2xl p-6 relative overflow-hidden shadow-xl"
+                  className="bg-brand-card/80 border border-brand-teal/30 rounded-2xl p-6 relative overflow-hidden shadow-xl flex flex-col justify-between"
                 >
-                  <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
-                    <span className="px-3 py-1 rounded-full bg-brand-teal/20 text-brand-teal text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" />
-                      {t.status}
-                    </span>
-                    <span className="text-xs font-mono text-gray-400">{t.bookingDate}</span>
+                  <div>
+                    <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+                      <span className="px-3 py-1 rounded-full bg-brand-teal/20 text-brand-teal text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3" />
+                        {t.status}
+                      </span>
+                      <span className="text-xs font-mono text-gray-400">{t.bookingDate}</span>
+                    </div>
+
+                    <h3 className="text-lg font-display font-extrabold text-white mb-2">{t.eventName}</h3>
+                    <p className="text-xs text-gray-300 font-mono mb-4 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-brand-teal" />
+                      <span>Pass Holder: <strong>{t.participantName}</strong></span>
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-black/40 p-3 rounded-xl border border-white/5 mb-4">
+                      <div>
+                        <span className="text-gray-500 block text-[9px] uppercase">Date & Time</span>
+                        <span className="text-white">{t.eventDate}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[9px] uppercase">Unique Code</span>
+                        <span className="text-brand-teal font-bold">{t.ticketCode}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <h3 className="text-lg font-display font-extrabold text-white mb-2">{t.eventName}</h3>
-                  <p className="text-xs text-gray-300 font-mono mb-4 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>Pass Holder: <strong>{t.participantName}</strong></span>
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-black/40 p-3 rounded-xl border border-white/5 mb-4">
-                    <div>
-                      <span className="text-gray-500 block text-[9px] uppercase">Date & Time</span>
-                      <span className="text-white">{t.eventDate}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 block text-[9px] uppercase">Unique Code</span>
-                      <span className="text-brand-teal font-bold">{t.ticketCode}</span>
-                    </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => setViewingTicket(t)}
+                      className="flex-1 py-2.5 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark border border-brand-teal/30 rounded-xl text-brand-teal font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>View Ticket</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTicketToDelete(t);
+                        setShowDeleteConfirmModal(true);
+                      }}
+                      className="px-3.5 py-2.5 bg-red-500/10 hover:bg-red-600 hover:text-white border border-red-500/30 rounded-xl text-red-400 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      title="Delete Ticket Pass"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Delete</span>
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() => setViewingTicket(t)}
-                    className="w-full py-2.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark border border-brand-teal/30 rounded-xl text-brand-teal font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span>View & Print Ticket Pass</span>
-                  </button>
                 </div>
               ))}
             </div>
@@ -1582,7 +1624,7 @@ export default function Events() {
                   </span>
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(viewingTicket.ticketCode);
@@ -1601,7 +1643,83 @@ export default function Events() {
                     <Printer className="w-3.5 h-3.5" />
                     <span>Print Ticket</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setTicketToDelete(viewingTicket);
+                      setShowDeleteConfirmModal(true);
+                    }}
+                    className="py-2.5 px-4 bg-red-500/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 rounded-xl font-mono text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                    title="Delete Ticket"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* TICKET DELETION CONFIRMATION MODAL WITH PRIVACY POLICY CLAUSE */}
+      <AnimatePresence>
+        {showDeleteConfirmModal && ticketToDelete && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 15 }}
+              className="bg-[#0B0F17] border-2 border-red-500/60 rounded-3xl max-w-lg w-full p-6 sm:p-8 relative shadow-[0_0_50px_rgba(239,68,68,0.3)] my-auto text-white font-sans"
+            >
+              <div className="flex items-center gap-3 text-red-400 mb-4">
+                <div className="p-3 bg-red-500/20 rounded-2xl border border-red-500/40">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-display font-extrabold text-xl text-white">Delete Ticket Confirmation</h3>
+                  <p className="text-xs font-mono text-gray-400">Pass Code: #{ticketToDelete.ticketCode}</p>
+                </div>
+              </div>
+
+              {/* Event details snapshot */}
+              <div className="bg-black/50 border border-white/10 rounded-2xl p-4 mb-5 font-mono text-xs space-y-1.5">
+                <p className="text-white font-bold text-sm">{ticketToDelete.eventName}</p>
+                <p className="text-gray-400">Holder: <span className="text-gray-200">{ticketToDelete.participantName}</span> ({ticketToDelete.participantEmail})</p>
+                <p className="text-gray-400">Date: <span className="text-gray-200">{ticketToDelete.eventDate}</span></p>
+              </div>
+
+              {/* Strict Privacy & Policy Warning Banner */}
+              <div className="bg-amber-500/10 border-l-4 border-amber-400 p-4 rounded-r-2xl mb-6 space-y-2 text-xs">
+                <p className="font-mono font-bold text-amber-300 uppercase tracking-wide">
+                  ⚠️ Privacy & Cancellation Policy Clause:
+                </p>
+                <p className="text-amber-100 font-semibold leading-relaxed">
+                  "If in the case the client will delete their ticket from the ticket option by mistakenly then it will be their responsibility if they will delete purposely or by mistakenly."
+                </p>
+                <p className="text-[11px] text-gray-400 leading-normal">
+                  Once deleted, your ticket access code is erased from your device session and marked as purged.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={confirmDeleteTicket}
+                  className="flex-1 py-3.5 bg-red-600 hover:bg-red-500 text-white font-mono font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-red-600/30"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Yes, Permanently Delete</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirmModal(false);
+                    setTicketToDelete(null);
+                  }}
+                  className="py-3.5 px-6 bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white font-mono text-xs sm:text-sm font-bold uppercase rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  Keep My Ticket
+                </button>
               </div>
             </motion.div>
           </div>

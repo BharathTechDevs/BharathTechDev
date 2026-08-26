@@ -366,6 +366,20 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                       <p className="pt-2 text-xs text-gray-500">To exercise these rights, email us at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.</p>
                     </div>
                   </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-display font-bold text-base text-amber-300 flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">5.</span> Ticket Management & User Deletion Responsibility Clause
+                    </h4>
+                    <div className="pl-6 bg-amber-500/10 border-l-4 border-amber-400 p-4 rounded-r-2xl space-y-2 text-gray-300">
+                      <p className="font-semibold text-white">
+                        "If in the case the client will delete their ticket from the ticket option by mistakenly then it will be their responsibility if they will delete purposely or by mistakenly."
+                      </p>
+                      <p className="text-xs text-gray-400 leading-relaxed">
+                        S-CODERS provides self-service ticket options within your events dashboard allowing participants to view and remove event passes. Once a client deletes their entry pass or ticket record, the QR validation record is wiped from the client's local keychain. S-CODERS bears zero liability for lost, removed, or accidentally deleted passes.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -668,8 +682,12 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                           <span className="text-white">Within 24 business hours</span>
                         </p>
                         <p>
-                          <span className="text-gray-500 uppercase block">WhatsApp Support:</span>
-                          <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-bold hover:underline">+91 8310463417</a>
+                          <span className="text-gray-500 uppercase block">Primary Contact / WhatsApp:</span>
+                          <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-bold hover:underline">+91 6363905989</a>
+                        </p>
+                        <p>
+                          <span className="text-gray-500 uppercase block">Second Number / Direct Line:</span>
+                          <a href="tel:+918310463417" className="text-brand-teal font-bold hover:underline">+91 8310463417</a>
                         </p>
                         <p>
                           <span className="text-gray-500 uppercase block">YouTube Channel:</span>
@@ -725,13 +743,22 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         <span>X / Twitter (@SCODERSozws)</span>
                       </a>
                       <a 
-                        href="https://wa.me/918310463417" 
+                        href="https://wa.me/916363905989" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
                       >
                         <Phone className="w-4 h-4 text-emerald-400" />
-                        <span>WhatsApp (8310463417)</span>
+                        <span>WhatsApp Primary (6363905989)</span>
+                      </a>
+                      <a 
+                        href="https://wa.me/918310463417" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
+                      >
+                        <Phone className="w-4 h-4 text-brand-teal" />
+                        <span>Second Line (8310463417)</span>
                       </a>
                       <a 
                         href="mailto:scoders82@gmail.com" 

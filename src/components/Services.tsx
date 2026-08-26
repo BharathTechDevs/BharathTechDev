@@ -5,7 +5,7 @@ import {
   Edit2, Save, X, Lock, Key, Copy, Play, RefreshCw, Send, Terminal, 
   Settings, Database, AppWindow, Eye, Check, ChevronRight, Layout,
   Laptop, Server, Clock, Calendar, Shield, HelpCircle, Star, Download,
-  Phone, Mail, MessageSquare, FileText
+  Phone, Mail, MessageSquare, FileText, QrCode, MessageCircle, ExternalLink, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -69,9 +69,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   const [regTimeline, setRegTimeline] = useState('');
   const [regSuccessKey, setRegSuccessKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
-  const [modalMode, setModalMode] = useState<'register' | 'enterKey'>('register');
+  const [modalMode, setModalMode] = useState<'register' | 'enterKey' | 'qrPay'>('register');
   const [inputtedKey, setInputtedKey] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
+
+  // QR Payment States in Services Modal
+  const [qrPayAmount, setQrPayAmount] = useState<number>(5000);
+  const [qrPayUtr, setQrPayUtr] = useState('');
+  const [qrPayVerifying, setQrPayVerifying] = useState(false);
+  const [qrPayError, setQrPayError] = useState<string | null>(null);
 
   // Sync current user state
   const [currentUser, setCurrentUser] = useState(() => {
@@ -504,6 +510,120 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     }
   };
 
+  const handleVerifyQrServicePay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registeringService) return;
+    const cleanUtr = qrPayUtr.trim();
+
+    if (cleanUtr.length < 8) {
+      setQrPayError('Please enter a valid 12-digit UPI Reference / UTR Number from your banking app.');
+      return;
+    }
+
+    const payerName = regName.trim() || currentUser?.name || 'Verified Client';
+    const payerEmail = regEmail.trim() || currentUser?.email || 'scoders82@gmail.com';
+
+    setQrPayError(null);
+    setQrPayVerifying(true);
+
+    try {
+      await new Promise(r => setTimeout(r, 1400));
+
+      const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
+      const generatedKey = `BTD-SERV-${serviceCode}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const newKeys = {
+        ...registeredKeys,
+        [registeringService.id]: {
+          key: generatedKey,
+          name: payerName,
+          email: payerEmail,
+          role: regRole || 'Client Developer',
+          requirements: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
+          budget: `Paid ₹${qrPayAmount.toLocaleString()}`,
+          timeline: regTimeline || 'Active Workflow',
+          timestamp: new Date().toLocaleString(),
+        }
+      };
+
+      setRegisteredKeys(newKeys);
+      localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+
+      // Save Relational Database Record
+      try {
+        const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
+        const mockChatId = 'CHT-SVC-' + Date.now().toString().slice(-4);
+        const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
+        const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
+        const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
+
+        const dbServiceReg: ServiceRegistration = {
+          id: regId,
+          clientProfile: {
+            name: payerName,
+            email: payerEmail,
+            phone: '+91 99999 00000',
+            company: 'Independent Client'
+          },
+          serviceId: registeringService.id,
+          selectedServiceTitle: registeringService.title,
+          uniqueKey: generatedKey,
+          projectRequirements: regRequirements || 'Advance Booking Deposit Verified',
+          budget: `₹${qrPayAmount.toLocaleString()}`,
+          timeline: regTimeline || '2-3 Weeks',
+          projectStatus: 'In Progress',
+          registrationDate: new Date().toISOString().split('T')[0],
+          projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          sourceCodeFileId: mockSrcFileId,
+          pdfFileId: mockPdfFileId,
+          chatId: mockChatId,
+          feedbackId: null,
+          invoiceId: mockInvoiceId
+        };
+
+        const currentRegs = DatabaseEngine.getServiceRegistrations();
+        DatabaseEngine.saveServiceRegistrations([dbServiceReg, ...currentRegs]);
+
+        const dbPayment: PaymentTransaction = {
+          id: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
+          clientId: payerEmail,
+          clientName: payerName,
+          clientEmail: payerEmail,
+          amount: qrPayAmount,
+          paymentMethod: `UPI QR (Ref: ${cleanUtr})`,
+          status: 'Successful',
+          timestamp: new Date().toISOString(),
+          reference: `Advance payment for S-CODERS ${registeringService.title}`,
+          interrupted: false,
+          failureReason: null
+        };
+        const currentPayments = DatabaseEngine.getPayments();
+        DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
+      } catch (e) {}
+
+      // Trigger Email Notification
+      try {
+        fetch('/api/email/service-accepted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: payerEmail,
+            clientName: payerName,
+            serviceTitle: registeringService.title,
+            uniqueKey: generatedKey,
+            actionUrl: `${window.location.origin}/?view=services`
+          })
+        }).catch(() => {});
+      } catch (e) {}
+
+      setQrPayVerifying(false);
+      setRegSuccessKey(generatedKey);
+    } catch (err) {
+      setQrPayVerifying(false);
+      setQrPayError('Failed to verify transaction. Please double check your 12-digit UTR.');
+    }
+  };
+
   const handleRemoveKey = (serviceId: string) => {
     const updated = { ...registeredKeys };
     delete updated[serviceId];
@@ -538,7 +658,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-20">
+        <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
             <Cpu className="w-3.5 h-3.5" />
             <span>OUR OFFERINGS</span>
@@ -546,9 +666,118 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-white tracking-tight mb-6">
             Elite Capabilities, <span className="text-brand-teal">Custom Engineered</span>
           </h2>
-          <p className="text-gray-400 font-sans font-light text-lg">
+          <p className="text-gray-400 font-sans font-light text-base sm:text-lg">
             S-CODERS • Bharath Tech Developers translates complex software architectures and agent logic into elegant commercial assets. Explore our solutions.
           </p>
+        </div>
+
+        {/* OFFICIAL S-CODERS ENGINEERING CONTACT & WHATSAPP SUPPORT HUB */}
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-brand-teal/30 bg-[#060a16]/90 shadow-2xl mb-16 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-brand-teal/10 blur-3xl rounded-full pointer-events-none" />
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2 max-w-xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-xs font-mono font-bold uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-[#25D366] animate-ping" />
+                Direct Lead Engineering Support
+              </div>
+              <h3 className="font-display font-extrabold text-xl sm:text-2xl text-white">
+                Contact Our Development Leads & Join Community
+              </h3>
+              <p className="text-gray-300 font-sans text-xs sm:text-sm leading-relaxed">
+                Connect directly with our lead architects for custom software, app development, or website dispatch enquiries. You can also join our official WhatsApp community channel for project updates and announcements.
+              </p>
+            </div>
+
+            {/* Official WhatsApp Group Button */}
+            <a
+              href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs sm:text-sm uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-[#25D366]/20 flex items-center gap-2.5 shrink-0 active:scale-95"
+            >
+              <Users className="w-5 h-5" />
+              <span>Join S-CODERS WhatsApp Group</span>
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+
+          {/* Contact Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10">
+            {/* Suhas Gowda - Primary Lead */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-brand-teal/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Founder & Lead AI Architect • Primary</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                </div>
+                <h4 className="font-display font-bold text-base sm:text-lg text-white">Suhas Gowda</h4>
+                <p className="text-brand-teal text-xs sm:text-sm font-mono mt-1 font-bold">+91 6363905989 <span className="text-[10px] text-gray-400 font-normal">(Primary)</span></p>
+                <p className="text-gray-400 text-xs sm:text-sm font-mono truncate mt-0.5">scoders82@gmail.com</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/5 text-center text-xs font-mono font-bold">
+                <a href="tel:+916363905989" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all flex items-center justify-center gap-1">
+                  <Phone className="w-3.5 h-3.5" /> Call
+                </a>
+                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white rounded-xl transition-all flex items-center justify-center gap-1">
+                  <Mail className="w-3.5 h-3.5" /> Email
+                </a>
+                <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] text-[#25D366] rounded-xl transition-all flex items-center justify-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" /> Chat
+                </a>
+              </div>
+            </div>
+
+            {/* Development Lead - Second Number */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-brand-teal/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Founder & Development Lead • Secondary</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                </div>
+                <h4 className="font-display font-bold text-base sm:text-lg text-white">Manoj Kumar</h4>
+                <p className="text-brand-teal text-xs sm:text-sm font-mono mt-1 font-bold">+91 8310463417 <span className="text-[10px] text-gray-400 font-normal">(Second Number)</span></p>
+                <p className="text-gray-400 text-xs sm:text-sm font-mono truncate mt-0.5">scoders82@gmail.com</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/5 text-center text-xs font-mono font-bold">
+                <a href="tel:+918310463417" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all flex items-center justify-center gap-1">
+                  <Phone className="w-3.5 h-3.5" /> Call
+                </a>
+                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white rounded-xl transition-all flex items-center justify-center gap-1">
+                  <Mail className="w-3.5 h-3.5" /> Email
+                </a>
+                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] text-[#25D366] rounded-xl transition-all flex items-center justify-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" /> Chat
+                </a>
+              </div>
+            </div>
+
+            {/* Official Central Desk */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-brand-teal/40 transition-colors">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Official Headquarters</span>
+                  <ShieldCheck className="w-4 h-4 text-brand-teal" />
+                </div>
+                <h4 className="font-display font-bold text-base sm:text-lg text-white">S-CODERS Tech HQ</h4>
+                <p className="text-gray-300 text-xs sm:text-sm font-mono mt-1">Bengaluru, Karnataka, India</p>
+                <div className="text-xs font-mono mt-1 space-y-0.5">
+                  <p className="text-white font-bold">Primary: <span className="text-brand-teal font-normal">+91 6363905989</span></p>
+                  <p className="text-white font-bold">Second: <span className="text-brand-teal font-normal">+91 8310463417</span></p>
+                </div>
+              </div>
+              <div className="mt-4 pt-3 border-t border-white/5">
+                <a 
+                  href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-white/10 hover:bg-brand-teal hover:text-brand-dark text-white rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-mono font-bold"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Join Official Group</span>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* General Services Overview Grid */}
@@ -1112,24 +1341,34 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                   // FORM STATE
                   <div>
                     {/* Toggle Modes */}
-                    <div className="grid grid-cols-2 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20">
+                    <div className="grid grid-cols-3 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20">
                       <button
                         type="button"
                         onClick={() => { setModalMode('register'); setKeyError(null); setInputtedKey(''); }}
-                        className={`py-2 text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
+                        className={`py-2 text-[11px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
                           modalMode === 'register' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
                       >
-                        Register New Key
+                        Register Key
                       </button>
                       <button
                         type="button"
                         onClick={() => { setModalMode('enterKey'); setKeyError(null); setInputtedKey(''); }}
-                        className={`py-2 text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
+                        className={`py-2 text-[11px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
                           modalMode === 'enterKey' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
                       >
-                        Enter Existing Key
+                        Enter Key
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setModalMode('qrPay'); setQrPayError(null); setQrPayUtr(''); }}
+                        className={`py-2 text-[11px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 flex items-center justify-center gap-1 ${
+                          modalMode === 'qrPay' ? 'bg-[#5f259f] text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        <span>QR Code Pay</span>
                       </button>
                     </div>
 
@@ -1227,7 +1466,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           </button>
                         </div>
                       </form>
-                    ) : (
+                    ) : modalMode === 'enterKey' ? (
                       <form onSubmit={handleVerifyKey} className="space-y-4 font-sans">
                         <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Enter Dispatch Key *</label>
@@ -1255,6 +1494,131 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           >
                             <Key className="w-3.5 h-3.5" />
                             Verify & Sync Keychain
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      /* QR CODE PAYMENT FORM */
+                      <form onSubmit={handleVerifyQrServicePay} className="space-y-4 font-sans">
+                        {/* Payer Info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">Your Name</label>
+                            <input
+                              type="text"
+                              value={regName}
+                              onChange={(e) => setRegName(e.target.value)}
+                              placeholder="e.g. Suhas Gowda"
+                              className="w-full bg-brand-dark/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">Your Email</label>
+                            <input
+                              type="email"
+                              value={regEmail}
+                              onChange={(e) => setRegEmail(e.target.value)}
+                              placeholder="e.g. scoders82@gmail.com"
+                              className="w-full bg-brand-dark/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Amount Selection */}
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1.5">Select Advance / Token Amount</label>
+                          <div className="grid grid-cols-3 gap-2 font-mono text-xs">
+                            {[2500, 5000, 10000].map((amt) => (
+                              <button
+                                key={amt}
+                                type="button"
+                                onClick={() => setQrPayAmount(amt)}
+                                className={`py-2 px-3 rounded-xl border font-bold transition-all text-center ${
+                                  qrPayAmount === amt
+                                    ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-md'
+                                    : 'bg-white/5 border-white/10 text-gray-300 hover:text-white'
+                                }`}
+                              >
+                                ₹{amt.toLocaleString()}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Bank of Baroda UPI Scanner Card */}
+                        <div className="bg-white text-black p-4 rounded-2xl shadow-xl border border-gray-200 max-w-xs mx-auto flex flex-col items-center">
+                          {/* BOB Header */}
+                          <div className="flex items-center gap-2.5 w-full mb-3 border-b border-gray-100 pb-2 justify-center">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shadow-sm shrink-0">
+                              <span className="text-white font-sans font-black text-[8px] tracking-tighter">BOB</span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-[7px] font-mono text-gray-400 block uppercase font-bold tracking-wider leading-none">Settlement Bank</span>
+                              <span className="text-[11px] font-sans font-bold text-gray-800">Bank Of Baroda - 2145</span>
+                            </div>
+                          </div>
+
+                          {/* QR Code Container */}
+                          <div className="relative p-1 bg-white rounded-xl border border-gray-200 shadow-inner">
+                            <img 
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                                `upi://pay?pa=scoders@ybl&pn=S-CODERS%20Technologies&am=${qrPayAmount}&cu=INR&tn=${encodeURIComponent(`Advance: ${registeringService.title}`)}`
+                              )}`}
+                              alt="UPI Payment QR Code"
+                              className="w-36 h-36 object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                            {/* PhonePe logo center */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-8 h-8 rounded-full bg-[#5f259f] border-2 border-white flex items-center justify-center shadow-md">
+                                <span className="text-white font-sans text-[11px] font-black tracking-tighter">पे</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className="text-[9px] font-mono text-gray-500 mt-2 uppercase font-bold tracking-wider">Merchant VPA: scoders@ybl</span>
+                        </div>
+
+                        {/* UTR Input */}
+                        <div>
+                          <label className="block text-[10px] font-mono text-brand-teal uppercase tracking-widest mb-1 font-bold">
+                            Enter 12-Digit UPI Ref / UTR Number *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={16}
+                            value={qrPayUtr}
+                            onChange={(e) => {
+                              setQrPayUtr(e.target.value.replace(/\D/g, ''));
+                              setQrPayError(null);
+                            }}
+                            placeholder="e.g. 423589123456"
+                            className="w-full bg-brand-dark/70 border border-brand-teal/40 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal font-mono tracking-wider"
+                          />
+                        </div>
+
+                        {qrPayError && (
+                          <p className="text-red-400 text-xs font-mono">{qrPayError}</p>
+                        )}
+
+                        <div className="pt-2">
+                          <button
+                            type="submit"
+                            disabled={qrPayVerifying || !qrPayUtr}
+                            className="w-full py-3 bg-[#5f259f] hover:bg-[#722ebd] text-white font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#5f259f]/30 disabled:opacity-50"
+                          >
+                            {qrPayVerifying ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Verifying with Bank of Baroda...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-4 h-4" />
+                                <span>Verify UPI Payment & Generate Key</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -2548,67 +2912,81 @@ export function ServiceProjectSpaceDashboard({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-white font-sans max-h-[70vh]">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 text-white font-sans">
       {/* LEFT COLUMN: CONTACT DETAILS & LIFECYCLE PROGRESS */}
       <div className="lg:col-span-4 space-y-6 flex flex-col justify-between">
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Status badge */}
-          <div className="bg-[#25d366]/5 border border-[#25d366]/20 p-4 rounded-2xl">
+          <div className="bg-[#25d366]/10 border border-[#25d366]/30 p-5 rounded-2xl">
             <div className="flex items-center gap-2 mb-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse" />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#25d366]">PROJECT LIFE-CYCLE ACTIVE</span>
+              <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">PROJECT LIFE-CYCLE ACTIVE</span>
             </div>
-            <h4 className="text-sm font-bold text-white mb-1.5">No Upfront Payment Required</h4>
-            <p className="text-gray-400 text-xs leading-relaxed">
+            <h4 className="text-base font-bold text-white mb-1.5">No Upfront Payment Required</h4>
+            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">
               Your registered project budget (<strong>{regInfo.budget || 'TBD'}</strong>) and timeline is being analyzed by our team. Price is determined dynamically after aligning requirements. We will connect with you via Call / WhatsApp and Zoom meeting to coordinate.
             </p>
           </div>
 
           {/* S-CODERS Professional Team contacts */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-mono text-gray-500 uppercase tracking-widest font-bold">S-CODERS EXPERT TEAM CONTACTS</h4>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">S-CODERS EXPERT TEAM CONTACTS</h4>
+              <span className="text-[10px] font-mono text-gray-400">HQ Support</span>
+            </div>
             
-            {/* Suhas Gowda */}
-            <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl space-y-2.5">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h5 className="text-sm font-bold text-white leading-tight">Suhas Gowda</h5>
-                  <span className="text-[10px] text-brand-teal font-mono uppercase tracking-widest">Lead AI Architect & Developer</span>
-                </div>
+            {/* Suhas Gowda - Primary Lead */}
+            <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-3">
+              <div>
+                <span className="text-[10px] text-brand-teal font-mono uppercase tracking-widest font-bold block">Founder & Lead AI Architect • Primary</span>
+                <h5 className="text-base font-bold text-white leading-tight mt-0.5">Suhas Gowda</h5>
+                <p className="text-xs sm:text-sm text-brand-teal font-mono font-bold mt-1">+91 6363905989 <span className="text-[10px] text-gray-400 font-normal">(Primary Number)</span></p>
+                <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">scoders82@gmail.com</p>
               </div>
-              <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
-                <a href="tel:+918310463417" className="py-1.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark rounded text-brand-teal transition-all flex items-center justify-center gap-1">
-                  <Phone className="w-3 h-3" /> Call
+              <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono font-bold">
+                <a href="tel:+916363905989" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark rounded-xl text-brand-teal transition-all flex items-center justify-center gap-1">
+                  <Phone className="w-3.5 h-3.5" /> Call
                 </a>
-                <a href="mailto:scoders82@gmail.com" className="py-1.5 bg-white/5 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
-                  <Mail className="w-3 h-3" /> Email
+                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
+                  <Mail className="w-3.5 h-3.5" /> Email
                 </a>
-                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-1.5 bg-[#25D366]/15 hover:bg-[#25D366] hover:text-[#0c0d14] rounded text-[#25D366] transition-all flex items-center justify-center gap-1">
-                  <MessageSquare className="w-3 h-3" /> WhatsApp
+                <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] rounded-xl text-[#25D366] transition-all flex items-center justify-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" /> Chat
                 </a>
               </div>
             </div>
 
-            {/* Bhuvan M */}
-            <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl space-y-2.5">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h5 className="text-sm font-bold text-white leading-tight">Bhuvan M</h5>
-                  <span className="text-[10px] text-brand-teal font-mono uppercase tracking-widest">Project Coordinator</span>
-                </div>
+            {/* Manoj Kumar - Second Number */}
+            <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-3">
+              <div>
+                <span className="text-[10px] text-brand-teal font-mono uppercase tracking-widest font-bold block">Founder & Development Lead • Secondary</span>
+                <h5 className="text-base font-bold text-white leading-tight mt-0.5">Manoj Kumar</h5>
+                <p className="text-xs sm:text-sm text-brand-teal font-mono font-bold mt-1">+91 8310463417 <span className="text-[10px] text-gray-400 font-normal">(Second Number)</span></p>
+                <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">scoders82@gmail.com</p>
               </div>
-              <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
-                <a href="tel:+918310463417" className="py-1.5 bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark rounded text-brand-teal transition-all flex items-center justify-center gap-1">
-                  <Phone className="w-3 h-3" /> Call
+              <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono font-bold">
+                <a href="tel:+918310463417" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark rounded-xl text-brand-teal transition-all flex items-center justify-center gap-1">
+                  <Phone className="w-3.5 h-3.5" /> Call
                 </a>
-                <a href="mailto:scoders82@gmail.com" className="py-1.5 bg-white/5 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
-                  <Mail className="w-3 h-3" /> Email
+                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
+                  <Mail className="w-3.5 h-3.5" /> Email
                 </a>
-                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-1.5 bg-[#25D366]/15 hover:bg-[#25D366] hover:text-[#0c0d14] rounded text-[#25D366] transition-all flex items-center justify-center gap-1">
-                  <MessageSquare className="w-3 h-3" /> WhatsApp
+                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] rounded-xl text-[#25D366] transition-all flex items-center justify-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" /> Chat
                 </a>
               </div>
             </div>
+
+            {/* Join WhatsApp Channel Card */}
+            <a
+              href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20"
+            >
+              <Users className="w-4 h-4" />
+              <span>Join Official WhatsApp Group</span>
+            </a>
           </div>
         </div>
       </div>

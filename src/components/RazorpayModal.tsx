@@ -81,7 +81,7 @@ export default function RazorpayModal({
   // Wallet states
   const [selectedWallet, setSelectedWallet] = useState('phonepe');
   const [isAwaitingWalletOtp, setIsAwaitingWalletOtp] = useState(false);
-  const [walletPhone, setWalletPhone] = useState(paymentDetails.phone || '8310463417');
+  const [walletPhone, setWalletPhone] = useState(paymentDetails.phone || '6363905989');
   const [walletOtp, setWalletOtp] = useState('');
   const [walletError, setWalletError] = useState<string | null>(null);
 
