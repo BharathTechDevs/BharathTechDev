@@ -3,7 +3,8 @@ import {
   Calendar, MapPin, Users, Award, Sparkles, MessageSquare, 
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
-  ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle
+  ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -736,7 +737,7 @@ export default function TenantDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-20">
+        <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
             <Calendar className="w-3.5 h-3.5" />
             <span>COMMUNITY BUILDING</span>
@@ -747,6 +748,50 @@ export default function TenantDashboard() {
           <p className="text-gray-400 font-sans font-light text-lg">
             S-CODERS • Bharath Tech Developers is heavily active in Bengaluru's academic and development circles. View our seminars, register to access live sandboxes, and download blueprints.
           </p>
+        </div>
+
+        {/* OFFICIAL S-CODERS WORKSHOP WHATSAPP COMMUNITY & CLASSROOM HUB */}
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-brand-teal/30 bg-[#060a16]/90 shadow-2xl mb-16 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-brand-teal/10 blur-3xl rounded-full pointer-events-none" />
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-3 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-xs font-mono font-bold uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-[#25D366] animate-ping" />
+                Official Workshop Community Channel
+              </div>
+              <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white">
+                Join the S-CODERS Workshop WhatsApp Group
+              </h3>
+              <p className="text-gray-300 font-sans text-sm sm:text-base leading-relaxed">
+                Connect directly with our instructors, speakers, and fellow student developers. Receive instant Zoom meeting invitations, workshop schedules, sandbox tokens, code repositories, and technical mentor assistance.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-mono text-gray-400">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
+                  <span className="text-[#25D366]">✓</span> Live Zoom Links & Recordings
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
+                  <span className="text-[#25D366]">✓</span> Code Repositories & Blueprints
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
+                  <span className="text-[#25D366]">✓</span> Mentor Q&A Support
+                </span>
+              </div>
+            </div>
+
+            {/* Official Workshop WhatsApp Group Button */}
+            <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+              <a
+                href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-8 py-4 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-sm uppercase tracking-wider rounded-2xl transition-all shadow-xl shadow-[#25D366]/25 flex items-center justify-center gap-3 cursor-pointer active:scale-95"
+              >
+                <Users className="w-5 h-5" />
+                <span>Join Workshop WhatsApp Group</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
         </div>
 
         {/* Continuous Moving Animation Marquee for Workshop Options */}

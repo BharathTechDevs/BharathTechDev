@@ -702,7 +702,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             {/* Official WhatsApp Group Button */}
             <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
               <a
-                href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-8 py-4 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-sm uppercase tracking-wider rounded-2xl transition-all shadow-xl shadow-[#25D366]/25 flex items-center justify-center gap-3 cursor-pointer active:scale-95"
@@ -2879,7 +2879,7 @@ export function ServiceProjectSpaceDashboard({
                 Connect with our team inside the official WhatsApp channel for milestone discussions, wireframe reviews, and sprint status.
               </p>
               <a
-                href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
