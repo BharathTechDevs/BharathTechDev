@@ -86,7 +86,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
           transition={{ duration: 0.8, delay: 0.15 }}
           className="text-4xl sm:text-6xl lg:text-7xl font-display font-serif text-white tracking-normal leading-[1.15] max-w-4xl mx-auto mb-8 drop-shadow-md"
         >
-          The Next Generation of <span className="italic text-brand-teal font-serif drop-shadow-[0_0_20px_rgba(34,211,238,0.3)]">Software Engineering</span> is Here.
+          The Next Generation of <span className="italic text-[#A7D8F2] font-serif">Software Engineering</span> is Here.
         </motion.h1>
 
         {/* Short storytelling subtitle */}

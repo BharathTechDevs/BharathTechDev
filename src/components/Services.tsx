@@ -671,111 +671,46 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           </p>
         </div>
 
-        {/* OFFICIAL S-CODERS ENGINEERING CONTACT & WHATSAPP SUPPORT HUB */}
+        {/* OFFICIAL S-CODERS WHATSAPP COMMUNITY & SUPPORT HUB */}
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-brand-teal/30 bg-[#060a16]/90 shadow-2xl mb-16 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-brand-teal/10 blur-3xl rounded-full pointer-events-none" />
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2 max-w-xl">
+            <div className="space-y-3 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-xs font-mono font-bold uppercase tracking-wider">
                 <span className="w-2 h-2 rounded-full bg-[#25D366] animate-ping" />
-                Direct Lead Engineering Support
+                Official WhatsApp Community Channel
               </div>
-              <h3 className="font-display font-extrabold text-xl sm:text-2xl text-white">
-                Contact Our Development Leads & Join Community
+              <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white">
+                Join the S-CODERS WhatsApp Group
               </h3>
-              <p className="text-gray-300 font-sans text-xs sm:text-sm leading-relaxed">
-                Connect directly with our lead architects for custom software, app development, or website dispatch enquiries. You can also join our official WhatsApp community channel for project updates and announcements.
+              <p className="text-gray-300 font-sans text-sm sm:text-base leading-relaxed">
+                Connect directly with our engineering team and developer community. Get live project announcements, technical consultations, architecture dispatches, and priority development support.
               </p>
+              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-mono text-gray-400">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
+                  <span className="text-[#25D366]">✓</span> 24/7 Community Support
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
+                  <span className="text-[#25D366]">✓</span> Live Architecture Updates
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
+                  <span className="text-[#25D366]">✓</span> Direct Project Discussion
+                </span>
+              </div>
             </div>
 
             {/* Official WhatsApp Group Button */}
-            <a
-              href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs sm:text-sm uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-[#25D366]/20 flex items-center gap-2.5 shrink-0 active:scale-95"
-            >
-              <Users className="w-5 h-5" />
-              <span>Join S-CODERS WhatsApp Group</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-
-          {/* Contact Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10">
-            {/* Suhas Gowda - Primary Lead */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-brand-teal/40 transition-colors">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Founder & Lead AI Architect • Primary</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                </div>
-                <h4 className="font-display font-bold text-base sm:text-lg text-white">Suhas Gowda</h4>
-                <p className="text-brand-teal text-xs sm:text-sm font-mono mt-1 font-bold">+91 6363905989 <span className="text-[10px] text-gray-400 font-normal">(Primary)</span></p>
-                <p className="text-gray-400 text-xs sm:text-sm font-mono truncate mt-0.5">scoders82@gmail.com</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/5 text-center text-xs font-mono font-bold">
-                <a href="tel:+916363905989" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all flex items-center justify-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> Call
-                </a>
-                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white rounded-xl transition-all flex items-center justify-center gap-1">
-                  <Mail className="w-3.5 h-3.5" /> Email
-                </a>
-                <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] text-[#25D366] rounded-xl transition-all flex items-center justify-center gap-1">
-                  <MessageSquare className="w-3.5 h-3.5" /> Chat
-                </a>
-              </div>
-            </div>
-
-            {/* Development Lead - Second Number */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-brand-teal/40 transition-colors">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Founder & Development Lead • Secondary</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                </div>
-                <h4 className="font-display font-bold text-base sm:text-lg text-white">Manoj Kumar</h4>
-                <p className="text-brand-teal text-xs sm:text-sm font-mono mt-1 font-bold">+91 8310463417 <span className="text-[10px] text-gray-400 font-normal">(Second Number)</span></p>
-                <p className="text-gray-400 text-xs sm:text-sm font-mono truncate mt-0.5">scoders82@gmail.com</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/5 text-center text-xs font-mono font-bold">
-                <a href="tel:+918310463417" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all flex items-center justify-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> Call
-                </a>
-                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white rounded-xl transition-all flex items-center justify-center gap-1">
-                  <Mail className="w-3.5 h-3.5" /> Email
-                </a>
-                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] text-[#25D366] rounded-xl transition-all flex items-center justify-center gap-1">
-                  <MessageSquare className="w-3.5 h-3.5" /> Chat
-                </a>
-              </div>
-            </div>
-
-            {/* Official Central Desk */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-brand-teal/40 transition-colors">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Official Headquarters</span>
-                  <ShieldCheck className="w-4 h-4 text-brand-teal" />
-                </div>
-                <h4 className="font-display font-bold text-base sm:text-lg text-white">S-CODERS Tech HQ</h4>
-                <p className="text-gray-300 text-xs sm:text-sm font-mono mt-1">Bengaluru, Karnataka, India</p>
-                <div className="text-xs font-mono mt-1 space-y-0.5">
-                  <p className="text-white font-bold">Primary: <span className="text-brand-teal font-normal">+91 6363905989</span></p>
-                  <p className="text-white font-bold">Second: <span className="text-brand-teal font-normal">+91 8310463417</span></p>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-white/5">
-                <a 
-                  href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-2 bg-white/10 hover:bg-brand-teal hover:text-brand-dark text-white rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-mono font-bold"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Join Official Group</span>
-                </a>
-              </div>
+            <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+              <a
+                href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-8 py-4 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-sm uppercase tracking-wider rounded-2xl transition-all shadow-xl shadow-[#25D366]/25 flex items-center justify-center gap-3 cursor-pointer active:scale-95"
+              >
+                <Users className="w-5 h-5" />
+                <span>Join Official WhatsApp Group</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
             </div>
           </div>
         </div>
@@ -2928,65 +2863,31 @@ export function ServiceProjectSpaceDashboard({
             </p>
           </div>
 
-          {/* S-CODERS Professional Team contacts */}
+          {/* S-CODERS WhatsApp Project Channel */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">S-CODERS EXPERT TEAM CONTACTS</h4>
-              <span className="text-[10px] font-mono text-gray-400">HQ Support</span>
+              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">PROJECT COORDINATION & SUPPORT</h4>
+              <span className="text-[10px] font-mono text-gray-400">WhatsApp Live</span>
             </div>
             
-            {/* Suhas Gowda - Primary Lead */}
             <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-3">
-              <div>
-                <span className="text-[10px] text-brand-teal font-mono uppercase tracking-widest font-bold block">Founder & Lead AI Architect • Primary</span>
-                <h5 className="text-base font-bold text-white leading-tight mt-0.5">Suhas Gowda</h5>
-                <p className="text-xs sm:text-sm text-brand-teal font-mono font-bold mt-1">+91 6363905989 <span className="text-[10px] text-gray-400 font-normal">(Primary Number)</span></p>
-                <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">scoders82@gmail.com</p>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+                <span className="text-xs font-mono text-white font-bold">Direct Developer Coordination</span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono font-bold">
-                <a href="tel:+916363905989" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark rounded-xl text-brand-teal transition-all flex items-center justify-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> Call
-                </a>
-                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
-                  <Mail className="w-3.5 h-3.5" /> Email
-                </a>
-                <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] rounded-xl text-[#25D366] transition-all flex items-center justify-center gap-1">
-                  <MessageSquare className="w-3.5 h-3.5" /> Chat
-                </a>
-              </div>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Connect with our team inside the official WhatsApp channel for milestone discussions, wireframe reviews, and sprint status.
+              </p>
+              <a
+                href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
+              >
+                <Users className="w-4 h-4" />
+                <span>Join Project WhatsApp Group</span>
+              </a>
             </div>
-
-            {/* Manoj Kumar - Second Number */}
-            <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-3">
-              <div>
-                <span className="text-[10px] text-brand-teal font-mono uppercase tracking-widest font-bold block">Founder & Development Lead • Secondary</span>
-                <h5 className="text-base font-bold text-white leading-tight mt-0.5">Manoj Kumar</h5>
-                <p className="text-xs sm:text-sm text-brand-teal font-mono font-bold mt-1">+91 8310463417 <span className="text-[10px] text-gray-400 font-normal">(Second Number)</span></p>
-                <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">scoders82@gmail.com</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono font-bold">
-                <a href="tel:+918310463417" className="py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark rounded-xl text-brand-teal transition-all flex items-center justify-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> Call
-                </a>
-                <a href="mailto:scoders82@gmail.com" className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1">
-                  <Mail className="w-3.5 h-3.5" /> Email
-                </a>
-                <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="py-2 bg-[#25D366]/20 hover:bg-[#25D366] hover:text-[#0c0d14] rounded-xl text-[#25D366] transition-all flex items-center justify-center gap-1">
-                  <MessageSquare className="w-3.5 h-3.5" /> Chat
-                </a>
-              </div>
-            </div>
-
-            {/* Join WhatsApp Channel Card */}
-            <a
-              href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20"
-            >
-              <Users className="w-4 h-4" />
-              <span>Join Official WhatsApp Group</span>
-            </a>
           </div>
         </div>
       </div>

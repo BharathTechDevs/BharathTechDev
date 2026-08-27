@@ -57,10 +57,11 @@ export default function Contact() {
   };
 
   const socialLinks = [
+    { name: 'WhatsApp Community', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Email Support', icon: <Mail className="w-5 h-5" />, href: 'mailto:scoders82@gmail.com', color: 'hover:text-brand-teal hover:border-brand-teal' },
-    { name: 'Instagram', icon: <Instagram className="w-5 h-5" />, href: 'https://www.instagram.com/scoders2025?igsh=Ym1jcG01czR1MHdj', color: 'hover:text-[#e4405f] hover:border-[#e4405f]' },
-    { name: 'WhatsApp (Primary)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/916363905989', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
+    { name: 'WhatsApp (Primary)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
     { name: 'WhatsApp (Second)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/918310463417', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
+    { name: 'Instagram', icon: <Instagram className="w-5 h-5" />, href: 'https://www.instagram.com/scoders2025?igsh=Ym1jcG01czR1MHdj', color: 'hover:text-[#e4405f] hover:border-[#e4405f]' },
     { name: 'YouTube', icon: <Youtube className="w-5 h-5" />, href: 'https://www.youtube.com/@S-CODERS', color: 'hover:text-[#ff0000] hover:border-[#ff0000]' },
     { name: 'Twitter / X', icon: <Twitter className="w-5 h-5" />, href: 'https://x.com/SCODERSozws', color: 'hover:text-[#1da1f2] hover:border-[#1da1f2]' },
     { name: 'LinkedIn', icon: <Linkedin className="w-5 h-5" />, href: 'https://linkedin.com/company/scoders', color: 'hover:text-[#0a66c2] hover:border-[#0a66c2]' },
@@ -139,6 +140,19 @@ export default function Contact() {
                 <div className="flex gap-3 text-sm font-sans font-light text-gray-300">
                   <Mail className="w-5 h-5 text-brand-coral shrink-0 mt-0.5" />
                   <a href="mailto:scoders82@gmail.com" className="hover:text-brand-teal transition-colors">scoders82@gmail.com</a>
+                </div>
+
+                {/* Instant WhatsApp Group & Support Card */}
+                <div className="pt-2">
+                  <a
+                    href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 px-4 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 text-black" />
+                    <span>Join Official WhatsApp Group</span>
+                  </a>
                 </div>
               </div>
             </div>

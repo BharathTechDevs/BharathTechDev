@@ -577,12 +577,6 @@ export default function TenantDashboard() {
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
   // RUN CODE SANDBOX SIMULATION
   const handleRunSandbox = () => {
     setIsCompiling(true);
@@ -1411,19 +1405,18 @@ export default function TenantDashboard() {
                         <Users className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-white">Join S-CODERS Announcements Group</h4>
+                        <h4 className="text-xs font-bold text-white">Join Workshop WhatsApp Group</h4>
                         <p className="text-gray-400 text-[10px] mt-1 leading-normal">
-                          Click below to join the official read-only S-CODERS WhatsApp channel. The live Zoom meeting link, schedules, and code files will be shared there.
+                          Click below to join the official S-CODERS Workshop WhatsApp group. Live Zoom meeting links, schedules, and code files will be shared there.
                         </p>
                       </div>
                       <a 
-                        href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+                        href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
                         target="_blank" 
                         rel="noopener noreferrer"
-                        onClick={() => setWhatsappJoined(true)}
-                        className="w-full py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-[11px] uppercase font-bold tracking-wider rounded-xl transition-all block text-center shadow-md shadow-[#25D366]/20"
+                        className="w-full py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-[11px] uppercase font-bold tracking-wider rounded-xl transition-all block text-center shadow-md shadow-[#25D366]/20 cursor-pointer"
                       >
-                        Join S-CODERS WhatsApp Channel
+                        Join Workshop WhatsApp Group
                       </a>
                     </div>
 
@@ -1490,10 +1483,16 @@ export default function TenantDashboard() {
                           <span className="text-[10px] font-mono text-emerald-300 bg-emerald-400/20 px-2 py-1 rounded font-bold">Verified Rate</span>
                         </div>
 
+                        {paymentError && (
+                          <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl text-red-400 text-xs font-mono">
+                            {paymentError}
+                          </div>
+                        )}
+
                         {currentUser && (
                           <div className="bg-brand-teal/5 border border-brand-teal/20 rounded-xl p-2.5 text-[10px] text-brand-teal flex items-center gap-2 mb-1 font-mono">
                             <Check className="w-3.5 h-3.5 shrink-0" />
-                            <span>Pre-authenticating from active user session.</span>
+                            <span>Pre-authenticating from active user session ({currentUser.email}).</span>
                           </div>
                         )}
 
@@ -1538,106 +1537,14 @@ export default function TenantDashboard() {
                         <div className="pt-1">
                           <button
                             type="submit"
-                            className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            disabled={isProcessing}
+                            className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <Sparkles className="w-4 h-4 fill-current animate-pulse" />
-                            Proceed to Pay ₹{((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} Securely
+                            {isProcessing ? 'Opening Razorpay Gateway...' : `Proceed to Pay ₹${((activeWorkshop.price ?? 1499) * payTicketsCount).toLocaleString()} with Razorpay`}
                           </button>
                         </div>
                       </form>
-                    ) : isPaymentVerified ? (
-                      <div className="space-y-4 font-sans py-2">
-                        {!generatedWorkshopKey ? (
-                          <div className="text-center py-4 space-y-4">
-                            <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto text-emerald-400">
-                              <Check className="w-7 h-7" />
-                            </div>
-                            <div>
-                              <h3 className="text-base font-extrabold text-white">Payment Verified Successfully!</h3>
-                              <p className="text-gray-400 text-xs mt-1 max-w-xs mx-auto leading-relaxed">
-                                Your payment is fully cleared. Click below to enter this option and mint your unique, personalized Workshop Access Key.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleGenerateUniqueKey}
-                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/20"
-                            >
-                              <Sparkles className="w-4 h-4 fill-current animate-pulse" />
-                              Generate Unique Workshop Access Key
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-5">
-                            <div className="text-center">
-                              <div className="w-12 h-12 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto mb-2 text-brand-teal">
-                                <Sparkles className="w-6 h-6 animate-pulse" />
-                              </div>
-                              <h3 className="text-base font-extrabold text-white">Access Key Minted!</h3>
-                              <p className="text-gray-400 text-[11px] mt-0.5">
-                                Every participant receives a different, unique crypt-signed access key.
-                              </p>
-                            </div>
-
-                            {/* Generated Key Card */}
-                            <div className="bg-brand-dark/90 border border-brand-teal/20 rounded-2xl p-4 text-center space-y-1 relative">
-                              <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Your Unique Attendance Key</span>
-                              <span className="font-mono text-xs font-black text-brand-teal select-all block py-1 truncate">{generatedWorkshopKey}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyKey(generatedWorkshopKey)}
-                                className="absolute right-2 top-2 p-1.5 bg-white/5 hover:bg-brand-teal/20 rounded text-gray-400 hover:text-brand-teal transition-all flex items-center gap-1 text-[9px] font-mono cursor-pointer border border-white/5"
-                              >
-                                {copiedKey ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                {copiedKey ? 'Copied' : 'Copy'}
-                              </button>
-                            </div>
-
-                            {/* WhatsApp Group Box */}
-                            <div className="bg-[#25D366]/5 border border-[#25D366]/20 p-4 rounded-2xl space-y-3">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-[#25D366]/10 rounded-xl text-[#25D366] border border-[#25D366]/20 shrink-0">
-                                  <Users className="w-4 h-4" />
-                                </div>
-                                <div>
-                                  <h4 className="text-xs font-bold text-white">Official WhatsApp Announcement Group</h4>
-                                  <p className="text-gray-400 text-[10px] mt-0.5 leading-normal">
-                                    Join our read-only channel to receive Zoom schedules and resources.
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Alert details for Group settings */}
-                              <div className="bg-brand-dark/40 border border-white/5 p-2.5 rounded-xl text-[9px] font-mono text-gray-400 leading-normal">
-                                <span className="text-amber-400 font-bold">📢 Group Policy:</span> This group is configured as <strong>announcement-only (Admins Only can post)</strong>. Participants can join and view updates, but cannot write messages. This ensures zero spam.
-                              </div>
-
-                              <a 
-                                href="https://chat.whatsapp.com/dummy-scoders-group"
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                onClick={() => setWhatsappJoined(true)}
-                                className="w-full py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-xs uppercase font-extrabold tracking-wider rounded-xl transition-all block text-center cursor-pointer shadow-md shadow-[#25D366]/10"
-                              >
-                                Join S-CODERS WhatsApp Channel
-                              </a>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowRegModal(false);
-                                setPaymentStep(false);
-                                setIsPaymentVerified(false);
-                                setGeneratedWorkshopKey(null);
-                              }}
-                              className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center block"
-                            >
-                              Enter Classroom Workspace
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     ) : (
                       <form onSubmit={handleVerifyManualKey} className="space-y-3.5 font-sans">
                         <div>
@@ -1691,12 +1598,12 @@ export default function TenantDashboard() {
           isOpen={showRazorpayModal}
           onClose={() => {
             setShowRazorpayModal(false);
-            setPaymentSimulating(false);
+            setIsProcessing(false);
           }}
           onFailure={(reason) => {
             setShowRazorpayModal(false);
-            setPaymentSimulating(false);
-            setOtpError(reason || 'Payment incomplete or cancelled. No workshop pass was issued.');
+            setIsProcessing(false);
+            setPaymentError(reason || 'Payment incomplete or cancelled. No workshop pass was issued.');
           }}
           onSuccess={handleRazorpayWorkshopSuccess}
           orderData={razorpayOrderData}

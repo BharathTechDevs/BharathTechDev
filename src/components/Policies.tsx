@@ -470,7 +470,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                     </div>
 
                     {/* Case B: Unable to pay on website */}
-                    <div className="space-y-1.5 bg-white/5 p-4 rounded-xl border border-white/5">
+                    <div className="space-y-2 bg-white/5 p-4 rounded-xl border border-white/5">
                       <h5 className="font-bold text-xs text-brand-teal flex items-center gap-1.5">
                         <span>🌐 Case 2: Technical Payment Failure On Our Website Itself</span>
                       </h5>
@@ -478,18 +478,29 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         If you are <strong className="text-white">unable to complete the payment on the website itself</strong> due to a website bug, portal breakdown, or checkout error:
                       </p>
                       <p className="text-brand-teal text-xs font-bold pt-1">
-                        👉 Please reach out to Customer Care (`scoders82@gmail.com`). In this scenario, S-CODERS takes FULL RESPONSIBILITY.
+                        👉 Please reach out to Customer Care (`scoders82@gmail.com`) or join our Official WhatsApp Support Group. In this scenario, S-CODERS takes FULL RESPONSIBILITY.
                       </p>
                       <p className="text-gray-400 text-[11px]">
                         Our customer care team will verify your account details, guide you through an alternate verified booking channel, or ensure your seat/service is logged without any extra charge.
                       </p>
+                      <div className="pt-2">
+                        <a
+                          href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-emerald-400 text-black rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Join Customer Care WhatsApp Group</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2 pt-2">
                     <h4 className="font-display font-bold text-sm text-white">Need Assistance With a Booking?</h4>
-                    <p className="text-gray-400 text-xs">
-                      For any questions regarding our return and refund policy, email us with your order/claim ID at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      For any questions regarding our return and refund policy, email us with your order/claim ID at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong> or contact our customer support team directly via our <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Official WhatsApp Community</a>.
                     </p>
                   </div>
                 </div>
@@ -678,12 +689,16 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                           <a href="mailto:scoders82@gmail.com" className="text-brand-teal font-bold hover:underline">scoders82@gmail.com</a>
                         </p>
                         <p>
+                          <span className="text-gray-500 uppercase block">Official WhatsApp Group:</span>
+                          <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Join S-CODERS WhatsApp Channel</a>
+                        </p>
+                        <p>
                           <span className="text-gray-500 uppercase block">Response Time:</span>
                           <span className="text-white">Within 24 business hours</span>
                         </p>
                         <p>
                           <span className="text-gray-500 uppercase block">Primary Contact / WhatsApp:</span>
-                          <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-bold hover:underline">+91 6363905989</a>
+                          <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-bold hover:underline">+91 6363905989</a>
                         </p>
                         <p>
                           <span className="text-gray-500 uppercase block">Second Number / Direct Line:</span>
@@ -743,13 +758,13 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         <span>X / Twitter (@SCODERSozws)</span>
                       </a>
                       <a 
-                        href="https://wa.me/916363905989" 
+                        href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
+                        className="flex items-center gap-2 px-4 py-2 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-black border border-[#25D366]/30 rounded-xl text-xs font-mono font-bold transition-all duration-300"
                       >
-                        <Phone className="w-4 h-4 text-emerald-400" />
-                        <span>WhatsApp Primary (6363905989)</span>
+                        <Phone className="w-4 h-4 text-[#25D366]" />
+                        <span>WhatsApp Official Community Group</span>
                       </a>
                       <a 
                         href="https://wa.me/918310463417" 

@@ -9,11 +9,11 @@
   
   --color-brand-dark: #011425; /* Dark Midnight Navy / Abyss Blue */
   --color-brand-card: #1F4959; /* Deep Ocean Teal Slate */
-  --color-brand-teal: #5C7C89; /* Muted Slate Blue / Dusty Teal */
-  --color-brand-accent: #5C7C89; /* Muted Slate Accent */
+  --color-brand-teal: #A7D8F2; /* Light Ice Blue Accent */
+  --color-brand-accent: #A7D8F2; /* Light Ice Blue Accent */
   --color-brand-coral: #1F4959; /* Deep Ocean Teal Accent */
   --color-brand-charcoal: #242424; /* Dark Charcoal */
-  --color-brand-slate: #5C7C89; /* Dusty Slate */
+  --color-brand-slate: #A7D8F2; /* Light Ice Blue Accent */
   --color-brand-abyss: #011425; /* Midnight Navy */
 }
 
@@ -29,7 +29,7 @@
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #5C7C89;
+  background: #A7D8F2;
 }
 
 html {
@@ -72,7 +72,7 @@ body {
 
 /* Ambient glow effects with architectural slate & ocean blue tones */
 .ambient-glow {
-  background: radial-gradient(circle, rgba(92, 124, 137, 0.22) 0%, rgba(31, 73, 89, 0.1) 50%, rgba(1, 20, 37, 0) 100%);
+  background: radial-gradient(circle, rgba(167, 216, 242, 0.18) 0%, rgba(31, 73, 89, 0.1) 50%, rgba(1, 20, 37, 0) 100%);
   filter: blur(60px);
 }
 
@@ -85,19 +85,19 @@ body {
 .glass-panel {
   background: rgba(31, 73, 89, 0.45);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(92, 124, 137, 0.25);
+  border: 1px solid rgba(167, 216, 242, 0.2);
   box-shadow: 0 16px 40px -12px rgba(1, 20, 37, 0.6);
 }
 
 .glass-panel-hover:hover {
-  border-color: rgba(92, 124, 137, 0.5);
-  box-shadow: 0 0 35px rgba(92, 124, 137, 0.15);
+  border-color: rgba(167, 216, 242, 0.4);
+  box-shadow: 0 0 35px rgba(167, 216, 242, 0.15);
   background: rgba(31, 73, 89, 0.6);
 }
 
 /* Subtle architectural line grid pattern */
 .bg-grid-pattern {
-  background-image: radial-gradient(circle, rgba(92, 124, 137, 0.12) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(167, 216, 242, 0.1) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
@@ -142,15 +142,15 @@ body {
 /* Form inputs styling */
 input, select, textarea {
   background-color: rgba(1, 20, 37, 0.85) !important;
-  border: 1px solid rgba(92, 124, 137, 0.25) !important;
+  border: 1px solid rgba(167, 216, 242, 0.25) !important;
   color: #FFFFFF !important;
   transition: all 0.2s ease-in-out;
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: #5C7C89 !important;
+  border-color: #A7D8F2 !important;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(92, 124, 137, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(167, 216, 242, 0.3) !important;
 }
 
 input::placeholder, textarea::placeholder {
@@ -159,13 +159,13 @@ input::placeholder, textarea::placeholder {
 
 /* Extra architectural gradients */
 .text-gradient-cyan-blue {
-  background: linear-gradient(135deg, #FFFFFF 0%, #5C7C89 100%);
+  background: linear-gradient(135deg, #FFFFFF 0%, #A7D8F2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-purple-coral {
-  background: linear-gradient(135deg, #5C7C89 0%, #1F4959 100%);
+  background: linear-gradient(135deg, #A7D8F2 0%, #1F4959 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

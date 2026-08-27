@@ -33,7 +33,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK";
+  const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4";
 
   const handleOpenWhatsApp = () => {
     window.open(WHATSAPP_GROUP_LINK, '_blank', 'noopener,noreferrer');

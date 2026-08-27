@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Lock, X, CheckCircle, ArrowRight, QrCode, 
   CreditCard, Building2, Wallet, RefreshCw, AlertCircle, 
-  Check, Copy, Sparkles, Smartphone, ChevronRight, Info, AlertTriangle, ArrowLeft
+  Check, Copy, Sparkles, Smartphone, ChevronRight, Info, AlertTriangle, ArrowLeft, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import UpiQrCanvas from './UpiQrCanvas';
 
 export interface RazorpayPaymentSuccessData {
   razorpay_payment_id: string;
@@ -166,35 +167,47 @@ export default function RazorpayModal({
     onClose();
   };
 
+  const formattedAmount = (amount || 0).toFixed(2);
+  const cleanNote = (paymentDetails.purpose || 'SCODERS Tech').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 30);
+  const cleanTr = (orderId || `order_${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '').slice(-12);
+
+  // Standard Universal NPCI UPI URI
+  const universalUpiLink = `upi://pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+
+  // Direct app-specific deep links
+  const phonePeLink = `phonepe://pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  const gpayLink = `tez://upi/pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  const paytmLink = `paytmmp://pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+
+  const getTargetDeepLink = (app: string) => {
+    switch (app) {
+      case 'phonepe': return phonePeLink;
+      case 'gpay': return gpayLink;
+      case 'paytm': return paytmLink;
+      default: return universalUpiLink;
+    }
+  };
+
   // 1. UPI Payment Trigger
-  const handleInitiateUpiApp = () => {
+  const handleInitiateUpiApp = (appOverride?: string) => {
     setUpiError(null);
-    if (selectedUpiApp === 'custom') {
+    const targetApp = appOverride || selectedUpiApp;
+    
+    if (targetApp === 'custom') {
       if (!customUpiId.trim() || !customUpiId.includes('@')) {
         setUpiError('Please enter a valid UPI ID (e.g. yourname@ybl or yourname@oksbi)');
         return;
       }
     }
 
-    // Attempt to open deep link on supported devices
-    const appNameMap: Record<string, string> = {
-      phonepe: 'PhonePe',
-      gpay: 'Google Pay',
-      paytm: 'Paytm',
-      bhim: 'BHIM UPI',
-      cred: 'CRED',
-      custom: `UPI ID (${customUpiId.trim()})`,
-      qr: 'Scan QR'
-    };
+    const linkUrl = getTargetDeepLink(targetApp);
 
-    const upiLink = `upi://pay?pa=${merchantUpi}&pn=S-CODERS%20Technologies&am=${amount}&cu=INR&tn=${encodeURIComponent(paymentDetails.purpose || 'S-CODERS Payment')}`;
-    
-    // Try opening deep link
-    if (selectedUpiApp !== 'qr') {
+    // Attempt to open deep link on supported devices
+    if (targetApp !== 'qr') {
       try {
         const link = document.createElement('a');
-        link.href = upiLink;
-        link.target = '_blank';
+        link.href = linkUrl;
+        link.target = '_top';
         link.rel = 'noopener noreferrer';
         document.body.appendChild(link);
         link.click();
@@ -613,28 +626,53 @@ export default function RazorpayModal({
                   </p>
 
                   {/* QR Code & VPA Display */}
-                  <div className="bg-white p-3 rounded-xl flex flex-col items-center justify-center text-black space-y-2 max-w-xs mx-auto shadow-lg">
-                    <span className="text-[9px] font-mono uppercase tracking-wider text-gray-600 font-bold">
-                      Scan with any UPI App
+                  <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center text-black space-y-2 max-w-xs mx-auto shadow-xl">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-gray-700 font-bold">
+                      Scan with any UPI App (GPay / PhonePe / Paytm)
                     </span>
-                    <div className="w-36 h-36 bg-white rounded-lg p-1 border border-gray-200 flex items-center justify-center">
-                      <img
-                        src={qrCodeUrl}
-                        alt="Razorpay QR"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <div className="text-[10px] font-mono text-gray-700 flex items-center justify-between w-full px-2">
-                      <span>UPI: <strong>{merchantUpi}</strong></span>
+                    <UpiQrCanvas upiString={universalUpiLink} size={180} />
+                    <div className="text-[11px] font-mono text-gray-800 flex items-center justify-between w-full px-1 pt-1 border-t border-gray-200">
+                      <span>VPA: <strong>{merchantUpi}</strong></span>
                       <span className="text-blue-700 font-bold">{Math.floor(qrTimer / 60)}:{(qrTimer % 60).toString().padStart(2, '0')}</span>
                     </div>
+                  </div>
+
+                  {/* Quick App Launch Links if opened on Mobile */}
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    <a
+                      href={phonePeLink}
+                      target="_top"
+                      rel="noopener noreferrer"
+                      className="py-2 px-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>PhonePe</span>
+                    </a>
+                    <a
+                      href={gpayLink}
+                      target="_top"
+                      rel="noopener noreferrer"
+                      className="py-2 px-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Google Pay</span>
+                    </a>
+                    <a
+                      href={paytmLink}
+                      target="_top"
+                      rel="noopener noreferrer"
+                      className="py-2 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Paytm</span>
+                    </a>
                   </div>
 
                   {/* Fallback Notice for missing apps */}
                   <div className="flex items-start gap-2 bg-black/40 p-2.5 rounded-lg border border-white/5 text-[11px] text-gray-400">
                     <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <span>
-                      If you do not have PhonePe installed on this device, simply pay using another device or scan the QR code, then enter the transaction UTR below.
+                      If deep links don't launch automatically on your device, simply scan the QR code above from your phone camera or PhonePe/GPay scanner, then enter the 12-digit transaction UTR below.
                     </span>
                   </div>
                 </div>
@@ -642,9 +680,22 @@ export default function RazorpayModal({
                 {/* 12-Digit UTR Form */}
                 <form onSubmit={handleVerifyUpiUtr} className="bg-black/30 border border-white/10 rounded-2xl p-4 space-y-3">
                   <div>
-                    <label className="block text-[11px] font-mono text-gray-300 font-bold uppercase tracking-wider mb-1.5">
-                      Enter 12-Digit UPI Ref / UTR Number *
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-mono text-gray-300 font-bold uppercase tracking-wider">
+                        Enter 12-Digit UPI Ref / UTR Number *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const demoUtr = `429${Math.floor(100000000 + Math.random() * 900000000)}`;
+                          setUpiUtrInput(demoUtr);
+                          setUtrError(null);
+                        }}
+                        className="text-[10px] font-mono text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                      >
+                        Auto-Fill Demo UTR
+                      </button>
+                    </div>
                     <input
                       type="text"
                       maxLength={16}
@@ -965,19 +1016,49 @@ export default function RazorpayModal({
                     {/* QR Code view */}
                     {selectedUpiApp === 'qr' && (
                       <div className="bg-white p-4 rounded-2xl flex flex-col items-center text-center text-black space-y-3 shadow-xl">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-gray-600 font-bold">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-gray-700 font-bold">
                           Scan with any UPI App (GPay, PhonePe, Paytm, BHIM)
                         </span>
-                        <div className="w-44 h-44 bg-white rounded-xl p-1 border border-gray-200 shadow-inner flex items-center justify-center">
-                          <img
-                            src={qrCodeUrl}
-                            alt="Razorpay QR"
-                            className="w-full h-full object-contain"
-                          />
+                        <div className="w-48 h-48 bg-white rounded-xl p-2 border border-gray-200 shadow-inner flex items-center justify-center">
+                          <UpiQrCanvas upiString={universalUpiLink} size={190} />
                         </div>
-                        <div className="flex items-center justify-between w-full max-w-xs text-xs font-mono pt-1">
-                          <span className="text-gray-600">Merchant: <strong>{merchantUpi}</strong></span>
+                        <div className="flex items-center justify-between w-full max-w-xs text-xs font-mono pt-1 text-gray-800">
+                          <span>Merchant: <strong>{merchantUpi}</strong></span>
                           <span className="text-blue-600 font-bold">{Math.floor(qrTimer / 60)}:{(qrTimer % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* App Selection Detail (PhonePe / GPay / Paytm) */}
+                    {(selectedUpiApp === 'phonepe' || selectedUpiApp === 'gpay' || selectedUpiApp === 'paytm') && (
+                      <div className="bg-blue-950/40 border border-blue-500/30 rounded-xl p-3.5 space-y-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="w-4 h-4 text-blue-400" />
+                            <span className="font-mono text-white font-bold">
+                              {selectedUpiApp === 'phonepe' ? 'PhonePe UPI' : selectedUpiApp === 'gpay' ? 'Google Pay (Tez)' : 'Paytm UPI'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            Instant Intent Ready
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-300 font-sans">
+                          Click below to launch {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'} directly on your device, or proceed to view QR & UTR verification.
+                        </p>
+
+                        <div className="flex gap-2">
+                          <a
+                            href={getTargetDeepLink(selectedUpiApp)}
+                            target="_top"
+                            rel="noopener noreferrer"
+                            onClick={() => setIsAwaitingUpiConfirmation(true)}
+                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-display font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 shadow-md"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Launch {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'GPay' : 'Paytm'}</span>
+                          </a>
                         </div>
                       </div>
                     )}

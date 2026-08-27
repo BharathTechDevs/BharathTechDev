@@ -3,7 +3,7 @@ import {
   Calendar, MapPin, Clock, Ticket, Check, ShieldCheck, Sparkles, 
   ArrowRight, X, User, Mail, Phone, Building, QrCode, Download, 
   Printer, Image as ImageIcon, Plus, Filter, AlertCircle, RefreshCw, 
-  Lock, IndianRupee, Eye, CheckCircle2, Copy, Upload, Trash2
+  Lock, IndianRupee, Eye, CheckCircle2, Copy, Upload, Trash2, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -11,6 +11,7 @@ import { getDynamicEvents, saveDynamicEvents, getEventTickets, saveEventTickets 
 import { SCODERSEvent, EventTicket } from '../types';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
+import UpiQrCanvas from './UpiQrCanvas';
 
 export default function Events() {
   const [events, setEvents] = useState<SCODERSEvent[]>([]);
@@ -281,21 +282,6 @@ export default function Events() {
     if (activeCategory === 'tickets') return true;
     return e.category === activeCategory;
   });
-
-  // Razorpay dynamic script loader
-  const loadRazorpayScript = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if ((window as any).Razorpay) {
-        resolve(true);
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
 
   // Unique Ticket Code Generator (SC-EVT-8F72K9X4 format)
   const generateUniqueTicketCode = () => {
@@ -1362,65 +1348,116 @@ export default function Events() {
                           )}
 
                           {/* Tab 2: Direct UPI QR (scoders@ybl) */}
-                          {eventPaymentTab === 'upi' && (
-                            <div className="bg-black/60 border border-brand-teal/30 p-4 rounded-2xl space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">Official UPI ID</span>
-                                  <span className="text-brand-teal font-mono font-bold text-sm">scoders@ybl</span>
+                          {eventPaymentTab === 'upi' && (() => {
+                            const evtPriceFormatted = (selectedEvent.ticketPrice || 0).toFixed(2);
+                            const evtCleanTitle = (selectedEvent.title || 'Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
+                            const evtUpiUniversal = `upi://pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
+                            const evtPhonePeLink = `phonepe://pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
+                            const evtGpayLink = `tez://upi/pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
+                            const evtPaytmLink = `paytmmp://pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
+
+                            return (
+                              <div className="bg-black/60 border border-brand-teal/30 p-4 rounded-2xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">Official UPI ID</span>
+                                    <span className="text-brand-teal font-mono font-bold text-sm">scoders@ybl</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText('scoders@ybl');
+                                      setCopiedUpi(true);
+                                      setTimeout(() => setCopiedUpi(false), 2000);
+                                    }}
+                                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg font-mono text-[10px] flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                    <span>{copiedUpi ? 'Copied!' : 'Copy UPI ID'}</span>
+                                  </button>
                                 </div>
+
+                                <div className="bg-white p-3.5 rounded-2xl max-w-[200px] mx-auto flex flex-col items-center shadow-lg text-black">
+                                  <UpiQrCanvas upiString={evtUpiUniversal} size={160} />
+                                  <span className="text-[9px] font-mono text-gray-700 font-bold mt-1.5">Scan with any UPI App</span>
+                                </div>
+
+                                {/* Direct Mobile UPI Intent Buttons */}
+                                <div className="grid grid-cols-3 gap-2">
+                                  <a
+                                    href={evtPhonePeLink}
+                                    target="_top"
+                                    rel="noopener noreferrer"
+                                    className="py-1.5 px-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>PhonePe</span>
+                                  </a>
+                                  <a
+                                    href={evtGpayLink}
+                                    target="_top"
+                                    rel="noopener noreferrer"
+                                    className="py-1.5 px-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>Google Pay</span>
+                                  </a>
+                                  <a
+                                    href={evtPaytmLink}
+                                    target="_top"
+                                    rel="noopener noreferrer"
+                                    className="py-1.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>Paytm</span>
+                                  </a>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest">
+                                      12-digit UTR / UPI Reference No. *
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setManualUpiRef(`429${Math.floor(100000000 + Math.random() * 900000000)}`);
+                                      }}
+                                      className="text-[10px] font-mono text-brand-teal hover:underline cursor-pointer"
+                                    >
+                                      Auto-Fill Demo UTR
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={manualUpiRef}
+                                    onChange={e => setManualUpiRef(e.target.value)}
+                                    placeholder="e.g. 402839482910"
+                                    className="w-full px-3.5 py-2 bg-black/50 border border-white/10 rounded-xl text-white font-mono text-xs focus:border-brand-teal focus:outline-none"
+                                  />
+                                </div>
+
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText('scoders@ybl');
-                                    setCopiedUpi(true);
-                                    setTimeout(() => setCopiedUpi(false), 2000);
-                                  }}
-                                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg font-mono text-[10px] flex items-center gap-1 cursor-pointer"
+                                  onClick={handleDirectUpiEventRegistration}
+                                  disabled={isProcessing}
+                                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                  <Copy className="w-3 h-3" />
-                                  <span>{copiedUpi ? 'Copied!' : 'Copy UPI ID'}</span>
+                                  {isProcessing ? (
+                                    <>
+                                      <RefreshCw className="w-4 h-4 animate-spin" />
+                                      <span>Verifying UPI Reference...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      <span>Verify UPI & Generate Event Pass</span>
+                                    </>
+                                  )}
                                 </button>
                               </div>
-
-                              <div className="bg-white p-3 rounded-xl max-w-[140px] mx-auto flex flex-col items-center">
-                                <QrCode className="w-24 h-24 text-black" />
-                                <span className="text-[8px] font-mono text-black font-bold mt-1">S-CODERS LAB</span>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest">
-                                  12-digit UTR / UPI Reference No. *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={manualUpiRef}
-                                  onChange={e => setManualUpiRef(e.target.value)}
-                                  placeholder="e.g. 402839482910"
-                                  className="w-full px-3.5 py-2 bg-black/50 border border-white/10 rounded-xl text-white font-mono text-xs focus:border-brand-teal focus:outline-none"
-                                />
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={handleDirectUpiEventRegistration}
-                                disabled={isProcessing}
-                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
-                              >
-                                {isProcessing ? (
-                                  <>
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                    <span>Verifying UPI Reference...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span>Verify UPI & Generate Event Pass</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       )}
                     </form>
@@ -1467,11 +1504,9 @@ export default function Events() {
                           </div>
                         </div>
 
-                        {/* Simulated QR Code matrix */}
-                        <div className="bg-white p-3 rounded-2xl flex flex-col items-center justify-center text-center">
-                          <div className="w-24 h-24 bg-black/90 rounded-xl flex items-center justify-center text-brand-teal p-1 relative">
-                            <QrCode className="w-20 h-20 text-white" />
-                          </div>
+                        {/* Verified Scannable Ticket QR Code */}
+                        <div className="bg-white p-3 rounded-2xl flex flex-col items-center justify-center text-center shadow-lg text-black">
+                          <UpiQrCanvas upiString={`https://scoders.com/verify-ticket?code=${viewingTicket.ticketCode}`} size={100} />
                           <span className="text-[8px] font-mono text-gray-800 font-bold mt-1 tracking-widest uppercase">
                             {viewingTicket.ticketCode}
                           </span>
