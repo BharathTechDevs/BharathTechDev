@@ -61,21 +61,23 @@ export default function Logo({
 
   const currentSize = sizeClasses[size];
 
-  // Color selections based on exact user brand guidelines & reference photo
+  // Color selections optimized for crisp contrast and vibrant identity across OLED & LCD screens
   const sColor = lightBg 
-    ? 'text-[#1200A5] font-black drop-shadow-sm' 
-    : 'text-[#1200A5] dark:text-[#2510E5] font-black drop-shadow-[0_0_10px_rgba(37,16,229,0.7)]'; // Exact deep dark navy/indigo blue for "S" as in reference image
+    ? 'text-[#1D4ED8] font-black drop-shadow-sm' 
+    : 'text-[#3B82F6] font-black drop-shadow-[0_0_14px_rgba(59,130,246,0.85)]'; // Vibrant electric royal blue for "S"
   
-  const linkColor = '#2563EB'; // Royal blue for chain link (-)
-  const bridgeColor = '#2563EB'; // Matching royal blue bridge
+  const linkColor = lightBg ? '#2563EB' : '#38BDF8'; // Bright Cyan-Blue for chain link (-)
+  const bridgeColor = lightBg ? '#2563EB' : '#38BDF8'; // Matching bright Cyan-Blue bridge
   
-  const codersColor = 'text-[#38BDF8] font-black drop-shadow-sm'; // Sky Blue for "CODERS"
+  const codersColor = lightBg 
+    ? 'text-[#0284C7] font-black drop-shadow-sm' 
+    : 'text-[#38BDF8] font-black drop-shadow-[0_0_10px_rgba(56,189,248,0.5)]'; // Sky Blue for "CODERS"
     
   const subtitleColor = lightBg 
     ? 'text-[#1E293B] font-semibold' 
     : 'text-slate-200 font-medium'; // "Bharath Tech Developers"
     
-  const sparkleColor = 'text-black'; // Black 4-point star as per reference image
+  const sparkleColor = lightBg ? 'text-slate-900' : 'text-[#A7D8F2]'; // Glowing 4-point star
 
   return (
     <div 
@@ -153,9 +155,9 @@ export default function Logo({
             >
               <path 
                 d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" 
-                fill="#000000"
+                fill="currentColor"
                 stroke={!lightBg ? "#ffffff" : "none"}
-                strokeWidth={!lightBg ? "1.5" : "0"}
+                strokeWidth={!lightBg ? "1" : "0"}
               />
             </svg>
           </div>

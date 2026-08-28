@@ -15,8 +15,9 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
       className="relative min-h-screen flex items-center justify-center pt-28 pb-20 overflow-hidden bg-brand-dark select-none"
     >
       {/* Background Ambience & Architectural Lighting */}
-      <div className="absolute top-1/4 left-1/2 w-[600px] h-[600px] ambient-glow rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-      <div className="absolute bottom-10 right-10 w-[450px] h-[450px] ambient-coral-glow rounded-full pointer-events-none opacity-40" />
+      <div className="absolute top-1/4 left-1/2 w-[700px] h-[700px] ambient-glow rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-80" />
+      <div className="absolute bottom-10 right-10 w-[500px] h-[500px] ambient-coral-glow rounded-full pointer-events-none opacity-60" />
+      <div className="absolute top-20 left-10 w-[400px] h-[400px] ambient-glow rounded-full pointer-events-none opacity-45" />
 
       {/* Floating Animated Cyber Particles in Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
@@ -53,13 +54,13 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
       </div>
       
       {/* Subtle architectural grid pattern */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-20 pointer-events-none" />
+      <div className="absolute inset-0 bg-grid-pattern opacity-25 pointer-events-none" />
 
       {/* Decorative Architectural Arch Silhouette Background Container */}
-      <div className="absolute inset-x-4 top-24 bottom-12 max-w-6xl mx-auto border border-[#5C7C89]/20 arch-frame pointer-events-none bg-gradient-to-b from-[#1F4959]/20 via-[#011425]/40 to-transparent flex items-center justify-center overflow-hidden">
+      <div className="absolute inset-x-3 sm:inset-x-6 top-20 bottom-8 max-w-6xl mx-auto border border-[#A7D8F2]/30 arch-frame pointer-events-none bg-gradient-to-b from-[#143b4e]/45 via-[#062338]/60 to-[#021221]/80 flex items-center justify-center overflow-hidden shadow-[0_0_50px_rgba(20,59,78,0.35)]">
         {/* Inner Arch Layer */}
-        <div className="w-3/4 h-5/6 border border-[#5C7C89]/30 arch-frame bg-[#011425]/60 opacity-80 backdrop-blur-3xl flex items-center justify-center">
-          <div className="w-2/3 h-4/5 border border-[#5C7C89]/20 arch-frame bg-[#1F4959]/20" />
+        <div className="w-4/5 h-[88%] border border-[#A7D8F2]/35 arch-frame bg-[#062338]/75 opacity-90 backdrop-blur-xl flex items-center justify-center shadow-[inset_0_0_30px_rgba(167,216,242,0.06)]">
+          <div className="w-3/4 h-4/5 border border-[#A7D8F2]/25 arch-frame bg-[#143b4e]/40" />
         </div>
       </div>
 
@@ -69,13 +70,13 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-[#1F4959]/60 border border-[#5C7C89]/40 text-white text-xs font-mono tracking-widest uppercase mb-10 shadow-lg backdrop-blur-md group hover:border-brand-teal/60 transition-all cursor-default"
+          className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#143b4e]/90 border border-[#A7D8F2]/45 text-white text-xs font-mono tracking-widest uppercase mb-10 shadow-xl backdrop-blur-md group hover:border-brand-teal transition-all cursor-default"
         >
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-teal opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-teal"></span>
           </span>
-          <span>S-CODERS • Bharath Tech Developers</span>
+          <span className="font-semibold">S-CODERS • Bharath Tech Developers</span>
           <Sparkles className="w-3.5 h-3.5 text-brand-teal group-hover:rotate-180 transition-transform duration-700" />
         </motion.div>
 

@@ -12,6 +12,7 @@ import { SCODERSEvent, EventTicket } from '../types';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import UpiQrCanvas from './UpiQrCanvas';
+import { openUpiApp } from '../utils/paymentLinks';
 
 export default function Events() {
   const [events, setEvents] = useState<SCODERSEvent[]>([]);
@@ -1384,33 +1385,48 @@ export default function Events() {
 
                                 {/* Direct Mobile UPI Intent Buttons */}
                                 <div className="grid grid-cols-3 gap-2">
-                                  <a
-                                    href={evtPhonePeLink}
-                                    target="_top"
-                                    rel="noopener noreferrer"
-                                    className="py-1.5 px-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiApp({
+                                      pa: 'scoders@ybl',
+                                      pn: 'S-CODERS Technologies',
+                                      am: selectedEvent.ticketPrice,
+                                      tn: evtCleanTitle,
+                                      tr: `EVT${Date.now()}`
+                                    }, 'phonepe')}
+                                    className="py-2 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                                   >
                                     <ExternalLink className="w-3 h-3" />
                                     <span>PhonePe</span>
-                                  </a>
-                                  <a
-                                    href={evtGpayLink}
-                                    target="_top"
-                                    rel="noopener noreferrer"
-                                    className="py-1.5 px-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiApp({
+                                      pa: 'scoders@ybl',
+                                      pn: 'S-CODERS Technologies',
+                                      am: selectedEvent.ticketPrice,
+                                      tn: evtCleanTitle,
+                                      tr: `EVT${Date.now()}`
+                                    }, 'gpay')}
+                                    className="py-2 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                                   >
                                     <ExternalLink className="w-3 h-3" />
                                     <span>Google Pay</span>
-                                  </a>
-                                  <a
-                                    href={evtPaytmLink}
-                                    target="_top"
-                                    rel="noopener noreferrer"
-                                    className="py-1.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiApp({
+                                      pa: 'scoders@ybl',
+                                      pn: 'S-CODERS Technologies',
+                                      am: selectedEvent.ticketPrice,
+                                      tn: evtCleanTitle,
+                                      tr: `EVT${Date.now()}`
+                                    }, 'universal')}
+                                    className="py-2 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                                   >
                                     <ExternalLink className="w-3 h-3" />
-                                    <span>Paytm</span>
-                                  </a>
+                                    <span>Paytm / UPI</span>
+                                  </button>
                                 </div>
 
                                 <div className="space-y-1">

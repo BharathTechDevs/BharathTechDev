@@ -13,6 +13,7 @@ import { PROJECT_EXAMPLES } from '../data';
 import { getDynamicServices, saveDynamicServices } from '../utils/dynamicData';
 import { ServiceEnquiry, Service, AppUser } from '../types';
 import { DatabaseEngine, ServiceRegistration, EnquiryItem, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
+import { openUpiApp, generateUpiUrl } from '../utils/paymentLinks';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -671,24 +672,24 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           </p>
         </div>
 
-        {/* OFFICIAL S-CODERS WHATSAPP COMMUNITY & SUPPORT HUB */}
+        {/* OFFICIAL S-CODERS SERVICE WHATSAPP COMMUNITY & SUPPORT HUB */}
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-brand-teal/30 bg-[#060a16]/90 shadow-2xl mb-16 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-brand-teal/10 blur-3xl rounded-full pointer-events-none" />
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
             <div className="space-y-3 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] text-xs font-mono font-bold uppercase tracking-wider">
                 <span className="w-2 h-2 rounded-full bg-[#25D366] animate-ping" />
-                Official WhatsApp Community Channel
+                Official Service Community Channel
               </div>
               <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white">
-                Join the S-CODERS WhatsApp Group
+                Join the S-CODERS Service WhatsApp Group
               </h3>
               <p className="text-gray-300 font-sans text-sm sm:text-base leading-relaxed">
                 Connect directly with our engineering team and developer community. Get live project announcements, technical consultations, architecture dispatches, and priority development support.
               </p>
               <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-mono text-gray-400">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
-                  <span className="text-[#25D366]">✓</span> 24/7 Community Support
+                  <span className="text-[#25D366]">✓</span> 24/7 Service Support
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white">
                   <span className="text-[#25D366]">✓</span> Live Architecture Updates
@@ -699,16 +700,16 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               </div>
             </div>
 
-            {/* Official WhatsApp Group Button */}
+            {/* Official Service WhatsApp Group Button */}
             <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
               <a
-                href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+                href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-8 py-4 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-sm uppercase tracking-wider rounded-2xl transition-all shadow-xl shadow-[#25D366]/25 flex items-center justify-center gap-3 cursor-pointer active:scale-95"
               >
                 <Users className="w-5 h-5" />
-                <span>Join Official WhatsApp Group</span>
+                <span>Join Service WhatsApp Group</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>
@@ -1468,7 +1469,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                                 key={amt}
                                 type="button"
                                 onClick={() => setQrPayAmount(amt)}
-                                className={`py-2 px-3 rounded-xl border font-bold transition-all text-center ${
+                                className={`py-2 px-3 rounded-xl border font-bold transition-all text-center cursor-pointer ${
                                   qrPayAmount === amt
                                     ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-md'
                                     : 'bg-white/5 border-white/10 text-gray-300 hover:text-white'
@@ -1478,6 +1479,80 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               </button>
                             ))}
                           </div>
+                        </div>
+
+                        {/* Direct Mobile UPI App Instant Triggers */}
+                        <div className="space-y-2 pt-1">
+                          <label className="block text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">
+                            ⚡ Pay Directly via UPI App (Instant Launch)
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {/* PhonePe Direct Trigger */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openUpiApp({
+                                  pa: 'scoders@ybl',
+                                  pn: 'S-CODERS Technologies',
+                                  am: qrPayAmount,
+                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
+                                  tr: `SRV${Date.now()}`
+                                }, 'phonepe');
+                              }}
+                              className="py-2.5 px-2 bg-[#5f259f]/20 hover:bg-[#5f259f]/40 active:scale-95 text-white border border-[#5f259f]/50 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-[#5f259f]/10"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-[#5f259f] flex items-center justify-center text-white text-[10px] font-bold">
+                                पे
+                              </div>
+                              <span className="text-[11px] font-bold font-mono">PhonePe</span>
+                              <span className="text-[8px] text-purple-300 font-mono">Tap to Open</span>
+                            </button>
+
+                            {/* Google Pay Direct Trigger */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openUpiApp({
+                                  pa: 'scoders@ybl',
+                                  pn: 'S-CODERS Technologies',
+                                  am: qrPayAmount,
+                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
+                                  tr: `SRV${Date.now()}`
+                                }, 'gpay');
+                              }}
+                              className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 active:scale-95 text-white border border-blue-500/50 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-blue-600/10"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
+                                G
+                              </div>
+                              <span className="text-[11px] font-bold font-mono">Google Pay</span>
+                              <span className="text-[8px] text-blue-300 font-mono">Tap to Open</span>
+                            </button>
+
+                            {/* Paytm / Any UPI Direct Trigger */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openUpiApp({
+                                  pa: 'scoders@ybl',
+                                  pn: 'S-CODERS Technologies',
+                                  am: qrPayAmount,
+                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
+                                  tr: `SRV${Date.now()}`
+                                }, 'universal');
+                              }}
+                              className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 active:scale-95 text-white border border-cyan-500/50 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-cyan-600/10"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-cyan-600 flex items-center justify-center text-white text-[10px] font-bold">
+                                UPI
+                              </div>
+                              <span className="text-[11px] font-bold font-mono">Any UPI App</span>
+                              <span className="text-[8px] text-cyan-300 font-mono">Paytm / BHIM</span>
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-gray-400 font-mono text-center">
+                            Tap above to launch your installed payment app with prefilled amount ₹{qrPayAmount.toLocaleString()}
+                          </p>
                         </div>
 
                         {/* Bank of Baroda UPI Scanner Card */}
@@ -1494,10 +1569,28 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           </div>
 
                           {/* QR Code Container */}
-                          <div className="relative p-1 bg-white rounded-xl border border-gray-200 shadow-inner">
+                          <a
+                            href={generateUpiUrl({
+                              pa: 'scoders@ybl',
+                              pn: 'S-CODERS Technologies',
+                              am: qrPayAmount,
+                              tn: `Advance: ${registeringService.title.slice(0, 20)}`,
+                              tr: `SRV${Date.now()}`
+                            }, 'universal')}
+                            target="_top"
+                            rel="noopener noreferrer"
+                            className="relative p-1 bg-white rounded-xl border border-gray-200 shadow-inner group cursor-pointer block"
+                            title="Click QR to open in UPI App"
+                          >
                             <img 
                               src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                                `upi://pay?pa=scoders@ybl&pn=S-CODERS%20Technologies&am=${qrPayAmount}&cu=INR&tn=${encodeURIComponent(`Advance: ${registeringService.title}`)}`
+                                generateUpiUrl({
+                                  pa: 'scoders@ybl',
+                                  pn: 'S-CODERS Technologies',
+                                  am: qrPayAmount,
+                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
+                                  tr: `SRV${Date.now()}`
+                                }, 'universal')
                               )}`}
                               alt="UPI Payment QR Code"
                               className="w-36 h-36 object-contain"
@@ -1509,7 +1602,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                                 <span className="text-white font-sans text-[11px] font-black tracking-tighter">पे</span>
                               </div>
                             </div>
-                          </div>
+                          </a>
 
                           <span className="text-[9px] font-mono text-gray-500 mt-2 uppercase font-bold tracking-wider">Merchant VPA: scoders@ybl</span>
                         </div>
@@ -2863,30 +2956,61 @@ export function ServiceProjectSpaceDashboard({
             </p>
           </div>
 
-          {/* S-CODERS WhatsApp Project Channel */}
+          {/* S-CODERS Direct Client Contact & Coordination */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">PROJECT COORDINATION & SUPPORT</h4>
-              <span className="text-[10px] font-mono text-gray-400">WhatsApp Live</span>
+              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">DIRECT DEVELOPER CONTACT</h4>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold">● Active Support</span>
             </div>
             
-            <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-                <span className="text-xs font-mono text-white font-bold">Direct Developer Coordination</span>
+            <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-4">
+              <div className="space-y-3">
+                {/* Phone Numbers */}
+                <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-200">
+                  <div className="p-2 bg-brand-teal/10 rounded-xl border border-brand-teal/20 text-brand-teal shrink-0 mt-0.5">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">Personal Phone Lines</span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                      <a href="tel:+916363905989" className="font-mono font-bold text-white hover:text-brand-teal transition-colors">
+                        +91 6363905989
+                      </a>
+                      <span className="text-gray-500">•</span>
+                      <a href="tel:+918310463417" className="font-mono font-bold text-white hover:text-brand-teal transition-colors">
+                        +91 8310463417
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-200">
+                  <div className="p-2 bg-brand-coral/10 rounded-xl border border-brand-coral/20 text-brand-coral shrink-0 mt-0.5">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">Official Direct Email</span>
+                    <a href="mailto:scoders82@gmail.com" className="font-mono font-bold text-white hover:text-brand-teal transition-colors block mt-0.5">
+                      scoders82@gmail.com
+                    </a>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Connect with our team inside the official WhatsApp channel for milestone discussions, wireframe reviews, and sprint status.
-              </p>
-              <a
-                href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
-              >
-                <Users className="w-4 h-4" />
-                <span>Join Project WhatsApp Group</span>
-              </a>
+
+              {/* Personal WhatsApp Link Button */}
+              <div className="pt-1">
+                <a
+                  href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Connect on Personal WhatsApp</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
             </div>
           </div>
         </div>

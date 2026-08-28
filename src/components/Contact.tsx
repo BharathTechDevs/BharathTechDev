@@ -57,7 +57,7 @@ export default function Contact() {
   };
 
   const socialLinks = [
-    { name: 'WhatsApp Community', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
+    { name: 'Customer Care Support', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Email Support', icon: <Mail className="w-5 h-5" />, href: 'mailto:scoders82@gmail.com', color: 'hover:text-brand-teal hover:border-brand-teal' },
     { name: 'WhatsApp (Primary)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
     { name: 'WhatsApp (Second)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/918310463417', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
@@ -151,7 +151,7 @@ export default function Contact() {
                     className="w-full py-3 px-4 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4 text-black" />
-                    <span>Join Official WhatsApp Group</span>
+                    <span>Customer Care Support WhatsApp Group</span>
                   </a>
                 </div>
               </div>

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import UpiQrCanvas from './UpiQrCanvas';
+import { openUpiApp, generateUpiUrl } from '../utils/paymentLinks';
 
 export interface RazorpayPaymentSuccessData {
   razorpay_payment_id: string;
@@ -200,21 +201,16 @@ export default function RazorpayModal({
       }
     }
 
-    const linkUrl = getTargetDeepLink(targetApp);
-
     // Attempt to open deep link on supported devices
     if (targetApp !== 'qr') {
-      try {
-        const link = document.createElement('a');
-        link.href = linkUrl;
-        link.target = '_top';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (e) {
-        console.warn("Could not launch UPI intent directly:", e);
-      }
+      const scheme = targetApp === 'phonepe' ? 'phonepe' : targetApp === 'gpay' ? 'gpay' : targetApp === 'paytm' ? 'paytm' : 'universal';
+      openUpiApp({
+        pa: merchantUpi,
+        pn: 'S-CODERS Technologies',
+        am: amount,
+        tn: cleanNote,
+        tr: cleanTr
+      }, scheme);
     }
 
     // Switch to step 2 (Awaiting UTR / Confirmation)
@@ -639,33 +635,48 @@ export default function RazorpayModal({
 
                   {/* Quick App Launch Links if opened on Mobile */}
                   <div className="grid grid-cols-3 gap-2 pt-1">
-                    <a
-                      href={phonePeLink}
-                      target="_top"
-                      rel="noopener noreferrer"
-                      className="py-2 px-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                    <button
+                      type="button"
+                      onClick={() => openUpiApp({
+                        pa: merchantUpi,
+                        pn: 'S-CODERS Technologies',
+                        am: amount,
+                        tn: cleanNote,
+                        tr: cleanTr
+                      }, 'phonepe')}
+                      className="py-2.5 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                     >
                       <ExternalLink className="w-3 h-3" />
                       <span>PhonePe</span>
-                    </a>
-                    <a
-                      href={gpayLink}
-                      target="_top"
-                      rel="noopener noreferrer"
-                      className="py-2 px-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openUpiApp({
+                        pa: merchantUpi,
+                        pn: 'S-CODERS Technologies',
+                        am: amount,
+                        tn: cleanNote,
+                        tr: cleanTr
+                      }, 'gpay')}
+                      className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                     >
                       <ExternalLink className="w-3 h-3" />
                       <span>Google Pay</span>
-                    </a>
-                    <a
-                      href={paytmLink}
-                      target="_top"
-                      rel="noopener noreferrer"
-                      className="py-2 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openUpiApp({
+                        pa: merchantUpi,
+                        pn: 'S-CODERS Technologies',
+                        am: amount,
+                        tn: cleanNote,
+                        tr: cleanTr
+                      }, 'universal')}
+                      className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                     >
                       <ExternalLink className="w-3 h-3" />
-                      <span>Paytm</span>
-                    </a>
+                      <span>Paytm / UPI</span>
+                    </button>
                   </div>
 
                   {/* Fallback Notice for missing apps */}
@@ -1049,16 +1060,24 @@ export default function RazorpayModal({
                         </p>
 
                         <div className="flex gap-2">
-                          <a
-                            href={getTargetDeepLink(selectedUpiApp)}
-                            target="_top"
-                            rel="noopener noreferrer"
-                            onClick={() => setIsAwaitingUpiConfirmation(true)}
-                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-display font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 shadow-md"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const scheme = selectedUpiApp === 'phonepe' ? 'phonepe' : selectedUpiApp === 'gpay' ? 'gpay' : selectedUpiApp === 'paytm' ? 'paytm' : 'universal';
+                              openUpiApp({
+                                pa: merchantUpi,
+                                pn: 'S-CODERS Technologies',
+                                am: amount,
+                                tn: cleanNote,
+                                tr: cleanTr
+                              }, scheme);
+                              setIsAwaitingUpiConfirmation(true);
+                            }}
+                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-display font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             <span>Launch {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'GPay' : 'Paytm'}</span>
-                          </a>
+                          </button>
                         </div>
                       </div>
                     )}

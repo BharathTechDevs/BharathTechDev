@@ -689,8 +689,8 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                           <a href="mailto:scoders82@gmail.com" className="text-brand-teal font-bold hover:underline">scoders82@gmail.com</a>
                         </p>
                         <p>
-                          <span className="text-gray-500 uppercase block">Official WhatsApp Group:</span>
-                          <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Join S-CODERS WhatsApp Channel</a>
+                          <span className="text-gray-500 uppercase block">Customer Care Support (WhatsApp):</span>
+                          <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Join Customer Care Support WhatsApp Group</a>
                         </p>
                         <p>
                           <span className="text-gray-500 uppercase block">Response Time:</span>
@@ -764,7 +764,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         className="flex items-center gap-2 px-4 py-2 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-black border border-[#25D366]/30 rounded-xl text-xs font-mono font-bold transition-all duration-300"
                       >
                         <Phone className="w-4 h-4 text-[#25D366]" />
-                        <span>WhatsApp Official Community Group</span>
+                        <span>Customer Care Support WhatsApp Group</span>
                       </a>
                       <a 
                         href="https://wa.me/918310463417" 

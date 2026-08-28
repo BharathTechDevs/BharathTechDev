@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getDynamicWorkshops, getDynamicInvoices } from '../utils/dynamicData';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
+import { openUpiApp } from '../utils/paymentLinks';
 
 interface PaymentHistoryItem {
   txnId: string;
@@ -348,14 +349,15 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
     const note = activeTab === 'workshop' ? `Workshop Booking` : purpose.substring(0, 30);
     
-    const intentUri = getUpiDeviceLink(app, payeeAddress, payeeName, payAmount, note);
+    const scheme = app === 'phonepe' ? 'phonepe' : app === 'gpay' ? 'gpay' : app === 'paytm' ? 'paytm' : app === 'bhim' ? 'bhim' : 'universal';
     
-    // Try launching the deep link immediately
-    try {
-      window.location.href = intentUri;
-    } catch (err) {
-      console.warn("Could not launch custom deep link automatically:", err);
-    }
+    openUpiApp({
+      pa: payeeAddress,
+      pn: payeeName,
+      am: payAmount,
+      tn: note,
+      tr: `PAY${Date.now()}`
+    }, scheme);
   };
 
   const handleRuyPaymentComplete = (e?: React.FormEvent) => {

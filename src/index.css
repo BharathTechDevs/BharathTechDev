@@ -7,14 +7,14 @@
   --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   
-  --color-brand-dark: #011425; /* Dark Midnight Navy / Abyss Blue */
-  --color-brand-card: #1F4959; /* Deep Ocean Teal Slate */
+  --color-brand-dark: #03182b; /* Dark Midnight Navy / Rich Deep Ocean */
+  --color-brand-card: #143b4e; /* Deep Ocean Teal Slate */
   --color-brand-teal: #A7D8F2; /* Light Ice Blue Accent */
   --color-brand-accent: #A7D8F2; /* Light Ice Blue Accent */
   --color-brand-coral: #1F4959; /* Deep Ocean Teal Accent */
-  --color-brand-charcoal: #242424; /* Dark Charcoal */
+  --color-brand-charcoal: #1e262f; /* Dark Charcoal */
   --color-brand-slate: #A7D8F2; /* Light Ice Blue Accent */
-  --color-brand-abyss: #011425; /* Midnight Navy */
+  --color-brand-abyss: #021221; /* Midnight Navy */
 }
 
 /* Custom scrollbar styling */
@@ -22,7 +22,7 @@
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #011425;
+  background: #03182b;
 }
 ::-webkit-scrollbar-thumb {
   background: #1F4959;
@@ -34,14 +34,15 @@
 
 html {
   scroll-behavior: smooth;
-  background-color: #011425;
+  background-color: #03182b;
   color: #FFFFFF;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #011425;
+  background-color: #03182b;
   color: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
@@ -72,27 +73,28 @@ body {
 
 /* Ambient glow effects with architectural slate & ocean blue tones */
 .ambient-glow {
-  background: radial-gradient(circle, rgba(167, 216, 242, 0.18) 0%, rgba(31, 73, 89, 0.1) 50%, rgba(1, 20, 37, 0) 100%);
+  background: radial-gradient(circle, rgba(167, 216, 242, 0.3) 0%, rgba(31, 73, 89, 0.3) 45%, rgba(3, 24, 43, 0) 75%);
   filter: blur(60px);
 }
 
 .ambient-coral-glow {
-  background: radial-gradient(circle, rgba(31, 73, 89, 0.3) 0%, rgba(36, 36, 36, 0.15) 50%, rgba(1, 20, 37, 0) 100%);
+  background: radial-gradient(circle, rgba(31, 73, 89, 0.5) 0%, rgba(10, 42, 60, 0.3) 50%, rgba(3, 24, 43, 0) 80%);
   filter: blur(60px);
 }
 
 /* Glassmorphism panel with deep ocean & slate translucency */
 .glass-panel {
-  background: rgba(31, 73, 89, 0.45);
+  background: rgba(10, 37, 56, 0.75);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(167, 216, 242, 0.2);
-  box-shadow: 0 16px 40px -12px rgba(1, 20, 37, 0.6);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(167, 216, 242, 0.25);
+  box-shadow: 0 16px 40px -12px rgba(2, 18, 33, 0.7);
 }
 
 .glass-panel-hover:hover {
-  border-color: rgba(167, 216, 242, 0.4);
-  box-shadow: 0 0 35px rgba(167, 216, 242, 0.15);
-  background: rgba(31, 73, 89, 0.6);
+  border-color: rgba(167, 216, 242, 0.5);
+  box-shadow: 0 0 35px rgba(167, 216, 242, 0.2);
+  background: rgba(15, 48, 72, 0.85);
 }
 
 /* Subtle architectural line grid pattern */
