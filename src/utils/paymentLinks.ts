@@ -1,72 +1,74 @@
 /**
- * Cross-platform UPI & Payment App deep link dispatcher.
- * Handles iframe breakouts, multiple protocol schemes for Android/iOS/Desktop,
- * intent fallback schemes, and payment redirects.
+ * Cross-platform UPI & Payment App Deep Link Dispatcher & Payment Handler.
+ * Supports iOS, Android, and Desktop web environments with multi-protocol schemes,
+ * intent packages, and immediate interactive redirects.
  */
 
 export interface UpiIntentParams {
-  pa: string; // Payee address (e.g. scoders@ybl)
-  pn: string; // Payee name
+  pa: string; // Payee VPA address (e.g. scoders@ybl)
+  pn: string; // Payee Name
   am: number | string; // Amount in INR
-  cu?: string; // Currency, defaults to INR
+  cu?: string; // Currency (INR)
   tn?: string; // Transaction note
   tr?: string; // Transaction reference / Order ID
 }
 
-export function generateUpiUrl(
-  params: UpiIntentParams, 
-  scheme: 'universal' | 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'intent' = 'universal'
-): string {
+/**
+ * Builds standard RFC / NPCI compliant UPI query strings
+ */
+export function buildUpiQueryString(params: UpiIntentParams): string {
   const currency = params.cu || 'INR';
   const cleanAmount = typeof params.am === 'number' ? params.am.toFixed(2) : parseFloat(params.am || '0').toFixed(2);
-  const cleanNote = (params.tn || 'S-CODERS Tech').replace(/[^a-zA-Z0-9 -]/g, '').slice(0, 30);
+  const cleanNote = (params.tn || 'SCODERS Services').replace(/[^a-zA-Z0-9 -]/g, '').slice(0, 30);
   const cleanTr = (params.tr || `TRX${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '').slice(-12);
   const cleanPn = encodeURIComponent(params.pn || 'S-CODERS Technologies');
   
-  const queryString = `pa=${params.pa}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  return `pa=${params.pa}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+}
+
+/**
+ * Generates direct URI schemes for specific payment providers
+ */
+export function generateUpiUrl(
+  params: UpiIntentParams, 
+  scheme: 'universal' | 'phonepe' | 'gpay' | 'paytm' | 'bhim' = 'universal'
+): string {
+  const qs = buildUpiQueryString(params);
 
   switch (scheme) {
     case 'phonepe':
-      return `phonepe://pay?${queryString}`;
+      return `phonepe://pay?${qs}`;
     case 'gpay':
-      return `tez://upi/pay?${queryString}`;
+      return `tez://upi/pay?${qs}`;
     case 'paytm':
-      return `paytmmp://pay?${queryString}`;
+      return `paytmmp://pay?${qs}`;
     case 'bhim':
-      return `bhim://pay?${queryString}`;
-    case 'intent':
-      // Android Native Intent URL format that guarantees launching target package or web fallback
-      return `intent://pay?${queryString}#Intent;scheme=upi;action=android.intent.action.VIEW;end;`;
+      return `bhim://pay?${qs}`;
     case 'universal':
     default:
-      return `upi://pay?${queryString}`;
+      return `upi://pay?${qs}`;
   }
 }
 
 /**
- * Returns specific Android package intent URLs for direct app launching
+ * Generates Android Intent URIs specifically matching target package manager on Android devices
  */
 export function getAppSpecificIntent(params: UpiIntentParams, app: 'phonepe' | 'gpay' | 'paytm'): string {
-  const currency = params.cu || 'INR';
-  const cleanAmount = typeof params.am === 'number' ? params.am.toFixed(2) : parseFloat(params.am || '0').toFixed(2);
-  const cleanNote = (params.tn || 'S-CODERS Tech').replace(/[^a-zA-Z0-9 -]/g, '').slice(0, 30);
-  const cleanTr = (params.tr || `TRX${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '').slice(-12);
-  const cleanPn = encodeURIComponent(params.pn || 'S-CODERS Technologies');
-  const queryString = `pa=${params.pa}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  const qs = buildUpiQueryString(params);
 
   if (app === 'phonepe') {
-    return `intent://pay?${queryString}#Intent;scheme=upi;package=com.phonepe.app;action=android.intent.action.VIEW;end;`;
+    return `intent://pay?${qs}#Intent;scheme=upi;package=com.phonepe.app;action=android.intent.action.VIEW;end;`;
   } else if (app === 'gpay') {
-    return `intent://pay?${queryString}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
+    return `intent://pay?${qs}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
   } else if (app === 'paytm') {
-    return `intent://pay?${queryString}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
+    return `intent://pay?${qs}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
   }
-  return `upi://pay?${queryString}`;
+  return `upi://pay?${qs}`;
 }
 
 /**
- * Dispatches a deep link safely from within web apps, mobile browsers, or iframe sandboxes.
- * Ensures the user is immediately redirected / prompted by their target app.
+ * Launches the requested UPI application or presents the universal device intent chooser.
+ * Uses top-level window dispatching to break out of iframes and trigger the OS app handler.
  */
 export function openUpiApp(
   params: UpiIntentParams, 
@@ -79,37 +81,42 @@ export function openUpiApp(
     : universalScheme;
 
   // Direct trigger via hidden anchor and window location
-  const triggerUrl = (url: string) => {
+  const executeLaunch = (url: string) => {
     try {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.setAttribute('target', '_top');
-      anchor.setAttribute('rel', 'noopener noreferrer');
-      anchor.style.display = 'none';
-      document.body.appendChild(anchor);
-      anchor.click();
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('rel', 'noopener noreferrer');
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
       setTimeout(() => {
-        if (document.body.contains(anchor)) {
-          document.body.removeChild(anchor);
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
         }
       }, 300);
     } catch {
-      window.location.href = url;
+      // Fallback
+    }
+
+    try {
+      window.location.assign(url);
+    } catch {
+      // Ignore navigation aborts
     }
   };
 
-  // 1. Try specialized app scheme (e.g. phonepe://, tez://, paytmmp://)
-  triggerUrl(customScheme);
+  // 1. Direct App Scheme (iOS & Android supported deep-links)
+  executeLaunch(customScheme);
 
-  // 2. Try Android intent wrapper if on mobile
-  if (app !== 'universal') {
+  // 2. Package-specific Android Intent for Android mobile browsers (Chrome / Samsung Internet / Firefox)
+  if (app === 'phonepe' || app === 'gpay' || app === 'paytm') {
     setTimeout(() => {
-      triggerUrl(packageIntent);
-    }, 250);
+      executeLaunch(packageIntent);
+    }, 150);
   }
 
-  // 3. Fallback to standard universal UPI intent
+  // 3. Universal UPI fallback handler
   setTimeout(() => {
-    triggerUrl(universalScheme);
-  }, 600);
+    executeLaunch(universalScheme);
+  }, 400);
 }

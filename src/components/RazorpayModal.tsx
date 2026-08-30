@@ -202,7 +202,7 @@ export default function RazorpayModal({
     }
 
     // Direct launch of selected UPI app deep link
-    if (targetApp !== 'qr') {
+    if (targetApp !== 'qr' && targetApp !== 'custom') {
       const scheme = targetApp === 'phonepe' ? 'phonepe' : targetApp === 'gpay' ? 'gpay' : targetApp === 'paytm' ? 'paytm' : 'universal';
       openUpiApp({
         pa: merchantUpi,

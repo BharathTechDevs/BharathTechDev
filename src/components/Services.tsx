@@ -2977,76 +2977,123 @@ export function ServiceProjectSpaceDashboard({
             </p>
           </div>
 
-          {/* S-CODERS Developer Profile & Direct Client Contact */}
+          {/* S-CODERS Developer Profile & Direct Client Contact - Image 1 Style */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">DEVELOPER INFORMATION</h4>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold">● Active Support</span>
+            {/* Section Header matching Image 1 */}
+            <div>
+              <span className="text-[11px] font-mono text-[#f87171] uppercase tracking-widest font-bold block mb-1">
+                WHO'S RUNNING IT
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-white lowercase tracking-tight">
+                your developers
+              </h3>
+              <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1 leading-relaxed">
+                live with the people who build your product, direct 1-on-1 development for your registered project.
+              </p>
             </div>
             
-            <div className="bg-white/5 border border-white/10 p-5 sm:p-6 rounded-2xl space-y-4 shadow-xl">
-              {/* Name of the developers */}
-              <div>
-                <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold tracking-wider">Name of the Developers</span>
-                <h5 className="font-display font-extrabold text-base sm:text-lg text-white mt-1 text-brand-teal">
-                  Shreyas (Founder & CEO), Bhuvan M (Tech Lead) & S-CODERS Engineering Team
-                </h5>
-              </div>
+            {/* Developer Cards Stack */}
+            <div className="space-y-4">
+              {/* Card 1: Shreyas (Founder & CEO) */}
+              <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-5 sm:p-6 space-y-3.5 transition-all shadow-xl group">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#f87171]/50 shrink-0 bg-[#f87171]/10">
+                    <img 
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200" 
+                      alt="Shreyas" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-display font-bold text-white text-xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
+                      shreyas
+                    </h4>
+                    <span className="text-[10px] font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
+                      FOUNDER • CEO • ARCHITECTURE
+                    </span>
+                  </div>
+                </div>
 
-              {/* Description of the developer */}
-              <div className="pt-1">
-                <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold tracking-wider">Description of the Developers</span>
-                <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed mt-1">
-                  Core software architects and builders at S-CODERS (Bharath Tech Developers). We design, develop, and deliver high-performance software applications, intelligent AI automation pipelines, and custom enterprise systems with direct 1-on-1 development for your registered project.
+                <p className="text-gray-300 text-xs font-sans leading-relaxed">
+                  founder, s-coders (bharath tech developers). shipped multiple production systems and ai agents. direct 1-on-1 architecture alignment, project coordination, and custom development.
                 </p>
-              </div>
 
-              {/* Contact Options in exact order: 1. Phone Number, 2. E-mail id, 3. personalWhatsApp */}
-              <div className="space-y-3 pt-3 border-t border-white/10">
-                {/* 1. Phone Number */}
-                <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-200">
-                  <div className="p-2.5 bg-brand-teal/10 rounded-xl border border-brand-teal/20 text-brand-teal shrink-0 mt-0.5">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">Phone Number</span>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                      <a href="tel:+916363905989" className="font-mono font-bold text-white hover:text-brand-teal transition-colors">
-                        +91 6363905989
-                      </a>
-                      <span className="text-gray-500">•</span>
-                      <a href="tel:+918310463417" className="font-mono font-bold text-white hover:text-brand-teal transition-colors">
-                        +91 8310463417
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. E-mail id */}
-                <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-200">
-                  <div className="p-2.5 bg-brand-coral/10 rounded-xl border border-brand-coral/20 text-brand-coral shrink-0 mt-0.5">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">E-mail id</span>
-                    <a href="mailto:scoders82@gmail.com" className="font-mono font-bold text-white hover:text-brand-teal transition-colors block mt-1">
-                      scoders82@gmail.com
-                    </a>
-                  </div>
-                </div>
-
-                {/* 3. personalWhatsApp */}
-                <div className="pt-2">
-                  <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1.5">personalWhatsApp</span>
+                {/* Direct Number & Contact Buttons instead of linkedin/github */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+                  <a
+                    href="tel:+916363905989"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-white/10 hover:border-[#f87171]/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-[#f87171]" />
+                    <span>+91 6363905989</span>
+                  </a>
+                  <a
+                    href="tel:+918310463417"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-white/10 hover:border-[#f87171]/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-[#f87171]" />
+                    <span>+91 8310463417</span>
+                  </a>
                   <a
                     href="https://wa.me/qr/NNPE4VUHYNIYA1"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Connect on Personal WhatsApp</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>WhatsApp</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Card 2: Bhuvan M (Tech Lead) */}
+              <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-5 sm:p-6 space-y-3.5 transition-all shadow-xl group">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-brand-teal/50 shrink-0 bg-brand-teal/10">
+                    <img 
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200" 
+                      alt="Bhuvan M" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-display font-bold text-white text-xl lowercase group-hover:text-brand-teal transition-colors leading-tight">
+                      bhuvan
+                    </h4>
+                    <span className="text-[10px] font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
+                      TECH LEAD • BACKEND • AI
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-gray-300 text-xs font-sans leading-relaxed">
+                  tech lead at s-coders. backend + ai engineer. builds the systems that make high-velocity client applications run, agents, pipelines, the infra that holds it all...
+                </p>
+
+                {/* Direct Number & Contact Buttons instead of linkedin/github */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+                  <a
+                    href="tel:+916363905989"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>+91 6363905989</span>
+                  </a>
+                  <a
+                    href="tel:+918310463417"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                    <span>+91 8310463417</span>
+                  </a>
+                  <a
+                    href="mailto:scoders82@gmail.com"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-full text-gray-300 hover:text-white text-xs font-mono transition-all cursor-pointer"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-brand-coral" />
+                    <span>scoders82@gmail.com</span>
                   </a>
                 </div>
               </div>
