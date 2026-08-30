@@ -1195,25 +1195,25 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               className="absolute inset-0 bg-brand-dark/85 backdrop-blur-md"
             />
 
-            {/* Modal Body */}
+            {/* Modal Body - Expanded comfortable layout */}
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-md max-h-[90vh] bg-brand-card border border-brand-teal/20 rounded-3xl p-5 sm:p-6 shadow-2xl relative z-10 overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl sm:max-w-3xl max-h-[90vh] bg-brand-card border border-brand-teal/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 overflow-hidden flex flex-col"
             >
               {/* Background accent glow */}
-              <div className="absolute top-0 right-0 w-48 h-48 bg-brand-teal/5 blur-3xl rounded-full pointer-events-none" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-teal/5 blur-3xl rounded-full pointer-events-none" />
 
               {/* Sticky Header */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-3.5 mb-4 shrink-0">
+              <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4 shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-brand-teal/10 rounded-xl border border-brand-teal/20 text-brand-teal">
-                    <Key className="w-4 h-4" />
+                    <Key className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold block">Access Portal</span>
-                    <h3 className="font-display font-black text-sm sm:text-base text-white leading-tight">Unlock {registeringService.title}</h3>
+                    <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold block">Access Portal</span>
+                    <h3 className="font-display font-black text-base sm:text-lg text-white leading-tight">Unlock {registeringService.title}</h3>
                   </div>
                 </div>
                 <button
@@ -1224,7 +1224,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                     setKeyError(null);
                     setInputtedKey('');
                   }}
-                  className="p-1.5 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0 relative z-20"
+                  className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0 relative z-20"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1235,39 +1235,60 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                 {regSuccessKey ? (
                   // SUCCESS STATE
                   <div className="text-center py-4 font-sans">
-                    <div className="w-14 h-14 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-teal">
-                      <Sparkles className="w-7 h-7 animate-pulse" />
+                    <div className="w-16 h-16 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-teal">
+                      <Sparkles className="w-8 h-8 animate-pulse" />
                     </div>
-                    <h3 className="text-xl font-display font-extrabold text-white mb-2">Access Granted!</h3>
-                    <p className="text-gray-400 text-xs font-light max-w-sm mx-auto mb-6">
-                      Your exclusive developer dispatch key for <strong className="text-white font-semibold">{registeringService.title}</strong> has been minted and secured.
+                    <h3 className="text-2xl font-display font-extrabold text-white mb-2">Access Granted!</h3>
+                    <p className="text-gray-300 text-sm font-light max-w-lg mx-auto mb-6">
+                      Your exclusive developer dispatch key for <strong className="text-white font-semibold">{registeringService.title}</strong> has been generated and activated.
                     </p>
 
-                    <div className="bg-brand-dark/95 border border-brand-teal/20 rounded-2xl p-4 mb-6 max-w-md mx-auto text-center space-y-1 relative">
-                      <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Your Unique License Key</span>
-                      <span className="font-mono text-base font-black text-brand-teal select-all block py-2">{regSuccessKey}</span>
+                    {/* Exact Notice Above Unique License Key */}
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 sm:p-6 mb-6 text-left max-w-xl mx-auto space-y-3.5 shadow-lg">
+                      <div className="flex items-center gap-2.5 text-amber-300 font-display font-extrabold text-sm sm:text-base">
+                        <span className="text-lg">⚠️</span>
+                        <span>IMPORTANT: Please Copy and Save Your Unique License Key</span>
+                      </div>
+                      <p className="text-gray-200 text-xs sm:text-sm font-sans leading-relaxed">
+                        Please copy and securely save your unique License Key. You will need this key the next time you want to access or view your project updates.
+                      </p>
+                      <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                        By entering your License Key, you can directly access your project without filling out the registration form again.
+                      </p>
+                      <div className="pt-2 text-amber-200 text-xs sm:text-sm font-sans flex items-start gap-2.5 bg-amber-500/15 p-3.5 rounded-xl border border-amber-500/25">
+                        <span className="text-base shrink-0">🔐</span>
+                        <span className="leading-relaxed">
+                          <strong>Caution:</strong> Keep your License Key safe and do not share it with anyone. It is required to securely access your project and its updates in the future.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Unique License Key Display Box */}
+                    <div className="bg-brand-dark/95 border border-brand-teal/30 rounded-2xl p-5 mb-6 max-w-xl mx-auto text-center space-y-2 relative shadow-xl">
+                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">Your Unique License Key</span>
+                      <span className="font-mono text-lg sm:text-xl font-black text-brand-teal select-all block py-2 tracking-wide">{regSuccessKey}</span>
                       <button
                         onClick={() => handleCopyKey(regSuccessKey)}
-                        className="absolute right-3 top-3 p-1.5 bg-white/5 hover:bg-brand-teal/20 rounded text-gray-400 hover:text-brand-teal transition-all flex items-center gap-1 text-[10px] font-mono cursor-pointer border border-white/5"
+                        className="absolute right-3.5 top-3.5 p-2 bg-white/5 hover:bg-brand-teal/20 rounded-lg text-gray-300 hover:text-brand-teal transition-all flex items-center gap-1.5 text-xs font-mono cursor-pointer border border-white/10"
                       >
-                        {copiedKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedKey ? 'Copied' : 'Copy'}
+                        {copiedKey ? <Check className="w-4 h-4 text-brand-teal" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedKey ? 'Copied' : 'Copy Key'}</span>
                       </button>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
                       <button
                         onClick={() => {
                           setActiveWorkspaceService(registeringService);
                           setRegisteringService(null);
                         }}
-                        className="flex-1 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                        className="flex-1 py-4 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-sm uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 active:scale-95"
                       >
-                        Launch Dev Workspace
+                        Launch Workspace
                       </button>
                       <button
                         onClick={() => setRegisteringService(null)}
-                        className="px-5 py-3 bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs font-mono uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                        className="px-6 py-4 bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs font-mono uppercase tracking-wider rounded-xl transition-all cursor-pointer"
                       >
                         Dismiss
                       </button>
@@ -2956,23 +2977,40 @@ export function ServiceProjectSpaceDashboard({
             </p>
           </div>
 
-          {/* S-CODERS Direct Client Contact & Coordination */}
+          {/* S-CODERS Developer Profile & Direct Client Contact */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">DIRECT DEVELOPER CONTACT</h4>
+              <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold">DEVELOPER INFORMATION</h4>
               <span className="text-[10px] font-mono text-emerald-400 font-bold">● Active Support</span>
             </div>
             
-            <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl space-y-4">
-              <div className="space-y-3">
-                {/* Phone Numbers */}
+            <div className="bg-white/5 border border-white/10 p-5 sm:p-6 rounded-2xl space-y-4 shadow-xl">
+              {/* Name of the developers */}
+              <div>
+                <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold tracking-wider">Name of the Developers</span>
+                <h5 className="font-display font-extrabold text-base sm:text-lg text-white mt-1 text-brand-teal">
+                  Shreyas (Founder & CEO), Bhuvan M (Tech Lead) & S-CODERS Engineering Team
+                </h5>
+              </div>
+
+              {/* Description of the developer */}
+              <div className="pt-1">
+                <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold tracking-wider">Description of the Developers</span>
+                <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed mt-1">
+                  Core software architects and builders at S-CODERS (Bharath Tech Developers). We design, develop, and deliver high-performance software applications, intelligent AI automation pipelines, and custom enterprise systems with direct 1-on-1 development for your registered project.
+                </p>
+              </div>
+
+              {/* Contact Options in exact order: 1. Phone Number, 2. E-mail id, 3. personalWhatsApp */}
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                {/* 1. Phone Number */}
                 <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-200">
-                  <div className="p-2 bg-brand-teal/10 rounded-xl border border-brand-teal/20 text-brand-teal shrink-0 mt-0.5">
+                  <div className="p-2.5 bg-brand-teal/10 rounded-xl border border-brand-teal/20 text-brand-teal shrink-0 mt-0.5">
                     <Phone className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">Personal Phone Lines</span>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">Phone Number</span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                       <a href="tel:+916363905989" className="font-mono font-bold text-white hover:text-brand-teal transition-colors">
                         +91 6363905989
                       </a>
@@ -2984,32 +3022,33 @@ export function ServiceProjectSpaceDashboard({
                   </div>
                 </div>
 
-                {/* Email Address */}
+                {/* 2. E-mail id */}
                 <div className="flex items-start gap-3 text-xs sm:text-sm text-gray-200">
-                  <div className="p-2 bg-brand-coral/10 rounded-xl border border-brand-coral/20 text-brand-coral shrink-0 mt-0.5">
+                  <div className="p-2.5 bg-brand-coral/10 rounded-xl border border-brand-coral/20 text-brand-coral shrink-0 mt-0.5">
                     <Mail className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">Official Direct Email</span>
-                    <a href="mailto:scoders82@gmail.com" className="font-mono font-bold text-white hover:text-brand-teal transition-colors block mt-0.5">
+                    <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold">E-mail id</span>
+                    <a href="mailto:scoders82@gmail.com" className="font-mono font-bold text-white hover:text-brand-teal transition-colors block mt-1">
                       scoders82@gmail.com
                     </a>
                   </div>
                 </div>
-              </div>
 
-              {/* Personal WhatsApp Link Button */}
-              <div className="pt-1">
-                <a
-                  href="https://wa.me/qr/NNPE4VUHYNIYA1"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer active:scale-95"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Connect on Personal WhatsApp</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                {/* 3. personalWhatsApp */}
+                <div className="pt-2">
+                  <span className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1.5">personalWhatsApp</span>
+                  <a
+                    href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer active:scale-95"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Connect on Personal WhatsApp</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>

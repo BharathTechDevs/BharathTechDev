@@ -4,7 +4,7 @@ import {
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
-  ExternalLink
+  ExternalLink, Linkedin, Github
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -1223,6 +1223,173 @@ export default function TenantDashboard() {
                     </div>
                   )}
 
+                  {/* WHO'S RUNNING IT / your hosts Section (Matches Page 3) */}
+                  <div className="pt-10 mt-10 border-t border-white/10 space-y-6">
+                    <div>
+                      <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold block mb-1">
+                        WHO'S RUNNING IT
+                      </span>
+                      <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-white lowercase">
+                        your hosts
+                      </h3>
+                      <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1">
+                        live with the people who built the product, not a slideshow host reading slides.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      {/* Host 1: Shreyas (Founder & CEO) */}
+                      <div className="bg-brand-dark/60 border border-white/10 hover:border-brand-teal/30 p-5 rounded-2xl flex flex-col justify-between transition-all group">
+                        <div>
+                          <div className="flex items-center gap-3.5 mb-3.5">
+                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-teal/40 shrink-0 bg-brand-teal/10">
+                              <img 
+                                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200" 
+                                alt="Shreyas" 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                            <div>
+                              <h4 className="font-display font-bold text-white text-base group-hover:text-brand-teal transition-colors">
+                                Shreyas
+                              </h4>
+                              <span className="text-[9px] font-mono text-brand-teal uppercase font-bold tracking-wider block">
+                                FOUNDER & CEO • WORKSHOPS
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-300 text-xs font-sans leading-relaxed mb-4">
+                            Founder & CEO at S-CODERS (Bharath Tech Developers). Shipped multiple production systems and AI agents. Passionate about product strategy, tech architecture, and empowering developers directly in live cohorts.
+                          </p>
+                        </div>
+
+                        {/* Social Links on left corner */}
+                        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                          <a
+                            href="https://www.linkedin.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/30 rounded-lg text-gray-300 hover:text-brand-teal text-[11px] font-mono transition-all cursor-pointer"
+                          >
+                            <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
+                            <span>in linkedin</span>
+                          </a>
+                          <a
+                            href="https://github.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-gray-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer"
+                          >
+                            <Github className="w-3.5 h-3.5" />
+                            <span>github</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Host 2: Bhuvan M (Tech Lead) */}
+                      <div className="bg-brand-dark/60 border border-white/10 hover:border-brand-teal/30 p-5 rounded-2xl flex flex-col justify-between transition-all group">
+                        <div>
+                          <div className="flex items-center gap-3.5 mb-3.5">
+                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-teal/40 shrink-0 bg-brand-teal/10">
+                              <img 
+                                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200" 
+                                alt="Bhuvan M" 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                            <div>
+                              <h4 className="font-display font-bold text-white text-base group-hover:text-brand-teal transition-colors">
+                                Bhuvan M
+                              </h4>
+                              <span className="text-[9px] font-mono text-brand-teal uppercase font-bold tracking-wider block">
+                                TECH LEAD • BACKEND • AI
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-300 text-xs font-sans leading-relaxed mb-4">
+                            Tech Lead at S-CODERS. Backend + AI systems architect. Builds the systems that make high-velocity client applications run, agents, pipelines, and the cloud infra that holds it all.
+                          </p>
+                        </div>
+
+                        {/* Social Links on left corner */}
+                        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                          <a
+                            href="https://www.linkedin.com/in/bhuvanm"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/30 rounded-lg text-gray-300 hover:text-brand-teal text-[11px] font-mono transition-all cursor-pointer"
+                          >
+                            <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
+                            <span>in linkedin</span>
+                          </a>
+                          <a
+                            href="https://github.com/bhuvanm15"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-gray-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer"
+                          >
+                            <Github className="w-3.5 h-3.5" />
+                            <span>github</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Host 3: S-CODERS Core Mentors */}
+                      <div className="bg-brand-dark/60 border border-white/10 hover:border-brand-teal/30 p-5 rounded-2xl flex flex-col justify-between transition-all group">
+                        <div>
+                          <div className="flex items-center gap-3.5 mb-3.5">
+                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-teal/40 shrink-0 bg-brand-teal/10 flex items-center justify-center text-brand-teal font-display font-black text-sm">
+                              <img 
+                                src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=200&h=200" 
+                                alt="S-CODERS Mentorship Team" 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                            <div>
+                              <h4 className="font-display font-bold text-white text-base group-hover:text-brand-teal transition-colors">
+                                S-CODERS Mentors
+                              </h4>
+                              <span className="text-[9px] font-mono text-brand-teal uppercase font-bold tracking-wider block">
+                                CORE ENGINEERING • 1:1 SESSIONS
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-300 text-xs font-sans leading-relaxed mb-4">
+                            Hands-on engineers and mentors guiding live code walkthroughs, real-time debugging sessions, sandbox architectures, and direct post-workshop support.
+                          </p>
+                        </div>
+
+                        {/* Social Links on left corner */}
+                        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                          <a
+                            href="https://www.linkedin.com/company/s-coders"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/30 rounded-lg text-gray-300 hover:text-brand-teal text-[11px] font-mono transition-all cursor-pointer"
+                          >
+                            <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
+                            <span>in linkedin</span>
+                          </a>
+                          <a
+                            href="https://github.com/scoders"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-gray-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer"
+                          >
+                            <Github className="w-3.5 h-3.5" />
+                            <span>github</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -1399,15 +1566,15 @@ export default function TenantDashboard() {
               className="absolute inset-0 bg-brand-dark/85 backdrop-blur-md"
             />
 
-            {/* Modal Container */}
+            {/* Modal Container - Expanded Layout */}
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-md bg-brand-card border border-brand-teal/20 rounded-3xl p-5 sm:p-6 shadow-2xl relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
+              className="relative w-full max-w-2xl sm:max-w-3xl bg-brand-card border border-brand-teal/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
             >
               {/* Glow filter */}
-              <div className="absolute top-0 right-0 w-48 h-48 bg-brand-teal/5 blur-3xl rounded-full pointer-events-none" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-teal/5 blur-3xl rounded-full pointer-events-none" />
 
               {/* Sticky Top Header with Close Button */}
               <div className="flex justify-between items-center pb-4 border-b border-white/5 mb-4 shrink-0 relative z-20">

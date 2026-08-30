@@ -10,10 +10,10 @@ import { AppUser } from '../types';
 import { getDynamicInvoices, getDynamicServices } from '../utils/dynamicData';
 import AdminConsole from './AdminConsole';
 
-// 4 Pre-configured Admin Credentials
+// Pre-configured Admin Credentials
 const ADMIN_ACCOUNTS = [
-  { id: 'suhas', email: 'suhas@scoders.com', password: 'suhas123', name: 'Suhas Gowda', role: 'Founder & Chief AI Architect' },
-  { id: 'bhuvan', email: 'bhuvan@scoders.com', password: 'bhuvan123', name: 'Bhuvan M', role: 'Chief Systems & AI Engineer' },
+  { id: 'shreyas', email: 'shreyas@scoders.com', password: 'shreyas123', name: 'Shreyas', role: 'Founder & CEO' },
+  { id: 'bhuvan', email: 'bhuvan@scoders.com', password: 'bhuvan123', name: 'Bhuvan M', role: 'Tech Lead • Backend & AI' },
   { id: 'admin', email: 'admin@scoders.com', password: 'admin123', name: 'Core Developer Lead', role: 'Senior Automation Lead' },
   { id: 'guest', email: 'guest@scoders.com', password: 'guest123', name: 'Guest Developer', role: 'External Auditor' }
 ];

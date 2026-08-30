@@ -201,7 +201,7 @@ export default function RazorpayModal({
       }
     }
 
-    // Attempt to open deep link on supported devices
+    // Direct launch of selected UPI app deep link
     if (targetApp !== 'qr') {
       const scheme = targetApp === 'phonepe' ? 'phonepe' : targetApp === 'gpay' ? 'gpay' : targetApp === 'paytm' ? 'paytm' : 'universal';
       openUpiApp({
@@ -952,47 +952,62 @@ export default function RazorpayModal({
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        onClick={() => { setSelectedUpiApp('phonepe'); setUpiError(null); }}
+                        onClick={() => {
+                          setSelectedUpiApp('phonepe');
+                          setUpiError(null);
+                          handleInitiateUpiApp('phonepe');
+                        }}
                         className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                           selectedUpiApp === 'phonepe'
-                            ? 'border-blue-400 bg-blue-950/60 shadow-lg shadow-blue-900/30 text-white'
-                            : 'border-white/10 bg-black/20 text-gray-400 hover:text-white hover:border-white/20'
+                            ? 'border-purple-400 bg-purple-950/40 shadow-lg shadow-purple-900/30 text-white'
+                            : 'border-white/10 bg-black/20 text-gray-300 hover:text-white hover:border-purple-400/50'
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-xs">
+                        <div className="w-9 h-9 rounded-full bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center font-bold text-xs shadow-inner">
                           PP
                         </div>
                         <span className="text-xs font-semibold">PhonePe</span>
+                        <span className="text-[9px] font-mono text-purple-300">Tap to Pay</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => { setSelectedUpiApp('gpay'); setUpiError(null); }}
+                        onClick={() => {
+                          setSelectedUpiApp('gpay');
+                          setUpiError(null);
+                          handleInitiateUpiApp('gpay');
+                        }}
                         className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                           selectedUpiApp === 'gpay'
-                            ? 'border-blue-400 bg-blue-950/60 shadow-lg shadow-blue-900/30 text-white'
-                            : 'border-white/10 bg-black/20 text-gray-400 hover:text-white hover:border-white/20'
+                            ? 'border-blue-400 bg-blue-950/40 shadow-lg shadow-blue-900/30 text-white'
+                            : 'border-white/10 bg-black/20 text-gray-300 hover:text-white hover:border-blue-400/50'
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                        <div className="w-9 h-9 rounded-full bg-blue-600/30 border border-blue-500/40 text-blue-300 flex items-center justify-center font-bold text-xs shadow-inner">
                           GP
                         </div>
                         <span className="text-xs font-semibold">Google Pay</span>
+                        <span className="text-[9px] font-mono text-blue-300">Tap to Pay</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => { setSelectedUpiApp('paytm'); setUpiError(null); }}
+                        onClick={() => {
+                          setSelectedUpiApp('paytm');
+                          setUpiError(null);
+                          handleInitiateUpiApp('paytm');
+                        }}
                         className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                           selectedUpiApp === 'paytm'
-                            ? 'border-blue-400 bg-blue-950/60 shadow-lg shadow-blue-900/30 text-white'
-                            : 'border-white/10 bg-black/20 text-gray-400 hover:text-white hover:border-white/20'
+                            ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-900/30 text-white'
+                            : 'border-white/10 bg-black/20 text-gray-300 hover:text-white hover:border-cyan-400/50'
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center font-bold text-xs">
+                        <div className="w-9 h-9 rounded-full bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 flex items-center justify-center font-bold text-xs shadow-inner">
                           PT
                         </div>
                         <span className="text-xs font-semibold">Paytm UPI</span>
+                        <span className="text-[9px] font-mono text-cyan-300">Tap to Pay</span>
                       </button>
                     </div>
 

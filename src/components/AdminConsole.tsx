@@ -59,9 +59,9 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [newDbFields, setNewDbFields] = useState<Record<string, string>>({});
   const [dbAnalytics, setDbAnalytics] = useState<any>(null);
 
-  // 4 Pre-configured Admin Credentials
+  // Pre-configured Admin Credentials
   const ADMIN_ACCOUNTS = [
-    { id: 'suhas', email: 'suhas@scoders.com', password: 'suhas123', name: 'Suhas Gowda' },
+    { id: 'shreyas', email: 'shreyas@scoders.com', password: 'shreyas123', name: 'Shreyas' },
     { id: 'bhuvan', email: 'bhuvan@scoders.com', password: 'bhuvan123', name: 'Bhuvan M' },
     { id: 'admin', email: 'admin@scoders.com', password: 'admin123', name: 'Core Developer Lead' },
     { id: 'guest', email: 'guest@scoders.com', password: 'guest123', name: 'Guest Developer' }

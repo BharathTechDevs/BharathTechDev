@@ -61,23 +61,23 @@ export default function Logo({
 
   const currentSize = sizeClasses[size];
 
-  // Color selections optimized for crisp contrast and vibrant identity across OLED & LCD screens
+  // Color selections optimized for crisp contrast and vibrant identity across OLED & LCD screens (matches Page 4)
   const sColor = lightBg 
     ? 'text-[#1D4ED8] font-black drop-shadow-sm' 
-    : 'text-[#3B82F6] font-black drop-shadow-[0_0_14px_rgba(59,130,246,0.85)]'; // Vibrant electric royal blue for "S"
+    : 'text-[#4361EE] font-black drop-shadow-[0_0_16px_rgba(67,97,238,0.9)]'; // Vibrant electric royal blue for "S"
   
-  const linkColor = lightBg ? '#2563EB' : '#38BDF8'; // Bright Cyan-Blue for chain link (-)
-  const bridgeColor = lightBg ? '#2563EB' : '#38BDF8'; // Matching bright Cyan-Blue bridge
+  const linkColor = lightBg ? '#2563EB' : '#00D2FF'; // Bright Electric Cyan for chain link (-)
+  const bridgeColor = lightBg ? '#2563EB' : '#00D2FF'; // Matching bright Electric Cyan bridge
   
   const codersColor = lightBg 
     ? 'text-[#0284C7] font-black drop-shadow-sm' 
-    : 'text-[#38BDF8] font-black drop-shadow-[0_0_10px_rgba(56,189,248,0.5)]'; // Sky Blue for "CODERS"
+    : 'text-[#00D2FF] font-black drop-shadow-[0_0_14px_rgba(0,210,255,0.7)]'; // Electric Cyan for "CODERS"
     
   const subtitleColor = lightBg 
     ? 'text-[#1E293B] font-semibold' 
-    : 'text-slate-200 font-medium'; // "Bharath Tech Developers"
+    : 'text-slate-100 font-medium'; // "Bharath Tech Developers"
     
-  const sparkleColor = lightBg ? 'text-slate-900' : 'text-[#A7D8F2]'; // Glowing 4-point star
+  const sparkleColor = lightBg ? 'text-slate-900' : 'text-[#E0F2FE]'; // Glowing 4-point star
 
   return (
     <div 
