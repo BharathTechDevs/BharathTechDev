@@ -12,6 +12,7 @@ import { SCODERSEvent, EventTicket } from '../types';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import UpiQrCanvas from './UpiQrCanvas';
+import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp } from '../utils/paymentLinks';
 
 export default function Events() {
@@ -1378,9 +1379,13 @@ export default function Events() {
                                   </button>
                                 </div>
 
-                                <div className="bg-white p-3.5 rounded-2xl max-w-[200px] mx-auto flex flex-col items-center shadow-lg text-black">
-                                  <UpiQrCanvas upiString={evtUpiUniversal} size={160} />
-                                  <span className="text-[9px] font-mono text-gray-700 font-bold mt-1.5">Scan with any UPI App</span>
+                                <div className="py-2 flex flex-col items-center">
+                                  <PhonePeScannerCard
+                                    upiString={evtUpiUniversal}
+                                    merchantName="sCoders"
+                                    merchantVpa="scoders@ybl"
+                                    amount={selectedEvent.ticketPrice}
+                                  />
                                 </div>
 
                                 {/* Direct Mobile UPI Intent Buttons */}

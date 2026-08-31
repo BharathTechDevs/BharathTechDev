@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import UpiQrCanvas from './UpiQrCanvas';
+import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp, generateUpiUrl } from '../utils/paymentLinks';
 
 export interface RazorpayPaymentSuccessData {
@@ -622,16 +623,14 @@ export default function RazorpayModal({
                   </p>
 
                   {/* QR Code & VPA Display */}
-                  <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center text-black space-y-2 max-w-xs mx-auto shadow-xl">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-gray-700 font-bold">
-                      Scan with any UPI App (GPay / PhonePe / Paytm)
-                    </span>
-                    <UpiQrCanvas upiString={universalUpiLink} size={180} />
-                    <div className="text-[11px] font-mono text-gray-800 flex items-center justify-between w-full px-1 pt-1 border-t border-gray-200">
-                      <span>VPA: <strong>{merchantUpi}</strong></span>
-                      <span className="text-blue-700 font-bold">{Math.floor(qrTimer / 60)}:{(qrTimer % 60).toString().padStart(2, '0')}</span>
-                    </div>
-                  </div>
+                  <PhonePeScannerCard
+                    upiString={universalUpiLink}
+                    merchantName="sCoders"
+                    merchantVpa={merchantUpi}
+                    amount={amount}
+                    showTimer={true}
+                    timerSeconds={qrTimer}
+                  />
 
                   {/* Quick App Launch Links if opened on Mobile */}
                   <div className="grid grid-cols-3 gap-2 pt-1">
@@ -1041,17 +1040,15 @@ export default function RazorpayModal({
 
                     {/* QR Code view */}
                     {selectedUpiApp === 'qr' && (
-                      <div className="bg-white p-4 rounded-2xl flex flex-col items-center text-center text-black space-y-3 shadow-xl">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-gray-700 font-bold">
-                          Scan with any UPI App (GPay, PhonePe, Paytm, BHIM)
-                        </span>
-                        <div className="w-48 h-48 bg-white rounded-xl p-2 border border-gray-200 shadow-inner flex items-center justify-center">
-                          <UpiQrCanvas upiString={universalUpiLink} size={190} />
-                        </div>
-                        <div className="flex items-center justify-between w-full max-w-xs text-xs font-mono pt-1 text-gray-800">
-                          <span>Merchant: <strong>{merchantUpi}</strong></span>
-                          <span className="text-blue-600 font-bold">{Math.floor(qrTimer / 60)}:{(qrTimer % 60).toString().padStart(2, '0')}</span>
-                        </div>
+                      <div className="py-2 flex flex-col items-center">
+                        <PhonePeScannerCard
+                          upiString={universalUpiLink}
+                          merchantName="sCoders"
+                          merchantVpa={merchantUpi}
+                          amount={amount}
+                          showTimer={true}
+                          timerSeconds={qrTimer}
+                        />
                       </div>
                     )}
 

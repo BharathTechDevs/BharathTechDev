@@ -13,6 +13,7 @@ import { PROJECT_EXAMPLES } from '../data';
 import { getDynamicServices, saveDynamicServices } from '../utils/dynamicData';
 import { ServiceEnquiry, Service, AppUser } from '../types';
 import { DatabaseEngine, ServiceRegistration, EnquiryItem, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
+import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp, generateUpiUrl } from '../utils/paymentLinks';
 
 interface ServicesProps {
@@ -1590,56 +1591,20 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           </p>
                         </div>
 
-                        {/* Bank of Baroda UPI Scanner Card */}
-                        <div className="bg-white text-black p-4 rounded-2xl shadow-xl border border-gray-200 max-w-xs mx-auto flex flex-col items-center">
-                          {/* BOB Header */}
-                          <div className="flex items-center gap-2.5 w-full mb-3 border-b border-gray-100 pb-2 justify-center">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shadow-sm shrink-0">
-                              <span className="text-white font-sans font-black text-[8px] tracking-tighter">BOB</span>
-                            </div>
-                            <div className="text-left">
-                              <span className="text-[7px] font-mono text-gray-400 block uppercase font-bold tracking-wider leading-none">Settlement Bank</span>
-                              <span className="text-[11px] font-sans font-bold text-gray-800">Bank Of Baroda - 2145</span>
-                            </div>
-                          </div>
-
-                          {/* QR Code Container */}
-                          <a
-                            href={generateUpiUrl({
+                        {/* PhonePe UPI Scanner Card */}
+                        <div className="py-2 flex flex-col items-center">
+                          <PhonePeScannerCard
+                            upiString={generateUpiUrl({
                               pa: 'scoders@ybl',
                               pn: 'S-CODERS Technologies',
                               am: qrPayAmount,
                               tn: `Advance: ${registeringService.title.slice(0, 20)}`,
                               tr: `SRV${Date.now()}`
                             }, 'universal')}
-                            target="_top"
-                            rel="noopener noreferrer"
-                            className="relative p-1 bg-white rounded-xl border border-gray-200 shadow-inner group cursor-pointer block"
-                            title="Click QR to open in UPI App"
-                          >
-                            <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                                generateUpiUrl({
-                                  pa: 'scoders@ybl',
-                                  pn: 'S-CODERS Technologies',
-                                  am: qrPayAmount,
-                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
-                                  tr: `SRV${Date.now()}`
-                                }, 'universal')
-                              )}`}
-                              alt="UPI Payment QR Code"
-                              className="w-36 h-36 object-contain"
-                              referrerPolicy="no-referrer"
-                            />
-                            {/* PhonePe logo center */}
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <div className="w-8 h-8 rounded-full bg-[#5f259f] border-2 border-white flex items-center justify-center shadow-md">
-                                <span className="text-white font-sans text-[11px] font-black tracking-tighter">पे</span>
-                              </div>
-                            </div>
-                          </a>
-
-                          <span className="text-[9px] font-mono text-gray-500 mt-2 uppercase font-bold tracking-wider">Merchant VPA: scoders@ybl</span>
+                            merchantName="sCoders"
+                            merchantVpa="scoders@ybl"
+                            amount={qrPayAmount}
+                          />
                         </div>
 
                         {/* UTR Input */}

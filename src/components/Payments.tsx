@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getDynamicWorkshops, getDynamicInvoices } from '../utils/dynamicData';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
+import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp } from '../utils/paymentLinks';
 
 interface PaymentHistoryItem {
@@ -30,12 +31,16 @@ interface PaymentsProps {
     purpose: string;
     amount: number;
     currency: 'INR' | 'USD';
+    returnView?: string;
   } | null;
   prefilledWorkshopId?: string | null;
   isModal?: boolean;
+  onSuccess?: (txn: PaymentHistoryItem) => void;
+  onClose?: () => void;
+  onNavigate?: (view: string) => void;
 }
 
-export default function Payments({ initialTab, prefilledInvoice, prefilledWorkshopId, isModal = false }: PaymentsProps) {
+export default function Payments({ initialTab, prefilledInvoice, prefilledWorkshopId, isModal = false, onSuccess, onClose, onNavigate }: PaymentsProps) {
   const workshopEvents = getDynamicWorkshops();
   const presetInvoices = getDynamicInvoices();
 
@@ -224,6 +229,9 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     localStorage.setItem('scoders_payments', JSON.stringify(updatedHistory));
 
     setSuccessTxn(newTxn);
+    if (onSuccess) {
+      onSuccess(newTxn);
+    }
     setRazorpayEmailNotice({
       sent: true,
       email: data.email,
@@ -232,6 +240,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     });
 
     // Trigger Popup Email Notice
+    const targetReturnView = prefilledInvoice?.returnView || (activeTab === 'workshop' ? 'workshops' : 'services');
     setEmailNoticeData({
       type: activeTab === 'workshop' ? 'workshop' : 'service',
       recipientEmail: data.email,
@@ -241,8 +250,11 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       uniqueKey: data.razorpay_payment_id,
       messageText: `Your Razorpay payment of ₹${data.amount.toLocaleString()} has been processed and verified successfully. An official receipt has been dispatched to ${data.email} via scoders82@gmail.com.`,
       amount: data.amount,
-      actionText: "View Payment Receipt",
-      onAction: () => setSuccessTxn(newTxn)
+      actionText: isModal ? "Return & Continue Work" : `Return to ${targetReturnView === 'workshops' ? 'Workshops' : targetReturnView === 'services' ? 'Services' : 'Workspace'}`,
+      onAction: () => {
+        if (onClose) onClose();
+        if (onNavigate && targetReturnView) onNavigate(targetReturnView);
+      }
     });
     setShowEmailNotice(true);
   };
@@ -412,8 +424,30 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       localStorage.setItem('scoders_payments', JSON.stringify(updatedHistory));
 
       setSuccessTxn(newTxn);
+      if (onSuccess) {
+        onSuccess(newTxn);
+      }
       setLoading(false);
       setRuyGatewayStep('success');
+
+      // Trigger Email Notice
+      const targetReturnView = prefilledInvoice?.returnView || (isWorkshop ? 'workshops' : 'services');
+      setEmailNoticeData({
+        type: isWorkshop ? 'workshop' : 'service',
+        recipientEmail: isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail,
+        recipientName: isWorkshop ? clientName || 'Workshop Attendee' : clientName,
+        subject: `✅ Payment Done Successfully - S-CODERS (Ref: ${newTxn.txnId})`,
+        title: purposeText,
+        uniqueKey: newTxn.txnId,
+        messageText: `Your payment of ₹${finalAmount.toLocaleString()} has been received and logged in the immutable ledger. An official receipt has been dispatched from scoders82@gmail.com.`,
+        amount: finalAmount,
+        actionText: isModal ? "Return & Continue Work" : `Return to ${targetReturnView === 'workshops' ? 'Workshops' : targetReturnView === 'services' ? 'Services' : 'Workspace'}`,
+        onAction: () => {
+          if (onClose) onClose();
+          if (onNavigate && targetReturnView) onNavigate(targetReturnView);
+        }
+      });
+      setShowEmailNotice(true);
 
       // Reset specific forms
       setInvoiceLookup('');
@@ -545,16 +579,20 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     }).format(val);
   };
 
-  // Generate UPI QR Code URL
+  // Generate UPI QR Code URL & URI String
   // pa = payee address, pn = payee name, am = amount, tn = transaction note, cu = currency
-  const getUpiQrUrl = () => {
+  const getUpiUri = () => {
     const payeeAddress = 'scoders@ybl';
     const payeeName = 'S-CODERS Technologies';
     const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
     const payCurrency = activeTab === 'workshop' ? 'INR' : currency;
     const note = activeTab === 'workshop' ? 'Workshop Booking' : purpose.substring(0, 30);
 
-    const upiUri = `upi://pay?pa=${payeeAddress}&pn=${encodeURIComponent(payeeName)}&am=${payAmount}&cu=${payCurrency}&tn=${encodeURIComponent(note)}`;
+    return `upi://pay?pa=${payeeAddress}&pn=${encodeURIComponent(payeeName)}&am=${payAmount}&cu=${payCurrency}&tn=${encodeURIComponent(note)}`;
+  };
+
+  const getUpiQrUrl = () => {
+    const upiUri = getUpiUri();
     return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
   };
 
@@ -687,10 +725,15 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                     )}
                   </button>
                   <button
-                    onClick={() => setSuccessTxn(null)}
-                    className="py-3 bg-brand-teal text-brand-dark font-mono text-xs font-bold rounded-xl hover:bg-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={() => {
+                      setSuccessTxn(null);
+                      if (onClose) onClose();
+                      const targetReturnView = prefilledInvoice?.returnView || (activeTab === 'workshop' ? 'workshops' : 'services');
+                      if (onNavigate && targetReturnView) onNavigate(targetReturnView);
+                    }}
+                    className="py-3 bg-brand-teal text-brand-dark font-mono text-xs font-bold rounded-xl hover:bg-white transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/20"
                   >
-                    Return to Portal
+                    <span>{isModal ? "Return & Continue Work" : "Return to Workspace"}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1209,45 +1252,12 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                           </div>
 
                            {/* Premium PhonePe Merchant Scanner Card (Matching User Image) */}
-                          <div className="bg-white text-black p-5 sm:p-6 rounded-[2rem] shadow-2xl border border-gray-100 max-w-xs w-full mx-auto relative overflow-hidden flex flex-col items-center">
-                            {/* Header: Bank of Baroda branding */}
-                            <div className="flex items-center gap-3 w-full mb-4 border-b border-gray-100 pb-3 justify-center">
-                              {/* Bank of Baroda Logo (Orange stylized circle with BOB) */}
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#fe5104] to-[#f37021] flex items-center justify-center shadow-md shrink-0">
-                                <span className="text-white font-sans font-black text-[9px] tracking-tighter">BOB</span>
-                              </div>
-                              <div className="text-left">
-                                <span className="text-[8px] font-mono text-gray-400 block uppercase font-bold tracking-wider leading-none">Settlement Bank</span>
-                                <span className="text-xs font-sans font-bold text-gray-800">Bank Of Baroda - 2145</span>
-                              </div>
-                            </div>
-
-                            {/* QR Code Container */}
-                            <div className="relative p-1.5 bg-white rounded-2xl border border-gray-100 shadow-inner group">
-                              <img
-                                src={getUpiQrUrl()}
-                                alt="S-CODERS Technologies UPI QR Code"
-                                referrerPolicy="no-referrer"
-                                className="w-44 h-44 sm:w-48 sm:h-48 object-contain"
-                              />
-                              
-                              {/* PhonePe logo in the absolute center of the QR code */}
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="w-9 h-9 rounded-full bg-[#5f259f] border-2 border-white flex items-center justify-center shadow-md">
-                                  {/* PhonePe "पे" symbol styling */}
-                                  <span className="text-white font-sans text-xs font-black tracking-tighter">पे</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Footer: View UPI details */}
-                            <div className="mt-4 text-center">
-                              <span className="text-[#5f259f] hover:text-[#4b1c7f] font-sans font-extrabold text-xs tracking-tight flex items-center gap-1 transition-colors cursor-pointer justify-center">
-                                View UPI details
-                              </span>
-                              <span className="text-[8px] font-mono text-gray-400 block mt-1 uppercase tracking-widest font-bold">Merchant ID: scoders@ybl</span>
-                            </div>
-                          </div>
+                          <PhonePeScannerCard
+                            upiString={getUpiUri()}
+                            merchantName="sCoders"
+                            merchantVpa="scoders@ybl"
+                            amount={activeTab === 'workshop' ? workshopTotal : amount}
+                          />
 
                           {/* UPI ID Details for manual typing */}
                           <div className="bg-brand-dark/50 border border-white/5 rounded-xl p-3 max-w-sm w-full flex items-center justify-between">

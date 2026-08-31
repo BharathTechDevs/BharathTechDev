@@ -109,8 +109,10 @@ interface PrefilledPaymentData {
     purpose: string;
     amount: number;
     currency: 'INR' | 'USD';
+    returnView?: string;
   } | null;
   workshopId: string | null;
+  returnView?: string;
 }
 
 export default function App() {
@@ -255,9 +257,11 @@ export default function App() {
         contact: details.email,
         purpose: `Startup Deposit for ${details.category} development`,
         amount: details.amount,
-        currency: 'INR'
+        currency: 'INR',
+        returnView: 'services'
       },
-      workshopId: null
+      workshopId: null,
+      returnView: 'services'
     });
     setIsPaymentModalOpen(true);
   };
@@ -267,7 +271,8 @@ export default function App() {
     setPrefilledPayment({
       tab: 'workshop',
       invoice: null,
-      workshopId: wId
+      workshopId: wId,
+      returnView: 'workshops'
     });
     setIsPaymentModalOpen(true);
   };
@@ -770,6 +775,12 @@ export default function App() {
                     prefilledInvoice={prefilledPayment?.invoice}
                     prefilledWorkshopId={prefilledPayment?.workshopId}
                     isModal={true}
+                    onClose={() => setIsPaymentModalOpen(false)}
+                    onNavigate={(view) => {
+                      setIsPaymentModalOpen(false);
+                      setCurrentView(view as any);
+                      window.scrollTo(0, 0);
+                    }}
                   />
                 </Suspense>
               </div>
