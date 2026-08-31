@@ -1263,17 +1263,31 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       </div>
                     </div>
 
-                    {/* Unique License Key Display Box */}
-                    <div className="bg-brand-dark/95 border border-brand-teal/30 rounded-2xl p-5 mb-6 max-w-xl mx-auto text-center space-y-2 relative shadow-xl">
-                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">Your Unique License Key</span>
-                      <span className="font-mono text-lg sm:text-xl font-black text-brand-teal select-all block py-2 tracking-wide">{regSuccessKey}</span>
-                      <button
-                        onClick={() => handleCopyKey(regSuccessKey)}
-                        className="absolute right-3.5 top-3.5 p-2 bg-white/5 hover:bg-brand-teal/20 rounded-lg text-gray-300 hover:text-brand-teal transition-all flex items-center gap-1.5 text-xs font-mono cursor-pointer border border-white/10"
-                      >
-                        {copiedKey ? <Check className="w-4 h-4 text-brand-teal" /> : <Copy className="w-4 h-4" />}
-                        <span>{copiedKey ? 'Copied' : 'Copy Key'}</span>
-                      </button>
+                    {/* Unique License Key Display Box - Non-overlapping Responsive Card */}
+                    <div className="bg-brand-dark/95 border border-brand-teal/30 rounded-2xl p-5 sm:p-6 mb-6 max-w-xl mx-auto shadow-xl space-y-3.5 text-left">
+                      <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                        <span className="text-[11px] sm:text-xs font-mono text-gray-300 uppercase tracking-widest font-bold">
+                          Your Unique License Key
+                        </span>
+                        <span className="text-[10px] font-mono text-brand-teal bg-brand-teal/10 px-2.5 py-0.5 rounded-full border border-brand-teal/20 font-bold">
+                          ACTIVE
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-black/60 p-3.5 sm:p-4 rounded-xl border border-white/10">
+                        <span className="font-mono text-base sm:text-lg md:text-xl font-black text-brand-teal select-all text-center sm:text-left tracking-wider break-all sm:break-normal py-1">
+                          {regSuccessKey}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyKey(regSuccessKey)}
+                          className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark rounded-xl font-mono text-xs sm:text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-md active:scale-95"
+                          title="Copy License Key to Clipboard"
+                        >
+                          {copiedKey ? <Check className="w-4 h-4 text-brand-dark" /> : <Copy className="w-4 h-4 text-brand-dark" />}
+                          <span>{copiedKey ? 'Copied!' : 'Copy Key'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
@@ -1388,9 +1402,9 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Approximate Budget *</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                          <div className="flex flex-col">
+                            <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1.5 font-semibold">Approximate Budget *</label>
                             <input
                               type="text"
                               required
@@ -1400,8 +1414,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
                             />
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Target Timeline *</label>
+                          <div className="flex flex-col">
+                            <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1.5 font-semibold">Target Timeline *</label>
                             <input
                               type="text"
                               required
@@ -1687,31 +1701,33 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           const regInfo = registeredKeys[serviceId] || { key: 'ENTER-KEY-TO-VERIFY', name: currentUser?.name || 'Authorized Client' };
 
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-3 md:p-6">
               {/* Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-brand-dark/95 backdrop-blur-md"
+                className="absolute inset-0 bg-brand-dark/95 backdrop-blur-lg"
               />
 
-              {/* Workspace Layout Container */}
+              {/* Workspace Layout Container - Extra Large & High Space Capacity */}
               <motion.div
-                initial={{ scale: 0.95, opacity: 0, y: 30 }}
+                initial={{ scale: 0.96, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.95, opacity: 0, y: 30 }}
-                className="relative w-full max-w-5xl h-[85vh] bg-[#020516] border border-brand-teal/20 rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col justify-between"
+                exit={{ scale: 0.96, opacity: 0, y: 20 }}
+                className="relative w-full max-w-[1440px] h-[96vh] sm:h-[94vh] max-h-[98vh] bg-[#020516] border border-brand-teal/25 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col justify-between"
               >
                 {/* Visual Header */}
-                <div className="p-6 bg-brand-dark/50 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-brand-teal/15 rounded-xl border border-brand-teal/25 text-brand-teal">
-                      {getIcon(activeWorkspaceService.icon, "w-5 h-5")}
+                <div className="px-5 py-4 sm:px-8 sm:py-5 bg-brand-dark/70 border-b border-white/10 flex flex-wrap items-center justify-between gap-4 shrink-0">
+                  <div className="flex items-center gap-3.5">
+                    <div className="p-3 bg-brand-teal/15 rounded-2xl border border-brand-teal/30 text-brand-teal">
+                      {getIcon(activeWorkspaceService.icon, "w-6 h-6")}
                     </div>
                     <div>
-                      <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Active Service Console</span>
-                      <h3 className="font-display font-extrabold text-lg text-white leading-none mt-1">
+                      <span className="text-[10px] sm:text-xs font-mono text-brand-teal uppercase tracking-widest font-bold block">
+                        ACTIVE SERVICE CONSOLE
+                      </span>
+                      <h3 className="font-display font-black text-xl sm:text-2xl text-white leading-tight mt-0.5">
                         {activeWorkspaceService.title} Workspace
                       </h3>
                     </div>
@@ -1719,25 +1735,26 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
 
                   {/* Key and Info indicators */}
                   <div className="flex items-center gap-3">
-                    <div className="hidden sm:flex flex-col items-end text-right font-mono">
-                      <span className="text-[9px] text-gray-500 uppercase tracking-widest">Licensed to</span>
-                      <span className="text-xs text-white font-semibold">{regInfo.name}</span>
+                    <div className="hidden md:flex flex-col items-end text-right font-mono">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest">Licensed to</span>
+                      <span className="text-sm text-white font-bold">{regInfo.name}</span>
                     </div>
-                    <div className="bg-white/5 border border-white/5 rounded-xl px-3.5 py-1.5 flex items-center gap-2 text-xs font-mono text-brand-teal">
-                      <Shield className="w-3.5 h-3.5" />
-                      {regInfo.key}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-2 flex items-center gap-2.5 text-xs sm:text-sm font-mono text-brand-teal">
+                      <Shield className="w-4 h-4 text-brand-teal" />
+                      <span className="font-bold tracking-wide">{regInfo.key}</span>
                     </div>
                     <button
                       onClick={() => setActiveWorkspaceService(null)}
-                      className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
+                      className="p-2.5 bg-white/5 hover:bg-white/15 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
+                      title="Close Console"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-6 h-6" />
                     </button>
                   </div>
                 </div>
 
-                {/* Main Content Area - Renders custom Project Space Dashboard */}
-                <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-brand-dark/30">
+                {/* Main Content Area - Renders custom Project Space Dashboard with spacious scrolling */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-brand-dark/40 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
                   <ServiceProjectSpaceDashboard 
                     service={activeWorkspaceService} 
                     regInfo={regInfo} 
@@ -1746,21 +1763,22 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                 </div>
 
                 {/* Footer action bar */}
-                <div className="p-6 bg-brand-dark/40 border-t border-white/5 flex flex-wrap items-center justify-between gap-4">
-                  <p className="text-xs text-gray-500 font-sans">
-                    💡 This is a live sandboxed prototype matching your actual custom deployment pipeline structure.
+                <div className="px-5 py-4 sm:px-8 sm:py-5 bg-brand-dark/60 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 shrink-0">
+                  <p className="text-xs sm:text-sm text-gray-400 font-sans flex items-center gap-2">
+                    <span>💡</span>
+                    <span>This is a live sandboxed prototype matching your actual custom deployment pipeline structure.</span>
                   </p>
-                  <div className="flex gap-3">
+                  <div className="flex items-center gap-3.5 w-full sm:w-auto">
                     <button
                       onClick={() => handleCopyKey(regInfo.key)}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 text-gray-300 hover:text-white font-mono text-xs uppercase rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                      className="flex-1 sm:flex-initial px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 hover:text-white font-mono text-xs sm:text-sm uppercase font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="w-4 h-4 text-brand-teal" />
                       Copy License Key
                     </button>
                     <button
                       onClick={() => setActiveWorkspaceService(null)}
-                      className="px-5 py-2 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                      className="flex-1 sm:flex-initial px-6 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 active:scale-95"
                     >
                       Save & Close Console
                     </button>
@@ -2961,182 +2979,190 @@ export function ServiceProjectSpaceDashboard({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 text-white font-sans">
-      {/* LEFT COLUMN: CONTACT DETAILS & LIFECYCLE PROGRESS */}
-      <div className="lg:col-span-4 space-y-6 flex flex-col justify-between">
-        <div className="space-y-5">
-          {/* Status badge */}
-          <div className="bg-[#25d366]/10 border border-[#25d366]/30 p-5 rounded-2xl">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse" />
-              <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">PROJECT LIFE-CYCLE ACTIVE</span>
-            </div>
-            <h4 className="text-base font-bold text-white mb-1.5">No Upfront Payment Required</h4>
-            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">
-              Your registered project budget (<strong>{regInfo.budget || 'TBD'}</strong>) and timeline is being analyzed by our team. Price is determined dynamically after aligning requirements. We will connect with you via Call / WhatsApp and Zoom meeting to coordinate.
-            </p>
+    <div className="space-y-8 text-white font-sans max-w-7xl mx-auto pb-6">
+      {/* 1. TOP LIFECYCLE STATUS BANNER */}
+      <div className="bg-[#25d366]/10 border border-[#25d366]/30 p-6 sm:p-7 rounded-3xl shadow-lg">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-2.5">
+          <div className="flex items-center gap-2.5">
+            <span className="w-3 h-3 rounded-full bg-[#25d366] animate-pulse" />
+            <span className="text-xs sm:text-sm font-mono font-black uppercase tracking-wider text-[#25d366]">
+              PROJECT LIFE-CYCLE ACTIVE
+            </span>
           </div>
+          <span className="text-xs font-mono text-gray-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+            Registered Budget: <strong className="text-white">{regInfo.budget || 'TBD'}</strong> • Timeline: <strong className="text-white">{regInfo.timeline || 'TBD'}</strong>
+          </span>
+        </div>
+        <h4 className="text-lg sm:text-xl font-bold text-white mb-2">No Upfront Payment Required</h4>
+        <p className="text-gray-200 text-sm sm:text-base leading-relaxed max-w-5xl">
+          Your registered project is officially initiated in our engineering pipeline. Pricing and milestones are determined dynamically after direct 1-on-1 requirements alignment. Our lead developers will connect with you via Call / WhatsApp and Zoom meeting to coordinate.
+        </p>
+      </div>
 
-          {/* S-CODERS Developer Profile & Direct Client Contact - Image 1 Style */}
-          <div className="space-y-4">
-            {/* Section Header matching Image 1 */}
-            <div>
-              <span className="text-[11px] font-mono text-[#f87171] uppercase tracking-widest font-bold block mb-1">
-                WHO'S RUNNING IT
-              </span>
-              <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-white lowercase tracking-tight">
-                your developers
-              </h3>
-              <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1 leading-relaxed">
-                live with the people who build your product, direct 1-on-1 development for your registered project.
+      {/* 2. DEVELOPERS SECTION - MATCHING IMAGE 1 DESIGN */}
+      <div className="space-y-4">
+        <div>
+          <span className="text-xs sm:text-sm font-mono text-[#f87171] uppercase tracking-widest font-bold block mb-1">
+            WHO'S RUNNING IT
+          </span>
+          <h3 className="text-3xl sm:text-4xl font-display font-extrabold text-white lowercase tracking-tight">
+            your developers
+          </h3>
+          <p className="text-gray-300 text-xs sm:text-sm font-sans mt-1 leading-relaxed max-w-3xl">
+            live with the people who built the product, direct 1-on-1 development for your registered project.
+          </p>
+        </div>
+        
+        {/* Developer Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card 1: Shreyas */}
+          <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300" 
+                    alt="Shreyas" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div>
+                  <h4 className="font-display font-bold text-white text-2xl sm:text-3xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
+                    shreyas
+                  </h4>
+                  <span className="text-[11px] sm:text-xs font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
+                    FOUNDER • CEO • ARCHITECTURE
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                founder, s-coders (bharath tech developers). shipped multiple production systems and ai agents. direct 1-on-1 architecture alignment, project coordination, and custom development.
               </p>
             </div>
-            
-            {/* Developer Cards Stack */}
-            <div className="space-y-4">
-              {/* Card 1: Shreyas (Founder & CEO) */}
-              <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-5 sm:p-6 space-y-3.5 transition-all shadow-xl group">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#f87171]/50 shrink-0 bg-[#f87171]/10">
-                    <img 
-                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200" 
-                      alt="Shreyas" 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-display font-bold text-white text-xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
-                      shreyas
-                    </h4>
-                    <span className="text-[10px] font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
-                      FOUNDER • CEO • ARCHITECTURE
-                    </span>
-                  </div>
+
+            {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+            <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+              <a
+                href="tel:+916363905989"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Phone className="w-3.5 h-3.5 text-[#f87171]" />
+                <span>+91 6363905989</span>
+              </a>
+              <a
+                href="mailto:scoders82@gmail.com"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Mail className="w-3.5 h-3.5 text-[#f87171]" />
+                <span>scoders82@gmail.com</span>
+              </a>
+              <a
+                href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>whatsapp</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Card 2: Bhuvan */}
+          <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-brand-teal/60 shrink-0 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
+                  <img 
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300" 
+                    alt="Bhuvan M" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
-
-                <p className="text-gray-300 text-xs font-sans leading-relaxed">
-                  founder, s-coders (bharath tech developers). shipped multiple production systems and ai agents. direct 1-on-1 architecture alignment, project coordination, and custom development.
-                </p>
-
-                {/* Direct Number & Contact Buttons instead of linkedin/github */}
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
-                  <a
-                    href="tel:+916363905989"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-white/10 hover:border-[#f87171]/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-[#f87171]" />
-                    <span>+91 6363905989</span>
-                  </a>
-                  <a
-                    href="tel:+918310463417"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-white/10 hover:border-[#f87171]/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-[#f87171]" />
-                    <span>+91 8310463417</span>
-                  </a>
-                  <a
-                    href="https://wa.me/qr/NNPE4VUHYNIYA1"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                    <span>WhatsApp</span>
-                  </a>
+                <div>
+                  <h4 className="font-display font-bold text-white text-2xl sm:text-3xl lowercase group-hover:text-brand-teal transition-colors leading-tight">
+                    bhuvan
+                  </h4>
+                  <span className="text-[11px] sm:text-xs font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
+                    TECH LEAD • BACKEND • AI
+                  </span>
                 </div>
               </div>
 
-              {/* Card 2: Bhuvan M (Tech Lead) */}
-              <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-5 sm:p-6 space-y-3.5 transition-all shadow-xl group">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-brand-teal/50 shrink-0 bg-brand-teal/10">
-                    <img 
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200" 
-                      alt="Bhuvan M" 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-display font-bold text-white text-xl lowercase group-hover:text-brand-teal transition-colors leading-tight">
-                      bhuvan
-                    </h4>
-                    <span className="text-[10px] font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
-                      TECH LEAD • BACKEND • AI
-                    </span>
-                  </div>
-                </div>
+              <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                tech lead at s-coders. backend + ai engineer. builds the systems that make high-velocity client applications run, agents, pipelines, the infra that holds it all...
+              </p>
+            </div>
 
-                <p className="text-gray-300 text-xs font-sans leading-relaxed">
-                  tech lead at s-coders. backend + ai engineer. builds the systems that make high-velocity client applications run, agents, pipelines, the infra that holds it all...
-                </p>
-
-                {/* Direct Number & Contact Buttons instead of linkedin/github */}
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
-                  <a
-                    href="tel:+916363905989"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>+91 6363905989</span>
-                  </a>
-                  <a
-                    href="tel:+918310463417"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                    <span>+91 8310463417</span>
-                  </a>
-                  <a
-                    href="mailto:scoders82@gmail.com"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-full text-gray-300 hover:text-white text-xs font-mono transition-all cursor-pointer"
-                  >
-                    <Mail className="w-3.5 h-3.5 text-brand-coral" />
-                    <span>scoders82@gmail.com</span>
-                  </a>
-                </div>
-              </div>
+            {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+            <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+              <a
+                href="tel:+918310463417"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                <span>+91 8310463417</span>
+              </a>
+              <a
+                href="mailto:scoders82@gmail.com"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Mail className="w-3.5 h-3.5 text-brand-teal" />
+                <span>scoders82@gmail.com</span>
+              </a>
+              <a
+                href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>whatsapp</span>
+              </a>
             </div>
           </div>
         </div>
       </div>
 
-      {/* RIGHT SIDE: TWO COLUMNS (PROGRESS FILES & LIVE CHAT) */}
-      <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* 3. MIDDLE SECTION: PROGRESS FILES & LIVE CHAT (SPACIOUS 2-COLUMN GRID) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         
         {/* PROGRESS FILES / PDF SECTION */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-xl min-h-[480px]">
           <div>
-            <div className="flex items-center gap-2 mb-3.5 border-b border-white/5 pb-2">
-              <FileText className="w-4 h-4 text-brand-teal" />
-              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-widest">Progress Files & Spec PDFs</h4>
+            <div className="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
+              <FileText className="w-5 h-5 text-brand-teal" />
+              <h4 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Progress Files & Spec PDFs</h4>
             </div>
             
-            <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
-              Whenever you log in with your key, the latest blueprints, wireframes, and spec files uploaded by S-CODERS will appear here.
+            <p className="text-xs sm:text-sm text-gray-300 mb-5 leading-relaxed">
+              Whenever you log in with your key, the latest blueprints, wireframes, and spec files uploaded by S-CODERS will appear here for download.
             </p>
 
-            <div className="space-y-2.5 flex-grow">
+            <div className="space-y-3 flex-grow">
               {[
                 { name: 'Project_Architecture_Spec.pdf', desc: 'Tech stack flow, system diagram & parameters', size: '1.8 MB' },
                 { name: 'Interactive_UI_Mockups_v1.pdf', desc: 'High fidelity wireframes & layout templates', size: '4.5 MB' },
                 { name: 'Database_Schema_Spec.pdf', desc: 'PostgreSQL structures, attributes & indices', size: '1.2 MB' },
                 { name: 'AI_Agent_Logic_Flowchart.pdf', desc: 'Structured chain-of-thought routing blueprint', size: '2.4 MB' }
               ].map((file) => (
-                <div key={file.name} className="p-3 bg-brand-dark/50 border border-white/5 rounded-xl flex items-center justify-between gap-3 text-left">
+                <div key={file.name} className="p-3.5 sm:p-4 bg-brand-dark/70 border border-white/10 hover:border-brand-teal/30 rounded-2xl flex items-center justify-between gap-3 text-left transition-all">
                   <div className="min-w-0 flex-1">
-                    <span className="block text-xs font-bold text-white truncate">{file.name}</span>
-                    <span className="block text-[10px] text-gray-500 truncate mt-0.5">{file.desc}</span>
+                    <span className="block text-sm font-bold text-white truncate">{file.name}</span>
+                    <span className="block text-xs text-gray-400 truncate mt-0.5">{file.desc}</span>
                   </div>
-                  <div className="shrink-0 flex items-center gap-2">
-                    <span className="text-[9px] font-mono text-gray-500">{file.size}</span>
+                  <div className="shrink-0 flex items-center gap-3">
+                    <span className="text-xs font-mono text-gray-400">{file.size}</span>
                     <button
                       onClick={() => handleDownload(file.name)}
                       disabled={downloadingFile !== null}
-                      className="p-1.5 bg-white/5 hover:bg-brand-teal/20 hover:text-brand-teal rounded-lg transition-colors cursor-pointer text-gray-400"
+                      className="p-2.5 bg-white/5 hover:bg-brand-teal/20 hover:text-brand-teal text-gray-300 rounded-xl transition-all cursor-pointer border border-white/10"
+                      title="Download Spec PDF"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -3145,12 +3171,12 @@ export function ServiceProjectSpaceDashboard({
           </div>
 
           {downloadingFile && (
-            <div className="mt-4 p-3 bg-brand-teal/5 border border-brand-teal/20 rounded-xl space-y-1.5 font-mono">
-              <div className="flex justify-between text-[10px]">
-                <span className="text-gray-400 truncate">Downloading: {downloadingFile}</span>
+            <div className="mt-5 p-4 bg-brand-teal/10 border border-brand-teal/30 rounded-2xl space-y-2 font-mono">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-300 truncate">Downloading: {downloadingFile}</span>
                 <span className="text-brand-teal font-bold">{downloadProgress}%</span>
               </div>
-              <div className="w-full bg-brand-dark h-1.5 rounded-full overflow-hidden">
+              <div className="w-full bg-brand-dark h-2 rounded-full overflow-hidden">
                 <div className="bg-brand-teal h-full transition-all duration-150" style={{ width: `${downloadProgress}%` }} />
               </div>
             </div>
@@ -3158,23 +3184,25 @@ export function ServiceProjectSpaceDashboard({
         </div>
 
         {/* CHATBOX SECTION */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col h-[400px] justify-between">
+        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-xl min-h-[480px]">
           <div>
-            <div className="flex items-center gap-2 mb-3 border-b border-white/5 pb-2">
-              <MessageSquare className="w-4 h-4 text-brand-teal" />
-              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-widest">Collaborative Live Chat</h4>
+            <div className="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
+              <MessageSquare className="w-5 h-5 text-brand-teal" />
+              <h4 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Collaborative Live Chat</h4>
             </div>
           </div>
 
           {/* Messages scrollable area */}
-          <div className="flex-grow overflow-y-auto space-y-3 pr-1 py-1 scrollbar-thin scrollbar-thumb-white/10 max-h-[250px]">
+          <div className="flex-grow overflow-y-auto space-y-3.5 pr-2 py-2 scrollbar-thin scrollbar-thumb-white/10 max-h-[300px] min-h-[220px]">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex flex-col ${msg.sender === 'client' ? 'items-end' : 'items-start'}`}>
-                <span className="text-[8px] font-mono text-gray-500 mb-1">
+                <span className="text-[10px] sm:text-xs font-mono text-gray-400 mb-1">
                   {msg.sender === 'client' ? 'You' : 'S-CODERS Lead'} • {msg.time}
                 </span>
-                <div className={`px-3 py-2 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
-                  msg.sender === 'client' ? 'bg-brand-teal text-brand-dark font-medium rounded-tr-none' : 'bg-white/5 text-gray-300 rounded-tl-none border border-white/5'
+                <div className={`px-4 py-3 rounded-2xl text-xs sm:text-sm max-w-[85%] leading-relaxed ${
+                  msg.sender === 'client' 
+                    ? 'bg-brand-teal text-brand-dark font-medium rounded-tr-none shadow-md' 
+                    : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10'
                 }`}>
                   {msg.text}
                 </div>
@@ -3183,110 +3211,114 @@ export function ServiceProjectSpaceDashboard({
           </div>
 
           {/* Chat Form Input */}
-          <form onSubmit={handleSendMessage} className="flex gap-2 border-t border-white/5 pt-3 mt-3">
+          <form onSubmit={handleSendMessage} className="flex gap-2.5 border-t border-white/10 pt-4 mt-3">
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Drop developer feedback..."
-              className="flex-grow bg-brand-dark/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-teal font-sans"
+              placeholder="Drop developer feedback or questions..."
+              className="flex-grow bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-teal font-sans placeholder-gray-500"
             />
             <button
               type="submit"
-              className="p-2.5 bg-brand-teal hover:bg-white text-brand-dark rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+              className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 font-bold"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4" />
             </button>
           </form>
         </div>
 
       </div>
 
-      {/* FULL WIDTH BOTTOM SECTION: FEEDBACK FORM (6 fields) */}
-      <div className="lg:col-span-12 border-t border-white/5 pt-6 mt-2">
-        <div className="max-w-3xl mx-auto bg-white/[0.01] border border-white/5 rounded-3xl p-6 sm:p-8">
-          <div className="text-center max-w-lg mx-auto mb-6">
-            <h4 className="text-sm font-mono text-brand-teal uppercase tracking-widest font-bold mb-1">We Value Your Experience</h4>
-            <h3 className="text-xl font-display font-black text-white">Client Service Feedback Form</h3>
-            <p className="text-gray-400 text-xs mt-1 leading-normal">
+      {/* 4. FULL WIDTH BOTTOM SECTION: FEEDBACK FORM (SPACIOUS & PROMINENT) */}
+      <div className="border-t border-white/10 pt-8 mt-4">
+        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl">
+          <div className="text-center max-w-xl mx-auto mb-8">
+            <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold mb-1.5">
+              WE VALUE YOUR EXPERIENCE
+            </h4>
+            <h3 className="text-2xl sm:text-3xl font-display font-black text-white">
+              Client Service Feedback Form
+            </h3>
+            <p className="text-gray-300 text-sm mt-2 leading-relaxed">
               Please share your honest ratings and suggestions with us. We utilize this loop to constantly optimize our Custom Engineering workflows!
             </p>
           </div>
 
-          <form onSubmit={handleFeedbackSubmit} className="space-y-4 font-sans text-left">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <form onSubmit={handleFeedbackSubmit} className="space-y-5 font-sans text-left max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div>
-                <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Full Name *</label>
+                <label className="block text-xs font-mono text-gray-400 uppercase tracking-widest mb-2 font-semibold">Full Name *</label>
                 <input
                   type="text"
                   required
                   value={feedName}
                   onChange={(e) => setFeedName(e.target.value)}
                   placeholder="e.g. Suhas Gowda"
-                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                  className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Email Address *</label>
+                <label className="block text-xs font-mono text-gray-400 uppercase tracking-widest mb-2 font-semibold">Email Address *</label>
                 <input
                   type="email"
                   required
                   value={feedEmail}
                   onChange={(e) => setFeedEmail(e.target.value)}
                   placeholder="e.g. email@btd.in"
-                  className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                  className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Your Role / College *</label>
+                <label className="block text-xs font-mono text-gray-400 uppercase tracking-widest mb-2 font-semibold">Your Role / College *</label>
                 <input
                   type="text"
                   required
                   value={feedRole}
                   onChange={(e) => setFeedRole(e.target.value)}
                   placeholder="e.g. SDE-1 / College Student"
-                  className="w-full bg-[#0d0f1a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                  className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                 />
               </div>
             </div>
 
             {/* Rating select (glowing stars 1to5) */}
             <div>
-              <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Rating stars (1 to 5) *</label>
-              <div className="flex items-center gap-2 bg-brand-dark/40 border border-white/5 p-3 rounded-xl w-fit">
+              <label className="block text-xs font-mono text-gray-400 uppercase tracking-widest mb-2 font-semibold">Rating Stars (1 to 5) *</label>
+              <div className="flex items-center gap-3 bg-brand-dark/60 border border-white/10 p-3.5 rounded-2xl w-fit">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     type="button"
                     key={star}
                     onClick={() => setFeedRating(star)}
-                    className="p-1 cursor-pointer transition-transform active:scale-90 hover:scale-110"
+                    className="p-1.5 cursor-pointer transition-transform active:scale-90 hover:scale-110"
                   >
-                    <Star className={`w-6 h-6 transition-all ${
-                      star <= feedRating ? 'text-amber-400 fill-amber-400 filter drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]' : 'text-gray-600'
+                    <Star className={`w-7 h-7 transition-all ${
+                      star <= feedRating ? 'text-amber-400 fill-amber-400 filter drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]' : 'text-gray-600'
                     }`} />
                   </button>
                 ))}
-                <span className="text-xs font-mono font-bold text-gray-400 ml-2">({feedRating}/5 Stars)</span>
+                <span className="text-sm font-mono font-bold text-gray-300 ml-2">({feedRating}/5 Stars)</span>
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Describe Your Feedback / Experience *</label>
+              <label className="block text-xs font-mono text-gray-400 uppercase tracking-widest mb-2 font-semibold">Describe Your Feedback / Experience *</label>
               <textarea
                 required
-                rows={3}
+                rows={4}
                 value={feedExperience}
                 onChange={(e) => setFeedExperience(e.target.value)}
                 placeholder="How was your experience working with S-CODERS? Highlight the speed, quality, and coordination."
-                className="w-full bg-[#0d0f1a] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all resize-none"
+                className="w-full bg-brand-dark/70 border border-white/15 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all resize-none leading-relaxed"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/15"
+              className="w-full py-4 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-sm uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 active:scale-95"
             >
               Submit Client Feedback Form
             </button>
@@ -3295,7 +3327,7 @@ export function ServiceProjectSpaceDashboard({
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-[#25d366]/10 border border-[#25d366]/20 text-[#25d366] text-xs font-mono font-bold text-center rounded-xl"
+                className="p-4 bg-[#25d366]/15 border border-[#25d366]/30 text-[#25d366] text-sm font-mono font-bold text-center rounded-2xl"
               >
                 ✓ Feedback submitted successfully! S-CODERS team appreciates your precious thoughts.
               </motion.div>

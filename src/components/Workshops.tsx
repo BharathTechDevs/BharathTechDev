@@ -4,7 +4,7 @@ import {
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
-  ExternalLink, Linkedin, Github
+  ExternalLink, Linkedin, Github, Phone, Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -1025,45 +1025,48 @@ export default function TenantDashboard() {
                         </div>
                       </div>
 
-                      {/* --- HIGH FIDELITY CLASSROOM TABBED CONTAINER --- */}
-                      <div className="bg-brand-dark/35 border border-white/5 rounded-2xl overflow-hidden mt-6">
+                      {/* --- HIGH FIDELITY CLASSROOM TABBED CONTAINER (SPACIOUS & EXPANDED) --- */}
+                      <div className="bg-brand-dark/60 border border-white/10 rounded-3xl overflow-hidden mt-6 shadow-xl">
                         {/* Tab Headers */}
-                        <div className="grid grid-cols-3 bg-brand-dark/80 border-b border-white/5 p-1">
+                        <div className="grid grid-cols-3 bg-brand-dark/90 border-b border-white/10 p-1.5 sm:p-2">
                           {[
                             { id: 'sandbox', label: 'Sandbox IDE', icon: Code },
-                            { id: 'resources', label: 'Downloads', icon: Download },
-                            { id: 'discussion', label: 'Discussion Live', icon: MessageCircle },
+                            { id: 'resources', label: 'Downloads Locker', icon: Download },
+                            { id: 'discussion', label: 'Live Discussion', icon: MessageCircle },
                           ].map(t => (
                             <button
                               key={t.id}
                               onClick={() => setActiveTab(t.id as any)}
-                              className={`py-2 px-2.5 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-mono font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer ${
                                 activeTab === t.id
-                                  ? 'bg-brand-teal text-brand-dark'
+                                  ? 'bg-brand-teal text-brand-dark shadow-md'
                                   : 'text-gray-400 hover:text-white'
                               }`}
                             >
-                              <t.icon className="w-3.5 h-3.5 shrink-0" />
+                              <t.icon className="w-4 h-4 shrink-0" />
                               <span className="hidden sm:inline">{t.label}</span>
                             </button>
                           ))}
                         </div>
 
                         {/* Tab Panels */}
-                        <div className="p-5 min-h-[35vh]">
+                        <div className="p-6 sm:p-7 min-h-[480px]">
                           
                           {/* TAB 1: SANDBOX IDE */}
                           {activeTab === 'sandbox' && (
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between text-[10px] font-mono text-gray-500">
-                                <span>main.ts (Read-Write Environment)</span>
-                                <span className="text-brand-teal">Interactive Sandbox Core</span>
+                            <div className="space-y-5">
+                              <div className="flex items-center justify-between text-xs font-mono text-gray-400">
+                                <span className="font-semibold text-gray-300">main.ts (Interactive Full-Stack Sandbox)</span>
+                                <span className="text-brand-teal font-bold flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" />
+                                  Live Compiler Ready
+                                </span>
                               </div>
-                              <div className="border border-white/5 rounded-xl overflow-hidden bg-brand-dark/95">
+                              <div className="border border-white/10 rounded-2xl overflow-hidden bg-brand-dark/95 shadow-inner">
                                 <textarea
                                   value={sandboxCode}
                                   onChange={(e) => setSandboxCode(e.target.value)}
-                                  className="w-full bg-transparent text-xs p-4 text-emerald-300 font-mono focus:outline-none h-44 resize-none leading-relaxed"
+                                  className="w-full bg-transparent text-sm p-5 text-emerald-300 font-mono focus:outline-none h-60 resize-none leading-relaxed"
                                   placeholder="// Write your custom workspace code here..."
                                 />
                               </div>
@@ -1072,19 +1075,19 @@ export default function TenantDashboard() {
                                 <button
                                   onClick={handleRunSandbox}
                                   disabled={isCompiling}
-                                  className="px-5 py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                                  className="px-6 py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/15"
                                 >
                                   {isCompiling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
                                   Run Code Sandbox
                                 </button>
-                                <span className="text-[10px] text-gray-500 font-mono">Status: Connected</span>
+                                <span className="text-xs text-gray-400 font-mono">Environment: TypeScript • Node 20 runtime</span>
                               </div>
 
                               {/* Terminal Display */}
                               {terminalLogs.length > 0 && (
-                                <div className="bg-[#010309] border border-white/5 rounded-xl p-4 font-mono text-[10px] space-y-1.5 text-emerald-400 max-h-36 overflow-y-auto">
+                                <div className="bg-[#010309] border border-white/10 rounded-2xl p-5 font-mono text-xs space-y-2 text-emerald-400 max-h-56 overflow-y-auto shadow-inner">
                                   {terminalLogs.map((log, i) => (
-                                    <div key={i} className={log.includes('📟') ? 'text-white' : log.includes('✅') ? 'text-emerald-300 font-extrabold' : ''}>
+                                    <div key={i} className={log.includes('📟') ? 'text-white font-bold' : log.includes('✅') ? 'text-emerald-300 font-extrabold' : ''}>
                                       {log}
                                     </div>
                                   ))}
@@ -1095,35 +1098,35 @@ export default function TenantDashboard() {
 
                           {/* TAB 2: DOWNLOADS TRACKER */}
                           {activeTab === 'resources' && (
-                            <div className="space-y-3">
-                              <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block font-bold mb-1">Developer Assets Locker</span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-4">
+                              <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block font-bold mb-2">Verified Developer Assets Locker</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {[
                                   { id: 'json', title: 'n8n Workflow Blueprints', type: 'JSON Specification', size: '24 KB' },
                                   { id: 'pdf_prompt', title: 'Gemini System Prompts', type: 'System Cheat-sheet PDF', size: '180 KB' },
                                   { id: 'zip', title: 'SaaS Multitenant Boilerplate', type: 'TypeScript React Zip', size: '1.4 MB' },
                                   { id: 'pdf_slides', title: 'Session Deck & Exercises', type: 'Slide Presentation PDF', size: '3.6 MB' },
                                 ].map(item => (
-                                  <div key={item.id} className="bg-brand-dark/40 border border-white/5 rounded-xl p-4 flex items-center justify-between gap-4">
+                                  <div key={item.id} className="bg-brand-dark/50 border border-white/10 hover:border-brand-teal/30 rounded-2xl p-5 flex items-center justify-between gap-4 transition-all">
                                     <div className="overflow-hidden">
-                                      <p className="text-xs font-semibold text-white truncate">{item.title}</p>
-                                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">{item.type} • {item.size}</p>
+                                      <p className="text-sm font-bold text-white truncate">{item.title}</p>
+                                      <p className="text-xs text-gray-400 font-mono mt-1">{item.type} • {item.size}</p>
                                     </div>
 
                                     {downloadingItem === item.id ? (
-                                      <div className="w-20 text-right space-y-1">
-                                        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                                      <div className="w-24 text-right space-y-1.5">
+                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                                           <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
                                         </div>
-                                        <span className="text-[8px] font-mono text-brand-teal">{downloadProgress}%</span>
+                                        <span className="text-xs font-mono text-brand-teal font-bold">{downloadProgress}%</span>
                                       </div>
                                     ) : (
                                       <button
                                         onClick={() => handleDownloadResource(item.id)}
-                                        className="p-2 bg-white/5 hover:bg-brand-teal/20 text-gray-400 hover:text-brand-teal rounded-lg transition-all border border-white/5 cursor-pointer"
+                                        className="p-3 bg-white/5 hover:bg-brand-teal/20 text-gray-300 hover:text-brand-teal rounded-xl transition-all border border-white/10 cursor-pointer"
                                         title="Download"
                                       >
-                                        <Download className="w-4 h-4" />
+                                        <Download className="w-5 h-5" />
                                       </button>
                                     )}
                                   </div>
@@ -1134,37 +1137,38 @@ export default function TenantDashboard() {
 
                           {/* TAB 3: DISCUSSION LIVE CHATROOM */}
                           {activeTab === 'discussion' && (
-                            <div className="flex flex-col h-[40vh] justify-between space-y-4">
-                              <div className="flex-grow bg-[#010309] border border-white/5 rounded-xl p-4 overflow-y-auto space-y-3 max-h-56">
+                            <div className="flex flex-col h-[460px] justify-between space-y-4">
+                              <div className="flex-grow bg-[#010309] border border-white/10 rounded-2xl p-5 overflow-y-auto space-y-4 max-h-80 shadow-inner">
                                 {chatroomMessages.map((msg, idx) => (
                                   <div key={msg.id || idx} className={`flex flex-col max-w-[85%] ${msg.isSelf ? 'ml-auto items-end' : 'items-start'}`}>
-                                    <div className="flex items-center gap-1.5 text-[9px] font-mono text-gray-500 mb-0.5">
-                                      <span className={msg.isSelf ? 'text-brand-teal font-bold' : 'text-gray-300 font-medium'}>{msg.sender}</span>
+                                    <div className="flex items-center gap-2 text-xs font-mono text-gray-400 mb-1">
+                                      <span className={msg.isSelf ? 'text-brand-teal font-bold' : 'text-gray-200 font-semibold'}>{msg.sender}</span>
                                       <span>•</span>
                                       <span>{msg.role}</span>
                                     </div>
-                                    <div className={`p-2.5 rounded-2xl text-xs ${msg.isSelf ? 'bg-brand-teal text-brand-dark rounded-tr-none font-medium' : 'bg-white/5 text-gray-300 rounded-tl-none'}`}>
+                                    <div className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${msg.isSelf ? 'bg-brand-teal text-brand-dark rounded-tr-none font-medium shadow-md' : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10'}`}>
                                       {msg.text}
                                     </div>
-                                    <span className="text-[8px] font-mono text-gray-600 mt-0.5">{msg.time}</span>
+                                    <span className="text-[10px] font-mono text-gray-500 mt-1">{msg.time}</span>
                                   </div>
                                 ))}
                                 <div ref={chatEndRef} />
                               </div>
 
-                              <form onSubmit={handleSendChat} className="flex gap-2 font-mono">
+                              <form onSubmit={handleSendChat} className="flex gap-3 font-sans">
                                 <input
                                   type="text"
                                   value={chatInput}
                                   onChange={(e) => setChatInput(e.target.value)}
                                   placeholder="Type question or comment to the live community..."
-                                  className="flex-grow bg-brand-dark/70 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                                  className="flex-grow bg-brand-dark/80 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all font-sans"
                                 />
                                 <button
                                   type="submit"
-                                  className="p-2 bg-brand-teal hover:bg-white text-brand-dark rounded-xl transition-colors cursor-pointer shrink-0"
+                                  className="px-6 py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
                                 >
                                   <Send className="w-4 h-4" />
+                                  <span>Send</span>
                                 </button>
                               </form>
                             </div>
@@ -1237,12 +1241,12 @@ export default function TenantDashboard() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Host 1: Shreyas (Founder & CEO) */}
-                      <div className="bg-brand-dark/60 border border-white/10 hover:border-brand-teal/30 p-5 rounded-2xl flex flex-col justify-between transition-all group">
-                        <div>
-                          <div className="flex items-center gap-3.5 mb-3.5">
-                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-teal/40 shrink-0 bg-brand-teal/10">
+                      <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
+                        <div className="space-y-3.5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
                               <img 
                                 src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200" 
                                 alt="Shreyas" 
@@ -1251,48 +1255,53 @@ export default function TenantDashboard() {
                               />
                             </div>
                             <div>
-                              <h4 className="font-display font-bold text-white text-base group-hover:text-brand-teal transition-colors">
-                                Shreyas
+                              <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
+                                shreyas
                               </h4>
-                              <span className="text-[9px] font-mono text-brand-teal uppercase font-bold tracking-wider block">
-                                FOUNDER & CEO • WORKSHOPS
+                              <span className="text-[11px] font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
+                                FOUNDER • WORKSHOPS • 1:1 SESSIONS
                               </span>
                             </div>
                           </div>
 
-                          <p className="text-gray-300 text-xs font-sans leading-relaxed mb-4">
-                            Founder & CEO at S-CODERS (Bharath Tech Developers). Shipped multiple production systems and AI agents. Passionate about product strategy, tech architecture, and empowering developers directly in live cohorts.
+                          <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                            founder, s-coders (bharath tech developers). shipped multiple production systems and ai agents. teaches practical architecture, workflows, and high-impact developer tooling.
                           </p>
                         </div>
 
-                        {/* Social Links on left corner */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                        {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+                        <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="https://www.linkedin.com/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/30 rounded-lg text-gray-300 hover:text-brand-teal text-[11px] font-mono transition-all cursor-pointer"
+                            href="tel:+916363905989"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
-                            <span>in linkedin</span>
+                            <Phone className="w-3.5 h-3.5 text-[#f87171]" />
+                            <span>+91 6363905989</span>
                           </a>
                           <a
-                            href="https://github.com/"
+                            href="mailto:scoders82@gmail.com"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-[#f87171]" />
+                            <span>scoders82@gmail.com</span>
+                          </a>
+                          <a
+                            href="https://wa.me/qr/NNPE4VUHYNIYA1"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-gray-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Github className="w-3.5 h-3.5" />
-                            <span>github</span>
+                            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                            <span>whatsapp</span>
                           </a>
                         </div>
                       </div>
 
                       {/* Host 2: Bhuvan M (Tech Lead) */}
-                      <div className="bg-brand-dark/60 border border-white/10 hover:border-brand-teal/30 p-5 rounded-2xl flex flex-col justify-between transition-all group">
-                        <div>
-                          <div className="flex items-center gap-3.5 mb-3.5">
-                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-teal/40 shrink-0 bg-brand-teal/10">
+                      <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
+                        <div className="space-y-3.5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-brand-teal/60 shrink-0 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
                               <img 
                                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200" 
                                 alt="Bhuvan M" 
@@ -1301,89 +1310,44 @@ export default function TenantDashboard() {
                               />
                             </div>
                             <div>
-                              <h4 className="font-display font-bold text-white text-base group-hover:text-brand-teal transition-colors">
-                                Bhuvan M
+                              <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-brand-teal transition-colors leading-tight">
+                                bhuvan
                               </h4>
-                              <span className="text-[9px] font-mono text-brand-teal uppercase font-bold tracking-wider block">
+                              <span className="text-[11px] font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
                                 TECH LEAD • BACKEND • AI
                               </span>
                             </div>
                           </div>
 
-                          <p className="text-gray-300 text-xs font-sans leading-relaxed mb-4">
-                            Tech Lead at S-CODERS. Backend + AI systems architect. Builds the systems that make high-velocity client applications run, agents, pipelines, and the cloud infra that holds it all.
+                          <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                            tech lead at s-coders. backend + ai systems architect. builds the systems that make reciprocate & live agents run: pipelines, fast inferences, and classroom sandboxes.
                           </p>
                         </div>
 
-                        {/* Social Links on left corner */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                        {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+                        <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="https://www.linkedin.com/in/bhuvanm"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/30 rounded-lg text-gray-300 hover:text-brand-teal text-[11px] font-mono transition-all cursor-pointer"
+                            href="tel:+918310463417"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
-                            <span>in linkedin</span>
+                            <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                            <span>+91 8310463417</span>
                           </a>
                           <a
-                            href="https://github.com/bhuvanm15"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-gray-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer"
+                            href="mailto:scoders82@gmail.com"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Github className="w-3.5 h-3.5" />
-                            <span>github</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Host 3: S-CODERS Core Mentors */}
-                      <div className="bg-brand-dark/60 border border-white/10 hover:border-brand-teal/30 p-5 rounded-2xl flex flex-col justify-between transition-all group">
-                        <div>
-                          <div className="flex items-center gap-3.5 mb-3.5">
-                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-brand-teal/40 shrink-0 bg-brand-teal/10 flex items-center justify-center text-brand-teal font-display font-black text-sm">
-                              <img 
-                                src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=200&h=200" 
-                                alt="S-CODERS Mentorship Team" 
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                            <div>
-                              <h4 className="font-display font-bold text-white text-base group-hover:text-brand-teal transition-colors">
-                                S-CODERS Mentors
-                              </h4>
-                              <span className="text-[9px] font-mono text-brand-teal uppercase font-bold tracking-wider block">
-                                CORE ENGINEERING • 1:1 SESSIONS
-                              </span>
-                            </div>
-                          </div>
-
-                          <p className="text-gray-300 text-xs font-sans leading-relaxed mb-4">
-                            Hands-on engineers and mentors guiding live code walkthroughs, real-time debugging sessions, sandbox architectures, and direct post-workshop support.
-                          </p>
-                        </div>
-
-                        {/* Social Links on left corner */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
-                          <a
-                            href="https://www.linkedin.com/company/s-coders"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/30 rounded-lg text-gray-300 hover:text-brand-teal text-[11px] font-mono transition-all cursor-pointer"
-                          >
-                            <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
-                            <span>in linkedin</span>
+                            <Mail className="w-3.5 h-3.5 text-brand-teal" />
+                            <span>scoders82@gmail.com</span>
                           </a>
                           <a
-                            href="https://github.com/scoders"
+                            href="https://wa.me/qr/NNPE4VUHYNIYA1"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-gray-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Github className="w-3.5 h-3.5" />
-                            <span>github</span>
+                            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                            <span>whatsapp</span>
                           </a>
                         </div>
                       </div>
@@ -1568,19 +1532,19 @@ export default function TenantDashboard() {
 
             {/* Modal Container - Expanded Layout */}
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-2xl sm:max-w-3xl bg-brand-card border border-brand-teal/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-4xl bg-[#10121d] border border-brand-teal/30 rounded-3xl p-6 sm:p-10 shadow-2xl relative z-10 overflow-hidden max-h-[92vh] flex flex-col"
             >
               {/* Glow filter */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-teal/5 blur-3xl rounded-full pointer-events-none" />
+              <div className="absolute top-0 right-0 w-80 h-80 bg-brand-teal/10 blur-3xl rounded-full pointer-events-none" />
 
               {/* Sticky Top Header with Close Button */}
-              <div className="flex justify-between items-center pb-4 border-b border-white/5 mb-4 shrink-0 relative z-20">
-                <div className="flex items-center gap-2">
-                  <Key className="w-4 h-4 text-brand-teal" />
-                  <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">Session Pass Gateway</span>
+              <div className="flex justify-between items-center pb-4 border-b border-white/10 mb-5 shrink-0 relative z-20">
+                <div className="flex items-center gap-2.5">
+                  <Key className="w-5 h-5 text-brand-teal" />
+                  <span className="text-xs font-mono text-brand-teal uppercase tracking-widest font-bold">Session Pass Gateway</span>
                 </div>
                 <button
                   type="button"
@@ -1591,34 +1555,36 @@ export default function TenantDashboard() {
                     setIsProcessing(false);
                     setPaymentError(null);
                   }}
-                  className="p-1.5 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer relative z-20"
+                  className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer relative z-20"
                   id="close-workshop-modal"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-6 h-6" />
                 </button>
               </div>
 
               {/* Scrollable Modal Content */}
-              <div className="overflow-y-auto flex-1 pr-1 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
+              <div className="overflow-y-auto flex-1 pr-2 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
                 {regSuccessKey ? (
                   // SUCCESS STATE
-                  <div className="text-center py-4 font-sans">
-                    <div className="w-14 h-14 bg-brand-teal/10 border border-brand-teal/25 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-teal">
-                      <Sparkles className="w-7 h-7 animate-pulse" />
+                  <div className="text-center py-6 font-sans max-w-2xl mx-auto space-y-6">
+                    <div className="w-16 h-16 bg-brand-teal/15 border border-brand-teal/30 rounded-full flex items-center justify-center mx-auto text-brand-teal shadow-lg shadow-brand-teal/20">
+                      <Sparkles className="w-8 h-8 animate-pulse" />
                     </div>
-                    <h3 className="text-xl font-display font-extrabold text-white mb-2">Registration Complete!</h3>
-                    <p className="text-gray-400 text-xs font-light max-w-sm mx-auto mb-5 leading-relaxed">
-                      Your attendance pass for <strong className="text-white font-semibold">{activeWorkshop.title}</strong> has been secured.
-                    </p>
+                    <div>
+                      <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-white mb-2">Registration Complete!</h3>
+                      <p className="text-gray-300 text-sm sm:text-base font-light max-w-md mx-auto leading-relaxed">
+                        Your attendance pass for <strong className="text-white font-bold">{activeWorkshop.title}</strong> has been secured.
+                      </p>
+                    </div>
 
                     {/* WhatsApp Group Link Section */}
-                    <div className="bg-brand-teal/5 border border-brand-teal/20 p-4 rounded-2xl flex flex-col items-center gap-3 text-center mb-5 max-w-sm mx-auto">
-                      <div className="p-2 bg-[#25D366]/10 rounded-full text-[#25D366] border border-[#25D366]/20">
-                        <Users className="w-5 h-5" />
+                    <div className="bg-brand-teal/10 border border-brand-teal/30 p-6 rounded-3xl flex flex-col items-center gap-4 text-center shadow-lg">
+                      <div className="p-3 bg-[#25D366]/20 rounded-full text-[#25D366] border border-[#25D366]/30">
+                        <Users className="w-7 h-7" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-white">Join Workshop WhatsApp Group</h4>
-                        <p className="text-gray-400 text-[10px] mt-1 leading-normal">
+                        <h4 className="text-base sm:text-lg font-bold text-white">Join Workshop WhatsApp Group</h4>
+                        <p className="text-gray-300 text-xs sm:text-sm mt-1.5 leading-relaxed max-w-lg">
                           Click below to join the official S-CODERS Workshop WhatsApp group. Live Zoom meeting links, schedules, and code files will be shared there.
                         </p>
                       </div>
@@ -1626,27 +1592,42 @@ export default function TenantDashboard() {
                         href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="w-full py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-[11px] uppercase font-bold tracking-wider rounded-xl transition-all block text-center shadow-md shadow-[#25D366]/20 cursor-pointer"
+                        className="w-full sm:w-auto px-8 py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-xs sm:text-sm uppercase font-extrabold tracking-wider rounded-2xl transition-all block text-center shadow-lg shadow-[#25D366]/25 cursor-pointer active:scale-95"
                       >
                         Join Workshop WhatsApp Group
                       </a>
                     </div>
 
-                    <div className="bg-brand-dark/95 border border-brand-teal/20 rounded-2xl p-4 mb-6 max-w-sm mx-auto text-center space-y-1 relative">
-                      <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest block font-bold">Your Unique Attendance Key</span>
-                      <span className="font-mono text-sm font-black text-brand-teal select-all block py-1.5 truncate">{regSuccessKey}</span>
-                      <button
-                        onClick={() => handleCopyKey(regSuccessKey)}
-                        className="absolute right-2 top-2 p-1 bg-white/5 hover:bg-brand-teal/20 rounded text-gray-400 hover:text-brand-teal transition-all flex items-center gap-1 text-[9px] font-mono cursor-pointer border border-white/5"
-                      >
-                        {copiedKey ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copiedKey ? 'Copied' : 'Copy'}
-                      </button>
+                    {/* Unique Attendance Key Display Box - Non-overlapping Responsive Card */}
+                    <div className="bg-brand-dark/95 border border-brand-teal/30 rounded-2xl p-5 sm:p-6 text-left space-y-3.5 shadow-inner">
+                      <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                        <span className="text-[11px] sm:text-xs font-mono text-gray-300 uppercase tracking-widest font-bold">
+                          Your Unique Attendance Key
+                        </span>
+                        <span className="text-[10px] font-mono text-brand-teal bg-brand-teal/10 px-2.5 py-0.5 rounded-full border border-brand-teal/20 font-bold">
+                          VERIFIED PASS
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-black/60 p-3.5 sm:p-4 rounded-xl border border-white/10">
+                        <span className="font-mono text-base sm:text-lg md:text-xl font-black text-brand-teal select-all text-center sm:text-left tracking-wider break-all sm:break-normal py-1">
+                          {regSuccessKey}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyKey(regSuccessKey)}
+                          className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark rounded-xl font-mono text-xs sm:text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-md active:scale-95"
+                          title="Copy Attendance Key to Clipboard"
+                        >
+                          {copiedKey ? <Check className="w-4 h-4 text-brand-dark" /> : <Copy className="w-4 h-4 text-brand-dark" />}
+                          <span>{copiedKey ? 'Copied!' : 'Copy Key'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     <button
                       onClick={() => setShowRegModal(false)}
-                      className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                      className="w-full py-4 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-sm uppercase tracking-wider rounded-2xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 active:scale-95"
                     >
                       Enter Classroom Workspace
                     </button>
