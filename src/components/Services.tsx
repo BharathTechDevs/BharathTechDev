@@ -14,7 +14,7 @@ import { getDynamicServices, saveDynamicServices } from '../utils/dynamicData';
 import { ServiceEnquiry, Service, AppUser } from '../types';
 import { DatabaseEngine, ServiceRegistration, EnquiryItem, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp, generateUpiUrl } from '../utils/paymentLinks';
+import { openUpiApp, generateUpiUrl, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -1528,7 +1528,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               type="button"
                               onClick={() => {
                                 openUpiApp({
-                                  pa: 'scoders@ybl',
+                                  pa: getActiveMerchantUpi(),
                                   pn: 'S-CODERS Technologies',
                                   am: qrPayAmount,
                                   tn: `Advance: ${registeringService.title.slice(0, 20)}`,
@@ -1549,7 +1549,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               type="button"
                               onClick={() => {
                                 openUpiApp({
-                                  pa: 'scoders@ybl',
+                                  pa: getActiveMerchantUpi(),
                                   pn: 'S-CODERS Technologies',
                                   am: qrPayAmount,
                                   tn: `Advance: ${registeringService.title.slice(0, 20)}`,
@@ -1570,7 +1570,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               type="button"
                               onClick={() => {
                                 openUpiApp({
-                                  pa: 'scoders@ybl',
+                                  pa: getActiveMerchantUpi(),
                                   pn: 'S-CODERS Technologies',
                                   am: qrPayAmount,
                                   tn: `Advance: ${registeringService.title.slice(0, 20)}`,
@@ -1595,14 +1595,14 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                         <div className="py-2 flex flex-col items-center">
                           <PhonePeScannerCard
                             upiString={generateUpiUrl({
-                              pa: 'scoders@ybl',
+                              pa: getActiveMerchantUpi(),
                               pn: 'S-CODERS Technologies',
                               am: qrPayAmount,
                               tn: `Advance: ${registeringService.title.slice(0, 20)}`,
                               tr: `SRV${Date.now()}`
                             }, 'universal')}
-                            merchantName="sCoders"
-                            merchantVpa="scoders@ybl"
+                            merchantName="S-CODERS Technologies"
+                            merchantVpa={getActiveMerchantUpi()}
                             amount={qrPayAmount}
                           />
                         </div>
@@ -3010,11 +3010,11 @@ export function ServiceProjectSpaceDashboard({
             {/* 3 Pill buttons: Phone, Email, WhatsApp */}
             <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
               <a
-                href="tel:+916363905989"
+                href="tel:+918310463417"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5 text-[#f87171]" />
-                <span>+91 6363905989</span>
+                <span>+91 8310463417</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
@@ -3024,7 +3024,7 @@ export function ServiceProjectSpaceDashboard({
                 <span>scoders82@gmail.com</span>
               </a>
               <a
-                href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                href="https://wa.me/918310463417"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -3065,11 +3065,11 @@ export function ServiceProjectSpaceDashboard({
             {/* 3 Pill buttons: Phone, Email, WhatsApp */}
             <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
               <a
-                href="tel:+918310463417"
+                href="tel:+916363905989"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                <span>+91 8310463417</span>
+                <span>+91 6363905989</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
@@ -3079,7 +3079,7 @@ export function ServiceProjectSpaceDashboard({
                 <span>scoders82@gmail.com</span>
               </a>
               <a
-                href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                href="https://wa.me/916363905989"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"

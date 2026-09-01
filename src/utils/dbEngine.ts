@@ -142,19 +142,41 @@ export interface GalleryMediaItem {
 const SEED_TEAM: TeamMemberRecord[] = [
   {
     id: 'T1',
-    name: 'Suhas Gowda',
-    role: 'Founder & Chief AI Architect',
-    department: 'AI & Automation',
-    contact: 'suhas@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300',
+    name: 'Shreyas M.',
+    role: 'Founder & CEO — S-CODERS',
+    department: 'Management',
+    contact: 'shreyas@scoders.com',
+    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300',
     joiningDate: '01/01/2026',
-    assignedProjects: ['AgroSmart AI Corp Core Agent', 'LMS Chatbot Integration'],
-    currentProjectStatus: 'Active & Architecting'
+    assignedProjects: ['S-CODERS Core AI Platform', 'Bharat Tech Developers Systems'],
+    currentProjectStatus: 'Directing & Expanding'
   },
   {
     id: 'T2',
+    name: 'Lokesh A.',
+    role: 'Co-Founder — S-CODERS',
+    department: 'Management',
+    contact: 'lokesh@scoders.com',
+    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300&h=300',
+    joiningDate: '01/01/2026',
+    assignedProjects: ['Vibe Coder AI Workflows', 'Rapid Prototyping Systems'],
+    currentProjectStatus: 'Building Real-World Products'
+  },
+  {
+    id: 'T3',
+    name: 'Bhuvan M.',
+    role: 'Tech Lead • Backend & AI',
+    department: 'AI & Automation',
+    contact: 'bhuvan@scoders.com',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300',
+    joiningDate: '01/01/2026',
+    assignedProjects: ['AgroSmart AI Cloud Core', 'Real-time WebSocket Engine'],
+    currentProjectStatus: 'Active & Architecting'
+  },
+  {
+    id: 'T4',
     name: 'Prathiksha R',
-    role: 'Co-Founder & Head of UI/UX',
+    role: 'Head of UI/UX',
     department: 'Design',
     contact: 'prathiksha@scoders.com',
     photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300&h=300',
@@ -163,23 +185,23 @@ const SEED_TEAM: TeamMemberRecord[] = [
     currentProjectStatus: 'Delivering Prototypes'
   },
   {
-    id: 'T3',
+    id: 'T5',
     name: 'Manoj Kumar',
     role: 'Lead Full-Stack Developer',
     department: 'Engineering',
     contact: 'manoj@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300',
+    photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300',
     joiningDate: '02/10/2026',
     assignedProjects: ['Durable Database Engine', 'Razorpay Payments API'],
     currentProjectStatus: 'Refactoring Backend Systems'
   },
   {
-    id: 'T4',
+    id: 'T6',
     name: 'Aishwarya Shenoy',
     role: 'AI Automation & Workshop Lead',
     department: 'AI & Automation',
     contact: 'aishwarya@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300',
+    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=300&h=300',
     joiningDate: '03/05/2026',
     assignedProjects: ['Microsoft Reactor Series', 'WhatsApp Bot Pipelines'],
     currentProjectStatus: 'Scheduling Tech Bootcamps'

@@ -4,9 +4,31 @@
  * intent packages, and immediate interactive redirects.
  */
 
+export const DEFAULT_BHUVAN_PHONE = '6363905989';
+export const DEFAULT_SHREYAS_PHONE = '8310463417';
+
+export const DEFAULT_BHUVAN_UPI = '6363905989@ybl';
+export const DEFAULT_SHREYAS_UPI = '8310463417@ybl';
+export const DEFAULT_UPI_VPA = '6363905989@ybl';
+export const DEFAULT_PAYEE_NAME = 'S-CODERS Technologies';
+
+export function getActiveMerchantUpi(): string {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('scoders_merchant_upi') || DEFAULT_BHUVAN_UPI;
+  }
+  return DEFAULT_BHUVAN_UPI;
+}
+
+export function setActiveMerchantUpi(upi: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('scoders_merchant_upi', upi);
+    window.dispatchEvent(new Event('scoders_merchant_upi_changed'));
+  }
+}
+
 export interface UpiIntentParams {
-  pa: string; // Payee VPA address (e.g. scoders@ybl)
-  pn: string; // Payee Name
+  pa?: string; // Payee VPA address (e.g. 6363905989@ybl)
+  pn?: string; // Payee Name
   am: number | string; // Amount in INR
   cu?: string; // Currency (INR)
   tn?: string; // Transaction note
@@ -21,9 +43,10 @@ export function buildUpiQueryString(params: UpiIntentParams): string {
   const cleanAmount = typeof params.am === 'number' ? params.am.toFixed(2) : parseFloat(params.am || '0').toFixed(2);
   const cleanNote = (params.tn || 'SCODERS Services').replace(/[^a-zA-Z0-9 -]/g, '').slice(0, 30);
   const cleanTr = (params.tr || `TRX${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '').slice(-12);
+  const paAddress = params.pa || getActiveMerchantUpi();
   const cleanPn = encodeURIComponent(params.pn || 'S-CODERS Technologies');
   
-  return `pa=${params.pa}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  return `pa=${paAddress}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
 }
 
 /**

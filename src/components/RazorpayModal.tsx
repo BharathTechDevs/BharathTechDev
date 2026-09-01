@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp, generateUpiUrl } from '../utils/paymentLinks';
+import { openUpiApp, generateUpiUrl, getActiveMerchantUpi } from '../utils/paymentLinks';
 
 export interface RazorpayPaymentSuccessData {
   razorpay_payment_id: string;
@@ -97,7 +97,13 @@ export default function RazorpayModal({
   // Format currency
   const amount = paymentDetails.amount || 0;
   const currency = paymentDetails.currency || 'INR';
-  const merchantUpi = paymentDetails.merchantUpiId || 'scoders@ybl';
+  const [activeMerchantVpa, setActiveMerchantVpa] = useState<string>(() => {
+    if (paymentDetails.merchantUpiId && paymentDetails.merchantUpiId !== 'scoders@ybl') {
+      return paymentDetails.merchantUpiId;
+    }
+    return getActiveMerchantUpi();
+  });
+  const merchantUpi = activeMerchantVpa;
   const orderId = orderData?.orderId || `order_rzp_${Date.now()}`;
 
   useEffect(() => {
@@ -235,7 +241,7 @@ export default function RazorpayModal({
 
     try {
       await new Promise(r => setTimeout(r, 1200));
-      setProcessingStage('Authenticating merchant settlement with scoders@ybl...');
+      setProcessingStage(`Authenticating merchant settlement with ${merchantUpi}...`);
       await new Promise(r => setTimeout(r, 600));
 
       const generatedPaymentId = `pay_upi_${cleanUtr}`;
@@ -255,6 +261,7 @@ export default function RazorpayModal({
             purpose: paymentDetails.purpose,
             amount: amount,
             currency: currency,
+            merchantUpiId: merchantUpi,
           }),
         });
       } catch (err) {}
@@ -344,6 +351,7 @@ export default function RazorpayModal({
             purpose: paymentDetails.purpose,
             amount: amount,
             currency: currency,
+            merchantUpiId: merchantUpi,
           }),
         });
       } catch (err) {}
@@ -393,6 +401,24 @@ export default function RazorpayModal({
       const generatedPaymentId = `pay_nb_${selectedBank.toLowerCase()}_${Date.now().toString(36)}`;
       const bypassSig = `sig_nb_${Date.now().toString(36)}`;
 
+      try {
+        await fetch('/api/razorpay/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_order_id: orderId,
+            razorpay_payment_id: generatedPaymentId,
+            razorpay_signature: bypassSig,
+            email: paymentDetails.email,
+            clientName: paymentDetails.clientName,
+            purpose: paymentDetails.purpose,
+            amount: amount,
+            currency: currency,
+            merchantUpiId: merchantUpi,
+          }),
+        });
+      } catch (err) {}
+
       setIsProcessing(false);
       onSuccess({
         razorpay_payment_id: generatedPaymentId,
@@ -438,6 +464,24 @@ export default function RazorpayModal({
       await new Promise(r => setTimeout(r, 1200));
       const generatedPaymentId = `pay_wal_${selectedWallet}_${Date.now().toString(36)}`;
       const bypassSig = `sig_wal_${Date.now().toString(36)}`;
+
+      try {
+        await fetch('/api/razorpay/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_order_id: orderId,
+            razorpay_payment_id: generatedPaymentId,
+            razorpay_signature: bypassSig,
+            email: paymentDetails.email,
+            clientName: paymentDetails.clientName,
+            purpose: paymentDetails.purpose,
+            amount: amount,
+            currency: currency,
+            merchantUpiId: merchantUpi,
+          }),
+        });
+      } catch (err) {}
 
       setIsProcessing(false);
       onSuccess({
@@ -614,7 +658,7 @@ export default function RazorpayModal({
                       </span>
                     </div>
                     <span className="text-[10px] font-mono text-gray-400">
-                      Merchant: <strong className="text-white">scoders@ybl</strong>
+                      Merchant: <strong className="text-white">{merchantUpi}</strong>
                     </span>
                   </div>
 
@@ -625,11 +669,12 @@ export default function RazorpayModal({
                   {/* QR Code & VPA Display */}
                   <PhonePeScannerCard
                     upiString={universalUpiLink}
-                    merchantName="sCoders"
+                    merchantName="S-CODERS"
                     merchantVpa={merchantUpi}
                     amount={amount}
                     showTimer={true}
                     timerSeconds={qrTimer}
+                    onVpaChange={setActiveMerchantVpa}
                   />
 
                   {/* Quick App Launch Links if opened on Mobile */}
@@ -1043,11 +1088,12 @@ export default function RazorpayModal({
                       <div className="py-2 flex flex-col items-center">
                         <PhonePeScannerCard
                           upiString={universalUpiLink}
-                          merchantName="sCoders"
+                          merchantName="S-CODERS"
                           merchantVpa={merchantUpi}
                           amount={amount}
                           showTimer={true}
                           timerSeconds={qrTimer}
+                          onVpaChange={setActiveMerchantVpa}
                         />
                       </div>
                     )}

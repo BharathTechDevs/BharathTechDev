@@ -13,7 +13,7 @@ import EmailNotificationModal, { EmailNotificationData } from './EmailNotificati
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp } from '../utils/paymentLinks';
+import { openUpiApp, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 
 export default function Events() {
   const [events, setEvents] = useState<SCODERSEvent[]>([]);
@@ -423,7 +423,7 @@ export default function Events() {
           clientName: regName.trim(),
           email: regEmail.trim(),
           purpose: `Event Pass: ${selectedEvent.name}`,
-          merchantUpiId: 'scoders@ybl'
+          merchantUpiId: getActiveMerchantUpi()
         });
 
         setShowRazorpayModal(true);
@@ -442,7 +442,7 @@ export default function Events() {
           clientName: regName.trim(),
           email: regEmail.trim(),
           purpose: `Event Pass: ${selectedEvent.name}`,
-          merchantUpiId: 'scoders@ybl'
+          merchantUpiId: getActiveMerchantUpi()
         });
         setShowRazorpayModal(true);
         setIsProcessing(false);
@@ -1349,26 +1349,24 @@ export default function Events() {
                             </div>
                           )}
 
-                          {/* Tab 2: Direct UPI QR (scoders@ybl) */}
+                          {/* Tab 2: Direct UPI QR */}
                           {eventPaymentTab === 'upi' && (() => {
+                            const activeVpa = getActiveMerchantUpi();
                             const evtPriceFormatted = (selectedEvent.ticketPrice || 0).toFixed(2);
-                            const evtCleanTitle = (selectedEvent.title || 'Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
-                            const evtUpiUniversal = `upi://pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
-                            const evtPhonePeLink = `phonepe://pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
-                            const evtGpayLink = `tez://upi/pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
-                            const evtPaytmLink = `paytmmp://pay?pa=scoders@ybl&pn=SCODERSTechnologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
+                            const evtCleanTitle = (selectedEvent.name || selectedEvent.title || 'Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
+                            const evtUpiUniversal = `upi://pay?pa=${activeVpa}&pn=S-CODERS%20Technologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
 
                             return (
                               <div className="bg-black/60 border border-brand-teal/30 p-4 rounded-2xl space-y-3">
                                 <div className="flex items-center justify-between">
                                   <div>
-                                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">Official UPI ID</span>
-                                    <span className="text-brand-teal font-mono font-bold text-sm">scoders@ybl</span>
+                                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">Official Merchant UPI</span>
+                                    <span className="text-brand-teal font-mono font-bold text-sm">{activeVpa}</span>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      navigator.clipboard.writeText('scoders@ybl');
+                                      navigator.clipboard.writeText(activeVpa);
                                       setCopiedUpi(true);
                                       setTimeout(() => setCopiedUpi(false), 2000);
                                     }}
@@ -1382,8 +1380,8 @@ export default function Events() {
                                 <div className="py-2 flex flex-col items-center">
                                   <PhonePeScannerCard
                                     upiString={evtUpiUniversal}
-                                    merchantName="sCoders"
-                                    merchantVpa="scoders@ybl"
+                                    merchantName="S-CODERS Technologies"
+                                    merchantVpa={activeVpa}
                                     amount={selectedEvent.ticketPrice}
                                   />
                                 </div>
@@ -1393,7 +1391,7 @@ export default function Events() {
                                   <button
                                     type="button"
                                     onClick={() => openUpiApp({
-                                      pa: 'scoders@ybl',
+                                      pa: activeVpa,
                                       pn: 'S-CODERS Technologies',
                                       am: selectedEvent.ticketPrice,
                                       tn: evtCleanTitle,
@@ -1407,7 +1405,7 @@ export default function Events() {
                                   <button
                                     type="button"
                                     onClick={() => openUpiApp({
-                                      pa: 'scoders@ybl',
+                                      pa: activeVpa,
                                       pn: 'S-CODERS Technologies',
                                       am: selectedEvent.ticketPrice,
                                       tn: evtCleanTitle,
@@ -1421,7 +1419,7 @@ export default function Events() {
                                   <button
                                     type="button"
                                     onClick={() => openUpiApp({
-                                      pa: 'scoders@ybl',
+                                      pa: activeVpa,
                                       pn: 'S-CODERS Technologies',
                                       am: selectedEvent.ticketPrice,
                                       tn: evtCleanTitle,

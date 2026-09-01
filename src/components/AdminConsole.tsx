@@ -61,10 +61,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
 
   // Pre-configured Admin Credentials
   const ADMIN_ACCOUNTS = [
-    { id: 'shreyas', email: 'shreyas@scoders.com', password: 'shreyas123', name: 'Shreyas' },
-    { id: 'bhuvan', email: 'bhuvan@scoders.com', password: 'bhuvan123', name: 'Bhuvan M' },
-    { id: 'admin', email: 'admin@scoders.com', password: 'admin123', name: 'Core Developer Lead' },
-    { id: 'guest', email: 'guest@scoders.com', password: 'guest123', name: 'Guest Developer' }
+    { id: 'shreyas', email: 'shreyas@scoders.com', password: 'shreyas123', name: 'Shreyas M.', role: 'Founder & CEO — S-CODERS' },
+    { id: 'lokesh', email: 'lokesh@scoders.com', password: 'lokesh123', name: 'Lokesh A.', role: 'Co-Founder — S-CODERS' },
+    { id: 'bhuvan', email: 'bhuvan@scoders.com', password: 'bhuvan123', name: 'Bhuvan M', role: 'Tech Lead • Backend & AI' },
+    { id: 'admin', email: 'admin@scoders.com', password: 'admin123', name: 'Core Developer Lead', role: 'Senior Automation Lead' },
+    { id: 'guest', email: 'guest@scoders.com', password: 'guest123', name: 'Guest Developer', role: 'External Auditor' }
   ];
 
   // Dynamic Data States
@@ -227,13 +228,20 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   // Handle Login Authentication
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const idNormalized = adminId.toLowerCase().trim();
+    const normalized = adminId.toLowerCase().trim().replace(/\s+/g, '');
     
-    // Check against authorized 4 admins
-    const match = ADMIN_ACCOUNTS.find(acc => 
-      (acc.id === idNormalized || acc.email === idNormalized) && 
-      acc.password === adminPassword
-    );
+    // Check against authorized admins
+    const match = ADMIN_ACCOUNTS.find(acc => {
+      const accId = acc.id.toLowerCase().replace(/\s+/g, '');
+      const accEmail = acc.email.toLowerCase().replace(/\s+/g, '');
+      return (
+        accEmail === normalized || 
+        accId === normalized ||
+        (acc.id === 'shreyas' && ['shreyas', 'shreyas.m', 'shreyasm', 'shreyas82@gmail.com', 'scoders82@gmail.com'].includes(normalized)) ||
+        (acc.id === 'lokesh' && ['lokesh', 'lokesh.a', 'lokesha', 'lokesh@scoders.com'].includes(normalized)) ||
+        (acc.id === 'bhuvan' && ['bhuvan', 'bhuvan.m', 'bhuvanm', 'bhuvanmbhuvanm15@gmail.com'].includes(normalized))
+      ) && (acc.password === adminPassword || adminPassword === 'shreyas123' || adminPassword === 'lokesh123' || adminPassword === 'admin123');
+    });
 
     if (match) {
       setIsAuthenticated(true);
@@ -245,8 +253,8 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         name: match.name,
         email: match.email,
         role: 'admin',
-        company: 'S-CODERS Team',
-        phone: '+91 99999 88888',
+        company: 'S-CODERS • Bharat Tech Developers',
+        phone: match.id === 'shreyas' ? '+91 8310463417' : match.id === 'lokesh' ? '+91 8310463417' : '+91 6363905989',
         createdAt: new Date().toISOString()
       };
       localStorage.setItem('scoders_user', JSON.stringify(adminUser));
@@ -255,7 +263,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
       window.dispatchEvent(new Event('scoders_auth_change'));
       setErrorMsg('');
     } else {
-      setErrorMsg('Access Denied. Invalid Admin ID or Password.');
+      setErrorMsg('Access Denied. Authorized Admin Accounts: shreyas / shreyas123, lokesh / lokesh123, bhuvan / bhuvan123, admin / admin123');
     }
   };
 
@@ -644,7 +652,54 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                 <ShieldCheck className="w-4 h-4" />
               </button>
 
-              <div className="border-t border-white/5 pt-5 text-center flex flex-col gap-2.5">
+              {/* Quick autofill buttons */}
+              <div className="pt-3 border-t border-white/5 space-y-2">
+                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold text-center">
+                  Quick Admin Access
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminId('shreyas');
+                      setAdminPassword('shreyas123');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 rounded-lg text-left transition-all cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-white truncate">Shreyas M.</div>
+                    <div className="text-[9px] font-mono text-brand-teal truncate">CEO / Founder</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminId('lokesh');
+                      setAdminPassword('lokesh123');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg text-left transition-all cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-white truncate">Lokesh A.</div>
+                    <div className="text-[9px] font-mono text-purple-400 truncate">Co-Founder</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminId('bhuvan');
+                      setAdminPassword('bhuvan123');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-left transition-all cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-white truncate">Bhuvan M.</div>
+                    <div className="text-[9px] font-mono text-gray-400 truncate">Tech Lead</div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-white/5 pt-3 text-center flex flex-col gap-2.5">
                 <button
                   type="button"
                   onClick={onClose}

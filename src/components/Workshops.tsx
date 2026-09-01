@@ -14,6 +14,7 @@ import { WorkshopComment, WorkshopEvent, AppUser } from '../types';
 import { DatabaseEngine, WorkshopRegistration, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
+import { getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -479,7 +480,7 @@ export default function TenantDashboard() {
         clientName: participantName,
         email: participantEmail,
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
-        merchantUpiId: 'scoders@ybl'
+        merchantUpiId: getActiveMerchantUpi()
       });
 
       setIsProcessing(false);
@@ -498,7 +499,7 @@ export default function TenantDashboard() {
         clientName: participantName,
         email: participantEmail,
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
-        merchantUpiId: 'scoders@ybl'
+        merchantUpiId: getActiveMerchantUpi()
       });
       setIsProcessing(false);
       setShowRazorpayModal(true);
@@ -512,7 +513,7 @@ export default function TenantDashboard() {
       data.email || regEmail || currentUser?.email || 'participant@scoders.com',
       regRole || 'Registered Developer',
       data.amount,
-      'Razorpay Smart Gateway (scoders@ybl)',
+      `Razorpay Gateway (${getActiveMerchantUpi()})`,
       data.razorpay_payment_id || ('PAY_WKSP_' + Date.now().toString(36).toUpperCase())
     );
   };
@@ -1272,11 +1273,11 @@ export default function TenantDashboard() {
                         {/* 3 Pill buttons: Phone, Email, WhatsApp */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="tel:+916363905989"
+                            href="tel:+918310463417"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
                             <Phone className="w-3.5 h-3.5 text-[#f87171]" />
-                            <span>+91 6363905989</span>
+                            <span>+91 8310463417</span>
                           </a>
                           <a
                             href="mailto:scoders82@gmail.com"
@@ -1286,7 +1287,7 @@ export default function TenantDashboard() {
                             <span>scoders82@gmail.com</span>
                           </a>
                           <a
-                            href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                            href="https://wa.me/918310463417"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -1327,11 +1328,11 @@ export default function TenantDashboard() {
                         {/* 3 Pill buttons: Phone, Email, WhatsApp */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="tel:+918310463417"
+                            href="tel:+916363905989"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
                             <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                            <span>+91 8310463417</span>
+                            <span>+91 6363905989</span>
                           </a>
                           <a
                             href="mailto:scoders82@gmail.com"
@@ -1341,7 +1342,7 @@ export default function TenantDashboard() {
                             <span>scoders82@gmail.com</span>
                           </a>
                           <a
-                            href="https://wa.me/qr/NNPE4VUHYNIYA1"
+                            href="https://wa.me/916363905989"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
