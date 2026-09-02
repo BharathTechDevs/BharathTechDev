@@ -1243,21 +1243,21 @@ export default function TenantDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Host 1: Shreyas (Founder & CEO) */}
+                      {/* Host 1: Shreyas.M (Founder & CEO) */}
                       <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
                         <div className="space-y-3.5">
                           <div className="flex items-center gap-4">
                             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
                               <img 
                                 src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200" 
-                                alt="Shreyas" 
+                                alt="Shreyas.M" 
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 referrerPolicy="no-referrer"
                               />
                             </div>
                             <div>
                               <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
-                                shreyas
+                                shreyas.m
                               </h4>
                               <span className="text-[11px] font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
                                 FOUNDER • WORKSHOPS • 1:1 SESSIONS
