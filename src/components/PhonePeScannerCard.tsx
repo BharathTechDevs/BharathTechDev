@@ -149,15 +149,47 @@ export default function PhonePeScannerCard({
           </span>
         )}
         
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 rounded-lg text-purple-200 font-mono text-xs transition-colors cursor-pointer"
-          title="Click to copy UPI ID"
-        >
-          <span>UPI ID: <strong className="text-white font-bold">{activeVpa}</strong></span>
-          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-gray-400" />}
-        </button>
+        <div className="mt-2 flex flex-col gap-1.5 w-full">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 rounded-lg text-purple-200 font-mono text-xs transition-colors cursor-pointer w-full"
+            title="Click to copy UPI ID"
+          >
+            <span>UPI ID: <strong className="text-white font-bold">{activeVpa}</strong></span>
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <Copy className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const phone = isBhuvan ? '6363905989' : '8310463417';
+              navigator.clipboard.writeText(phone);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 rounded-lg text-gray-200 hover:text-white font-mono text-xs transition-colors cursor-pointer w-full"
+            title="Click to copy Phone Number for PhonePe"
+          >
+            <span>PhonePe Mobile: <strong className="text-purple-300 font-bold">{isBhuvan ? '6363905989' : '8310463417'}</strong></span>
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <Copy className="w-3.5 h-3.5 text-purple-300 shrink-0" />}
+          </button>
+        </div>
+
+        {/* Security hint for PhonePe users */}
+        <div className="mt-3 p-2.5 bg-purple-950/40 border border-purple-500/30 rounded-xl text-[11px] text-gray-300 text-left space-y-1">
+          <div className="flex items-center gap-1.5 text-purple-300 font-semibold font-mono text-[10px] uppercase">
+            <span>💡 PhonePe Security Notice Tip</span>
+          </div>
+          <p className="text-[10px] text-gray-300 font-sans leading-tight">
+            If PhonePe shows <em className="text-purple-200">"declined for security reasons"</em> on browser link, simply:
+          </p>
+          <ul className="text-[10px] text-gray-400 list-disc pl-3.5 space-y-0.5 font-sans">
+            <li>Open PhonePe and <strong className="text-white">Scan this QR code directly</strong></li>
+            <li>Or send via PhonePe <strong className="text-white">"To Mobile Number"</strong>: <span className="text-purple-300 font-mono font-bold">{isBhuvan ? '6363905989' : '8310463417'}</span></li>
+            <li>Or pay via <strong className="text-white">Google Pay / Paytm</strong></li>
+          </ul>
+        </div>
       </div>
 
       {/* Optional Timer */}

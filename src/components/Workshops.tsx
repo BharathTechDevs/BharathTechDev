@@ -1270,30 +1270,25 @@ export default function TenantDashboard() {
                           </p>
                         </div>
 
-                        {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+                        {/* Social Profiles: GitHub & LinkedIn */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="tel:+918310463417"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Phone className="w-3.5 h-3.5 text-[#f87171]" />
-                            <span>+91 8310463417</span>
-                          </a>
-                          <a
-                            href="mailto:scoders82@gmail.com"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-[#f87171]" />
-                            <span>scoders82@gmail.com</span>
-                          </a>
-                          <a
-                            href="https://wa.me/918310463417"
+                            href="https://github.com/shreyas-scoders"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                            <span>whatsapp</span>
+                            <Github className="w-3.5 h-3.5 text-white" />
+                            <span>GitHub</span>
+                          </a>
+                          <a
+                            href="https://linkedin.com/in/shreyas-scoders"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                          >
+                            <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                            <span>LinkedIn</span>
                           </a>
                         </div>
                       </div>
@@ -1325,30 +1320,25 @@ export default function TenantDashboard() {
                           </p>
                         </div>
 
-                        {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+                        {/* Social Profiles: GitHub & LinkedIn */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="tel:+916363905989"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                            <span>+91 6363905989</span>
-                          </a>
-                          <a
-                            href="mailto:scoders82@gmail.com"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-brand-teal" />
-                            <span>scoders82@gmail.com</span>
-                          </a>
-                          <a
-                            href="https://wa.me/916363905989"
+                            href="https://github.com/bhuvan-scoders"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                            <span>whatsapp</span>
+                            <Github className="w-3.5 h-3.5 text-white" />
+                            <span>GitHub</span>
+                          </a>
+                          <a
+                            href="https://linkedin.com/in/bhuvan-scoders"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                          >
+                            <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                            <span>LinkedIn</span>
                           </a>
                         </div>
                       </div>
