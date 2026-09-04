@@ -1273,7 +1273,7 @@ export default function TenantDashboard() {
                         {/* Social Profiles: GitHub & LinkedIn */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="https://github.com/shreyas-scoders"
+                            href="https://github.com/shreyasshreyas40858-max/Chaturya"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -1282,7 +1282,7 @@ export default function TenantDashboard() {
                             <span>GitHub</span>
                           </a>
                           <a
-                            href="https://linkedin.com/in/shreyas-scoders"
+                            href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -1310,35 +1310,40 @@ export default function TenantDashboard() {
                                 bhuvan
                               </h4>
                               <span className="text-[11px] font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
-                                TECH LEAD • BACKEND • AI
+                                TECH LEAD • FULL-STACK • UI/UX
                               </span>
                             </div>
                           </div>
 
                           <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                            tech lead at s-coders. backend + ai systems architect. builds the systems that make reciprocate & live agents run: pipelines, fast inferences, and classroom sandboxes.
+                            Tech Lead at S-CODERS. Full-Stack Developer & UI/UX enthusiast. Architected and developed the complete S-CODERS digital platform, responsive applications, and interactive experiences.
                           </p>
                         </div>
 
-                        {/* Social Profiles: GitHub & LinkedIn */}
+                        {/* Contact & Connect Links */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="https://github.com/bhuvan-scoders"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                            href="tel:+916363905989"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Github className="w-3.5 h-3.5 text-white" />
-                            <span>GitHub</span>
+                            <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                            <span>+91 6363905989</span>
                           </a>
                           <a
-                            href="https://linkedin.com/in/bhuvan-scoders"
+                            href="https://wa.me/916363905989"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
                           >
-                            <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
-                            <span>LinkedIn</span>
+                            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                            <span>WhatsApp</span>
+                          </a>
+                          <a
+                            href="mailto:scoders82@gmail.com"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-brand-teal" />
+                            <span>Email</span>
                           </a>
                         </div>
                       </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Mail, MessageSquare, Send, CheckCircle, ChevronDown, ChevronUp,
-  Instagram, MessageCircle, Youtube, Twitter, Linkedin, MapPin, 
+  Instagram, MessageCircle, Youtube, Twitter, Linkedin, Github, MapPin, 
   Sparkles, ShieldCheck, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -139,11 +139,19 @@ export default function Contact() {
                   <Phone className="w-5 h-5 text-brand-teal shrink-0 mt-0.5" />
                   <div>
                     <span className="text-[11px] font-mono uppercase text-gray-400 font-bold block">Shreyas M • Founder & CEO (+91 8310463417)</span>
-                    <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-3 mt-1">
                       <a href="tel:+918310463417" className="hover:text-brand-teal font-mono transition-colors">+91 8310463417</a>
                       <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="text-[#25D366] text-xs font-mono hover:underline flex items-center gap-1">
                         <MessageCircle className="w-3 h-3" />
                         <span>Chat on WhatsApp</span>
+                      </a>
+                      <a href="https://github.com/shreyasshreyas40858-max/Chaturya" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white text-xs font-mono hover:underline flex items-center gap-1">
+                        <Github className="w-3 h-3 text-white" />
+                        <span>GitHub</span>
+                      </a>
+                      <a href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" rel="noopener noreferrer" className="text-[#38bdf8] text-xs font-mono hover:underline flex items-center gap-1">
+                        <Linkedin className="w-3 h-3" />
+                        <span>LinkedIn</span>
                       </a>
                     </div>
                   </div>

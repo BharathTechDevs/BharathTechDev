@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { 
   Linkedin, Github, Users2, Sparkles, HeartHandshake, Rocket, Lightbulb, 
   Building2, BrainCircuit, Globe, Smartphone, Cog, ShieldCheck, Laptop, 
-  GraduationCap, Quote, Mail, Phone, Code2, Bot, Wrench, Palette, Cpu, CheckCircle2
+  GraduationCap, Quote, Mail, Phone, Code2, Bot, Wrench, Palette, Cpu, CheckCircle2,
+  MessageCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TEAM_MEMBERS } from '../data';
@@ -23,7 +24,7 @@ const cardVariants = {
 };
 
 export default function Team() {
-  const [selectedLeader, setSelectedLeader] = useState<'both' | 'shreyas' | 'lokesh'>('both');
+  const [selectedLeader, setSelectedLeader] = useState<'all' | 'shreyas' | 'lokesh' | 'bhuvan'>('all');
 
   return (
     <section id="team" className="py-24 bg-brand-dark relative overflow-hidden select-none">
@@ -54,9 +55,9 @@ export default function Team() {
           {/* Executive Filter Controls */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
             <button
-              onClick={() => setSelectedLeader('both')}
+              onClick={() => setSelectedLeader('all')}
               className={`px-4 py-2 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer ${
-                selectedLeader === 'both'
+                selectedLeader === 'all'
                   ? 'bg-brand-teal text-brand-dark shadow-lg shadow-brand-teal/20'
                   : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
               }`}
@@ -83,6 +84,16 @@ export default function Team() {
             >
               Lokesh A. (Co-Founder)
             </button>
+            <button
+              onClick={() => setSelectedLeader('bhuvan')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer ${
+                selectedLeader === 'bhuvan'
+                  ? 'bg-cyan-400 text-brand-dark shadow-lg shadow-cyan-400/20'
+                  : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
+              }`}
+            >
+              Bhuvan M. (Tech Lead)
+            </button>
           </div>
         </motion.div>
 
@@ -90,7 +101,7 @@ export default function Team() {
         <div className="space-y-12 mb-16">
           
           {/* 1. SHREYAS M. — FOUNDER & CEO */}
-          {(selectedLeader === 'both' || selectedLeader === 'shreyas') && (
+          {(selectedLeader === 'all' || selectedLeader === 'shreyas') && (
             <motion.div
               initial={{ opacity: 0, y: 25 }}
               animate={{ opacity: 1, y: 0 }}
@@ -138,8 +149,26 @@ export default function Team() {
                     </p>
                   </div>
 
-                  {/* Contact Links */}
+                  {/* Contact & Social Links */}
                   <div className="flex flex-wrap items-center gap-2 pt-2">
+                    <a
+                      href="https://github.com/shreyasshreyas40858-max/Chaturya"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-xs font-mono text-gray-300 hover:text-white transition-all shadow-sm cursor-pointer"
+                    >
+                      <Github className="w-3.5 h-3.5 text-white" />
+                      <span>GitHub</span>
+                    </a>
+                    <a
+                      href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-xs font-mono text-[#38bdf8] hover:text-white transition-all shadow-sm cursor-pointer"
+                    >
+                      <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                      <span>LinkedIn</span>
+                    </a>
                     <a
                       href="tel:+918310463417"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-xs font-mono text-gray-300 hover:text-white transition-all"
@@ -247,7 +276,7 @@ export default function Team() {
           )}
 
           {/* 2. LOKESH A. — CO-FOUNDER */}
-          {(selectedLeader === 'both' || selectedLeader === 'lokesh') && (
+          {(selectedLeader === 'all' || selectedLeader === 'lokesh') && (
             <motion.div
               initial={{ opacity: 0, y: 25 }}
               animate={{ opacity: 1, y: 0 }}
@@ -411,6 +440,193 @@ export default function Team() {
             </motion.div>
           )}
 
+          {/* 3. BHUVAN M. — TECH LEAD */}
+          {(selectedLeader === 'all' || selectedLeader === 'bhuvan') && (
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="glass-panel rounded-3xl border border-cyan-500/30 hover:border-cyan-400/50 overflow-hidden p-6 sm:p-10 shadow-2xl relative bg-gradient-to-b from-[#0c1624] to-[#0A0B10]"
+            >
+              <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 opacity-40 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative z-10">
+                {/* Tech Lead Avatar & Badges */}
+                <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left space-y-4">
+                  <div className="relative group">
+                    <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-2 border-cyan-400/60 shadow-xl shadow-cyan-500/20">
+                      <img
+                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600&h=600"
+                        alt="Bhuvan M. - Tech Lead"
+                        className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="absolute -bottom-3 -right-3 px-3 py-1 bg-cyan-400 text-brand-dark rounded-full text-[11px] font-mono font-bold uppercase tracking-wider shadow-lg">
+                      TECH LEAD
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white tracking-tight">
+                      Bhuvan M.
+                    </h3>
+                    <p className="text-cyan-400 font-mono text-xs font-semibold uppercase tracking-wider mt-1">
+                      Tech Lead — S-CODERS
+                    </p>
+                    <p className="text-gray-400 font-mono text-[11px] mt-0.5">
+                      Bharat Tech Developers
+                    </p>
+                  </div>
+
+                  {/* Profile & Expertise */}
+                  <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-2xl w-full text-left">
+                    <span className="text-[10px] font-mono text-cyan-300 uppercase block font-semibold mb-1">
+                      Core Persona & Subtitle
+                    </span>
+                    <p className="text-xs text-gray-200 font-sans leading-relaxed font-medium">
+                      Full-Stack Developer • Web Developer • UI/UX Enthusiast • Digital Product Builder
+                    </p>
+                  </div>
+
+                  {/* Contact Links */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2">
+                    <a
+                      href="tel:+916363905989"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-500/40 rounded-full text-xs font-mono text-gray-300 hover:text-white transition-all"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>+91 6363905989</span>
+                    </a>
+                    <a
+                      href="https://wa.me/916363905989"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/60 rounded-full text-xs font-mono text-emerald-300 hover:text-white transition-all cursor-pointer"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                      <span>WhatsApp</span>
+                    </a>
+                    <a
+                      href="mailto:scoders82@gmail.com"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-500/40 rounded-full text-xs font-mono text-gray-300 hover:text-white transition-all"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>scoders82@gmail.com</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Narrative & Vision */}
+                <div className="lg:col-span-8 space-y-6">
+                  <div className="space-y-3">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Tech Leadership • S-CODERS</span>
+                    </div>
+                    
+                    <p className="text-gray-300 text-sm sm:text-base font-sans font-light leading-relaxed">
+                      I’m <strong className="text-white font-medium">Bhuvan M.</strong>, the Tech Lead at <strong className="text-cyan-400 font-semibold">S-CODERS</strong>, where I focus on turning ideas into modern, functional, and engaging digital experiences.
+                    </p>
+
+                    <p className="text-gray-400 text-sm font-sans font-light leading-relaxed">
+                      My journey in technology is driven by a passion for web development, creative design, problem-solving, and building digital products from the ground up. I enjoy taking an idea from its initial concept and transforming it into a complete, working digital experience.
+                    </p>
+
+                    <p className="text-gray-400 text-sm font-sans font-light leading-relaxed">
+                      As the Tech Lead of S-CODERS, I focus on the technical development and implementation of our digital platforms. I work on website architecture, frontend development, interactive interfaces, responsive design, and overall user experience to create products that are both visually appealing and practically useful.
+                    </p>
+
+                    <div className="p-3.5 bg-cyan-500/10 border border-cyan-500/25 rounded-xl">
+                      <p className="text-cyan-200 text-xs sm:text-sm font-sans leading-relaxed">
+                        ✨ One of my key contributions to S-CODERS is the <strong className="text-white font-semibold">complete design and development of the S-CODERS website</strong>, from its initial structure and interface to its responsive design, interactions, and overall digital experience.
+                      </p>
+                    </div>
+
+                    <p className="text-gray-400 text-sm font-sans font-light leading-relaxed">
+                      Beyond S-CODERS, I actively work on personal and development projects that are available through my GitHub portfolio, where I continue to experiment with different technologies and build practical applications. I also maintain a professional presence on LinkedIn, where I share my technology journey, projects, learning experiences, and professional development.
+                    </p>
+
+                    <p className="text-gray-400 text-sm font-sans font-light leading-relaxed">
+                      Through continuous building and learning, I aim to strengthen my skills while exploring modern technologies, AI-assisted development, creative web experiences, and new approaches to solving real-world problems.
+                    </p>
+                  </div>
+
+                  {/* Vision Block */}
+                  <div className="p-5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 relative overflow-hidden space-y-3">
+                    <div className="flex items-center gap-2 text-cyan-300 font-mono text-xs uppercase tracking-wider font-bold">
+                      <Rocket className="w-4 h-4 text-cyan-400" />
+                      <span>🚀 My Vision</span>
+                    </div>
+                    <p className="text-gray-200 text-sm font-sans leading-relaxed">
+                      "My vision is to contribute to building S-CODERS into a technology company known for creating innovative, reliable, and meaningful digital products. I believe that technology becomes powerful when <strong className="text-white font-medium">creativity, functionality, and user experience come together</strong>. My goal is to build digital experiences that are not only impressive to look at but also useful, intuitive, and capable of solving real-world problems."
+                    </p>
+                    <div className="pt-2 border-t border-cyan-500/20 flex items-center gap-2">
+                      <Quote className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <span className="text-xs font-mono text-cyan-300 italic font-semibold">
+                        «“Build with purpose. Create with creativity. Deliver with impact.”»
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 💡 What I Focus On Grid (10 Focus Items) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-white font-mono text-xs uppercase tracking-wider font-bold">
+                      <Lightbulb className="w-4 h-4 text-amber-400" />
+                      <span>💡 What I Focus On</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {[
+                        { icon: Globe, title: 'Full-Stack Web Development', color: 'text-cyan-400' },
+                        { icon: Laptop, title: 'Modern Website Development', color: 'text-blue-400' },
+                        { icon: Palette, title: 'UI/UX & Interactive Experiences', color: 'text-pink-400' },
+                        { icon: Cpu, title: 'Website Architecture & Implementation', color: 'text-emerald-400' },
+                        { icon: Smartphone, title: 'Responsive Web Applications', color: 'text-amber-400' },
+                        { icon: Rocket, title: 'Digital Product Development', color: 'text-orange-400' },
+                        { icon: Bot, title: 'AI-Assisted Development', color: 'text-purple-400' },
+                        { icon: BrainCircuit, title: 'Technology & Problem Solving', color: 'text-rose-400' },
+                        { icon: Wrench, title: 'Modern Development Tools & Workflows', color: 'text-indigo-400' },
+                        { icon: Sparkles, title: 'Creative Digital Experiences', color: 'text-teal-400' },
+                      ].map((item, idx) => {
+                        const IconComp = item.icon;
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2.5 p-2.5 bg-white/5 border border-cyan-500/10 hover:border-cyan-500/30 rounded-xl transition-all"
+                          >
+                            <div className="p-1.5 rounded-lg bg-black/40 border border-cyan-500/20 shrink-0">
+                              <IconComp className={`w-3.5 h-3.5 ${item.color}`} />
+                            </div>
+                            <span className="text-xs font-sans text-gray-200 font-medium">
+                              {item.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 🏢 My Role at S-CODERS Statement */}
+                  <div className="p-4 rounded-2xl bg-white/5 border border-cyan-500/20 space-y-1.5">
+                    <div className="flex items-center gap-2 text-cyan-300 font-mono text-xs uppercase tracking-wider font-semibold">
+                      <Building2 className="w-4 h-4 text-cyan-400" />
+                      <span>🏢 My Role at S-CODERS</span>
+                    </div>
+                    <p className="text-gray-300 text-xs font-sans font-light leading-relaxed">
+                      As Tech Lead, I focus on converting the team's ideas into technically functional and engaging digital products. My responsibilities include planning, designing, developing, and improving the technical aspects of S-CODERS projects. I work particularly on <strong className="text-white font-medium">web development, user interfaces, digital experiences, and technical implementation</strong>. The <strong className="text-white font-medium">S-CODERS website was completely designed and developed by me</strong>, representing my approach to combining technology, creativity, functionality, and user experience. Alongside my work at S-CODERS, my GitHub projects and professional work reflect my continuous interest in learning, experimenting, and building technology. I aim to help S-CODERS create technology that combines innovation, design, functionality, and real-world value.
+                    </p>
+                    <div className="pt-2 text-right">
+                      <span className="text-[11px] font-mono text-cyan-300 font-semibold">
+                        — Bhuvan M. • Tech Lead, S-CODERS • Bharat Tech Developers
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
         </div>
 
         {/* Section Divider */}
@@ -454,26 +670,30 @@ export default function Team() {
                       {member.name}
                     </h3>
                     <div className="flex items-center gap-2">
-                      <motion.a
-                        whileHover={{ scale: 1.2 }}
-                        whileTap={{ scale: 0.9 }}
-                        href={member.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-brand-teal transition-colors p-1"
-                      >
-                        <Linkedin className="w-4 h-4" />
-                      </motion.a>
-                      <motion.a
-                        whileHover={{ scale: 1.2 }}
-                        whileTap={{ scale: 0.9 }}
-                        href={member.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-white transition-colors p-1"
-                      >
-                        <Github className="w-4 h-4" />
-                      </motion.a>
+                      {member.linkedin ? (
+                        <motion.a
+                          whileHover={{ scale: 1.2 }}
+                          whileTap={{ scale: 0.9 }}
+                          href={member.linkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gray-400 hover:text-brand-teal transition-colors p-1"
+                        >
+                          <Linkedin className="w-4 h-4" />
+                        </motion.a>
+                      ) : null}
+                      {member.github ? (
+                        <motion.a
+                          whileHover={{ scale: 1.2 }}
+                          whileTap={{ scale: 0.9 }}
+                          href={member.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gray-400 hover:text-white transition-colors p-1"
+                        >
+                          <Github className="w-4 h-4" />
+                        </motion.a>
+                      ) : null}
                     </div>
                   </div>
                   

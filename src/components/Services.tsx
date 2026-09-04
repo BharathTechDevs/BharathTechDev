@@ -5,7 +5,8 @@ import {
   Edit2, Save, X, Lock, Key, Copy, Play, RefreshCw, Send, Terminal, 
   Settings, Database, AppWindow, Eye, Check, ChevronRight, Layout,
   Laptop, Server, Clock, Calendar, Shield, HelpCircle, Star, Download,
-  Phone, Mail, MessageSquare, FileText, QrCode, MessageCircle, ExternalLink, ShieldCheck
+  Phone, Mail, MessageSquare, FileText, QrCode, MessageCircle, ExternalLink, ShieldCheck,
+  Github, Linkedin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -3007,8 +3008,26 @@ export function ServiceProjectSpaceDashboard({
               </p>
             </div>
 
-            {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+            {/* Social & Contact Pill buttons */}
             <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+              <a
+                href="https://github.com/shreyasshreyas40858-max/Chaturya"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Github className="w-3.5 h-3.5 text-white" />
+                <span>GitHub</span>
+              </a>
+              <a
+                href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                <span>LinkedIn</span>
+              </a>
               <a
                 href="tel:+918310463417"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -3052,17 +3071,17 @@ export function ServiceProjectSpaceDashboard({
                     bhuvan
                   </h4>
                   <span className="text-[11px] sm:text-xs font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
-                    TECH LEAD • BACKEND • AI
+                    TECH LEAD • FULL-STACK • UI/UX
                   </span>
                 </div>
               </div>
 
               <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                tech lead at s-coders. backend + ai engineer. builds the systems that make high-velocity client applications run, agents, pipelines, the infra that holds it all...
+                Tech Lead at S-CODERS. Full-Stack Developer & UI/UX enthusiast. Architected and developed the complete S-CODERS digital platform, responsive web applications, and interactive user experiences.
               </p>
             </div>
 
-            {/* 3 Pill buttons: Phone, Email, WhatsApp */}
+            {/* Contact Pill buttons */}
             <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
               <a
                 href="tel:+916363905989"
@@ -3072,13 +3091,6 @@ export function ServiceProjectSpaceDashboard({
                 <span>+91 6363905989</span>
               </a>
               <a
-                href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-              >
-                <Mail className="w-3.5 h-3.5 text-brand-teal" />
-                <span>scoders82@gmail.com</span>
-              </a>
-              <a
                 href="https://wa.me/916363905989"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -3086,6 +3098,13 @@ export function ServiceProjectSpaceDashboard({
               >
                 <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
                 <span>whatsapp</span>
+              </a>
+              <a
+                href="mailto:scoders82@gmail.com"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Mail className="w-3.5 h-3.5 text-brand-teal" />
+                <span>scoders82@gmail.com</span>
               </a>
             </div>
           </div>
