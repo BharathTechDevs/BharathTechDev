@@ -140,7 +140,7 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
           onLogin(adminUser);
         }, 600);
       } else {
-        setErrorMsg('Invalid Admin ID or password. Authorized admin accounts: shreyas / shreyas123, lokesh / lokesh123, bhuvan / bhuvan123, admin / admin123');
+        setErrorMsg('Invalid Admin ID or Security Password. Please enter your authorized credentials.');
       }
     } else {
       // Client Access Flow
@@ -210,14 +210,6 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
         }, 1200);
       }
     }
-  };
-
-  // Quick helper to autofill admin credentials during evaluation
-  const handleAutofillAdmin = (admin: typeof ADMIN_ACCOUNTS[0]) => {
-    setActiveTab('admin');
-    setEmail(admin.id);
-    setPassword(admin.password);
-    setErrorMsg('');
   };
 
   // Client Ticket Dispatch
@@ -486,60 +478,12 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
               </button>
             </form>
 
-            {/* Admin Credentials Quick Autofills */}
+            {/* Admin Credential Notice */}
             {activeTab === 'admin' && (
-              <div className="mt-8 pt-6 border-t border-white/5 space-y-3">
-                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold">
-                  Authorized Admin Accounts
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail('shreyas');
-                      setPassword('shreyas123');
-                      setErrorMsg('');
-                    }}
-                    className="p-2.5 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-xs font-display font-bold text-white group-hover:text-brand-teal flex items-center justify-between">
-                      <span className="truncate">Shreyas M.</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-brand-teal text-brand-dark font-extrabold uppercase">CEO</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-gray-400 mt-0.5">ID: shreyas | Pass: shreyas123</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail('lokesh');
-                      setPassword('lokesh123');
-                      setErrorMsg('');
-                    }}
-                    className="p-2.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/60 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-xs font-display font-bold text-white group-hover:text-purple-400 flex items-center justify-between">
-                      <span className="truncate">Lokesh A.</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500 text-white font-extrabold uppercase">CO-FOUNDER</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-gray-400 mt-0.5">ID: lokesh | Pass: lokesh123</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail('bhuvan');
-                      setPassword('bhuvan123');
-                      setErrorMsg('');
-                    }}
-                    className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-brand-teal/40 rounded-xl text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-xs font-display font-bold text-white group-hover:text-brand-teal flex items-center justify-between">
-                      <span className="truncate">Bhuvan M.</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-gray-300 font-bold uppercase">TECH LEAD</span>
-                    </div>
-                    <div className="text-[10px] font-mono text-gray-400 mt-0.5">ID: bhuvan | Pass: bhuvan123</div>
-                  </button>
+              <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5 text-brand-teal" />
+                  <span>Credential-Only Authentication Enforced</span>
                 </div>
               </div>
             )}

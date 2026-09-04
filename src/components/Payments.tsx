@@ -9,7 +9,7 @@ import { getDynamicWorkshops, getDynamicInvoices } from '../utils/dynamicData';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
+import { openUpiApp, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI, getBankingNameForUpi } from '../utils/paymentLinks';
 
 interface PaymentHistoryItem {
   txnId: string;
@@ -310,29 +310,32 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
 
   // Helper to generate the most robust device-specific UPI deep link
   const getUpiDeviceLink = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic', address: string, name: string, amount: number, note: string) => {
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+    const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
     
-    const encodedName = encodeURIComponent(name);
-    const encodedNote = encodeURIComponent(note);
-    const params = `pa=${address}&pn=${encodedName}&am=${amount}&cu=INR&tn=${encodedNote}`;
+    const cleanBankingName = getBankingNameForUpi(address);
+    const encodedName = encodeURIComponent(cleanBankingName);
+    const cleanAmount = (amount || 0).toFixed(2);
+    const cleanNote = (note || 'SCODERS Payment').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
+    const encodedNote = encodeURIComponent(cleanNote);
+    const params = `pa=${address}&pn=${encodedName}&am=${cleanAmount}&cu=INR&tn=${encodedNote}`;
     
     if (isAndroid) {
       if (app === 'phonepe') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;action=android.intent.action.VIEW;end;`;
       } else if (app === 'gpay') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
       } else if (app === 'paytm') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
       } else if (app === 'bhim') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+        return `intent://pay?${params}#Intent;scheme=upi;package=in.org.npci.upiapp;action=android.intent.action.VIEW;end;`;
       }
       return `upi://pay?${params}`;
     } else if (isIOS) {
       if (app === 'phonepe') {
         return `phonepe://pay?${params}`;
       } else if (app === 'gpay') {
-        return `gpay://upi/pay?${params}`;
+        return `tez://upi/pay?${params}`;
       } else if (app === 'paytm') {
         return `paytmmp://pay?${params}`;
       }
@@ -358,9 +361,9 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     
     // Generate UPI standard payload
     const payeeAddress = getActiveMerchantUpi();
-    const payeeName = 'S-CODERS Technologies';
+    const payeeName = getBankingNameForUpi(payeeAddress);
     const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
-    const note = activeTab === 'workshop' ? `Workshop Booking` : purpose.substring(0, 30);
+    const note = (activeTab === 'workshop' ? `Workshop Booking` : purpose).slice(0, 25);
     
     const scheme = app === 'phonepe' ? 'phonepe' : app === 'gpay' ? 'gpay' : app === 'paytm' ? 'paytm' : app === 'bhim' ? 'bhim' : 'universal';
     
@@ -368,8 +371,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       pa: payeeAddress,
       pn: payeeName,
       am: payAmount,
-      tn: note,
-      tr: `PAY${Date.now()}`
+      tn: note
     }, scheme);
   };
 
@@ -584,12 +586,12 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   // pa = payee address, pn = payee name, am = amount, tn = transaction note, cu = currency
   const getUpiUri = () => {
     const payeeAddress = getActiveMerchantUpi();
-    const payeeName = 'S-CODERS Technologies';
+    const payeeName = getBankingNameForUpi(payeeAddress);
     const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
-    const payCurrency = activeTab === 'workshop' ? 'INR' : currency;
-    const note = activeTab === 'workshop' ? 'Workshop Booking' : purpose.substring(0, 30);
+    const cleanAmount = (payAmount || 0).toFixed(2);
+    const cleanNote = (activeTab === 'workshop' ? 'Workshop Booking' : purpose || 'SCODERS Payment').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
 
-    return `upi://pay?pa=${payeeAddress}&pn=${encodeURIComponent(payeeName)}&am=${payAmount}&cu=${payCurrency}&tn=${encodeURIComponent(note)}`;
+    return `upi://pay?pa=${payeeAddress}&pn=${encodeURIComponent(payeeName)}&am=${cleanAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}`;
   };
 
   const getUpiQrUrl = () => {

@@ -1,4 +1,4 @@
-import { AppUser, Service, WorkshopEvent } from '../types';
+import { AppUser, Service, WorkshopEvent, CandidateApplication } from '../types';
 
 // ==========================================
 // 1. DATABASE SCHEMA TYPES
@@ -271,6 +271,75 @@ const SEED_ENQUIRIES: EnquiryItem[] = [
     replyStatus: 'Responded',
     replyMessage: 'Hi Shruti, thank you for reaching out! Prathiksha and our team would love to design this child-friendly LMS platform. S-CODERS can certainly build and launch this Next.js app. I have sent an introductory meeting invite to your email.',
     replyDate: '2026-07-18T08:30:00Z'
+  }
+];
+
+const SEED_APPLICATIONS: CandidateApplication[] = [
+  {
+    id: 'SCD-APP-2026-001',
+    submissionDate: '2026-08-15',
+    status: 'Shortlisted',
+    sector: 'AI & Automation Engineering',
+    roleTitle: 'Junior AI Workflow Engineer (n8n & LLM Orchestration)',
+    employmentType: 'Full-Time',
+    fullName: 'Ananya Sharma',
+    email: 'ananya.sharma.dev@gmail.com',
+    phone: '+91 98450 11223',
+    whatsapp: '+91 98450 11223',
+    currentCity: 'Bengaluru, Karnataka',
+    portfolioUrl: 'https://ananyasharma.dev',
+    githubUrl: 'https://github.com/ananya-ai',
+    linkedinUrl: 'https://linkedin.com/in/ananya-sharma-tech',
+    highestQualification: 'B.Tech in Computer Science & Engineering',
+    institutionName: 'PES University, Bengaluru',
+    yearOfGraduation: '2025',
+    experienceLevel: '0-1 Years',
+    keySkills: 'Python, Gemini SDK, n8n, LangChain, React, FastAPI, Docker, Vector Databases',
+    previousProjects: 'Built a WhatsApp autonomous customer support bot integrated with pgvector and Gemini Flash that reduced ticket triage time by 70%.',
+    availabilityNotice: 'Immediate',
+    expectedCompensation: '₹45,000 / month',
+    whyJoinScoders: 'S-CODERS is driving genuine AI agent innovation right out of Bangalore. I want to build real-world workflows that impact startups directly.',
+    impressiveAchievement: 'Finalist at Smart India Hackathon 2024 for an automated agricultural disease detection agent.',
+    resumeLink: 'https://drive.google.com/file/d/sample-resume-ananya/view',
+    agreementTitle: 'S-CODERS Professional Talent Induction & Non-Disclosure Agreement',
+    agreementReferenceId: 'SCD-AGR-2026-ANANYA-01',
+    agreementDate: '2026-08-15',
+    effectiveDate: '2026-09-01',
+    agreementDuration: '12 Months',
+    agreementJurisdiction: 'Bengaluru, Karnataka, India',
+    agreementVersion: 'v2.4 - 2026',
+    companyLegalName: 'S-CODERS (Bharath Tech Developers)',
+    companyAddress: 'Bengaluru, Karnataka, India - 560060',
+    companyCin: 'UDYAM-KR-03-018249',
+    companyGstin: '29AABCXXXXX1Z5',
+    companyPan: 'AABCS8291M',
+    companyEmail: 'scoders82@gmail.com',
+    companyPhone: '+91 6363905989 / +91 8867540445',
+    companyAuthorizedRepresentative: 'Shreyas M. / Bhuvan M.',
+    companyRepresentativeDesignation: 'Founder & CEO / Tech Lead',
+    candidateLegalName: 'Ananya Sharma',
+    guardianName: 'Ramesh Sharma',
+    dateOfBirth: '2003-04-12',
+    gender: 'Female',
+    permanentAddress: '#42, 3rd Cross, Indiranagar, Bengaluru - 560038',
+    communicationAddress: '#42, 3rd Cross, Indiranagar, Bengaluru - 560038',
+    panNumber: 'ABCPS1234K',
+    aadhaarNumber: 'XXXX-XXXX-8921',
+    officialEmail: 'ananya.sharma.dev@gmail.com',
+    emergencyContactName: 'Ramesh Sharma (Father)',
+    emergencyContactPhone: '+91 94480 22334',
+    bankName: 'HDFC Bank',
+    accountHolderName: 'Ananya Sharma',
+    accountNumber: '50100492819201',
+    ifscCode: 'HDFC0001234',
+    branchName: 'Indiranagar Branch, Bengaluru',
+    candidateDigitalSignature: 'Ananya Sharma',
+    agreedToNda: true,
+    agreedToCodeOfConduct: true,
+    agreedToIpAssignment: true,
+    declarationConfirmed: true,
+    adminNotes: 'Impressed by her live demo of the Gemini agent. Scheduled for Technical Round with Suhas Gowda.',
+    reviewedBy: 'Bhuvan M.'
   }
 ];
 
@@ -600,6 +669,39 @@ export class DatabaseEngine {
     this.setStored('db_gallery_media', data);
   }
 
+  // --- Collection 10: Candidate Applications (Recruitment) ---
+  public static getCandidateApplications(): CandidateApplication[] {
+    return this.getStored('db_candidate_applications', SEED_APPLICATIONS);
+  }
+
+  public static saveCandidateApplications(data: CandidateApplication[]): void {
+    this.setStored('db_candidate_applications', data);
+    localStorage.setItem('scoders_candidate_applications', JSON.stringify(data));
+  }
+
+  public static addCandidateApplication(app: CandidateApplication): void {
+    const apps = this.getCandidateApplications();
+    const updated = [app, ...apps.filter(a => a.id !== app.id)];
+    this.saveCandidateApplications(updated);
+  }
+
+  public static updateCandidateApplicationStatus(id: string, status: CandidateApplication['status'], notes?: string, reviewedBy?: string): CandidateApplication[] {
+    const apps = this.getCandidateApplications();
+    const updated = apps.map(app => {
+      if (app.id === id) {
+        return {
+          ...app,
+          status,
+          adminNotes: notes !== undefined ? notes : app.adminNotes,
+          reviewedBy: reviewedBy !== undefined ? reviewedBy : app.reviewedBy
+        };
+      }
+      return app;
+    });
+    this.saveCandidateApplications(updated);
+    return updated;
+  }
+
   // ==========================================
   // 4. METRICS & INTERACTIVE ANALYTICS API
   // ==========================================
@@ -609,6 +711,7 @@ export class DatabaseEngine {
     const enquiries = this.getEnquiries();
     const payments = this.getPayments();
     const feedbacks = this.getFeedbacks();
+    const candidateApplications = this.getCandidateApplications();
 
     // Calculate revenue
     const successPayments = payments.filter((p) => p.status === 'Successful');
@@ -623,6 +726,7 @@ export class DatabaseEngine {
       totalRegisteredClients: services.length,
       totalWorkshopParticipants: workshops.length,
       totalServices: services.length,
+      totalCandidateApplications: candidateApplications.length,
       pendingServices: services.filter((s) => s.projectStatus === 'Pending').length,
       completedServices: services.filter((s) => s.projectStatus === 'Completed').length,
       deliveredProjects: services.filter((s) => s.projectStatus === 'Delivered').length,
@@ -644,6 +748,13 @@ export class DatabaseEngine {
           type: 'Workshop Admission',
           title: w.workshopTitle,
           date: w.paymentDate
+        })),
+        ...candidateApplications.map((c) => ({
+          name: c.fullName,
+          email: c.email,
+          type: 'Talent Application',
+          title: `${c.sector} (${c.roleTitle})`,
+          date: c.submissionDate
         }))
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5),
       recentFeedback: feedbacks.slice(0, 5),
@@ -662,6 +773,7 @@ export class DatabaseEngine {
     localStorage.removeItem('db_enquiries');
     localStorage.removeItem('db_team_members');
     localStorage.removeItem('db_gallery_media');
+    localStorage.removeItem('db_candidate_applications');
     
     // Core structural seeds
     this.saveServiceRegistrations(SEED_SERVICES_REG);
@@ -673,5 +785,6 @@ export class DatabaseEngine {
     this.saveEnquiries(SEED_ENQUIRIES);
     this.saveTeamMembers(SEED_TEAM);
     this.saveGalleryMedia(SEED_GALLERY);
+    this.saveCandidateApplications(SEED_APPLICATIONS);
   }
 }

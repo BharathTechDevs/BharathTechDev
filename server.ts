@@ -520,6 +520,109 @@ async function sendEmailNotification({
   }
 }
 
+// Email template generator for Recruitment Application & Induction Agreement
+function getRecruitmentEmailHtml({
+  candidateName,
+  sector,
+  roleTitle,
+  agreementRef,
+  submissionId,
+  effectiveDate,
+  actionUrl,
+}: {
+  candidateName: string;
+  sector: string;
+  roleTitle: string;
+  agreementRef: string;
+  submissionId: string;
+  effectiveDate: string;
+  actionUrl: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>S-CODERS Recruitment Application & Induction Agreement</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+              <tr>
+                <td style="padding: 32px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #22D3EE;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Talent & Engineering Induction • Bengaluru, India</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px 32px; text-align: center;">
+                  <div style="display: inline-block; padding: 10px 24px; border-radius: 9999px; background-color: rgba(34, 211, 238, 0.15); border: 1px solid #22D3EE;">
+                    <span style="font-size: 13px; font-weight: 800; color: #22D3EE; text-transform: uppercase;">
+                      ✓ CANDIDATE INDUCTION DOSSIER REGISTERED
+                    </span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 32px 20px 32px;">
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Dear <strong>${candidateName}</strong>,</p>
+                  <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
+                    Thank you for applying to join S-CODERS (Bharath Tech Developers). Your recruitment application along with the Talent Induction & Non-Disclosure Agreement (NDA) has been securely recorded in our database.
+                  </p>
+                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0 0 14px 0;">
+                    Our core technical evaluation committee will review your profile, qualifications, and repository highlights. Qualified candidates will receive an interview scheduling invitation within <strong>24 to 48 hours</strong>.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 32px 30px 32px;">
+                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
+                    <tr>
+                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Sector / Track:</td>
+                      <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${sector}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Role Applied:</td>
+                      <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #22D3EE;">${roleTitle}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Application Ref ID:</td>
+                      <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${submissionId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Agreement Ref:</td>
+                      <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #38BDF8;">${agreementRef}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Proposed Effective Date:</td>
+                      <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #94A3B8;">${effectiveDate}</td>
+                    </tr>
+                    <tr>
+                      <td colspan="2" align="center" style="padding-top: 20px;">
+                        <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: #22D3EE; color: #0B0F17; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
+                          Visit S-CODERS Website →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">S-CODERS Careers Division • scoders82@gmail.com • Bengaluru, Karnataka, India</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -911,6 +1014,141 @@ async function startServer() {
     } catch (err: any) {
       console.error("Event Failed Email Error:", err);
       res.status(500).json({ error: "Failed to send event failure email." });
+    }
+  });
+
+  // ==========================================
+  // RECRUITMENT & TALENT INDUCTION API
+  // ==========================================
+  const applicationsFilePath = path.join(process.cwd(), "data", "applications.json");
+
+  // Helper to ensure data directory & get applications
+  function getStoredApplications(): any[] {
+    try {
+      const dataDir = path.dirname(applicationsFilePath);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      if (fs.existsSync(applicationsFilePath)) {
+        const content = fs.readFileSync(applicationsFilePath, "utf-8");
+        return JSON.parse(content || "[]");
+      }
+    } catch (err) {
+      console.error("Error reading applications file:", err);
+    }
+    return [];
+  }
+
+  function saveStoredApplications(apps: any[]): void {
+    try {
+      const dataDir = path.dirname(applicationsFilePath);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      fs.writeFileSync(applicationsFilePath, JSON.stringify(apps, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Error writing applications file:", err);
+    }
+  }
+
+  // 1. Submit Candidate Recruitment Application & Agreement
+  app.post("/api/careers/apply", async (req, res) => {
+    try {
+      const applicationData = req.body;
+      if (!applicationData || !applicationData.fullName || !applicationData.email || !applicationData.sector) {
+        return res.status(400).json({ error: "Mandatory candidate profile details are missing." });
+      }
+
+      const submissionId = applicationData.id || `SCD-APP-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const agreementRef = applicationData.agreementReferenceId || `SCD-AGR-2026-${Date.now().toString(36).toUpperCase()}`;
+      const now = new Date().toISOString();
+
+      const candidateRecord = {
+        ...applicationData,
+        id: submissionId,
+        agreementReferenceId: agreementRef,
+        submissionDate: applicationData.submissionDate || now.split('T')[0],
+        status: applicationData.status || 'Submitted',
+        createdAt: now,
+      };
+
+      const existingApps = getStoredApplications();
+      const updatedApps = [candidateRecord, ...existingApps.filter(a => a.id !== submissionId)];
+      saveStoredApplications(updatedApps);
+
+      // Trigger asynchronous confirmation email
+      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
+      sendEmailNotification({
+        to: candidateRecord.email,
+        subject: `📋 Recruitment Application & Induction Agreement Recorded - S-CODERS (Ref: ${agreementRef})`,
+        html: getRecruitmentEmailHtml({
+          candidateName: candidateRecord.fullName,
+          sector: candidateRecord.sector,
+          roleTitle: candidateRecord.roleTitle || 'Developer Associate',
+          agreementRef: agreementRef,
+          submissionId: submissionId,
+          effectiveDate: candidateRecord.effectiveDate || '2026-09-01',
+          actionUrl: `${origin}/?view=careers`,
+        }),
+      }).catch(err => console.error("Recruitment email dispatch notice:", err.message));
+
+      res.status(201).json({
+        success: true,
+        message: "Candidate application and induction agreement successfully submitted and saved.",
+        applicationId: submissionId,
+        agreementReferenceId: agreementRef,
+        candidate: candidateRecord,
+      });
+    } catch (err: any) {
+      console.error("Recruitment Application Submit Error:", err);
+      res.status(500).json({ error: "Failed to process candidate application: " + err.message });
+    }
+  });
+
+  // 2. Fetch All Candidate Applications (for Admin & Dashboard)
+  app.get("/api/careers/applications", (req, res) => {
+    try {
+      const apps = getStoredApplications();
+      res.json({ success: true, count: apps.length, applications: apps });
+    } catch (err: any) {
+      console.error("Fetch Applications Error:", err);
+      res.status(500).json({ error: "Failed to fetch candidate applications." });
+    }
+  });
+
+  // 3. Update Candidate Application Status (Admin Action)
+  app.patch("/api/careers/status", (req, res) => {
+    try {
+      const { id, status, adminNotes, reviewedBy } = req.body;
+      if (!id || !status) {
+        return res.status(400).json({ error: "Candidate ID and new status are required." });
+      }
+
+      const apps = getStoredApplications();
+      let updated = false;
+      const newApps = apps.map(app => {
+        if (app.id === id) {
+          updated = true;
+          return {
+            ...app,
+            status,
+            adminNotes: adminNotes !== undefined ? adminNotes : app.adminNotes,
+            reviewedBy: reviewedBy !== undefined ? reviewedBy : app.reviewedBy,
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+        return app;
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Application not found." });
+      }
+
+      saveStoredApplications(newApps);
+      res.json({ success: true, message: `Application status updated to ${status}` });
+    } catch (err: any) {
+      console.error("Update Status Error:", err);
+      res.status(500).json({ error: "Failed to update application status." });
     }
   });
 

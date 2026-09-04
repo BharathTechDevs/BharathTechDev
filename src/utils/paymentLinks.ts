@@ -10,7 +10,18 @@ export const DEFAULT_SHREYAS_PHONE = '8310463417';
 export const DEFAULT_BHUVAN_UPI = '6363905989@ybl';
 export const DEFAULT_SHREYAS_UPI = '8310463417@ybl';
 export const DEFAULT_UPI_VPA = '6363905989@ybl';
-export const DEFAULT_PAYEE_NAME = 'S-CODERS Technologies';
+export const DEFAULT_PAYEE_NAME = 'BHUVAN M';
+
+export function getBankingNameForUpi(vpa: string): string {
+  if (vpa.includes('6363905989')) return 'BHUVAN M';
+  if (vpa.includes('8310463417')) return 'SHREYAS M';
+  return 'BHUVAN M';
+}
+
+export function getPhoneNumberForUpi(vpa: string): string {
+  if (vpa.includes('8310463417')) return DEFAULT_SHREYAS_PHONE;
+  return DEFAULT_BHUVAN_PHONE;
+}
 
 export function getActiveMerchantUpi(): string {
   if (typeof window !== 'undefined') {
@@ -22,55 +33,102 @@ export function getActiveMerchantUpi(): string {
 export function setActiveMerchantUpi(upi: string) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('scoders_merchant_upi', upi);
-    window.dispatchEvent(new Event('scoders_merchant_upi_changed'));
+    window.dispatchEvent(new CustomEvent('scoders_merchant_upi_changed', { detail: { upi } }));
   }
 }
 
 export interface UpiIntentParams {
   pa?: string; // Payee VPA address (e.g. 6363905989@ybl)
-  pn?: string; // Payee Name
+  pn?: string; // Payee Name (defaults to CBS registered name)
   am: number | string; // Amount in INR
   cu?: string; // Currency (INR)
   tn?: string; // Transaction note
   tr?: string; // Transaction reference / Order ID
+  mc?: string; // Merchant category code
 }
 
 /**
- * Builds standard RFC / NPCI compliant UPI query strings
+ * Builds standard RFC / NPCI compliant UPI query strings.
+ * CRITICAL FIX: For P2P personal VPAs (e.g. @ybl):
+ * - Payee name (pn) MUST match the registered CBS bank name (BHUVAN M / SHREYAS M). Mismatches trigger "Security reasons decline".
+ * - Transaction Reference (tr) is strictly prohibited on P2P addresses by NPCI/ICICI Bank. Including &tr= causes "Exceeded bank limit for this payment".
  */
 export function buildUpiQueryString(params: UpiIntentParams): string {
   const currency = params.cu || 'INR';
   const cleanAmount = typeof params.am === 'number' ? params.am.toFixed(2) : parseFloat(params.am || '0').toFixed(2);
-  const cleanNote = (params.tn || 'SCODERS Services').replace(/[^a-zA-Z0-9 -]/g, '').slice(0, 30);
-  const cleanTr = (params.tr || `TRX${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '').slice(-12);
+  const cleanNote = (params.tn || 'SCODERS Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
   const paAddress = params.pa || getActiveMerchantUpi();
-  const cleanPn = encodeURIComponent(params.pn || 'S-CODERS Technologies');
   
-  return `pa=${paAddress}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  // Use registered bank name matching CBS to avoid security flags in PhonePe/GPay
+  const registeredName = getBankingNameForUpi(paAddress);
+  const cleanPn = encodeURIComponent(registeredName);
+  
+  let query = `pa=${paAddress}&pn=${cleanPn}&am=${cleanAmount}&cu=${currency}&tn=${encodeURIComponent(cleanNote)}`;
+
+  // Only append &tr= if explicit merchant category code exists or verified merchant account
+  if (params.mc) {
+    query += `&mc=${encodeURIComponent(params.mc)}`;
+    if (params.tr) {
+      const cleanTr = params.tr.replace(/[^a-zA-Z0-9]/g, '').slice(-12);
+      query += `&tr=${cleanTr}`;
+    }
+  }
+
+  return query;
 }
 
 /**
- * Generates direct URI schemes for specific payment providers
+ * Generates direct URI schemes for specific payment providers with platform detection
  */
 export function generateUpiUrl(
   params: UpiIntentParams, 
   scheme: 'universal' | 'phonepe' | 'gpay' | 'paytm' | 'bhim' = 'universal'
 ): string {
-  const qs = buildUpiQueryString(params);
+  return getAppropriateUpiLink(params, scheme);
+}
 
-  switch (scheme) {
-    case 'phonepe':
-      return `phonepe://pay?${qs}`;
-    case 'gpay':
-      return `tez://upi/pay?${qs}`;
-    case 'paytm':
-      return `paytmmp://pay?${qs}`;
-    case 'bhim':
-      return `bhim://pay?${qs}`;
-    case 'universal':
-    default:
-      return `upi://pay?${qs}`;
+/**
+ * Returns platform-optimized UPI link (Android Intent vs iOS custom scheme vs universal fallback)
+ */
+export function getAppropriateUpiLink(
+  params: UpiIntentParams,
+  app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'universal' = 'universal'
+): string {
+  const qs = buildUpiQueryString(params);
+  const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+  const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (isAndroid) {
+    switch (app) {
+      case 'phonepe':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=com.phonepe.app;action=android.intent.action.VIEW;end;`;
+      case 'gpay':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
+      case 'paytm':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
+      case 'bhim':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=in.org.npci.upiapp;action=android.intent.action.VIEW;end;`;
+      default:
+        return `upi://pay?${qs}`;
+    }
   }
+
+  if (isIOS) {
+    switch (app) {
+      case 'phonepe':
+        return `phonepe://pay?${qs}`;
+      case 'gpay':
+        return `tez://upi/pay?${qs}`;
+      case 'paytm':
+        return `paytmmp://pay?${qs}`;
+      case 'bhim':
+        return `bhim://pay?${qs}`;
+      default:
+        return `upi://pay?${qs}`;
+    }
+  }
+
+  return `upi://pay?${qs}`;
 }
 
 /**
@@ -91,23 +149,57 @@ export function getAppSpecificIntent(params: UpiIntentParams, app: 'phonepe' | '
 
 /**
  * Launches the requested UPI application or presents the universal device intent chooser.
- * Uses top-level window dispatching to break out of iframes and trigger the OS app handler.
+ * Handles Android Intent, iOS deep schemes, auto-copies UPI ID, and safely informs desktop users.
  */
 export function openUpiApp(
   params: UpiIntentParams, 
   app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'universal' = 'universal'
 ) {
-  const customScheme = generateUpiUrl(params, app);
-  const universalScheme = generateUpiUrl(params, 'universal');
-  const packageIntent = (app === 'phonepe' || app === 'gpay' || app === 'paytm') 
-    ? getAppSpecificIntent(params, app) 
-    : universalScheme;
+  const targetVpa = params.pa || getActiveMerchantUpi();
+  const targetPhone = getPhoneNumberForUpi(targetVpa);
+  const targetName = getBankingNameForUpi(targetVpa);
 
-  // Direct trigger via hidden anchor and window location
-  const executeLaunch = (url: string) => {
+  // Guarantee matching CBS banking name & target address
+  params.pa = targetVpa;
+  params.pn = targetName;
+
+  // 1. Auto-copy UPI ID to clipboard as immediate convenience
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(targetVpa).catch(() => {});
+    }
+  } catch {
+    // Ignore clipboard error
+  }
+
+  // 2. Dispatch event so UI can display helpful guidance toast
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('scoders_upi_launched', {
+      detail: {
+        app,
+        vpa: targetVpa,
+        phone: targetPhone,
+        name: targetName,
+        amount: params.am
+      }
+    }));
+  }
+
+  // 3. Determine single target URL based on device OS
+  const targetUrl = getAppropriateUpiLink(params, app);
+
+  // 4. Launch intent on mobile devices
+  if (typeof window !== 'undefined') {
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile) {
+      // On desktop, opening custom mobile schemas fails silently;
+      // UPI ID is already copied and QR code is rendered for mobile scan.
+      return;
+    }
+
     try {
       const link = document.createElement('a');
-      link.href = url;
+      link.href = targetUrl;
       link.setAttribute('rel', 'noopener noreferrer');
       link.style.display = 'none';
       document.body.appendChild(link);
@@ -116,30 +208,13 @@ export function openUpiApp(
         if (document.body.contains(link)) {
           document.body.removeChild(link);
         }
-      }, 300);
+      }, 500);
     } catch {
-      // Fallback
+      try {
+        window.location.href = targetUrl;
+      } catch {
+        // Ignore fallback
+      }
     }
-
-    try {
-      window.location.assign(url);
-    } catch {
-      // Ignore navigation aborts
-    }
-  };
-
-  // 1. Direct App Scheme (iOS & Android supported deep-links)
-  executeLaunch(customScheme);
-
-  // 2. Package-specific Android Intent for Android mobile browsers (Chrome / Samsung Internet / Firefox)
-  if (app === 'phonepe' || app === 'gpay' || app === 'paytm') {
-    setTimeout(() => {
-      executeLaunch(packageIntent);
-    }, 150);
   }
-
-  // 3. Universal UPI fallback handler
-  setTimeout(() => {
-    executeLaunch(universalScheme);
-  }, 400);
 }

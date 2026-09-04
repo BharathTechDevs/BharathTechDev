@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Menu, X, Terminal, ArrowRight, ChevronDown, 
   Cpu, BookOpen, Users, Globe, Receipt, Mail, Camera, Shield,
-  LogOut, Key, User, Home, ClipboardCheck, Calendar, Target, Users2, Sparkles
+  LogOut, Key, User, Home, ClipboardCheck, Calendar, Target, Users2, Sparkles, Briefcase
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
@@ -83,6 +83,7 @@ export default function Header({
       items: [
         { name: 'About Us', desc: 'Our engineering heritage, vision, mission & roadmap', view: 'about', icon: Target },
         { name: 'The Crew', desc: 'Meet our leadership team & engineering brain trust', view: 'crew', icon: Users2 },
+        { name: 'Careers & Hiring', desc: 'Join S-CODERS crew, multi-step application & induction agreement', view: 'careers', icon: Briefcase },
         { name: 'Communities', desc: 'Thriving developer chapters & tech networking events', view: 'communities', icon: Globe },
         { name: 'Rules & Policies', desc: 'Terms, privacy, refunds & delivery parameters', view: 'policies', icon: ClipboardCheck }
       ]
@@ -237,6 +238,20 @@ export default function Header({
 
           {/* Right Header Controls (Desktop & Tablet) */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick Careers / Hiring pill */}
+            <button
+              onClick={() => { onViewChange('careers'); window.scrollTo(0, 0); }}
+              className={`hidden md:flex items-center gap-2 px-3 sm:px-3.5 py-2 border rounded-xl text-xs font-mono font-bold transition-all cursor-pointer shadow-sm ${
+                currentView === 'careers'
+                  ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-brand-teal/20'
+                  : 'bg-brand-dark/80 hover:bg-brand-teal/10 border-brand-teal/30 text-gray-200 hover:text-white'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5 text-brand-teal" />
+              <span>Careers</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </button>
+
             {/* Quick AI Consultant trigger button visible on all desktop / laptop screens */}
             <button
               onClick={onOpenAssistant}

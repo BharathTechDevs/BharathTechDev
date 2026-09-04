@@ -22,6 +22,7 @@ import Networking from './components/Networking';
 import Events from './components/Events';
 import AuthPortal from './components/AuthPortal';
 import Policies from './components/Policies';
+import Careers from './components/Careers';
 
 const ViewLoader = () => (
   <div className="flex flex-col items-center justify-center py-24 min-h-[40vh] w-full">
@@ -588,7 +589,20 @@ export default function App() {
             </motion.div>
           )}
 
-
+          {currentView === 'careers' && (
+            <motion.div
+              key="careers"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* S-CODERS Talent Recruitment & Legal Induction Agreement Portal */}
+              <Suspense fallback={<ViewLoader />}>
+                <Careers onNavigate={(v) => { setCurrentView(v as any); window.scrollTo(0, 0); }} />
+              </Suspense>
+            </motion.div>
+          )}
 
           {currentView === 'policies' && (
             <motion.div
@@ -672,6 +686,7 @@ export default function App() {
                 <button onClick={() => { setCurrentView('about'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About Us</button>
                 <button onClick={() => { setCurrentView('crew'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">The Crew</button>
                 <button onClick={() => { setCurrentView('communities'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Communities</button>
+                <button onClick={() => { setCurrentView('careers'); window.scrollTo(0,0); }} className="hover:text-brand-teal text-brand-teal font-semibold transition-colors cursor-pointer focus:outline-none">Careers</button>
                 <button onClick={() => { setCurrentView('networking'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Networking & Achievements</button>
                 <button onClick={() => { setCurrentView('contact'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Contact</button>
               </div>

@@ -13,7 +13,15 @@ import EmailNotificationModal, { EmailNotificationData } from './EmailNotificati
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
+import { 
+  openUpiApp, 
+  getActiveMerchantUpi, 
+  setActiveMerchantUpi, 
+  DEFAULT_BHUVAN_UPI, 
+  DEFAULT_SHREYAS_UPI, 
+  getBankingNameForUpi, 
+  getPhoneNumberForUpi 
+} from '../utils/paymentLinks';
 
 export default function Events() {
   const [events, setEvents] = useState<SCODERSEvent[]>([]);
@@ -55,6 +63,34 @@ export default function Events() {
   const [eventPaymentTab, setEventPaymentTab] = useState<'razorpay' | 'upi' | 'card'>('razorpay');
   const [manualUpiRef, setManualUpiRef] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [activeMerchantUpi, setActiveMerchantUpiState] = useState<string>(() => getActiveMerchantUpi());
+  const [upiNoticeBanner, setUpiNoticeBanner] = useState<{ app: string; phone: string; vpa: string } | null>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e?.detail?.upi) {
+        setActiveMerchantUpiState(e.detail.upi);
+      } else {
+        setActiveMerchantUpiState(getActiveMerchantUpi());
+      }
+    };
+    const launchHandler = (e: any) => {
+      if (e?.detail) {
+        setUpiNoticeBanner({
+          app: e.detail.app,
+          phone: e.detail.phone,
+          vpa: e.detail.vpa
+        });
+      }
+    };
+    window.addEventListener('scoders_merchant_upi_changed', handler as EventListener);
+    window.addEventListener('scoders_upi_launched', launchHandler as EventListener);
+    return () => {
+      window.removeEventListener('scoders_merchant_upi_changed', handler as EventListener);
+      window.removeEventListener('scoders_upi_launched', launchHandler as EventListener);
+    };
+  }, []);
   const [paymentStatusNotice, setPaymentStatusNotice] = useState<{
     type: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
     message: string;
@@ -1351,18 +1387,50 @@ export default function Events() {
 
                           {/* Tab 2: Direct UPI QR */}
                           {eventPaymentTab === 'upi' && (() => {
-                            const activeVpa = getActiveMerchantUpi();
+                            const activeVpa = activeMerchantUpi;
+                            const currentBankingName = getBankingNameForUpi(activeVpa);
+                            const currentPhone = getPhoneNumberForUpi(activeVpa);
+                            const isBhuvan = activeVpa.includes('6363905989');
                             const evtPriceFormatted = (selectedEvent.ticketPrice || 0).toFixed(2);
                             const evtCleanTitle = (selectedEvent.name || selectedEvent.title || 'Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
-                            const evtUpiUniversal = `upi://pay?pa=${activeVpa}&pn=S-CODERS%20Technologies&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
+                            const evtUpiUniversal = `upi://pay?pa=${activeVpa}&pn=${encodeURIComponent(currentBankingName)}&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
 
                             return (
                               <div className="bg-black/60 border border-brand-teal/30 p-4 rounded-2xl space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">Official Merchant UPI</span>
-                                    <span className="text-brand-teal font-mono font-bold text-sm">{activeVpa}</span>
+                                {/* Account Switcher for Bank Limit Resilience */}
+                                <div className="space-y-1.5 bg-white/5 p-2.5 rounded-xl border border-white/10">
+                                  <div className="flex items-center justify-between text-[10px] font-mono">
+                                    <span className="text-gray-300 uppercase tracking-wider font-semibold">Select Receiving Account:</span>
+                                    <span className="text-amber-400 font-bold">Switch if bank limit hit</span>
                                   </div>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveMerchantUpi(DEFAULT_BHUVAN_UPI)}
+                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                        isBhuvan
+                                          ? 'bg-brand-teal text-black shadow-md shadow-brand-teal/20'
+                                          : 'bg-black/40 text-gray-400 hover:text-white border border-white/10'
+                                      }`}
+                                    >
+                                      <span>Bhuvan M. (6363)</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveMerchantUpi(DEFAULT_SHREYAS_UPI)}
+                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                        !isBhuvan
+                                          ? 'bg-brand-teal text-black shadow-md shadow-brand-teal/20'
+                                          : 'bg-black/40 text-gray-400 hover:text-white border border-white/10'
+                                      }`}
+                                    >
+                                      <span>Shreyas M. (8310)</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Active Account Details with 1-Tap Copy */}
+                                <div className="grid grid-cols-2 gap-2">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1370,66 +1438,112 @@ export default function Events() {
                                       setCopiedUpi(true);
                                       setTimeout(() => setCopiedUpi(false), 2000);
                                     }}
-                                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg font-mono text-[10px] flex items-center gap-1 cursor-pointer"
+                                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left transition-all cursor-pointer group"
                                   >
-                                    <Copy className="w-3 h-3" />
-                                    <span>{copiedUpi ? 'Copied!' : 'Copy UPI ID'}</span>
+                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                                      <span>UPI ID</span>
+                                      {copiedUpi ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-gray-400 group-hover:text-white" />}
+                                    </div>
+                                    <div className="text-xs font-mono font-bold text-brand-teal truncate mt-0.5">{activeVpa}</div>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(currentPhone);
+                                      setCopiedPhone(true);
+                                      setTimeout(() => setCopiedPhone(false), 2000);
+                                    }}
+                                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left transition-all cursor-pointer group"
+                                  >
+                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                                      <span>Mobile Number</span>
+                                      {copiedPhone ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-gray-400 group-hover:text-white" />}
+                                    </div>
+                                    <div className="text-xs font-mono font-bold text-purple-300 truncate mt-0.5">{currentPhone}</div>
                                   </button>
                                 </div>
 
                                 <div className="py-2 flex flex-col items-center">
                                   <PhonePeScannerCard
                                     upiString={evtUpiUniversal}
-                                    merchantName="S-CODERS Technologies"
+                                    merchantName={currentBankingName}
                                     merchantVpa={activeVpa}
                                     amount={selectedEvent.ticketPrice}
                                   />
                                 </div>
 
                                 {/* Direct Mobile UPI Intent Buttons */}
-                                <div className="grid grid-cols-3 gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiApp({
-                                      pa: activeVpa,
-                                      pn: 'S-CODERS Technologies',
-                                      am: selectedEvent.ticketPrice,
-                                      tn: evtCleanTitle,
-                                      tr: `EVT${Date.now()}`
-                                    }, 'phonepe')}
-                                    className="py-2 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>PhonePe</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiApp({
-                                      pa: activeVpa,
-                                      pn: 'S-CODERS Technologies',
-                                      am: selectedEvent.ticketPrice,
-                                      tn: evtCleanTitle,
-                                      tr: `EVT${Date.now()}`
-                                    }, 'gpay')}
-                                    className="py-2 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>Google Pay</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiApp({
-                                      pa: activeVpa,
-                                      pn: 'S-CODERS Technologies',
-                                      am: selectedEvent.ticketPrice,
-                                      tn: evtCleanTitle,
-                                      tr: `EVT${Date.now()}`
-                                    }, 'universal')}
-                                    className="py-2 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-lg text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>Paytm / UPI</span>
-                                  </button>
+                                <div className="space-y-1">
+                                  <div className="text-[10px] font-mono text-gray-400 uppercase tracking-widest text-center">
+                                    Direct App Links
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => openUpiApp({
+                                        pa: activeVpa,
+                                        pn: currentBankingName,
+                                        am: selectedEvent.ticketPrice,
+                                        tn: evtCleanTitle
+                                      }, 'phonepe')}
+                                      className="py-2.5 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-md"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>PhonePe</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openUpiApp({
+                                        pa: activeVpa,
+                                        pn: currentBankingName,
+                                        am: selectedEvent.ticketPrice,
+                                        tn: evtCleanTitle
+                                      }, 'gpay')}
+                                      className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-md"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>Google Pay</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openUpiApp({
+                                        pa: activeVpa,
+                                        pn: currentBankingName,
+                                        am: selectedEvent.ticketPrice,
+                                        tn: evtCleanTitle
+                                      }, 'universal')}
+                                      className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-md"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>Paytm / Any UPI</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Troubleshooting Guidance for GPay / PhonePe error shown in user screenshots */}
+                                <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl text-[11px] text-gray-300 space-y-1.5">
+                                  <div className="flex items-center gap-1.5 text-amber-300 font-bold font-mono text-[11px] uppercase">
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span>If PhonePe or GPay shows "Declined" or "Exceeded Bank Limit":</span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-300 leading-relaxed font-sans">
+                                    Indian banks restrict browser links to personal accounts. If your app declines:
+                                  </p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 pt-0.5">
+                                    <div className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px]">
+                                      <span className="text-white font-bold block mb-0.5">1. Direct Mobile Pay</span>
+                                      <span className="text-gray-400">Open GPay/PhonePe ➔ Pay to Mobile ➔ <strong className="text-purple-300 font-mono">{currentPhone}</strong></span>
+                                    </div>
+                                    <div className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px]">
+                                      <span className="text-white font-bold block mb-0.5">2. Direct UPI ID Pay</span>
+                                      <span className="text-gray-400">Open GPay/PhonePe ➔ Pay to UPI ID ➔ <strong className="text-brand-teal font-mono">{activeVpa}</strong></span>
+                                    </div>
+                                    <div className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px]">
+                                      <span className="text-white font-bold block mb-0.5">3. Switch Beneficiary</span>
+                                      <span className="text-gray-400">If Bhuvan's daily bank limit is reached, switch to <strong className="text-amber-300">Shreyas (8310)</strong> above!</span>
+                                    </div>
+                                  </div>
                                 </div>
 
                                 <div className="space-y-1">

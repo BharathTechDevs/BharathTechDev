@@ -3,7 +3,8 @@ import {
   ShieldCheck, Lock, Unlock, Settings, Cpu, Calendar, Receipt, 
   ClipboardCheck, Mail, Plus, Trash2, Edit2, Check, ArrowLeft, 
   X, RefreshCw, Sparkles, DollarSign, IndianRupee, Eye, ListFilter, Camera,
-  Star, Database, BarChart as BarChartIcon, TrendingUp, Users as UsersIcon, Upload
+  Star, Database, BarChart as BarChartIcon, TrendingUp, Users as UsersIcon, Upload,
+  Briefcase, FileText, CheckCircle2, AlertCircle, Building2, Landmark, User, Download, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -17,12 +18,13 @@ import {
   getDynamicNetworking, saveDynamicNetworking,
   DynamicInvoice
 } from '../utils/dynamicData';
-import { Service, WorkshopEvent, ServiceEnquiry, GeneralMessage, NetworkingAchievement } from '../types';
+import { Service, WorkshopEvent, ServiceEnquiry, GeneralMessage, NetworkingAchievement, CandidateApplication } from '../types';
 import { 
   DatabaseEngine, ServiceRegistration, WorkshopRegistration, 
   PaymentTransaction, FeedbackItem, ChatConversation, 
   FileRecord, EnquiryItem, TeamMemberRecord, GalleryMediaItem 
 } from '../utils/dbEngine';
+import RecruitmentAdmin from './RecruitmentAdmin';
 
 interface AdminConsoleProps {
   onClose: () => void;
@@ -37,7 +39,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [adminId, setAdminId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState<'services' | 'workshops' | 'invoices' | 'payments' | 'leads' | 'networking' | 'database'>('database');
+  const [activeTab, setActiveTab] = useState<'recruitment' | 'services' | 'workshops' | 'invoices' | 'payments' | 'leads' | 'networking' | 'database'>('recruitment');
   const [dbSubView, setDbSubView] = useState<'explorer' | 'dashboard'>('dashboard');
 
   // Relational Database Explorer States
@@ -50,8 +52,17 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [dbEnquiries, setDbEnquiries] = useState<EnquiryItem[]>([]);
   const [dbTeamMembers, setDbTeamMembers] = useState<TeamMemberRecord[]>([]);
   const [dbGalleryMedia, setDbGalleryMedia] = useState<GalleryMediaItem[]>([]);
+  const [dbCandidateApps, setDbCandidateApps] = useState<CandidateApplication[]>([]);
 
-  const [selectedDbTable, setSelectedDbTable] = useState<'service_registrations' | 'workshop_registrations' | 'payments' | 'feedbacks' | 'chats' | 'files' | 'enquiries' | 'team_members' | 'gallery_media'>('service_registrations');
+  // Recruitment / Hiring Filter & Detail states
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState('');
+  const [candidateFilterSector, setCandidateFilterSector] = useState('ALL');
+  const [candidateFilterStatus, setCandidateFilterStatus] = useState('ALL');
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateApplication | null>(null);
+  const [candidateAuditNotes, setCandidateAuditNotes] = useState('');
+  const [isUpdatingCandidateStatus, setIsUpdatingCandidateStatus] = useState(false);
+
+  const [selectedDbTable, setSelectedDbTable] = useState<'service_registrations' | 'workshop_registrations' | 'payments' | 'feedbacks' | 'chats' | 'files' | 'enquiries' | 'team_members' | 'gallery_media' | 'candidate_applications'>('service_registrations');
   const [dbSearchQuery, setDbSearchQuery] = useState('');
   const [dbFilterStatus, setDbFilterStatus] = useState('ALL');
   const [selectedDbRecord, setSelectedDbRecord] = useState<any | null>(null);
@@ -122,6 +133,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setDbEnquiries(DatabaseEngine.getEnquiries());
     setDbTeamMembers(DatabaseEngine.getTeamMembers());
     setDbGalleryMedia(DatabaseEngine.getGalleryMedia());
+    setDbCandidateApps(DatabaseEngine.getCandidateApplications());
     setDbAnalytics(DatabaseEngine.getAnalytics());
   };
 
@@ -263,7 +275,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
       window.dispatchEvent(new Event('scoders_auth_change'));
       setErrorMsg('');
     } else {
-      setErrorMsg('Access Denied. Authorized Admin Accounts: shreyas / shreyas123, lokesh / lokesh123, bhuvan / bhuvan123, admin / admin123');
+      setErrorMsg('Access Denied: Invalid Admin ID or Security Password. Please enter your authorized credentials.');
     }
   };
 
@@ -580,6 +592,37 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     }
   };
 
+  const handleUpdateCandidateStatus = async (id: string, newStatus: any) => {
+    setIsUpdatingCandidateStatus(true);
+    try {
+      const updated = DatabaseEngine.updateCandidateApplicationStatus(id, newStatus, candidateAuditNotes);
+      setDbCandidateApps(updated);
+      if (selectedCandidate && selectedCandidate.id === id) {
+        setSelectedCandidate(updated.find(c => c.id === id) || null);
+      }
+      await fetch('/api/careers/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus, notes: candidateAuditNotes })
+      }).catch(() => {});
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdatingCandidateStatus(false);
+    }
+  };
+
+  const handleDeleteCandidate = (id: string) => {
+    if (confirm('Are you sure you want to remove this recruitment application record?')) {
+      const remaining = dbCandidateApps.filter(c => c.id !== id);
+      DatabaseEngine.saveCandidateApplications(remaining);
+      setDbCandidateApps(remaining);
+      if (selectedCandidate?.id === id) {
+        setSelectedCandidate(null);
+      }
+    }
+  };
+
   return (
     <div id="admin-panel" className="min-h-screen bg-brand-dark relative py-12 px-4 sm:px-6 lg:px-8 admin-portal-theme">
       {/* Dynamic ambient backgrounds */}
@@ -652,54 +695,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                 <ShieldCheck className="w-4 h-4" />
               </button>
 
-              {/* Quick autofill buttons */}
-              <div className="pt-3 border-t border-white/5 space-y-2">
-                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold text-center">
-                  Quick Admin Access
+              <div className="pt-3 border-t border-white/5 text-center flex flex-col gap-2.5">
+                <div className="flex items-center justify-center gap-1.5 text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5 text-brand-teal" />
+                  <span>Credential-Only Authentication Enforced</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminId('shreyas');
-                      setAdminPassword('shreyas123');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 rounded-lg text-left transition-all cursor-pointer"
-                  >
-                    <div className="text-[11px] font-bold text-white truncate">Shreyas M.</div>
-                    <div className="text-[9px] font-mono text-brand-teal truncate">CEO / Founder</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminId('lokesh');
-                      setAdminPassword('lokesh123');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg text-left transition-all cursor-pointer"
-                  >
-                    <div className="text-[11px] font-bold text-white truncate">Lokesh A.</div>
-                    <div className="text-[9px] font-mono text-purple-400 truncate">Co-Founder</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminId('bhuvan');
-                      setAdminPassword('bhuvan123');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-left transition-all cursor-pointer"
-                  >
-                    <div className="text-[11px] font-bold text-white truncate">Bhuvan M.</div>
-                    <div className="text-[9px] font-mono text-gray-400 truncate">Tech Lead</div>
-                  </button>
-                </div>
-              </div>
-
-              <div className="border-t border-white/5 pt-3 text-center flex flex-col gap-2.5">
                 <button
                   type="button"
                   onClick={onClose}
@@ -753,6 +753,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
             <div className="flex flex-wrap gap-2 border-b border-white/5 pb-2">
               {[
                 { id: 'database', label: 'Relational Database Engine', icon: <Database className="w-4 h-4 text-brand-teal" /> },
+                { id: 'recruitment', label: 'Talent & Induction Agreements', icon: <Briefcase className="w-4 h-4 text-brand-teal" /> },
                 { id: 'services', label: 'Services Catalog', icon: <Cpu className="w-4 h-4" /> },
                 { id: 'workshops', label: 'Workshops/Events', icon: <Calendar className="w-4 h-4" /> },
                 { id: 'networking', label: 'Networking & Photos', icon: <Camera className="w-4 h-4" /> },
@@ -1851,6 +1852,15 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                   </div>
                   )}
                 </div>
+              )}
+
+              {activeTab === 'recruitment' && (
+                <RecruitmentAdmin 
+                  applications={dbCandidateApps}
+                  onUpdateStatus={handleUpdateCandidateStatus}
+                  onDeleteApplication={handleDeleteCandidate}
+                  onRefresh={loadAllData}
+                />
               )}
 
               {activeTab === 'services' && (

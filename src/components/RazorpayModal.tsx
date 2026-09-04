@@ -7,7 +7,17 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp, generateUpiUrl, getActiveMerchantUpi } from '../utils/paymentLinks';
+import { 
+  openUpiApp, 
+  generateUpiUrl, 
+  getAppropriateUpiLink,
+  getActiveMerchantUpi, 
+  setActiveMerchantUpi, 
+  DEFAULT_BHUVAN_UPI, 
+  DEFAULT_SHREYAS_UPI, 
+  getBankingNameForUpi, 
+  getPhoneNumberForUpi 
+} from '../utils/paymentLinks';
 
 export interface RazorpayPaymentSuccessData {
   razorpay_payment_id: string;
@@ -176,16 +186,17 @@ export default function RazorpayModal({
   };
 
   const formattedAmount = (amount || 0).toFixed(2);
-  const cleanNote = (paymentDetails.purpose || 'SCODERS Tech').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 30);
-  const cleanTr = (orderId || `order_${Date.now()}`).replace(/[^a-zA-Z0-9]/g, '').slice(-12);
+  const cleanNote = (paymentDetails.purpose || 'SCODERS Tech').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
+  const currentBankingName = getBankingNameForUpi(merchantUpi);
+  const currentPhone = getPhoneNumberForUpi(merchantUpi);
 
-  // Standard Universal NPCI UPI URI
-  const universalUpiLink = `upi://pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  // Standard Universal NPCI UPI URI with CBS registered bank name & no tr on personal accounts
+  const universalUpiLink = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(currentBankingName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}`;
 
-  // Direct app-specific deep links
-  const phonePeLink = `phonepe://pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
-  const gpayLink = `tez://upi/pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
-  const paytmLink = `paytmmp://pay?pa=${merchantUpi}&pn=SCODERSTechnologies&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}&tr=${cleanTr}`;
+  // Direct app-specific deep links using platform-optimized intent schemes
+  const phonePeLink = getAppropriateUpiLink({ pa: merchantUpi, pn: currentBankingName, am: amount, tn: cleanNote }, 'phonepe');
+  const gpayLink = getAppropriateUpiLink({ pa: merchantUpi, pn: currentBankingName, am: amount, tn: cleanNote }, 'gpay');
+  const paytmLink = getAppropriateUpiLink({ pa: merchantUpi, pn: currentBankingName, am: amount, tn: cleanNote }, 'paytm');
 
   const getTargetDeepLink = (app: string) => {
     switch (app) {
@@ -213,10 +224,9 @@ export default function RazorpayModal({
       const scheme = targetApp === 'phonepe' ? 'phonepe' : targetApp === 'gpay' ? 'gpay' : targetApp === 'paytm' ? 'paytm' : 'universal';
       openUpiApp({
         pa: merchantUpi,
-        pn: 'S-CODERS Technologies',
+        pn: currentBankingName,
         am: amount,
-        tn: cleanNote,
-        tr: cleanTr
+        tn: cleanNote
       }, scheme);
     }
 
@@ -501,7 +511,7 @@ export default function RazorpayModal({
     }
   };
 
-  const upiDeepLink = `upi://pay?pa=${merchantUpi}&pn=S-CODERS%20Technologies&am=${amount}&cu=INR&tn=${encodeURIComponent(paymentDetails.purpose || 'S-CODERS Payment')}`;
+  const upiDeepLink = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(currentBankingName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiDeepLink)}&margin=10`;
 
   return (
@@ -683,10 +693,9 @@ export default function RazorpayModal({
                       type="button"
                       onClick={() => openUpiApp({
                         pa: merchantUpi,
-                        pn: 'S-CODERS Technologies',
+                        pn: currentBankingName,
                         am: amount,
-                        tn: cleanNote,
-                        tr: cleanTr
+                        tn: cleanNote
                       }, 'phonepe')}
                       className="py-2.5 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                     >
@@ -697,10 +706,9 @@ export default function RazorpayModal({
                       type="button"
                       onClick={() => openUpiApp({
                         pa: merchantUpi,
-                        pn: 'S-CODERS Technologies',
+                        pn: currentBankingName,
                         am: amount,
-                        tn: cleanNote,
-                        tr: cleanTr
+                        tn: cleanNote
                       }, 'gpay')}
                       className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                     >
@@ -711,10 +719,9 @@ export default function RazorpayModal({
                       type="button"
                       onClick={() => openUpiApp({
                         pa: merchantUpi,
-                        pn: 'S-CODERS Technologies',
+                        pn: currentBankingName,
                         am: amount,
-                        tn: cleanNote,
-                        tr: cleanTr
+                        tn: cleanNote
                       }, 'universal')}
                       className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
                     >
@@ -1124,10 +1131,9 @@ export default function RazorpayModal({
                               const scheme = selectedUpiApp === 'phonepe' ? 'phonepe' : selectedUpiApp === 'gpay' ? 'gpay' : selectedUpiApp === 'paytm' ? 'paytm' : 'universal';
                               openUpiApp({
                                 pa: merchantUpi,
-                                pn: 'S-CODERS Technologies',
+                                pn: currentBankingName,
                                 am: amount,
-                                tn: cleanNote,
-                                tr: cleanTr
+                                tn: cleanNote
                               }, scheme);
                               setIsAwaitingUpiConfirmation(true);
                             }}
