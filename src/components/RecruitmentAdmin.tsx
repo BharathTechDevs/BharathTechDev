@@ -51,7 +51,16 @@ export default function RecruitmentAdmin({
       app.panNumber?.toLowerCase().includes(q)
     );
 
-    const matchesSector = filterSector === 'ALL' || app.sector === filterSector;
+    const matchesSector = filterSector === 'ALL' || 
+      app.sector === filterSector ||
+      (filterSector === 'Backend & AI Systems' && (app.sector === 'AI & Automation Engineering' || app.sector === 'Backend & AI Systems')) ||
+      (filterSector === 'Full-Stack Web Development' && (app.sector === 'Full-Stack Web Development' || app.sector === 'Full Stack Development')) ||
+      (filterSector === 'Video Editing' && (app.sector === 'Video Editing' || app.sector === 'Video Editing & Multimedia')) ||
+      (filterSector === 'Content Writing' && (app.sector === 'Content Writing' || app.sector === 'Content Writing & Copywriting')) ||
+      (filterSector === 'Digital Marketing' && (app.sector === 'Digital Marketing' || app.sector === 'Digital Marketing & Growth')) ||
+      (filterSector === 'Startup & Business' && (app.sector === 'Startup & Business' || app.sector === 'Business Development & Operations')) ||
+      (filterSector === 'Event Management' && (app.sector === 'Event Management' || app.sector === 'Tech Workshops & Community Growth')) ||
+      (filterSector === 'DevOps & Cloud Systems' && (app.sector === 'Cloud & Infrastructure' || app.sector === 'DevOps & Cloud Systems'));
     const matchesStatus = filterStatus === 'ALL' || app.status === filterStatus;
 
     return matchesSearch && matchesSector && matchesStatus;
@@ -149,12 +158,20 @@ export default function RecruitmentAdmin({
             className="px-3 py-2 bg-brand-card/80 border border-white/10 rounded-xl text-xs text-gray-200 focus:outline-none focus:border-brand-teal"
           >
             <option value="ALL">All Sectors</option>
+            <option value="AI & Automation Engineering">AI & Automation Engineering</option>
             <option value="Frontend Engineering">Frontend Engineering</option>
             <option value="Backend & AI Systems">Backend & AI Systems</option>
-            <option value="Full Stack Development">Full Stack Development</option>
+            <option value="Full-Stack Web Development">Full-Stack Web Development</option>
             <option value="Mobile App Development">Mobile App Development</option>
-            <option value="DevOps & Cloud Systems">DevOps & Cloud Systems</option>
+            <option value="Video Editing">Video Editing</option>
+            <option value="Content Writing">Content Writing</option>
+            <option value="Digital Marketing">Digital Marketing</option>
+            <option value="Startup & Business">Startup & Business</option>
+            <option value="Event Management">Event Management</option>
             <option value="UI/UX & Product Design">UI/UX & Product Design</option>
+            <option value="DevOps & Cloud Systems">DevOps & Cloud Systems</option>
+            <option value="QA & Software Testing">QA & Software Testing</option>
+            <option value="Tech Workshops & Community Growth">Tech Workshops & Community Growth</option>
           </select>
 
           {/* Status Filter */}

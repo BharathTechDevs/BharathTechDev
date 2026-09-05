@@ -3,7 +3,9 @@ import {
   Briefcase, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, 
   Shield, FileText, Building2, User, Landmark, Sparkles, 
   Cpu, Smartphone, Globe, Palette, Cloud, Users, Award, 
-  Download, Printer, Check, Copy, ExternalLink, RefreshCw
+  Download, Printer, Check, Copy, ExternalLink, RefreshCw,
+  Layout, Terminal, Code, Video, Megaphone, PenTool, TrendingUp, Film,
+  Calendar, Rocket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CandidateApplication } from '../types';
@@ -18,51 +20,215 @@ const SECTORS = [
     id: 'ai_engineering',
     name: 'AI & Automation Engineering',
     role: 'AI Agent & LLM Workflow Engineer',
+    roles: [
+      'AI Agent & LLM Workflow Engineer',
+      'Generative AI & Prompt Engineer',
+      'n8n & Workflow Automation Specialist',
+      'Python & Vector Database Engineer',
+      'AI Solutions Architect'
+    ],
     icon: Cpu,
     skills: 'Gemini SDK, n8n, Python, Vector DBs, LangChain',
     badge: 'High Priority Hiring'
   },
   {
+    id: 'frontend_engineering',
+    name: 'Frontend Engineering',
+    role: 'Frontend Software Engineer (React / Next.js)',
+    roles: [
+      'Frontend Software Engineer (React / Next.js)',
+      'UI/UX Implementation Developer',
+      'React 19 & TypeScript Specialist',
+      'Web Performance & Animation Specialist'
+    ],
+    icon: Layout,
+    skills: 'React 19, TypeScript, Next.js, Tailwind CSS, Motion',
+    badge: 'Immediate Opening'
+  },
+  {
+    id: 'backend_systems',
+    name: 'Backend & AI Systems',
+    role: 'Backend Systems Engineer (Node.js / Python)',
+    roles: [
+      'Backend Systems Engineer (Node.js / Python)',
+      'API & Microservices Architect',
+      'Database & Cache Engineer (PostgreSQL / Redis)',
+      'FastAPI & Python Developer'
+    ],
+    icon: Terminal,
+    skills: 'Node.js, Express, FastAPI, PostgreSQL, Redis, REST/gRPC',
+    badge: 'Core Platform'
+  },
+  {
     id: 'fullstack_web',
     name: 'Full-Stack Web Development',
-    role: 'Full-Stack Software Engineer (React / Next.js)',
+    role: 'Full-Stack Software Engineer (React / Node.js)',
+    roles: [
+      'Full-Stack Software Engineer (React / Node.js)',
+      'MERN Stack Developer',
+      'Next.js Full-Stack Architect',
+      'SaaS Platform Engineer'
+    ],
     icon: Globe,
-    skills: 'React 19, TypeScript, Node.js, Express, Tailwind CSS',
-    badge: 'Immediate Opening'
+    skills: 'React 19, Node.js, Express, PostgreSQL, TypeScript',
+    badge: 'Active Hiring'
   },
   {
     id: 'mobile_apps',
     name: 'Mobile App Development',
     role: 'React Native Cross-Platform Developer',
+    roles: [
+      'React Native Cross-Platform Developer',
+      'Flutter & Dart Mobile Engineer',
+      'Android (Kotlin) Application Developer',
+      'iOS & Native Modules Developer'
+    ],
     icon: Smartphone,
-    skills: 'React Native, Expo, Native Modules, Offline Sync',
+    skills: 'React Native, Expo, Flutter, Native Modules, Offline Sync',
     badge: 'Active Hiring'
+  },
+  {
+    id: 'video_editing',
+    name: 'Video Editing',
+    role: 'Video Editor & Motion Designer',
+    roles: [
+      'Video Editor & Motion Designer',
+      'Lead Video Editor & Reel Creator',
+      'Motion Graphics & VFX Artist',
+      'YouTube & Long-Form Video Editor',
+      'Shorts & Reels Video Editor',
+      'Podcast & Audio-Visual Production Specialist',
+      'Thumbnail & Visual Asset Designer'
+    ],
+    icon: Video,
+    skills: 'Premiere Pro, After Effects, DaVinci Resolve, CapCut, Photoshop',
+    badge: 'Media Track'
+  },
+  {
+    id: 'content_writing',
+    name: 'Content Writing',
+    role: 'Content Writer & Copywriter',
+    roles: [
+      'Content Writer & Copywriter',
+      'Technical Content Writer & Tech Blogger',
+      'Social Media Copywriter & Ghostwriter',
+      'Video Scriptwriter (Tech & AI Content)',
+      'Developer Documentation & Guide Specialist',
+      'Creative & Ad Copywriter'
+    ],
+    icon: PenTool,
+    skills: 'Technical Writing, SEO Writing, Storytelling, Scriptwriting, Copywriting',
+    badge: 'Content Track'
+  },
+  {
+    id: 'digital_marketing',
+    name: 'Digital Marketing',
+    role: 'Digital Marketing Specialist',
+    roles: [
+      'Digital Marketing Specialist',
+      'Social Media Marketing Manager',
+      'Performance Marketing & Paid Ads Lead (Meta / Google Ads)',
+      'SEO & Organic Growth Strategist',
+      'Influencer Relations & Creator Partnerships Lead',
+      'Email & Retention Marketing Specialist'
+    ],
+    icon: Megaphone,
+    skills: 'Meta Ads, Google Ads, SEO, Social Strategy, Growth Hacking, Analytics',
+    badge: 'Growth Track'
+  },
+  {
+    id: 'startup_business',
+    name: 'Startup & Business',
+    role: 'Business Development & Startup Associate',
+    roles: [
+      'Business Development & Startup Associate',
+      'Startup Strategy & Operations Lead',
+      'Client Relations & Tech Sales Executive',
+      'Partnership & Investor Relations Associate',
+      'Product Operations & Project Coordinator',
+      'Entrepreneur-in-Residence (EIR) Intern'
+    ],
+    icon: Rocket,
+    skills: 'Startup Operations, Business Development, Client Outreach, Pitch Decks, CRM',
+    badge: 'Strategy Track'
+  },
+  {
+    id: 'event_management',
+    name: 'Event Management',
+    role: 'Event Coordinator & Community Lead',
+    roles: [
+      'Event Coordinator & Community Lead',
+      'Hackathon & Workshop Operations Manager',
+      'Campus Ambassador & College Outreach Lead',
+      'Event Logistics & Venue Production Lead',
+      'Sponsorship & Hospitality Coordinator',
+      'Stage & AV Technical Coordinator'
+    ],
+    icon: Calendar,
+    skills: 'Event Operations, Logistics, Community Building, Hospitality, Public Speaking',
+    badge: 'Events Track'
   },
   {
     id: 'ui_ux_design',
     name: 'UI/UX & Product Design',
     role: 'Lead UI/UX Designer & Product Architect',
+    roles: [
+      'Lead UI/UX Designer & Product Architect',
+      'Product Designer (Figma / Design Systems)',
+      'Interaction & Motion Designer',
+      'Visual & Brand Identity Designer'
+    ],
     icon: Palette,
     skills: 'Figma, Design Systems, Motion Prototyping, Wireframing',
     badge: 'Design Track'
   },
   {
     id: 'devops_cloud',
-    name: 'Cloud & Infrastructure',
+    name: 'DevOps & Cloud Systems',
     role: 'DevOps & Backend Pipeline Engineer',
+    roles: [
+      'DevOps & Backend Pipeline Engineer',
+      'Cloud Infrastructure Architect (GCP / Cloud Run)',
+      'Site Reliability Engineer (SRE)',
+      'CI/CD & Containerization Specialist'
+    ],
     icon: Cloud,
-    skills: 'Docker, Cloud Run, PostgreSQL, Redis, CI/CD Pipelines',
+    skills: 'Docker, Cloud Run, GCP, PostgreSQL, Redis, CI/CD',
     badge: 'Infrastructure'
+  },
+  {
+    id: 'qa_testing',
+    name: 'QA & Software Testing',
+    role: 'QA Automation Engineer',
+    roles: [
+      'QA Automation Engineer',
+      'Full-Cycle Web & Mobile Tester',
+      'API & Load Performance Tester',
+      'Security & Vulnerability Test Specialist'
+    ],
+    icon: CheckCircle2,
+    skills: 'Jest, Playwright, Cypress, Postman, Security Auditing',
+    badge: 'Quality Track'
   },
   {
     id: 'workshops_community',
     name: 'Tech Workshops & Community Growth',
     role: 'Developer Evangelist & Workshop Coordinator',
+    roles: [
+      'Developer Evangelist & Workshop Coordinator',
+      'Technical Workshop Instructor',
+      'Campus Ambassador & Hackathon Lead',
+      'Tech Content Creator & Community Manager'
+    ],
     icon: Users,
     skills: 'Technical Training, Public Speaking, Developer Relations',
     badge: 'Growth Track'
   }
 ];
+
+const ALL_PREDEFINED_ROLES = Array.from(
+  new Set(SECTORS.flatMap(s => s.roles || [s.role]))
+);
 
 export default function Careers({ onNavigate }: CareersProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -648,17 +814,57 @@ export default function Careers({ onNavigate }: CareersProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-2">
-                    Designated Role Title <span className="text-brand-teal">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-mono uppercase tracking-wider text-gray-300">
+                      Designated Role Title <span className="text-brand-teal">*</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-gray-400">
+                      Select or type custom
+                    </span>
+                  </div>
                   <input
                     type="text"
                     required
+                    list="all-roles-datalist"
                     value={roleTitle}
                     onChange={(e) => setRoleTitle(e.target.value)}
-                    placeholder="e.g. AI Workflow Engineer"
+                    placeholder="e.g. AI Workflow Engineer, Frontend Developer..."
                     className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-colors"
                   />
+                  <datalist id="all-roles-datalist">
+                    {ALL_PREDEFINED_ROLES.map((role) => (
+                      <option key={role} value={role} />
+                    ))}
+                  </datalist>
+
+                  {/* Quick Role Selection Pills for Active Track */}
+                  {(() => {
+                    const activeSector = SECTORS.find(s => s.name === selectedSector);
+                    if (!activeSector?.roles || activeSector.roles.length === 0) return null;
+                    return (
+                      <div className="mt-2.5 space-y-1.5">
+                        <span className="text-[10px] font-mono text-gray-400 block">
+                          Suggested Roles in {activeSector.name} (Click to auto-fill):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeSector.roles.map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setRoleTitle(r)}
+                              className={`text-[11px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer text-left ${
+                                roleTitle === r
+                                  ? 'bg-brand-teal text-brand-dark font-bold border-brand-teal shadow-sm shadow-brand-teal/20'
+                                  : 'bg-white/5 border-white/10 text-gray-300 hover:border-brand-teal/40 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              {r}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
