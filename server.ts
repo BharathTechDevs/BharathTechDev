@@ -1076,8 +1076,13 @@ async function startServer() {
       const updatedApps = [candidateRecord, ...existingApps.filter(a => a.id !== submissionId)];
       saveStoredApplications(updatedApps);
 
-      // Trigger asynchronous confirmation email
-      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
+      // Trigger asynchronous confirmation email with clean branded URL (no 'ais' prefix)
+      let appBaseUrl = 'https://s-coders.com';
+      const host = (req.headers.host || '').toLowerCase();
+      const originHeader = (req.headers.origin || '').toLowerCase();
+      if (!host.includes('ais') && !originHeader.includes('ais') && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+        appBaseUrl = req.headers.origin || `https://${req.headers.host}`;
+      }
       sendEmailNotification({
         to: candidateRecord.email,
         subject: `📋 Recruitment Application & Induction Agreement Recorded - S-CODERS (Ref: ${agreementRef})`,
@@ -1088,7 +1093,7 @@ async function startServer() {
           agreementRef: agreementRef,
           submissionId: submissionId,
           effectiveDate: candidateRecord.effectiveDate || '2026-09-01',
-          actionUrl: `${origin}/?view=careers`,
+          actionUrl: `${appBaseUrl}/careers`,
         }),
       }).catch(err => console.error("Recruitment email dispatch notice:", err.message));
 
@@ -1149,6 +1154,20 @@ async function startServer() {
     } catch (err: any) {
       console.error("Update Status Error:", err);
       res.status(500).json({ error: "Failed to update application status." });
+    }
+  });
+
+  // 4. Delete Candidate Application (Admin Action)
+  app.delete("/api/careers/applications/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const apps = getStoredApplications();
+      const remaining = apps.filter(a => a.id !== id);
+      saveStoredApplications(remaining);
+      res.json({ success: true, message: "Application deleted successfully." });
+    } catch (err: any) {
+      console.error("Delete Application Error:", err);
+      res.status(500).json({ error: "Failed to delete candidate application." });
     }
   });
 

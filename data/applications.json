@@ -1,0 +1,36 @@
+[
+  {
+    "fullName": "Priya Sharma",
+    "email": "priya.sharma@example.com",
+    "sector": "AI & Automation Engineering",
+    "roleTitle": "Generative AI & Prompt Engineer",
+    "employmentType": "Full-Time",
+    "expectedCompensation": "₹50,000 / month",
+    "phone": "+91 9876500000",
+    "whatsapp": "+91 9876500000",
+    "currentCity": "Bengaluru",
+    "portfolioUrl": "https://priyasharma.tech",
+    "status": "Submitted",
+    "id": "SCD-APP-MTRJN9NJ-4700",
+    "agreementReferenceId": "SCD-AGR-2026-MTRJN9NJ",
+    "submissionDate": "2026-09-07",
+    "createdAt": "2026-09-07T17:58:02.911Z"
+  },
+  {
+    "fullName": "Kavya Ramesh",
+    "email": "kavya.ramesh@example.com",
+    "sector": "AI & Automation Engineering",
+    "roleTitle": "AI Agent & LLM Workflow Engineer",
+    "employmentType": "Full-Time",
+    "expectedCompensation": "₹45,000 / month",
+    "phone": "+91 9876543210",
+    "whatsapp": "+91 9876543210",
+    "currentCity": "Bengaluru",
+    "portfolioUrl": "https://kavya.dev",
+    "status": "Submitted",
+    "id": "SCD-APP-MTRJBB1T-5169",
+    "agreementReferenceId": "SCD-AGR-2026-MTRJBB1T",
+    "submissionDate": "2026-09-07",
+    "createdAt": "2026-09-07T17:48:44.849Z"
+  }
+]

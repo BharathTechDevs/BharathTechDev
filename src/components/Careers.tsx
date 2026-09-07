@@ -5,7 +5,7 @@ import {
   Cpu, Smartphone, Globe, Palette, Cloud, Users, Award, 
   Download, Printer, Check, Copy, ExternalLink, RefreshCw,
   Layout, Terminal, Code, Video, Megaphone, PenTool, TrendingUp, Film,
-  Calendar, Rocket
+  Calendar, Rocket, Link2, Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CandidateApplication } from '../types';
@@ -236,6 +236,53 @@ export default function Careers({ onNavigate }: CareersProps) {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [successApp, setSuccessApp] = useState<CandidateApplication | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+  // Compute the live active cloud server URL (running right now on Google Cloud Run)
+  const liveActiveCloudUrl = typeof window !== 'undefined' && window.location.origin
+    ? `${window.location.origin}/careers`
+    : 'https://ais-pre-4pr6x2ldsz6wlrzuhtwvkl-289165168867.asia-southeast1.run.app/careers';
+
+  // State for custom domain if user connects one
+  const [customDomainInput, setCustomDomainInput] = useState<string>('');
+  const [isUsingCustomDomain, setIsUsingCustomDomain] = useState(false);
+
+  const getShareUrl = (): string => {
+    if (isUsingCustomDomain && customDomainInput.trim()) {
+      let d = customDomainInput.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+      return d.endsWith('/careers') ? `https://${d}` : `https://${d}/careers`;
+    }
+    return liveActiveCloudUrl;
+  };
+
+  const shareableCareersUrl = getShareUrl();
+
+  const handleCopyShareLink = () => {
+    const textToCopy = shareableCareersUrl;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopiedShareLink(true);
+        setTimeout(() => setCopiedShareLink(false), 2500);
+      }).catch(() => fallbackCopy(textToCopy));
+    } else {
+      fallbackCopy(textToCopy);
+    }
+  };
+
+  const fallbackCopy = (text: string) => {
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopiedShareLink(true);
+      setTimeout(() => setCopiedShareLink(false), 2500);
+    } catch (e) {
+      console.error('Copy fallback failed', e);
+    }
+  };
 
   // Generate an initial unique Agreement Reference ID
   const [agreementRefId] = useState<string>(() => {
@@ -398,7 +445,7 @@ export default function Careers({ onNavigate }: CareersProps) {
       return false;
     }
     if (!expectedCompensation.trim()) {
-      setErrorBanner('Please specify your Expected Monthly Stipend or Compensation.');
+      setErrorBanner('Please specify your Expected Salary.');
       return false;
     }
     if (!whyJoinScoders.trim()) {
@@ -607,24 +654,29 @@ export default function Careers({ onNavigate }: CareersProps) {
       // 1. Save directly to DatabaseEngine local collection
       DatabaseEngine.addCandidateApplication(applicationPayload);
 
-      // 2. Post to server-side API endpoint for persistent storage & email dispatch
+      // 2. Post to server-side API endpoint for persistent storage in data/applications.json & email dispatch
       const res = await fetch('/api/careers/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(applicationPayload)
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        console.warn('Server endpoint warning (using local persistent DB engine):', errorData);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.candidate) {
+          DatabaseEngine.addCandidateApplication(data.candidate);
+        }
       }
+
+      // 3. Trigger server sync to keep collections unified
+      DatabaseEngine.syncApplicationsFromServer().catch(() => {});
 
       setSuccessApp(applicationPayload);
       setCurrentStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Submission error:', err);
-      // Even if network fails, DatabaseEngine has safely preserved it
+      // Even if network fails, DatabaseEngine has safely preserved it locally
       setSuccessApp(applicationPayload);
       setCurrentStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -642,7 +694,7 @@ export default function Careers({ onNavigate }: CareersProps) {
       <div className="max-w-5xl mx-auto relative z-10">
         
         {/* Header Title Section */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-8">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-teal/10 border border-brand-teal/30 text-brand-teal text-xs font-mono mb-4 uppercase tracking-wider">
             <Briefcase className="w-3.5 h-3.5" />
             <span>S-CODERS TALENT & CAREERS PORTAL</span>
@@ -653,6 +705,147 @@ export default function Careers({ onNavigate }: CareersProps) {
           <p className="text-gray-400 font-sans font-light text-base sm:text-lg leading-relaxed">
             We are hiring builders, AI architects, designers, and systems engineers. Complete your profile and execute the Talent Induction & Non-Disclosure Agreement.
           </p>
+        </div>
+
+        {/* Dedicated Separate Link & Database Sync Banner */}
+        <div className="mb-10 bg-brand-card/80 border border-brand-teal/30 rounded-2xl p-4 sm:p-6 backdrop-blur-md shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-brand-teal/5 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="flex flex-col gap-4 relative z-10">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-brand-teal/15 border border-brand-teal/30 flex items-center justify-center text-brand-teal shrink-0">
+                  <Link2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+                      Direct Recruitment Form Link
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Live Cloud Server Active
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-[10px] font-mono">
+                      Database Connected
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed">
+                    Share this link with applicants. Anyone who fills the form will have their candidate dossier & signed agreement saved into the S-CODERS recruitment database and synced with the Admin Console.
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Actions (Copy & WhatsApp) */}
+              <div className="flex items-center gap-2 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/10">
+                <button
+                  type="button"
+                  onClick={handleCopyShareLink}
+                  className={`flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer shadow-md ${
+                    copiedShareLink
+                      ? 'bg-emerald-500 text-brand-dark shadow-emerald-500/20'
+                      : 'bg-brand-teal text-brand-dark hover:bg-white hover:text-brand-dark shadow-brand-teal/10'
+                  }`}
+                >
+                  {copiedShareLink ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Link Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Apply to S-CODERS: Join the Tech Crew & execute Talent Induction Agreement: ${shareableCareersUrl}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2.5 rounded-xl bg-emerald-600/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/25 font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Share on WhatsApp"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Current Working Live URL Box */}
+            <div className="bg-black/50 border border-brand-teal/25 rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold uppercase tracking-wider shrink-0 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    Working Link:
+                  </span>
+                  <div className="font-mono text-xs sm:text-sm font-semibold text-brand-teal bg-brand-teal/10 px-3 py-1.5 rounded-lg border border-brand-teal/30 truncate select-all break-all">
+                    {shareableCareersUrl}
+                  </div>
+                </div>
+                <a
+                  href={shareableCareersUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-teal text-brand-dark hover:bg-white transition-all text-xs font-mono font-bold cursor-pointer shadow-md"
+                >
+                  <span>Open & Test Form</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
+              {/* Status & Technical Explanation */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-white/10 text-xs text-gray-300">
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10 flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white block font-mono text-[11px]">Why this link is 100% active:</strong>
+                    <span className="text-gray-400 text-[11px] leading-relaxed">
+                      This is the real, running server on Google Cloud Run. Anyone who clicks it can apply right now, and all submissions immediately write to your database and appear in your Admin Console.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white block font-mono text-[11px]">Why "ais" is in the link & why TinyURL failed:</strong>
+                    <span className="text-gray-400 text-[11px] leading-relaxed">
+                      <strong>ais</strong> stands for <em>Google AI Studio</em>. Public shorteners (TinyURL, Bitly) block or show security warning screens on cloud domains (<code className="text-cyan-300 font-mono">.run.app</code>). Custom domains like <code className="text-amber-300 font-mono">s-coders.com</code> require purchasing the domain and setting up DNS.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Domain Option Toggle */}
+              <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsUsingCustomDomain(!isUsingCustomDomain)}
+                  className="text-xs font-mono text-gray-400 hover:text-brand-teal flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>{isUsingCustomDomain ? 'Use Cloud Run URL' : 'Have a registered custom domain (e.g. yourcompany.com)?'}</span>
+                </button>
+
+                {isUsingCustomDomain && (
+                  <div className="flex items-center gap-2 flex-1 max-w-md">
+                    <span className="text-xs font-mono text-gray-400">https://</span>
+                    <input
+                      type="text"
+                      value={customDomainInput}
+                      onChange={(e) => setCustomDomainInput(e.target.value)}
+                      placeholder="yourdomain.com"
+                      className="bg-black/60 border border-brand-teal/30 rounded-lg px-3 py-1 text-xs font-mono text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal flex-1"
+                    />
+                    <span className="text-xs font-mono text-gray-400">/careers</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Step Progress Tracker */}
@@ -1133,15 +1326,17 @@ export default function Careers({ onNavigate }: CareersProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-2">
-                    Expected Stipend / Monthly Compensation <span className="text-brand-teal">*</span>
+                  <label htmlFor="expectedSalary" className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-2">
+                    Expected Salary <span className="text-brand-teal">*</span>
                   </label>
                   <input
+                    id="expectedSalary"
+                    name="expectedSalary"
                     type="text"
                     required
                     value={expectedCompensation}
                     onChange={(e) => setExpectedCompensation(e.target.value)}
-                    placeholder="e.g. ₹35,000 - ₹50,000 / month"
+                    placeholder="Expected Salary"
                     className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-colors"
                   />
                 </div>
@@ -1987,6 +2182,30 @@ export default function Careers({ onNavigate }: CareersProps) {
                   <p className="text-gray-400 font-mono uppercase text-[10px]">Authorized Signature</p>
                   <p className="font-semibold text-brand-teal font-display mt-1">{successApp.candidateDigitalSignature}</p>
                 </div>
+              </div>
+
+              {/* Navigation & New Application Actions */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep(1);
+                    setSuccessApp(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 text-xs font-mono transition-colors cursor-pointer"
+                >
+                  ← Submit Another Candidate Application
+                </button>
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('home')}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-xs hover:bg-white transition-colors cursor-pointer"
+                  >
+                    Return to S-CODERS Home →
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

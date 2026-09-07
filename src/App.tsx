@@ -23,6 +23,41 @@ import Events from './components/Events';
 import AuthPortal from './components/AuthPortal';
 import Policies from './components/Policies';
 import Careers from './components/Careers';
+import { DatabaseEngine } from './utils/dbEngine';
+
+type AppView = 'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies' | 'careers';
+
+const VALID_VIEWS: AppView[] = ['home', 'about', 'crew', 'services', 'workshops', 'communities', 'payments', 'contact', 'admin', 'networking', 'events', 'portal', 'policies', 'careers'];
+
+function resolveViewFromUrl(): AppView {
+  try {
+    const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+    if (path === 'careers' || path === 'recruitment' || path === 'jobs' || path === 'apply') {
+      return 'careers';
+    }
+    if (VALID_VIEWS.includes(path as AppView)) {
+      return path as AppView;
+    }
+
+    const hash = window.location.hash.replace(/^#/, '').toLowerCase();
+    if (hash === 'careers' || hash === 'recruitment' || hash === 'jobs' || hash === 'apply') {
+      return 'careers';
+    }
+    if (VALID_VIEWS.includes(hash as AppView)) {
+      return hash as AppView;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view')?.toLowerCase();
+    if (v === 'careers' || v === 'recruitment' || v === 'jobs' || v === 'apply') {
+      return 'careers';
+    }
+    if (v && VALID_VIEWS.includes(v as AppView)) {
+      return v as AppView;
+    }
+  } catch (e) {}
+  return 'home';
+}
 
 const ViewLoader = () => (
   <div className="flex flex-col items-center justify-center py-24 min-h-[40vh] w-full">
@@ -118,24 +153,52 @@ interface PrefilledPaymentData {
 
 export default function App() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies'>(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const v = params.get('view');
-      const validViews = ['home', 'about', 'crew', 'services', 'workshops', 'communities', 'payments', 'contact', 'admin', 'networking', 'events', 'portal', 'policies'];
-      if (v && validViews.includes(v)) {
-        return v as any;
-      }
-    } catch (e) {}
-    return 'home';
-  });
+  const [currentView, setCurrentView] = useState<AppView>(resolveViewFromUrl);
   const [activePolicyTab, setActivePolicyTab] = useState<string>('terms');
   const [prefilledPayment, setPrefilledPayment] = useState<PrefilledPaymentData | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const handleViewChange = (view: string) => {
-    setCurrentView(view as any);
+    const targetView = view as AppView;
+    setCurrentView(targetView);
+    try {
+      if (targetView === 'careers') {
+        window.history.pushState({ view: 'careers' }, '', '/careers');
+        document.title = 'Careers & Recruitment Portal | S-CODERS (Bharath Tech Developers)';
+      } else if (targetView === 'home') {
+        window.history.pushState({ view: 'home' }, '', '/');
+        document.title = 'S-CODERS | Bharath Tech Developers';
+      } else {
+        window.history.pushState({ view: targetView }, '', `/?view=${targetView}`);
+      }
+    } catch (e) {}
   };
+
+  // Synchronize browser URL navigation (back/forward, direct link, hashchange)
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const detectedView = resolveViewFromUrl();
+      setCurrentView(detectedView);
+      if (detectedView === 'careers') {
+        document.title = 'Careers & Recruitment Portal | S-CODERS (Bharath Tech Developers)';
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+
+    if (currentView === 'careers') {
+      document.title = 'Careers & Recruitment Portal | S-CODERS (Bharath Tech Developers)';
+    }
+
+    // Sync candidate applications from backend server database
+    DatabaseEngine.syncApplicationsFromServer().catch(() => {});
+
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
 
   const handleViewPolicy = (tab: string) => {
     setActivePolicyTab(tab);

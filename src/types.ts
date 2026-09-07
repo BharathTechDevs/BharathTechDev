@@ -245,6 +245,8 @@ export interface CandidateApplication {
   // Admin audit
   adminNotes?: string;
   reviewedBy?: string;
+  createdAt?: string;
+  lastUpdated?: string;
 }
 
 

@@ -134,6 +134,9 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setDbTeamMembers(DatabaseEngine.getTeamMembers());
     setDbGalleryMedia(DatabaseEngine.getGalleryMedia());
     setDbCandidateApps(DatabaseEngine.getCandidateApplications());
+    DatabaseEngine.syncApplicationsFromServer().then(apps => {
+      setDbCandidateApps(apps);
+    }).catch(() => {});
     setDbAnalytics(DatabaseEngine.getAnalytics());
   };
 
@@ -612,13 +615,18 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     }
   };
 
-  const handleDeleteCandidate = (id: string) => {
+  const handleDeleteCandidate = async (id: string) => {
     if (confirm('Are you sure you want to remove this recruitment application record?')) {
       const remaining = dbCandidateApps.filter(c => c.id !== id);
       DatabaseEngine.saveCandidateApplications(remaining);
       setDbCandidateApps(remaining);
       if (selectedCandidate?.id === id) {
         setSelectedCandidate(null);
+      }
+      try {
+        await fetch(`/api/careers/applications/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Delete application network error:', err);
       }
     }
   };

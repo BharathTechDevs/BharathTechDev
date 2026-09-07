@@ -702,6 +702,40 @@ export class DatabaseEngine {
     return updated;
   }
 
+  /**
+   * Synchronize candidate applications with backend server database (/api/careers/applications).
+   * Ensures that applications filled by candidates using the direct career link on any device are loaded.
+   */
+  public static async syncApplicationsFromServer(): Promise<CandidateApplication[]> {
+    try {
+      const res = await fetch('/api/careers/applications');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.applications)) {
+          const local = this.getCandidateApplications();
+          const map = new Map<string, CandidateApplication>();
+          
+          // Seed local first
+          local.forEach(app => map.set(app.id, app));
+          // Server database entries take precedence and add new ones
+          data.applications.forEach((app: CandidateApplication) => map.set(app.id, app));
+          
+          const merged = Array.from(map.values()).sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.submissionDate || 0).getTime();
+            const dateB = new Date(b.createdAt || b.submissionDate || 0).getTime();
+            return dateB - dateA;
+          });
+          
+          this.saveCandidateApplications(merged);
+          return merged;
+        }
+      }
+    } catch (err) {
+      console.warn('Sync candidate applications with server database warning:', err);
+    }
+    return this.getCandidateApplications();
+  }
+
   // ==========================================
   // 4. METRICS & INTERACTIVE ANALYTICS API
   // ==========================================
