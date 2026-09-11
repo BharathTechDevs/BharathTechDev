@@ -5,7 +5,8 @@ import {
   Cpu, Smartphone, Globe, Palette, Cloud, Users, Award, 
   Download, Printer, Check, Copy, ExternalLink, RefreshCw,
   Layout, Terminal, Code, Video, Megaphone, PenTool, TrendingUp, Film,
-  Calendar, Rocket, Link2, Share2
+  Calendar, Rocket, Link2, Share2, Lock, Key, Mail, Clock, ChevronRight,
+  ShieldCheck, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CandidateApplication } from '../types';
@@ -231,12 +232,24 @@ const ALL_PREDEFINED_ROLES = Array.from(
 );
 
 export default function Careers({ onNavigate }: CareersProps) {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 'submitted_stage1' | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [successApp, setSuccessApp] = useState<CandidateApplication | null>(null);
+  const [submittedStage1App, setSubmittedStage1App] = useState<CandidateApplication | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+  // Onboarding security gatekeeper & authorization state
+  const [onboardingAuthorized, setOnboardingAuthorized] = useState(false);
+  const [authorizedAppId, setAuthorizedAppId] = useState('');
+  const [authorizedToken, setAuthorizedToken] = useState('');
+  const [isVerifyingToken, setIsVerifyingToken] = useState(false);
+  const [tokenInputId, setTokenInputId] = useState('');
+  const [tokenInputKey, setTokenInputKey] = useState('');
+  const [tokenVerifyError, setTokenVerifyError] = useState<string | null>(null);
+  const [accessVerifiedBanner, setAccessVerifiedBanner] = useState<string | null>(null);
+  const [showTokenUnlockDialog, setShowTokenUnlockDialog] = useState(false);
 
   // Compute the live active cloud server URL (running right now on Google Cloud Run)
   const liveActiveCloudUrl = typeof window !== 'undefined' && window.location.origin
@@ -256,6 +269,70 @@ export default function Careers({ onNavigate }: CareersProps) {
   };
 
   const shareableCareersUrl = getShareUrl();
+
+  // Listen for onboarding link params: ?stage=onboarding&appId=...&token=...
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const stage = params.get('stage');
+      const appId = params.get('appId');
+      const token = params.get('token');
+
+      if (stage === 'onboarding' && appId && token) {
+        verifyOnboardingToken(appId, token);
+      }
+    } catch (e) {
+      console.error('URL params onboarding check failed:', e);
+    }
+  }, []);
+
+  const verifyOnboardingToken = async (appId: string, token: string) => {
+    setIsVerifyingToken(true);
+    setTokenVerifyError(null);
+    try {
+      const res = await fetch(`/api/careers/verify-onboarding?appId=${encodeURIComponent(appId.trim())}&token=${encodeURIComponent(token.trim())}`);
+      const data = await res.json();
+      if (res.ok && data.valid && data.candidate) {
+        const c: CandidateApplication = data.candidate;
+        setOnboardingAuthorized(true);
+        setAuthorizedAppId(c.id || appId.trim());
+        setAuthorizedToken(token.trim());
+
+        // Pre-fill fields from the verified candidate application
+        if (c.fullName) {
+          setFullName(c.fullName);
+          setCandidateLegalName(c.fullName);
+          setAccountHolderName(c.fullName);
+        }
+        if (c.email) {
+          setEmail(c.email);
+          setOfficialEmail(c.email);
+        }
+        if (c.phone) setPhone(c.phone);
+        if (c.whatsapp) setWhatsapp(c.whatsapp);
+        if (c.currentCity) {
+          setCurrentCity(c.currentCity);
+          setCommunicationAddress(c.currentCity);
+        }
+        if (c.sector) setSelectedSector(c.sector);
+        if (c.roleTitle) setRoleTitle(c.roleTitle);
+        if (c.expectedCompensation) setExpectedCompensation(c.expectedCompensation);
+        if (c.availabilityNotice) setAvailabilityNotice(c.availabilityNotice);
+
+        setAccessVerifiedBanner(`✓ Verification Successful! Welcome, ${c.fullName}. Your interview clearance has been validated by S-CODERS Admin.`);
+        setCurrentStep(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setOnboardingAuthorized(false);
+        setTokenVerifyError(data.error || 'Invalid or expired onboarding authorization credentials.');
+      }
+    } catch (err: any) {
+      setOnboardingAuthorized(false);
+      setTokenVerifyError('Unable to connect to S-CODERS verification server. Please verify your connection.');
+    } finally {
+      setIsVerifyingToken(false);
+    }
+  };
 
   const handleCopyShareLink = () => {
     const textToCopy = shareableCareersUrl;
@@ -366,6 +443,7 @@ export default function Careers({ onNavigate }: CareersProps) {
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [branchName, setBranchName] = useState('');
+  const [upiId, setUpiId] = useState('');
 
   // Declarations & Signatures
   const [candidateDigitalSignature, setCandidateDigitalSignature] = useState('');
@@ -464,16 +542,87 @@ export default function Careers({ onNavigate }: CareersProps) {
     return true;
   };
 
-  const handleProceedToStep2 = () => {
-    if (validateStep1()) {
-      // Pre-populate candidate legal name and official email if not yet set
+  const handleProceedToStep2 = async () => {
+    if (!validateStep1()) return;
+
+    setIsSubmitting(true);
+    setErrorBanner(null);
+
+    const submissionId = `SCD-APP-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    const applicationPayload: CandidateApplication = {
+      id: submissionId,
+      submissionDate: todayDate,
+      status: 'Submitted',
+      sector: selectedSector,
+      roleTitle,
+      employmentType,
+      fullName,
+      email,
+      phone,
+      whatsapp,
+      currentCity,
+      portfolioUrl: portfolioUrl || 'N/A',
+      githubUrl: githubUrl || 'N/A',
+      linkedinUrl: linkedinUrl || 'N/A',
+      highestQualification,
+      institutionName,
+      yearOfGraduation,
+      experienceLevel,
+      keySkills,
+      previousProjects,
+      availabilityNotice,
+      expectedCompensation,
+      whyJoinScoders,
+      impressiveAchievement,
+      resumeLink,
+      adminNotes: 'Application Form 1 submitted via Careers Recruitment Portal. Profile placed in shortlisting queue.',
+      reviewedBy: 'Under Initial Screening'
+    };
+
+    try {
+      // 1. Save directly to DatabaseEngine local collection
+      DatabaseEngine.addCandidateApplication(applicationPayload);
+
+      // 2. Post to server-side API endpoint for persistent storage & confirmation email dispatch from scoders82@gmail.com
+      const res = await fetch('/api/careers/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(applicationPayload)
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.candidate) {
+          DatabaseEngine.addCandidateApplication(data.candidate);
+        }
+      }
+
+      // 3. Trigger server sync to keep collections unified
+      DatabaseEngine.syncApplicationsFromServer().catch(() => {});
+
+      // Pre-populate candidate legal name and official email for next stage
       if (!candidateLegalName) setCandidateLegalName(fullName);
       if (!officialEmail) setOfficialEmail(email);
       if (!accountHolderName) setAccountHolderName(fullName);
       if (!communicationAddress && currentCity) setCommunicationAddress(currentCity);
-      
-      setCurrentStep(2);
+
+      // Save submitted stage 1 application state
+      setSubmittedStage1App(applicationPayload);
+      setAuthorizedAppId(submissionId);
+
+      // Advance to the dedicated Stage 1 Submission Confirmation Screen
+      setCurrentStep('submitted_stage1');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      console.error('Stage 1 submission error:', err);
+      // Even if network fails, DatabaseEngine has safely preserved it locally
+      setSubmittedStage1App(applicationPayload);
+      setAuthorizedAppId(submissionId);
+      setCurrentStep('submitted_stage1');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -572,7 +721,7 @@ export default function Careers({ onNavigate }: CareersProps) {
   };
 
   // ==========================================
-  // FINAL SUBMISSION HANDLER
+  // FINAL SUBMISSION HANDLER: STEP 2 (ONBOARDING)
   // ==========================================
   const handleSubmitApplication = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -581,103 +730,125 @@ export default function Careers({ onNavigate }: CareersProps) {
     setIsSubmitting(true);
     setErrorBanner(null);
 
-    const submissionId = `SCD-APP-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const targetAppId = authorizedAppId || successApp?.id || submittedStage1App?.id || `SCD-APP-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    const applicationPayload: CandidateApplication = {
-      id: submissionId,
-      submissionDate: todayDate,
-      status: 'Submitted',
-      sector: selectedSector,
-      roleTitle,
-      employmentType,
-      fullName,
-      email,
-      phone,
-      whatsapp,
-      currentCity,
-      portfolioUrl: portfolioUrl || 'N/A',
-      githubUrl: githubUrl || 'N/A',
-      linkedinUrl: linkedinUrl || 'N/A',
-      highestQualification,
-      institutionName,
-      yearOfGraduation,
-      experienceLevel,
-      keySkills,
-      previousProjects,
-      availabilityNotice,
-      expectedCompensation,
-      whyJoinScoders,
-      impressiveAchievement,
-      resumeLink,
-      agreementTitle,
-      agreementReferenceId: agreementRefId,
-      agreementDate,
-      effectiveDate,
-      agreementDuration,
-      agreementJurisdiction,
-      agreementVersion,
-      companyLegalName,
-      companyAddress,
-      companyCin,
-      companyGstin,
-      companyPan,
-      companyEmail,
-      companyPhone,
-      companyAuthorizedRepresentative,
-      companyRepresentativeDesignation,
-      candidateLegalName,
-      guardianName,
-      dateOfBirth,
-      gender,
-      permanentAddress,
-      communicationAddress,
-      panNumber: panNumber.toUpperCase(),
-      aadhaarNumber,
-      officialEmail,
-      emergencyContactName,
-      emergencyContactPhone,
-      bankName,
-      accountHolderName,
-      accountNumber,
-      ifscCode: ifscCode.toUpperCase(),
-      branchName,
-      candidateDigitalSignature,
-      agreedToNda,
-      agreedToCodeOfConduct,
-      agreedToIpAssignment,
-      declarationConfirmed,
-      adminNotes: 'Application received via Careers Recruitment Portal. Mandatory fields and induction agreement verified.',
-      reviewedBy: 'Under Initial Screening'
+    const onboardingPayload = {
+      appId: targetAppId,
+      token: authorizedToken,
+      onboardingData: {
+        agreementTitle,
+        agreementReferenceId: agreementRefId,
+        agreementDate,
+        effectiveDate,
+        agreementDuration,
+        agreementJurisdiction,
+        agreementVersion,
+        companyLegalName,
+        companyAddress,
+        companyCin,
+        companyGstin,
+        companyPan,
+        companyEmail,
+        companyPhone,
+        companyAuthorizedRepresentative,
+        companyRepresentativeDesignation,
+        candidateLegalName,
+        guardianName,
+        dateOfBirth,
+        gender,
+        permanentAddress,
+        communicationAddress,
+        panNumber: panNumber.toUpperCase(),
+        aadhaarNumber,
+        officialEmail,
+        emergencyContactName,
+        emergencyContactPhone,
+        bankName,
+        accountHolderName,
+        accountNumber,
+        ifscCode: ifscCode.toUpperCase(),
+        branchName,
+        upiId: upiId.trim(),
+        candidateDigitalSignature,
+        agreedToNda,
+        agreedToCodeOfConduct,
+        agreedToIpAssignment,
+        declarationConfirmed
+      }
     };
 
     try {
-      // 1. Save directly to DatabaseEngine local collection
-      DatabaseEngine.addCandidateApplication(applicationPayload);
-
-      // 2. Post to server-side API endpoint for persistent storage in data/applications.json & email dispatch
-      const res = await fetch('/api/careers/apply', {
+      // 1. Post to server-side onboarding endpoint
+      const res = await fetch('/api/careers/submit-onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(applicationPayload)
+        body: JSON.stringify(onboardingPayload)
       });
+
+      let updatedRecord: CandidateApplication;
 
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (data.candidate) {
-          DatabaseEngine.addCandidateApplication(data.candidate);
-        }
+        updatedRecord = data.candidate;
+      } else {
+        // Fallback local update
+        updatedRecord = {
+          ...(submittedStage1App || {}),
+          id: targetAppId,
+          submissionDate: todayDate,
+          status: 'Onboarding Completed',
+          sector: selectedSector,
+          roleTitle,
+          employmentType,
+          fullName: candidateLegalName || fullName,
+          email: officialEmail || email,
+          phone,
+          whatsapp,
+          currentCity,
+          portfolioUrl: portfolioUrl || 'N/A',
+          githubUrl: githubUrl || 'N/A',
+          linkedinUrl: linkedinUrl || 'N/A',
+          highestQualification,
+          institutionName,
+          yearOfGraduation,
+          experienceLevel,
+          keySkills,
+          previousProjects,
+          availabilityNotice,
+          expectedCompensation,
+          whyJoinScoders,
+          impressiveAchievement,
+          resumeLink,
+          ...onboardingPayload.onboardingData
+        } as CandidateApplication;
       }
 
-      // 3. Trigger server sync to keep collections unified
+      DatabaseEngine.addCandidateApplication(updatedRecord);
       DatabaseEngine.syncApplicationsFromServer().catch(() => {});
 
-      setSuccessApp(applicationPayload);
+      setSuccessApp(updatedRecord);
       setCurrentStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      console.error('Submission error:', err);
-      // Even if network fails, DatabaseEngine has safely preserved it locally
-      setSuccessApp(applicationPayload);
+      console.error('Onboarding submission error:', err);
+      const fallbackRecord = {
+        ...(submittedStage1App || {}),
+        id: targetAppId,
+        submissionDate: todayDate,
+        status: 'Onboarding Completed',
+        sector: selectedSector,
+        roleTitle,
+        employmentType,
+        fullName: candidateLegalName || fullName,
+        email: officialEmail || email,
+        phone,
+        whatsapp,
+        currentCity,
+        ...onboardingPayload.onboardingData
+      } as CandidateApplication;
+
+      DatabaseEngine.addCandidateApplication(fallbackRecord);
+      setSuccessApp(fallbackRecord);
       setCurrentStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -855,22 +1026,22 @@ export default function Careers({ onNavigate }: CareersProps) {
             <div className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
               currentStep === 1 
                 ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal' 
-                : currentStep > 1 
+                : currentStep === 'submitted_stage1' || currentStep > 1 
                   ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
                   : 'bg-white/5 text-gray-500'
             }`}>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
                 currentStep === 1 
                   ? 'bg-brand-teal text-brand-dark' 
-                  : currentStep > 1 
+                  : currentStep === 'submitted_stage1' || currentStep > 1 
                     ? 'bg-emerald-500 text-brand-dark' 
                     : 'bg-white/10 text-gray-400'
               }`}>
-                {currentStep > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '01'}
+                {currentStep === 'submitted_stage1' || currentStep > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '01'}
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-[11px] font-mono uppercase tracking-wider">Step 1</p>
-                <p className="text-xs font-semibold text-white truncate">Profile & Sector</p>
+                <p className="text-xs font-semibold text-white truncate">Profile & Application</p>
               </div>
             </div>
 
@@ -878,22 +1049,28 @@ export default function Careers({ onNavigate }: CareersProps) {
             <div className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
               currentStep === 2 
                 ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal' 
-                : currentStep > 2 
+                : currentStep === 3 
                   ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
-                  : 'bg-white/5 text-gray-500'
+                  : currentStep === 'submitted_stage1'
+                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                    : 'bg-white/5 text-gray-500'
             }`}>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
                 currentStep === 2 
                   ? 'bg-brand-teal text-brand-dark' 
-                  : currentStep > 2 
+                  : currentStep === 3 
                     ? 'bg-emerald-500 text-brand-dark' 
-                    : 'bg-white/10 text-gray-400'
+                    : currentStep === 'submitted_stage1'
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                      : 'bg-white/10 text-gray-400'
               }`}>
-                {currentStep > 2 ? <Check className="w-4 h-4 stroke-[3]" /> : '02'}
+                {currentStep === 3 ? <Check className="w-4 h-4 stroke-[3]" /> : currentStep === 'submitted_stage1' ? <Lock className="w-3.5 h-3.5" /> : '02'}
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-[11px] font-mono uppercase tracking-wider">Step 2</p>
-                <p className="text-xs font-semibold text-white truncate">Legal & Induction Agreement</p>
+                <p className="text-xs font-semibold text-white truncate">
+                  {currentStep === 'submitted_stage1' ? 'Legal & Banking (Locked)' : 'Legal & Induction Agreement'}
+                </p>
               </div>
             </div>
 
@@ -1385,19 +1562,177 @@ export default function Careers({ onNavigate }: CareersProps) {
               </div>
             </div>
 
-            {/* Navigation CTA: Proceed to Step 2 */}
+            {/* Navigation CTA: Proceed to Step 2 (First Form Submission) */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
               <p className="text-xs text-gray-400">
-                All questions above are mandatory. Clicking Next will open the Induction Agreement form.
+                All questions above are mandatory. Clicking below submits your First Application Form for shortlisting review.
               </p>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={handleProceedToStep2}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-sm uppercase tracking-wider hover:bg-white hover:shadow-xl hover:shadow-brand-teal/20 transition-all duration-300 cursor-pointer focus:outline-none"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-sm uppercase tracking-wider hover:bg-white hover:shadow-xl hover:shadow-brand-teal/20 transition-all duration-300 cursor-pointer focus:outline-none disabled:opacity-50"
               >
-                <span>Next: Legal & Induction Agreement</span>
-                <ArrowRight className="w-5 h-5" />
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>Submitting Application Form...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Next – Legal & Introduction Agreement</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ============================================================ */}
+        {/* INTERMEDIATE STEP: STAGE 1 SUBMISSION CONFIRMATION & ROADMAP */}
+        {/* ============================================================ */}
+        {currentStep === 'submitted_stage1' && (
+          <motion.div
+            key="submitted_stage1"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="space-y-8 max-w-4xl mx-auto"
+          >
+            {/* Primary Success Announcement Banner */}
+            <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-br from-[#021F2D] via-brand-card to-[#011425] border-2 border-brand-teal/50 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-brand-teal/15 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-white/10">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-lg shadow-emerald-500/20">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold uppercase mb-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    First Application Form Submitted Successfully
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-display font-extrabold text-white">
+                    Application Form 1 Acknowledged
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-300 mt-1">
+                    Candidate: <strong className="text-white">{submittedStage1App?.fullName || fullName}</strong> • Role: <strong className="text-brand-teal">{submittedStage1App?.roleTitle || roleTitle}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Exact Mandated Confirmation Notice Box */}
+              <div className="mt-6 p-6 rounded-2xl bg-brand-dark/80 border border-brand-teal/40 space-y-4">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+                  <span className="font-mono text-xs uppercase tracking-wider text-brand-teal flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Official S-CODERS Confirmation Email Dispatched
+                  </span>
+                  <span className="font-mono text-xs px-2.5 py-1 rounded bg-brand-teal/10 border border-brand-teal/30 text-cyan-300 font-bold">
+                    scoders82@gmail.com
+                  </span>
+                </div>
+
+                <blockquote className="text-sm sm:text-base text-gray-100 italic leading-relaxed border-l-4 border-brand-teal pl-4 py-1">
+                  «Your application form has been submitted successfully.
+                  Your resume and application form will now undergo the shortlisting process. If your profile is shortlisted, you will receive another email from S-CODERS – Bharat Tech Developers with information about the next stage of the selection process.»
+                </blockquote>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-white/10 text-xs">
+                  <div className="text-gray-400 font-mono">
+                    Recipient Address: <span className="text-white font-bold">{submittedStage1App?.email || email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-mono">Reference ID:</span>
+                    <code className="bg-black/50 px-2.5 py-1 rounded text-brand-teal font-mono font-bold border border-brand-teal/30">
+                      {submittedStage1App?.id || authorizedAppId}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
+              {/* Why Second Form is not accessible immediately */}
+              <div className="mt-6 p-5 rounded-2xl bg-white/5 border border-white/10 text-xs text-gray-300 space-y-3">
+                <div className="flex items-center gap-2 text-amber-300 font-bold font-mono uppercase tracking-wider">
+                  <Lock className="w-4 h-4" />
+                  Why is the Second Application Form currently locked?
+                </div>
+                <p className="leading-relaxed text-gray-300">
+                  The second application form comprises the <strong>S-CODERS Talent Induction & Non-Disclosure Agreement (NDA)</strong>, official government identity document records (PAN Card & Aadhaar Number), and direct banking coordinates for compensation disbursement.
+                </p>
+                <p className="leading-relaxed text-gray-300">
+                  To safeguard candidate data integrity and enforce company compliance, this second form is accessed strictly after passing the technical interview stage and receiving an <strong>Authorization Access Token</strong> directly from S-CODERS recruitment management.
+                </p>
+              </div>
+
+              {/* Recruitment Selection Roadmap */}
+              <div className="mt-8 pt-6 border-t border-white/10">
+                <h4 className="text-xs font-mono uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-brand-teal" />
+                  S-CODERS 7-Stage Candidate Selection Roadmap
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs">
+                    <div className="font-bold flex items-center justify-between">
+                      <span>1. First Form</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <p className="text-[11px] text-gray-300 mt-1">Submitted & Logged in Central DB</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs">
+                    <div className="font-bold flex items-center justify-between">
+                      <span>2. Shortlisting</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200">Active</span>
+                    </div>
+                    <p className="text-[11px] text-gray-300 mt-1">Application & Portfolio Evaluation</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs">
+                    <div className="font-bold flex items-center justify-between">
+                      <span>3. Interview</span>
+                      <Clock className="w-3 h-3" />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">Google Meet Invite (If Shortlisted)</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs">
+                    <div className="font-bold flex items-center justify-between">
+                      <span>4. Onboarding Form</span>
+                      <Lock className="w-3 h-3" />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">Legal Agreement & Banking Setup</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep(2);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <Key className="w-4 h-4 text-brand-teal" />
+                  <span>Have an Authorization Token? Unlock Stage 2</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep(1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-white/10 text-gray-400 hover:text-white font-mono text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <span>Submit Another Application</span>
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1405,7 +1740,110 @@ export default function Careers({ onNavigate }: CareersProps) {
         {/* ============================================================ */}
         {/* STEP 2: INDUCTION & NON-DISCLOSURE AGREEMENT (NDA) */}
         {/* ============================================================ */}
-        {currentStep === 2 && (
+        {currentStep === 2 && !onboardingAuthorized && (
+          <motion.div
+            key="step2_gatekeeper"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="max-w-2xl mx-auto space-y-6"
+          >
+            <div className="bg-brand-card/90 border-2 border-amber-500/40 rounded-3xl p-8 sm:p-10 backdrop-blur-md shadow-2xl space-y-6">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+                <Lock className="w-8 h-8" />
+              </div>
+
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-mono uppercase font-bold">
+                  Stage 2 Gatekeeper Protection
+                </div>
+                <h3 className="text-2xl font-display font-bold text-white">
+                  Second Application Form Access Restricted
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-300 max-w-lg mx-auto leading-relaxed">
+                  The S-CODERS Legal Induction Agreement, Government ID verification, and Banking details form is accessible only to candidates who have cleared their technical interview and been authorized by Recruitment Admin.
+                </p>
+              </div>
+
+              {/* Token verification form */}
+              <div className="p-6 rounded-2xl bg-brand-dark/70 border border-white/10 space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-gray-300">
+                    Application ID Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={tokenInputId}
+                    onChange={(e) => setTokenInputId(e.target.value)}
+                    placeholder="e.g. SCD-APP-2026-XXXX"
+                    className="w-full bg-brand-card border border-white/15 rounded-xl px-4 py-3 text-sm text-white font-mono placeholder-gray-500 focus:outline-none focus:border-brand-teal"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-gray-300">
+                    Authorization Security Token
+                  </label>
+                  <input
+                    type="text"
+                    value={tokenInputKey}
+                    onChange={(e) => setTokenInputKey(e.target.value)}
+                    placeholder="e.g. SCD-ONB-ABC12345"
+                    className="w-full bg-brand-card border border-white/15 rounded-xl px-4 py-3 text-sm text-white font-mono placeholder-gray-500 focus:outline-none focus:border-brand-teal"
+                  />
+                  <p className="text-[11px] text-gray-400">
+                    Your unique token is delivered via email from <code className="text-cyan-300 font-mono">scoders82@gmail.com</code> upon clearing your technical interview.
+                  </p>
+                </div>
+
+                {tokenVerifyError && (
+                  <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                    <span>{tokenVerifyError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isVerifyingToken || !tokenInputId.trim() || !tokenInputKey.trim()}
+                  onClick={() => verifyOnboardingToken(tokenInputId, tokenInputKey)}
+                  className="w-full py-3.5 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-xs uppercase tracking-wider hover:bg-white transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/20"
+                >
+                  {isVerifyingToken ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Verifying Authorization...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Key className="w-4 h-4" />
+                      <span>Verify & Unlock Second Form</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center gap-4 pt-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep(1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-gray-400 hover:text-white font-mono flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Return to First Application Form</span>
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ============================================================ */}
+        {/* STEP 2: INDUCTION & NON-DISCLOSURE AGREEMENT (AUTHORIZED) */}
+        {/* ============================================================ */}
+        {currentStep === 2 && onboardingAuthorized && (
           <motion.form
             key="step2"
             onSubmit={handleSubmitApplication}
@@ -1415,6 +1853,22 @@ export default function Careers({ onNavigate }: CareersProps) {
             transition={{ duration: 0.3 }}
             className="space-y-8"
           >
+            {accessVerifiedBanner && (
+              <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-semibold flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>{accessVerifiedBanner}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAccessVerifiedBanner(null)}
+                  className="text-emerald-400 hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Induction Banner */}
             <div className="p-6 rounded-2xl bg-gradient-to-r from-[#1F4959]/50 via-brand-card to-[#011425] border border-brand-teal/30 flex items-start sm:items-center justify-between gap-4">
               <div>
@@ -1917,6 +2371,19 @@ export default function Careers({ onNavigate }: CareersProps) {
                     onChange={(e) => setBranchName(e.target.value)}
                     placeholder="e.g. Koramangala Branch, Bengaluru"
                     className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-2">
+                    UPI ID (Optional / Fast Disbursements)
+                  </label>
+                  <input
+                    type="text"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="e.g. candidate@okhdfcbank / paytm"
+                    className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 font-mono focus:outline-none focus:border-brand-teal transition-colors"
                   />
                 </div>
               </div>

@@ -162,9 +162,9 @@ export interface EventTicket {
 export interface CandidateApplication {
   id: string; // e.g. "SCD-APP-2026-9481"
   submissionDate: string;
-  status: 'Submitted' | 'Under Review' | 'Shortlisted' | 'Technical Round' | 'Offer Extended' | 'Hired' | 'Archived';
+  status: 'Submitted' | 'Under Review' | 'Shortlisted' | 'Interview Scheduled' | 'Interview Cleared' | 'Approved for Onboarding' | 'Onboarding Completed' | 'Hired' | 'Rejected' | 'Archived' | 'Technical Round' | 'Offer Extended';
   
-  // Step 1: Sector & Candidate Profile
+  // Step 1: Sector & Candidate Profile (First Application Form)
   sector: string; // Sector / Department
   roleTitle: string;
   employmentType: 'Full-Time' | 'Part-Time' | 'Internship' | 'Contractor';
@@ -194,53 +194,70 @@ export interface CandidateApplication {
   impressiveAchievement: string;
   resumeLink: string;
 
-  // Step 2: Legal Induction & Non-Disclosure Agreement
-  // 1. Agreement Identification
-  agreementTitle: string;
-  agreementReferenceId: string;
-  agreementDate: string;
-  effectiveDate: string;
-  agreementDuration: string;
-  agreementJurisdiction: string;
-  agreementVersion: string;
+  // Stage 3 & 4: Interview & Shortlisting Details
+  interviewDate?: string;
+  interviewTime?: string;
+  interviewMeetingLink?: string; // Zoom link
+  interviewRoundTitle?: string;
+  interviewInstructions?: string;
+  interviewFeedback?: string;
+  interviewCleared?: boolean;
+  interviewClearedAt?: string;
 
-  // 2. S-CODERS Entity Details
-  companyLegalName: string;
-  companyAddress: string;
-  companyCin: string;
-  companyGstin: string;
-  companyPan: string;
-  companyEmail: string;
-  companyPhone: string;
-  companyAuthorizedRepresentative: string;
-  companyRepresentativeDesignation: string;
+  // Stage 5 & 6: Admin Authorization for Second Form
+  onboardingAuthorized?: boolean;
+  onboardingToken?: string;
+  onboardingAuthorizedAt?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
 
-  // 3. Candidate / Contracting Party Legal Verification Details
-  candidateLegalName: string;
-  guardianName: string; // Father / Spouse / Guardian
-  dateOfBirth: string;
-  gender: string;
-  permanentAddress: string;
-  communicationAddress: string;
-  panNumber: string;
-  aadhaarNumber: string;
-  officialEmail: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
+  // Stage 7: Second Application Form (Onboarding, Identification, Banking & Legal Induction)
+  agreementTitle?: string;
+  agreementReferenceId?: string;
+  agreementDate?: string;
+  effectiveDate?: string;
+  agreementDuration?: string;
+  agreementJurisdiction?: string;
+  agreementVersion?: string;
+
+  // S-CODERS Entity Details
+  companyLegalName?: string;
+  companyAddress?: string;
+  companyCin?: string;
+  companyGstin?: string;
+  companyPan?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyAuthorizedRepresentative?: string;
+  companyRepresentativeDesignation?: string;
+
+  // Full Personal & Identification Details
+  candidateLegalName?: string;
+  guardianName?: string; // Father / Spouse / Guardian
+  dateOfBirth?: string;
+  gender?: string;
+  permanentAddress?: string;
+  communicationAddress?: string;
+  panNumber?: string;
+  aadhaarNumber?: string;
+  officialEmail?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   
-  // Bank details for payroll / stipend disbursement
-  bankName: string;
-  accountHolderName: string;
-  accountNumber: string;
-  ifscCode: string;
-  branchName: string;
+  // Bank coordinates for payroll / stipend disbursement
+  bankName?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  branchName?: string;
+  upiId?: string;
 
   // Signatures & Consent
-  candidateDigitalSignature: string;
-  agreedToNda: boolean;
-  agreedToCodeOfConduct: boolean;
-  agreedToIpAssignment: boolean;
-  declarationConfirmed: boolean;
+  candidateDigitalSignature?: string;
+  agreedToNda?: boolean;
+  agreedToCodeOfConduct?: boolean;
+  agreedToIpAssignment?: boolean;
+  declarationConfirmed?: boolean;
 
   // Admin audit
   adminNotes?: string;

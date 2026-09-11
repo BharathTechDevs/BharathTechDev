@@ -520,30 +520,26 @@ async function sendEmailNotification({
   }
 }
 
-// Email template generator for Recruitment Application & Induction Agreement
+// 1. Stage 1: Initial Application Form Confirmation Email Template
 function getRecruitmentEmailHtml({
   candidateName,
   sector,
   roleTitle,
-  agreementRef,
   submissionId,
-  effectiveDate,
-  actionUrl,
+  submissionDate,
 }: {
   candidateName: string;
   sector: string;
   roleTitle: string;
-  agreementRef: string;
   submissionId: string;
-  effectiveDate: string;
-  actionUrl: string;
+  submissionDate: string;
 }) {
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>S-CODERS Recruitment Application & Induction Agreement</title>
+      <title>Application Received - S-CODERS (Bharat Tech Developers)</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
@@ -553,26 +549,130 @@ function getRecruitmentEmailHtml({
               <tr>
                 <td style="padding: 32px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #22D3EE;">
                   <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
-                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Talent & Engineering Induction • Bengaluru, India</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharat Tech Developers • Bengaluru, India</p>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 24px 32px; text-align: center;">
-                  <div style="display: inline-block; padding: 10px 24px; border-radius: 9999px; background-color: rgba(34, 211, 238, 0.15); border: 1px solid #22D3EE;">
-                    <span style="font-size: 13px; font-weight: 800; color: #22D3EE; text-transform: uppercase;">
-                      ✓ CANDIDATE INDUCTION DOSSIER REGISTERED
+                  <div style="display: inline-block; padding: 8px 20px; border-radius: 9999px; background-color: rgba(34, 211, 238, 0.15); border: 1px solid #22D3EE;">
+                    <span style="font-size: 12px; font-weight: 800; color: #22D3EE; text-transform: uppercase; letter-spacing: 0.5px;">
+                      ✓ APPLICATION SUBMITTED SUCCESSFULLY
                     </span>
                   </div>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
-                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Dear <strong>${candidateName}</strong>,</p>
-                  <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                    Thank you for applying to join S-CODERS (Bharath Tech Developers). Your recruitment application along with the Talent Induction & Non-Disclosure Agreement (NDA) has been securely recorded in our database.
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 16px 0;">Dear <strong>${candidateName}</strong>,</p>
+                  
+                  <div style="background-color: #0F172A; border-left: 4px solid #22D3EE; padding: 18px 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="font-size: 15px; color: #F1F5F9; line-height: 1.7; margin: 0; font-weight: 500;">
+                      Your application form has been submitted successfully.
+                    </p>
+                    <p style="font-size: 14px; color: #94A3B8; line-height: 1.7; margin: 12px 0 0 0;">
+                      Your resume and application form will now undergo the shortlisting process. If your profile is shortlisted, you will receive another email from <strong>S-CODERS – Bharat Tech Developers</strong> with information about the next stage of the selection process.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 32px 30px 32px;">
+                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Application Reference ID:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-family: monospace; font-weight: 700; color: #22D3EE;">${submissionId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Sector / Department:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${sector}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Role Applied For:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-weight: 700; color: #F8FAFC;">${roleTitle}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Date of Submission:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; color: #94A3B8;">${submissionDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Selection Workflow:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 12px; color: #38BDF8; font-weight: 600;">Screening → Interview → Onboarding</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 12px; color: #94A3B8; margin: 0 0 4px 0;">Official S-CODERS Talent & HR Desk</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">Email: <strong style="color: #22D3EE;">scoders82@gmail.com</strong> • Bengaluru, Karnataka, India</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// 2. Stage 4: Shortlisted Candidate - Interview Invitation with Zoom Link
+function getInterviewInviteEmailHtml({
+  candidateName,
+  sector,
+  roleTitle,
+  submissionId,
+  zoomLink,
+  interviewDate,
+  interviewTime,
+  roundTitle,
+  instructions,
+}: {
+  candidateName: string;
+  sector: string;
+  roleTitle: string;
+  submissionId: string;
+  zoomLink: string;
+  interviewDate: string;
+  interviewTime: string;
+  roundTitle: string;
+  instructions?: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Interview Invitation - S-CODERS (Bharat Tech Developers)</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+              <tr>
+                <td style="padding: 32px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #22D3EE;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharat Tech Developers • Bengaluru, India</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px 32px; text-align: center;">
+                  <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10B981;">
+                    <span style="font-size: 12px; font-weight: 800; color: #10B981; text-transform: uppercase; letter-spacing: 0.5px;">
+                      🎉 PROFILE SHORTLISTED FOR ONLINE INTERVIEW
+                    </span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 32px 20px 32px;">
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 16px 0;">Dear <strong>${candidateName}</strong>,</p>
+                  <p style="font-size: 15px; color: #E2E8F0; line-height: 1.7; margin: 0 0 18px 0;">
+                    We are pleased to inform you that your resume and application form for the <strong>${roleTitle}</strong> (${sector}) position at <strong>S-CODERS – Bharat Tech Developers</strong> have been officially <strong>shortlisted</strong>!
                   </p>
-                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0 0 14px 0;">
-                    Our core technical evaluation committee will review your profile, qualifications, and repository highlights. Qualified candidates will receive an interview scheduling invitation within <strong>24 to 48 hours</strong>.
+                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0 0 20px 0;">
+                    Please find the details and instructions for your online interview round below. Only candidates who successfully clear this interview will proceed to the next stage of the selection process.
                   </p>
                 </td>
               </tr>
@@ -580,38 +680,263 @@ function getRecruitmentEmailHtml({
                 <td style="padding: 0 32px 30px 32px;">
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
                     <tr>
-                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Sector / Track:</td>
-                      <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${sector}</td>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Interview Round:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${roundTitle || 'Technical & Cultural Evaluation'}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Role Applied:</td>
-                      <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #22D3EE;">${roleTitle}</td>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Interview Date:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-weight: 700; color: #22D3EE;">${interviewDate}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Application Ref ID:</td>
-                      <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${submissionId}</td>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Interview Time:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-weight: 700; color: #10B981;">${interviewTime} (IST)</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Agreement Ref:</td>
-                      <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #38BDF8;">${agreementRef}</td>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Meeting Platform:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-weight: 600; color: #38BDF8;">Zoom Video Meeting</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Proposed Effective Date:</td>
-                      <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #94A3B8;">${effectiveDate}</td>
+                      <td style="padding: 8px 0; font-size: 12px; color: #64748B; text-transform: uppercase;">Application Ref:</td>
+                      <td align="right" style="padding: 8px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${submissionId}</td>
                     </tr>
                     <tr>
-                      <td colspan="2" align="center" style="padding-top: 20px;">
-                        <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: #22D3EE; color: #0B0F17; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                          Visit S-CODERS Website →
+                      <td colspan="2" align="center" style="padding-top: 24px;">
+                        <a href="${zoomLink}" target="_blank" style="display: inline-block; padding: 14px 32px; background-color: #2D8CFF; color: #FFFFFF; text-decoration: none; font-weight: 800; font-size: 14px; border-radius: 10px; box-shadow: 0 4px 12px rgba(45, 140, 255, 0.4);">
+                          📹 Join Zoom Interview Meeting →
                         </a>
+                        <p style="font-size: 11px; color: #64748B; margin: 12px 0 0 0; word-break: break-all;">
+                          Link: <a href="${zoomLink}" style="color: #38BDF8;">${zoomLink}</a>
+                        </p>
                       </td>
                     </tr>
                   </table>
+
+                  ${instructions ? `
+                    <div style="background-color: #0F172A; border: 1px solid #1E293B; border-radius: 10px; padding: 16px; margin-top: 16px;">
+                      <span style="font-size: 11px; color: #22D3EE; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">Important Instructions:</span>
+                      <p style="font-size: 13px; color: #CBD5E1; line-height: 1.6; margin: 0;">${instructions}</p>
+                    </div>
+                  ` : ''}
                 </td>
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">S-CODERS Careers Division • scoders82@gmail.com • Bengaluru, Karnataka, India</p>
+                  <p style="font-size: 12px; color: #94A3B8; margin: 0 0 4px 0;">Official S-CODERS Selection Committee</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">Email: <strong style="color: #22D3EE;">scoders82@gmail.com</strong> • Bengaluru, Karnataka, India</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// 3. Stage 6: Admin-Controlled Authorization for Second Application Form Email
+function getOnboardingAuthorizationEmailHtml({
+  candidateName,
+  sector,
+  roleTitle,
+  submissionId,
+  onboardingUrl,
+}: {
+  candidateName: string;
+  sector: string;
+  roleTitle: string;
+  submissionId: string;
+  onboardingUrl: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Interview Cleared - Authorized for Stage 2 Onboarding (S-CODERS)</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+              <tr>
+                <td style="padding: 32px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #10B981;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharat Tech Developers • Bengaluru, India</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px 32px; text-align: center;">
+                  <div style="display: inline-block; padding: 8px 24px; border-radius: 9999px; background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10B981;">
+                    <span style="font-size: 12px; font-weight: 800; color: #10B981; text-transform: uppercase; letter-spacing: 0.5px;">
+                      🌟 INTERVIEW CLEARED • AUTHORIZED FOR STAGE 2 ONBOARDING
+                    </span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 32px 20px 32px;">
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 16px 0;">Dear <strong>${candidateName}</strong>,</p>
+                  
+                  <div style="background-color: #0F172A; border-left: 4px solid #10B981; padding: 18px 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="font-size: 15px; color: #10B981; font-weight: 700; line-height: 1.6; margin: 0 0 8px 0;">
+                      Congratulations! You have successfully cleared your interview round for ${roleTitle} (${sector}).
+                    </p>
+                    <p style="font-size: 14px; color: #CBD5E1; line-height: 1.7; margin: 0;">
+                      The S-CODERS Admin & Engineering leadership has officially authorized you to proceed to the <strong>Second Application Form</strong>.
+                    </p>
+                  </div>
+
+                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.7; margin: 0 0 16px 0;">
+                    In this final section, you will provide the following confidential information required for official onboarding, payroll/stipend disbursement, and compliance:
+                  </p>
+
+                  <ul style="font-size: 13px; color: #E2E8F0; line-height: 1.8; margin: 0 0 20px 0; padding-left: 24px;">
+                    <li>Full personal details & emergency contacts</li>
+                    <li>Government identification (Aadhaar & PAN verification)</li>
+                    <li>Permanent residential address coordinates</li>
+                    <li>Direct bank account details for compensation/stipend disbursement</li>
+                    <li>Execution of the official S-CODERS Talent Induction & Non-Disclosure Agreement (NDA)</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 32px 30px 32px;" align="center">
+                  <a href="${onboardingUrl}" target="_blank" style="display: inline-block; padding: 16px 36px; background-color: #22D3EE; color: #0B0F17; text-decoration: none; font-weight: 900; font-size: 14px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(34, 211, 238, 0.4);">
+                    Unlock & Complete Second Application Form →
+                  </a>
+                  <p style="font-size: 11px; color: #64748B; margin: 12px 0 0 0; word-break: break-all;">
+                    Direct Secure Link: <a href="${onboardingUrl}" style="color: #38BDF8;">${onboardingUrl}</a>
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 12px; color: #94A3B8; margin: 0 0 4px 0;">S-CODERS Authorized Recruitment Board</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">Email: <strong style="color: #22D3EE;">scoders82@gmail.com</strong> • Bengaluru, Karnataka, India</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// 4. Rejection Email Notification
+function getRejectionEmailHtml({
+  candidateName,
+  roleTitle,
+  submissionId,
+  reason,
+}: {
+  candidateName: string;
+  roleTitle: string;
+  submissionId: string;
+  reason?: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Application Status Update - S-CODERS</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden;">
+              <tr>
+                <td style="padding: 32px; background: #0F172A; text-align: center; border-bottom: 1px solid #334155;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase;">Bharat Tech Developers</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px 32px;">
+                  <p style="font-size: 15px; color: #F8FAFC;">Dear <strong>${candidateName}</strong>,</p>
+                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.7;">
+                    Thank you for your interest in joining S-CODERS and for submitting your application for the <strong>${roleTitle}</strong> role (Ref: ${submissionId}).
+                  </p>
+                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.7;">
+                    After careful review by our evaluation committee, we regret to inform you that we will not be progressing your application to the next stage at this time.
+                  </p>
+                  ${reason ? `
+                    <div style="background-color: #0F172A; border-left: 4px solid #64748B; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
+                      <p style="font-size: 13px; color: #CBD5E1; margin: 0;"><strong>Evaluation Note:</strong> ${reason}</p>
+                    </div>
+                  ` : ''}
+                  <p style="font-size: 13px; color: #64748B; line-height: 1.6;">
+                    We sincerely appreciate the time you invested with us and wish you the very best in your professional endeavors.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">S-CODERS Talent Acquisition • scoders82@gmail.com</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// 5. Stage 7 Completion Email
+function getOnboardingCompleteEmailHtml({
+  candidateName,
+  roleTitle,
+  agreementRef,
+  submissionId,
+}: {
+  candidateName: string;
+  roleTitle: string;
+  agreementRef: string;
+  submissionId: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Onboarding Dossier Completed - S-CODERS</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden;">
+              <tr>
+                <td style="padding: 32px; background: #0F172A; text-align: center; border-bottom: 2px solid #10B981;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase;">Official Onboarding Finalized</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px 32px;">
+                  <p style="font-size: 16px; color: #F8FAFC;">Dear <strong>${candidateName}</strong>,</p>
+                  <p style="font-size: 14px; color: #10B981; font-weight: 700; line-height: 1.6;">
+                    ✓ Your Second Application Form, identification verification, bank coordinates, and signed Talent Induction & NDA have been successfully recorded!
+                  </p>
+                  <p style="font-size: 14px; color: #94A3B8; line-height: 1.6;">
+                    Agreement Reference ID: <strong style="color: #22D3EE; font-family: monospace;">${agreementRef}</strong><br>
+                    Application ID: <strong style="color: #F8FAFC; font-family: monospace;">${submissionId}</strong>
+                  </p>
+                  <p style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                    Our HR & IT Operations desk will now finalize your profile, system credentials, and initial sprint onboarding. Welcome to the S-CODERS team!
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">S-CODERS Official HR Desk • scoders82@gmail.com</p>
                 </td>
               </tr>
             </table>
@@ -1051,7 +1376,7 @@ async function startServer() {
     }
   }
 
-  // 1. Submit Candidate Recruitment Application & Agreement
+  // 1. Submit First Application Form (Step 1 Screening)
   app.post("/api/careers/apply", async (req, res) => {
     try {
       const applicationData = req.body;
@@ -1059,16 +1384,15 @@ async function startServer() {
         return res.status(400).json({ error: "Mandatory candidate profile details are missing." });
       }
 
-      const submissionId = applicationData.id || `SCD-APP-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const agreementRef = applicationData.agreementReferenceId || `SCD-AGR-2026-${Date.now().toString(36).toUpperCase()}`;
+      const submissionId = applicationData.id || `SCD-APP-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
       const now = new Date().toISOString();
+      const submissionDate = applicationData.submissionDate || now.split('T')[0];
 
       const candidateRecord = {
         ...applicationData,
         id: submissionId,
-        agreementReferenceId: agreementRef,
-        submissionDate: applicationData.submissionDate || now.split('T')[0],
-        status: applicationData.status || 'Submitted',
+        submissionDate,
+        status: 'Submitted',
         createdAt: now,
       };
 
@@ -1076,32 +1400,23 @@ async function startServer() {
       const updatedApps = [candidateRecord, ...existingApps.filter(a => a.id !== submissionId)];
       saveStoredApplications(updatedApps);
 
-      // Trigger asynchronous confirmation email with clean branded URL (no 'ais' prefix)
-      let appBaseUrl = 'https://s-coders.com';
-      const host = (req.headers.host || '').toLowerCase();
-      const originHeader = (req.headers.origin || '').toLowerCase();
-      if (!host.includes('ais') && !originHeader.includes('ais') && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-        appBaseUrl = req.headers.origin || `https://${req.headers.host}`;
-      }
+      // Trigger official confirmation email from scoders82@gmail.com
       sendEmailNotification({
         to: candidateRecord.email,
-        subject: `📋 Recruitment Application & Induction Agreement Recorded - S-CODERS (Ref: ${agreementRef})`,
+        subject: `📋 Application Submitted Successfully - S-CODERS (Ref: ${submissionId})`,
         html: getRecruitmentEmailHtml({
           candidateName: candidateRecord.fullName,
           sector: candidateRecord.sector,
           roleTitle: candidateRecord.roleTitle || 'Developer Associate',
-          agreementRef: agreementRef,
-          submissionId: submissionId,
-          effectiveDate: candidateRecord.effectiveDate || '2026-09-01',
-          actionUrl: `${appBaseUrl}/careers`,
+          submissionId,
+          submissionDate,
         }),
-      }).catch(err => console.error("Recruitment email dispatch notice:", err.message));
+      }).catch(err => console.error("Stage 1 Confirmation email notice:", err.message));
 
       res.status(201).json({
         success: true,
-        message: "Candidate application and induction agreement successfully submitted and saved.",
+        message: "Your application form has been submitted successfully.",
         applicationId: submissionId,
-        agreementReferenceId: agreementRef,
         candidate: candidateRecord,
       });
     } catch (err: any) {
@@ -1110,7 +1425,7 @@ async function startServer() {
     }
   });
 
-  // 2. Fetch All Candidate Applications (for Admin & Dashboard)
+  // 2. Fetch All Candidate Applications (for Admin Console)
   app.get("/api/careers/applications", (req, res) => {
     try {
       const apps = getStoredApplications();
@@ -1121,7 +1436,338 @@ async function startServer() {
     }
   });
 
-  // 3. Update Candidate Application Status (Admin Action)
+  // 3. Shortlist Candidate & Schedule Online Interview (Admin Action - Stage 3 & 4)
+  app.post("/api/careers/shortlist", async (req, res) => {
+    try {
+      const { 
+        id, 
+        zoomLink, 
+        interviewDate, 
+        interviewTime, 
+        roundTitle = "Technical & Architecture Evaluation", 
+        instructions,
+        adminNotes 
+      } = req.body;
+
+      if (!id || !zoomLink || !interviewDate || !interviewTime) {
+        return res.status(400).json({ error: "Candidate ID, Zoom meeting link, date, and time are required." });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => a.id === id);
+      if (!candidate) {
+        return res.status(404).json({ error: "Candidate application not found." });
+      }
+
+      const updatedCandidate = {
+        ...candidate,
+        status: 'Shortlisted',
+        interviewMeetingLink: zoomLink,
+        interviewDate,
+        interviewTime,
+        interviewRoundTitle: roundTitle,
+        interviewInstructions: instructions,
+        adminNotes: adminNotes || candidate.adminNotes,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      const updatedApps = apps.map(a => a.id === id ? updatedCandidate : a);
+      saveStoredApplications(updatedApps);
+
+      // Send official Interview Invitation email from scoders82@gmail.com
+      await sendEmailNotification({
+        to: candidate.email,
+        subject: `🎉 Congratulations! Shortlisted for Online Interview - S-CODERS (Ref: ${candidate.id})`,
+        html: getInterviewInviteEmailHtml({
+          candidateName: candidate.fullName,
+          sector: candidate.sector,
+          roleTitle: candidate.roleTitle,
+          submissionId: candidate.id,
+          zoomLink,
+          interviewDate,
+          interviewTime,
+          roundTitle,
+          instructions,
+        }),
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Candidate shortlisted and official interview invitation email sent.",
+        candidate: updatedCandidate 
+      });
+    } catch (err: any) {
+      console.error("Shortlist Candidate Error:", err);
+      res.status(500).json({ error: "Failed to shortlist candidate: " + err.message });
+    }
+  });
+
+  // 4. Record Interview Outcome / Final Selection (Admin Action - Stage 5)
+  app.post("/api/careers/interview-decision", async (req, res) => {
+    try {
+      const { id, decision, feedback, adminNotes } = req.body;
+      if (!id || !decision || !['cleared', 'rejected'].includes(decision)) {
+        return res.status(400).json({ error: "Valid candidate ID and decision ('cleared' or 'rejected') are required." });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => a.id === id);
+      if (!candidate) {
+        return res.status(404).json({ error: "Candidate application not found." });
+      }
+
+      const newStatus = decision === 'cleared' ? 'Interview Cleared' : 'Rejected';
+      const updatedCandidate = {
+        ...candidate,
+        status: newStatus,
+        interviewFeedback: feedback,
+        interviewClearedAt: decision === 'cleared' ? new Date().toISOString() : undefined,
+        rejectedAt: decision === 'rejected' ? new Date().toISOString() : undefined,
+        rejectionReason: decision === 'rejected' ? (feedback || "Did not clear technical interview round") : undefined,
+        adminNotes: adminNotes || candidate.adminNotes,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      const updatedApps = apps.map(a => a.id === id ? updatedCandidate : a);
+      saveStoredApplications(updatedApps);
+
+      // If rejected, dispatch polite rejection email
+      if (decision === 'rejected') {
+        sendEmailNotification({
+          to: candidate.email,
+          subject: `Update regarding your Application at S-CODERS (Ref: ${candidate.id})`,
+          html: getRejectionEmailHtml({
+            candidateName: candidate.fullName,
+            roleTitle: candidate.roleTitle,
+            submissionId: candidate.id,
+            reason: feedback,
+          }),
+        }).catch(err => console.error("Rejection email dispatch notice:", err.message));
+      }
+
+      res.json({
+        success: true,
+        message: decision === 'cleared' 
+          ? "Candidate marked as Interview Cleared. Ready for Admin Onboarding Authorization."
+          : "Candidate marked as Rejected.",
+        candidate: updatedCandidate
+      });
+    } catch (err: any) {
+      console.error("Interview Decision Error:", err);
+      res.status(500).json({ error: "Failed to record interview decision: " + err.message });
+    }
+  });
+
+  // 5. Admin-Controlled Authorization for Second Application Form (Admin Action - Stage 6)
+  app.post("/api/careers/authorize-onboarding", async (req, res) => {
+    try {
+      const { id, adminNotes } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: "Candidate ID is required." });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => a.id === id);
+      if (!candidate) {
+        return res.status(404).json({ error: "Candidate application not found." });
+      }
+
+      // Generate a secure, unique onboarding token
+      const onboardingToken = `SCD-ONB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      const now = new Date().toISOString();
+
+      const updatedCandidate = {
+        ...candidate,
+        status: 'Approved for Onboarding',
+        onboardingAuthorized: true,
+        onboardingToken,
+        onboardingAuthorizedAt: now,
+        adminNotes: adminNotes || candidate.adminNotes,
+        lastUpdated: now,
+      };
+
+      const updatedApps = apps.map(a => a.id === id ? updatedCandidate : a);
+      saveStoredApplications(updatedApps);
+
+      // Determine the origin URL for the onboarding link
+      const host = (req.headers.host || 'localhost:3000').toLowerCase();
+      const origin = req.headers.origin || `http://${host}`;
+      const onboardingUrl = `${origin}/careers?stage=onboarding&appId=${candidate.id}&token=${onboardingToken}`;
+
+      // Dispatch official authorization email with link from scoders82@gmail.com
+      await sendEmailNotification({
+        to: candidate.email,
+        subject: `🌟 Interview Cleared - Authorized for Stage 2 Onboarding & Banking Coordinates (Ref: ${candidate.id})`,
+        html: getOnboardingAuthorizationEmailHtml({
+          candidateName: candidate.fullName,
+          sector: candidate.sector,
+          roleTitle: candidate.roleTitle,
+          submissionId: candidate.id,
+          onboardingUrl,
+        }),
+      });
+
+      res.json({
+        success: true,
+        message: "Candidate authorized for Second Application Form. Official invitation email dispatched.",
+        onboardingToken,
+        onboardingUrl,
+        candidate: updatedCandidate
+      });
+    } catch (err: any) {
+      console.error("Authorize Onboarding Error:", err);
+      res.status(500).json({ error: "Failed to authorize onboarding: " + err.message });
+    }
+  });
+
+  // 6. Verify Access to Second Application Form (Candidate Access Gatekeeper - Stage 7)
+  app.get("/api/careers/verify-onboarding", (req, res) => {
+    try {
+      const { appId, token } = req.query;
+      if (!appId || !token) {
+        return res.status(400).json({ 
+          valid: false, 
+          error: "Application Reference ID and authorization access token are required." 
+        });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => 
+        a.id === appId && 
+        a.onboardingToken === token && 
+        (a.status === 'Approved for Onboarding' || a.status === 'Onboarding Completed' || a.status === 'Hired')
+      );
+
+      if (!candidate) {
+        return res.status(403).json({ 
+          valid: false, 
+          error: "Access Denied. This section is restricted exclusively to candidates who have cleared the interview and received official Admin authorization." 
+        });
+      }
+
+      res.json({
+        valid: true,
+        candidate: {
+          id: candidate.id,
+          fullName: candidate.fullName,
+          email: candidate.email,
+          phone: candidate.phone,
+          sector: candidate.sector,
+          roleTitle: candidate.roleTitle,
+          status: candidate.status,
+          currentCity: candidate.currentCity,
+        }
+      });
+    } catch (err: any) {
+      console.error("Verify Onboarding Error:", err);
+      res.status(500).json({ valid: false, error: "Failed to verify onboarding credentials." });
+    }
+  });
+
+  // 7. Submit Second Application Form (Personal, ID, Bank Details & Signed NDA - Stage 7)
+  app.post("/api/careers/submit-onboarding", async (req, res) => {
+    try {
+      const { appId, token, onboardingData } = req.body;
+      if (!appId || !token || !onboardingData) {
+        return res.status(400).json({ error: "Application ID, authorization token, and onboarding data are required." });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => a.id === appId && a.onboardingToken === token);
+      if (!candidate) {
+        return res.status(403).json({ error: "Unauthorized submission or invalid session." });
+      }
+
+      const agreementRef = onboardingData.agreementReferenceId || `SCD-AGR-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      const now = new Date().toISOString();
+
+      const updatedCandidate = {
+        ...candidate,
+        ...onboardingData,
+        agreementReferenceId: agreementRef,
+        status: 'Onboarding Completed',
+        onboardingCompletedAt: now,
+        lastUpdated: now,
+      };
+
+      const updatedApps = apps.map(a => a.id === appId ? updatedCandidate : a);
+      saveStoredApplications(updatedApps);
+
+      // Send completion confirmation email from scoders82@gmail.com
+      sendEmailNotification({
+        to: updatedCandidate.email,
+        subject: `✓ Onboarding & Induction Dossier Successfully Recorded - S-CODERS (Ref: ${agreementRef})`,
+        html: getOnboardingCompleteEmailHtml({
+          candidateName: updatedCandidate.fullName,
+          roleTitle: updatedCandidate.roleTitle,
+          agreementRef,
+          submissionId: appId,
+        }),
+      }).catch(err => console.error("Onboarding completion email notice:", err.message));
+
+      res.json({
+        success: true,
+        message: "Second Application Form submitted successfully. Onboarding and banking coordinates recorded.",
+        agreementReferenceId: agreementRef,
+        candidate: updatedCandidate
+      });
+    } catch (err: any) {
+      console.error("Submit Onboarding Error:", err);
+      res.status(500).json({ error: "Failed to submit onboarding form: " + err.message });
+    }
+  });
+
+  // 8. Reject Candidate Application (Admin Action)
+  app.post("/api/careers/reject", async (req, res) => {
+    try {
+      const { id, reason, adminNotes } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: "Candidate ID is required." });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => a.id === id);
+      if (!candidate) {
+        return res.status(404).json({ error: "Candidate application not found." });
+      }
+
+      const now = new Date().toISOString();
+      const updatedCandidate = {
+        ...candidate,
+        status: 'Rejected',
+        rejectionReason: reason || "Did not meet required criteria for this cycle",
+        rejectedAt: now,
+        adminNotes: adminNotes || candidate.adminNotes,
+        lastUpdated: now,
+      };
+
+      const updatedApps = apps.map(a => a.id === id ? updatedCandidate : a);
+      saveStoredApplications(updatedApps);
+
+      // Dispatch polite rejection email
+      sendEmailNotification({
+        to: candidate.email,
+        subject: `Update regarding your Application at S-CODERS (Ref: ${candidate.id})`,
+        html: getRejectionEmailHtml({
+          candidateName: candidate.fullName,
+          roleTitle: candidate.roleTitle,
+          submissionId: candidate.id,
+          reason,
+        }),
+      }).catch(err => console.error("Rejection email dispatch notice:", err.message));
+
+      res.json({
+        success: true,
+        message: "Candidate application rejected and notification dispatched.",
+        candidate: updatedCandidate
+      });
+    } catch (err: any) {
+      console.error("Reject Application Error:", err);
+      res.status(500).json({ error: "Failed to reject candidate: " + err.message });
+    }
+  });
+
+  // 9. Update Candidate Application Status (Generic Admin Action)
   app.patch("/api/careers/status", (req, res) => {
     try {
       const { id, status, adminNotes, reviewedBy } = req.body;
@@ -1157,7 +1803,7 @@ async function startServer() {
     }
   });
 
-  // 4. Delete Candidate Application (Admin Action)
+  // 10. Delete Candidate Application (Admin Action)
   app.delete("/api/careers/applications/:id", (req, res) => {
     try {
       const { id } = req.params;

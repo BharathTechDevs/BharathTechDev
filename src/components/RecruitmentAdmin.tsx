@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { 
   Briefcase, Search, RefreshCw, CheckCircle2, 
   Clock, AlertCircle, Trash2, Building2, User, Landmark, 
-  FileText, ShieldCheck, Download, Sparkles
+  FileText, ShieldCheck, Download, Sparkles,
+  Mail, Key, Lock, Check, Copy, ExternalLink, Calendar, Video, ThumbsUp, ThumbsDown, XCircle, Send
 } from 'lucide-react';
 import { CandidateApplication } from '../types';
+import { DatabaseEngine } from '../utils/dbEngine';
 
 interface RecruitmentAdminProps {
   applications: CandidateApplication[];
@@ -13,13 +15,18 @@ interface RecruitmentAdminProps {
   onRefresh: () => void;
 }
 
-const STATUS_COLORS: Record<CandidateApplication['status'], { bg: string; text: string; border: string }> = {
+const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'Submitted': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' },
   'Under Review': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30' },
   'Shortlisted': { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/30' },
+  'Interview Scheduled': { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30' },
+  'Interview Cleared': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  'Approved for Onboarding': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+  'Onboarding Completed': { bg: 'bg-lime-500/10', text: 'text-lime-400', border: 'border-lime-500/30' },
   'Technical Round': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
   'Offer Extended': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30' },
   'Hired': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  'Rejected': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/30' },
   'Archived': { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/30' }
 };
 
@@ -36,6 +43,18 @@ export default function RecruitmentAdmin({
   const [auditNote, setAuditNote] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateFeedback, setUpdateFeedback] = useState<string | null>(null);
+
+  // 7-Stage Workflow Modal States
+  const [showShortlistModal, setShowShortlistModal] = useState(false);
+  const [interviewDate, setInterviewDate] = useState('');
+  const [interviewMeetingLink, setInterviewMeetingLink] = useState('https://meet.google.com/scoders-tech-interview');
+  const [interviewNotes, setInterviewNotes] = useState('');
+
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('Qualifications and profile did not align with immediate project requirements.');
+
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false);
 
   const selectedApp = applications.find(a => a.id === selectedAppId) || applications[0] || null;
 
@@ -79,6 +98,126 @@ export default function RecruitmentAdmin({
       await onUpdateStatus(selectedApp.id, newStatus, auditNote);
       setUpdateFeedback(`Status successfully advanced to "${newStatus}"`);
       setTimeout(() => setUpdateFeedback(null), 3000);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleShortlistSubmit = async () => {
+    if (!selectedApp) return;
+    setIsUpdating(true);
+    try {
+      const res = await fetch('/api/careers/shortlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: selectedApp.id,
+          interviewDate: interviewDate || 'Within 2-3 business days (to be coordinated)',
+          interviewMeetingLink: interviewMeetingLink || 'https://meet.google.com/scoders-tech-interview',
+          notes: interviewNotes
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidate) {
+        DatabaseEngine.addCandidateApplication(data.candidate);
+        setUpdateFeedback(`✓ Candidate shortlisted! Interview invitation email dispatched from scoders82@gmail.com.`);
+        setShowShortlistModal(false);
+        onRefresh();
+      } else {
+        alert(data.error || 'Failed to shortlist candidate.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error communicating with recruitment server.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleInterviewDecision = async (decision: 'Cleared' | 'Not Cleared') => {
+    if (!selectedApp) return;
+    setIsUpdating(true);
+    try {
+      const res = await fetch('/api/careers/interview-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: selectedApp.id,
+          decision,
+          feedback: auditNote || (decision === 'Cleared' ? 'Candidate passed technical assessment and showed strong architectural acumen.' : 'Candidate did not meet criteria for the role.')
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidate) {
+        DatabaseEngine.addCandidateApplication(data.candidate);
+        setUpdateFeedback(decision === 'Cleared' 
+          ? `✓ Interview Cleared! Candidate can now be authorized for Stage 2 induction.`
+          : `Interview outcome recorded: Not Cleared.`
+        );
+        onRefresh();
+      } else {
+        alert(data.error || 'Failed to record interview decision.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error updating interview outcome.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleAuthorizeOnboarding = async () => {
+    if (!selectedApp) return;
+    setIsUpdating(true);
+    try {
+      const res = await fetch('/api/careers/authorize-onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: selectedApp.id,
+          notes: auditNote || 'Approved for Legal Induction, Government ID verification, and Banking details.'
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidate) {
+        DatabaseEngine.addCandidateApplication(data.candidate);
+        setUpdateFeedback(`✓ Onboarding Token [${data.token}] generated & dispatch email sent from scoders82@gmail.com!`);
+        onRefresh();
+      } else {
+        alert(data.error || 'Failed to authorize onboarding.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error authorizing onboarding.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!selectedApp) return;
+    setIsUpdating(true);
+    try {
+      const res = await fetch('/api/careers/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: selectedApp.id,
+          reason: rejectionReason
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.candidate) {
+        DatabaseEngine.addCandidateApplication(data.candidate);
+        setUpdateFeedback(`Candidate status updated to Rejected. Formal notification dispatched from scoders82@gmail.com.`);
+        setShowRejectModal(false);
+        onRefresh();
+      } else {
+        alert(data.error || 'Failed to record rejection.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Error processing rejection.');
     } finally {
       setIsUpdating(false);
     }
@@ -306,37 +445,323 @@ export default function RecruitmentAdmin({
                 </div>
               </div>
 
-              {/* Status Advancement Widget */}
-              <div className="p-4 bg-brand-card/50 border border-brand-teal/20 rounded-xl space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-gray-300 font-bold flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-brand-teal" />
-                    Update Application Workflow Status
-                  </span>
+              {/* 7-Stage Workflow Action Center */}
+              <div className="p-5 bg-brand-card/60 border border-brand-teal/30 rounded-2xl space-y-4 shadow-lg shadow-black/20">
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-brand-teal" />
+                    <span className="text-xs font-mono uppercase tracking-wider text-white font-bold">
+                      7-Stage Recruitment Workflow Pipeline
+                    </span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${STATUS_COLORS[selectedApp.status]?.bg || 'bg-white/5'} ${STATUS_COLORS[selectedApp.status]?.text || 'text-white'} ${STATUS_COLORS[selectedApp.status]?.border || 'border-white/10'}`}>
+                      {selectedApp.status}
+                    </span>
+                  </div>
                   {updateFeedback && (
-                    <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                    <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1.5 animate-fadeIn">
+                      <Check className="w-3.5 h-3.5" />
                       {updateFeedback}
                     </span>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {(['Submitted', 'Under Review', 'Shortlisted', 'Technical Round', 'Offer Extended', 'Hired', 'Archived'] as CandidateApplication['status'][]).map((st) => (
-                    <button
-                      key={st}
-                      disabled={isUpdating || selectedApp.status === st}
-                      onClick={() => handleStatusChange(st)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                        selectedApp.status === st
-                          ? 'bg-brand-teal text-brand-dark shadow-sm'
-                          : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  ))}
+                {/* Stage Tracker Visual */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs font-mono">
+                  <div className={`p-2.5 rounded-xl border text-center ${
+                    selectedApp.status ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}>
+                    <span className="text-[10px] block text-gray-400">STAGE 1</span>
+                    <span className="font-bold text-[11px] block mt-0.5">Form 1 Received</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border text-center ${
+                    selectedApp.status === 'Shortlisted' || selectedApp.status === 'Interview Scheduled' || selectedApp.status === 'Interview Cleared' || selectedApp.status === 'Approved for Onboarding' || selectedApp.status === 'Onboarding Completed' || selectedApp.status === 'Hired'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : selectedApp.status === 'Under Review'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                      : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}>
+                    <span className="text-[10px] block text-gray-400">STAGE 2</span>
+                    <span className="font-bold text-[11px] block mt-0.5">Screening</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border text-center ${
+                    selectedApp.interviewCleared || selectedApp.status === 'Interview Cleared' || selectedApp.status === 'Approved for Onboarding' || selectedApp.status === 'Onboarding Completed' || selectedApp.status === 'Hired'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : selectedApp.status === 'Shortlisted' || selectedApp.status === 'Interview Scheduled' || selectedApp.status === 'Technical Round'
+                      ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                      : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}>
+                    <span className="text-[10px] block text-gray-400">STAGE 3 & 4</span>
+                    <span className="font-bold text-[11px] block mt-0.5">Interview</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border text-center ${
+                    selectedApp.onboardingAuthorized || selectedApp.onboardingToken || selectedApp.status === 'Approved for Onboarding' || selectedApp.status === 'Onboarding Completed' || selectedApp.status === 'Hired'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}>
+                    <span className="text-[10px] block text-gray-400">STAGE 5</span>
+                    <span className="font-bold text-[11px] block mt-0.5">Stage 2 Access</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border text-center ${
+                    selectedApp.status === 'Onboarding Completed' || selectedApp.status === 'Hired'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}>
+                    <span className="text-[10px] block text-gray-400">STAGE 6</span>
+                    <span className="font-bold text-[11px] block mt-0.5">NDA & Banking</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border text-center ${
+                    selectedApp.status === 'Hired'
+                      ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                      : selectedApp.status === 'Rejected'
+                      ? 'bg-rose-500/15 border-rose-500/50 text-rose-300'
+                      : 'bg-white/5 border-white/10 text-gray-400'
+                  }`}>
+                    <span className="text-[10px] block text-gray-400">STAGE 7</span>
+                    <span className="font-bold text-[11px] block mt-0.5">Decision</span>
+                  </div>
                 </div>
 
+                {/* Specific Action Buttons for Current Workflow State */}
+                <div className="bg-brand-dark/50 p-4 rounded-xl border border-white/10 space-y-3">
+                  <div className="text-xs font-mono uppercase text-gray-400 font-semibold">
+                    Recommended Next Action for {selectedApp.fullName}:
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* If Under Review or Submitted: Option to shortlist or mark review */}
+                    {(selectedApp.status === 'Submitted' || selectedApp.status === 'Under Review') && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInterviewDate(new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16));
+                            setShowShortlistModal(true);
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-brand-dark font-mono font-bold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Shortlist & Schedule Technical Interview</span>
+                        </button>
+
+                        {selectedApp.status !== 'Under Review' && (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => handleStatusChange('Under Review')}
+                            className="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/15 text-gray-300 font-mono text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Clock className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Mark as Under Review</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {/* If Shortlisted / Technical Round: Record Interview Decision */}
+                    {(selectedApp.status === 'Shortlisted' || selectedApp.status === 'Interview Scheduled' || selectedApp.status === 'Technical Round') && (
+                      <div className="w-full space-y-2.5">
+                        <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-xs text-cyan-300 flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <Video className="w-4 h-4 text-cyan-400" />
+                            <span><strong>Interview Scheduled:</strong> {selectedApp.interviewDate || 'Pending Date Confirmation'}</span>
+                          </div>
+                          {selectedApp.interviewMeetingLink && (
+                            <a
+                              href={selectedApp.interviewMeetingLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] underline flex items-center gap-1 text-cyan-200 hover:text-white"
+                            >
+                              <span>Open Google Meet</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => handleInterviewDecision('Cleared')}
+                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-brand-dark font-mono font-bold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                            <span>Technical Interview Cleared (Pass)</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => handleInterviewDecision('Not Cleared')}
+                            className="px-3.5 py-2 bg-white/5 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-mono text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                            <span>Interview Not Cleared</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If Interview Cleared: Authorize Stage 2 */}
+                    {selectedApp.status === 'Interview Cleared' && (
+                      <div className="w-full space-y-2">
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>Candidate passed technical interview! You can now authorize access to Step 2 (Legal NDA & Bank Details).</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={handleAuthorizeOnboarding}
+                          className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-brand-teal to-emerald-400 hover:from-white hover:to-teal-200 text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-brand-teal/20 flex items-center justify-center gap-2 cursor-pointer transition-transform active:scale-95"
+                        >
+                          <Key className="w-4 h-4" />
+                          <span>Generate Security Token & Authorize Stage 2 (Dispatches Email)</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* If Approved for Onboarding or Token is Generated: Display Token & Link */}
+                    {(selectedApp.onboardingToken || selectedApp.status === 'Approved for Onboarding') && (
+                      <div className="w-full p-4 bg-brand-dark/90 border border-brand-teal/40 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-xs font-mono font-bold text-brand-teal uppercase flex items-center gap-1.5">
+                            <Key className="w-4 h-4" />
+                            Active Onboarding Access Token & Secure Gatekeeper Link:
+                          </span>
+                          <span className="text-[10px] font-mono text-gray-400">
+                            Sent to candidate via <code className="text-cyan-300">scoders82@gmail.com</code>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 bg-brand-card rounded-lg border border-white/10 flex items-center justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-mono text-gray-400 block">TOKEN CODE</span>
+                              <span className="font-mono text-sm font-bold text-white select-all">
+                                {selectedApp.onboardingToken}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedApp.onboardingToken || '');
+                                setCopiedToken(true);
+                                setTimeout(() => setCopiedToken(false), 2000);
+                              }}
+                              className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white cursor-pointer"
+                              title="Copy Token"
+                            >
+                              {copiedToken ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                            </button>
+                          </div>
+
+                          <div className="p-3 bg-brand-card rounded-lg border border-white/10 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-mono text-gray-400 block">DIRECT ONBOARDING LINK</span>
+                              <span className="font-mono text-xs text-brand-teal truncate block">
+                                {window.location.origin}/careers?stage=onboarding&appId={selectedApp.id}&token={selectedApp.onboardingToken}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const link = `${window.location.origin}/careers?stage=onboarding&appId=${selectedApp.id}&token=${selectedApp.onboardingToken}`;
+                                  navigator.clipboard.writeText(link);
+                                  setCopiedOnboardingLink(true);
+                                  setTimeout(() => setCopiedOnboardingLink(false), 2000);
+                                }}
+                                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white cursor-pointer"
+                                title="Copy Direct URL"
+                              >
+                                {copiedOnboardingLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                              </button>
+                              <a
+                                href={`/careers?stage=onboarding&appId=${selectedApp.id}&token=${selectedApp.onboardingToken}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-brand-teal hover:text-white cursor-pointer"
+                                title="Open Form in New Tab"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+
+                        {selectedApp.status !== 'Onboarding Completed' && selectedApp.status !== 'Hired' && (
+                          <div className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-lg flex items-center gap-2">
+                            <Clock className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                            <span>Awaiting candidate submission of government identity, permanent address, and bank account details.</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* If Onboarding Completed: Mark as Hired */}
+                    {selectedApp.status === 'Onboarding Completed' && (
+                      <div className="w-full flex flex-wrap items-center justify-between gap-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                        <div className="flex items-center gap-2 text-xs text-emerald-300">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>Candidate has submitted bank details, PAN/Aadhaar & signed the Legal Agreement!</span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => handleStatusChange('Hired')}
+                          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-brand-dark font-mono font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Mark as Hired / Offer Confirmed</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Rejection Option (courteous email) */}
+                    {selectedApp.status !== 'Rejected' && selectedApp.status !== 'Hired' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRejectModal(true)}
+                        className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-mono text-xs rounded-xl flex items-center gap-1.5 cursor-pointer ml-auto"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Send Polite Rejection</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Status Override Chips */}
+                <div className="pt-2 border-t border-white/10">
+                  <span className="text-[10px] font-mono text-gray-400 uppercase block mb-1.5">
+                    Manual Workflow Status Override:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(['Submitted', 'Under Review', 'Shortlisted', 'Interview Scheduled', 'Interview Cleared', 'Approved for Onboarding', 'Onboarding Completed', 'Hired', 'Rejected', 'Archived'] as CandidateApplication['status'][]).map((st) => (
+                      <button
+                        key={st}
+                        disabled={isUpdating || selectedApp.status === st}
+                        onClick={() => handleStatusChange(st)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+                          selectedApp.status === st
+                            ? 'bg-brand-teal text-brand-dark shadow-sm font-bold'
+                            : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Internal HR / Tech Lead Evaluation Notes */}
                 <div className="pt-2">
                   <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
                     Internal HR / Tech Lead Evaluation Notes:
@@ -492,9 +917,15 @@ export default function RecruitmentAdmin({
                     <span className="text-gray-500 block text-[10px] font-mono">IFSC CODE</span>
                     <span className="text-white font-mono">{selectedApp.ifscCode}</span>
                   </div>
-                  <div className="sm:col-span-2">
+                  <div>
                     <span className="text-gray-500 block text-[10px] font-mono">BRANCH JURISDICTION</span>
                     <span className="text-white">{selectedApp.branchName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[10px] font-mono">UPI ID</span>
+                    <span className="text-brand-teal font-mono font-bold">
+                      {selectedApp.upiId || (selectedApp.onboardingAuthorized ? 'Not provided' : 'Pending Stage 2 Onboarding')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -537,6 +968,156 @@ export default function RecruitmentAdmin({
         </div>
 
       </div>
+
+      {/* SHORTLIST & INTERVIEW SCHEDULING MODAL */}
+      {showShortlistModal && selectedApp && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-dark border border-brand-teal/40 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2 text-brand-teal font-display font-bold text-lg">
+                <Calendar className="w-5 h-5" />
+                <span>Shortlist & Schedule Technical Interview</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShortlistModal(false)}
+                className="text-gray-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs text-gray-300 space-y-1">
+              <p>Candidate: <strong className="text-white">{selectedApp.fullName}</strong> ({selectedApp.email})</p>
+              <p>Role / Sector: <span className="text-cyan-300 font-mono">{selectedApp.sector}</span></p>
+              <p className="text-gray-400 pt-1">
+                Submitting this will advance status to <strong>"Interview Scheduled"</strong> and immediately dispatch a formal technical invitation from <code className="text-cyan-300 font-mono">scoders82@gmail.com</code>.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-1">
+                  Interview Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={interviewDate}
+                  onChange={(e) => setInterviewDate(e.target.value)}
+                  className="w-full bg-brand-card border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-teal font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-1">
+                  Google Meet / Video Link
+                </label>
+                <input
+                  type="url"
+                  value={interviewMeetingLink}
+                  onChange={(e) => setInterviewMeetingLink(e.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  className="w-full bg-brand-card border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-teal font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-1">
+                  Custom Message / Interview Scope:
+                </label>
+                <textarea
+                  rows={3}
+                  value={interviewNotes}
+                  onChange={(e) => setInterviewNotes(e.target.value)}
+                  placeholder="e.g. Please be ready with your GitHub portfolio and walk us through your architecture."
+                  className="w-full bg-brand-card border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-teal"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowShortlistModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-mono text-gray-400 hover:text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleShortlistSubmit}
+                className="px-5 py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl flex items-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/20"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isUpdating ? 'Dispatching...' : 'Dispatch Interview Email'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT CANDIDATE MODAL */}
+      {showRejectModal && selectedApp && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-dark border border-rose-500/40 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2 text-rose-400 font-display font-bold text-lg">
+                <XCircle className="w-5 h-5" />
+                <span>Send Polite Rejection Notice</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRejectModal(false)}
+                className="text-gray-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs text-gray-300 space-y-1">
+              <p>Candidate: <strong className="text-white">{selectedApp.fullName}</strong> ({selectedApp.email})</p>
+              <p className="text-gray-400 pt-1">
+                A formal, respectful notification thanking them for their time will be dispatched from <code className="text-cyan-300 font-mono">scoders82@gmail.com</code>.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-gray-300 mb-1">
+                  Reason / Constructive Feedback:
+                </label>
+                <textarea
+                  rows={4}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Provide respectful context..."
+                  className="w-full bg-brand-card border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowRejectModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-mono text-gray-400 hover:text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleRejectSubmit}
+                className="px-5 py-2.5 bg-rose-500 hover:bg-rose-400 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-xl flex items-center gap-2 cursor-pointer shadow-lg shadow-rose-500/20"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isUpdating ? 'Sending...' : 'Confirm Rejection Email'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
