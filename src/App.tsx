@@ -786,17 +786,34 @@ export default function App() {
 
       {/* Floating Interactive Trigger Widgets */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
-        {/* Instant WhatsApp Community & Customer Care trigger */}
-        <a
-          href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="p-4 bg-[#25d366] hover:bg-[#20ba5a] text-white rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center cursor-pointer group relative"
-          title="Join S-CODERS WhatsApp Group & Customer Care"
-        >
-          <MessageCircle className="w-6 h-6" />
-          <span className="sr-only">Join WhatsApp Group</span>
-        </a>
+        {/* Instant WhatsApp Community & Support trigger (Context-Aware Routing) */}
+        {(() => {
+          const isService = currentView === 'services';
+          const isWorkshop = currentView === 'workshops';
+          const waLink = isService
+            ? "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+            : isWorkshop
+            ? "https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
+            : "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4";
+          const waTitle = isService
+            ? "Join S-CODERS Service WhatsApp Group"
+            : isWorkshop
+            ? "Join S-CODERS Workshop Community Group"
+            : "Join S-CODERS Customer Care & Support WhatsApp Group";
+
+          return (
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 bg-[#25d366] hover:bg-[#20ba5a] text-white rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center cursor-pointer group relative"
+              title={waTitle}
+            >
+              <MessageCircle className="w-6 h-6" />
+              <span className="sr-only">{waTitle}</span>
+            </a>
+          );
+        })()}
 
         {/* Floating AI Consultant trigger */}
         <button

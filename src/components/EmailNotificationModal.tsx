@@ -33,7 +33,27 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4";
+  const isService = data.type === 'service';
+  const isWorkshop = data.type === 'workshop';
+
+  // Dynamic routing: Service WhatsApp Group vs Workshop Group vs Customer Care/Event Group
+  const WHATSAPP_GROUP_LINK = isService
+    ? "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+    : isWorkshop
+    ? "https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
+    : "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4";
+
+  const groupTitle = isService
+    ? "Join S-CODERS Service WhatsApp Group"
+    : isWorkshop
+    ? "Join S-CODERS Workshop Community Group"
+    : "Join S-CODERS WhatsApp Community Group";
+
+  const groupDesc = isService
+    ? "Connect directly with our engineering team, get live architecture dispatches, 1-on-1 sprint coordination, and priority development support."
+    : isWorkshop
+    ? "All workshop masterclasses, live session links, code repositories, and developer Q&A are shared directly inside the official WhatsApp community."
+    : "All live event room codes, session recordings, mentor Q&A, and technical dispatch updates are shared directly inside the official WhatsApp community. Please join before proceeding.";
 
   const handleOpenWhatsApp = () => {
     window.open(WHATSAPP_GROUP_LINK, '_blank', 'noopener,noreferrer');
@@ -86,16 +106,16 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
               </div>
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold block">
-                  Mandatory Step 1 • Official Community
+                  Mandatory Step 1 • {isService ? 'Service WhatsApp Group' : isWorkshop ? 'Workshop WhatsApp Group' : 'Official Community'}
                 </span>
                 <h4 className="text-sm sm:text-base font-display font-extrabold text-white">
-                  Join S-CODERS WhatsApp Group First
+                  {groupTitle}
                 </h4>
               </div>
             </div>
 
             <p className="text-xs sm:text-sm text-gray-300 font-sans leading-relaxed">
-              All live event room codes, session recordings, mentor Q&A, and technical dispatch updates are shared directly inside the official WhatsApp community. Please join before proceeding.
+              {groupDesc}
             </p>
 
             <div className="pt-1 flex flex-col sm:flex-row gap-2.5">
@@ -105,7 +125,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                 className="flex-1 py-3 px-4 bg-[#25D366] hover:bg-[#1EBE5D] text-black font-mono font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
               >
                 <MessageCircle className="w-4 h-4" />
-                <span>{hasJoinedWhatsApp ? '✓ WhatsApp Group Opened' : 'Join WhatsApp Group Now'}</span>
+                <span>{hasJoinedWhatsApp ? '✓ WhatsApp Group Opened' : isService ? 'Join Service WhatsApp Group Now' : isWorkshop ? 'Join Workshop WhatsApp Group' : 'Join WhatsApp Group Now'}</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>

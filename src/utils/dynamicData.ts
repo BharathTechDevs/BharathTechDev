@@ -1,4 +1,4 @@
-import { Service, WorkshopEvent, NetworkingAchievement, SCODERSEvent, EventTicket } from '../types';
+import { Service, WorkshopEvent, NetworkingAchievement, SCODERSEvent, EventTicket, CandidateApplication } from '../types';
 import { SERVICES, WORKSHOP_EVENTS } from '../data';
 
 const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
@@ -344,3 +344,44 @@ export function saveDynamicNetworking(items: NetworkingAchievement[]): void {
     window.dispatchEvent(new Event('scoders_db_change'));
   }
 }
+
+// --- SAVED CANDIDATE APPLICATIONS (Saved like Event Tickets) ---
+export function getSavedCandidateApplications(): CandidateApplication[] {
+  try {
+    const saved = localStorage.getItem('scoders_saved_candidate_applications');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Error loading saved candidate applications:', e);
+  }
+  return [];
+}
+
+export function saveCandidateApplications(apps: CandidateApplication[]): void {
+  try {
+    localStorage.setItem('scoders_saved_candidate_applications', JSON.stringify(apps));
+  } catch (e) {
+    console.error('Error saving candidate applications:', e);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('scoders_saved_applications_change'));
+    window.dispatchEvent(new Event('scoders_db_change'));
+  }
+}
+
+export function addSavedCandidateApplication(app: CandidateApplication): CandidateApplication[] {
+  const current = getSavedCandidateApplications();
+  const filtered = current.filter(a => a.id !== app.id);
+  const updated = [app, ...filtered];
+  saveCandidateApplications(updated);
+  return updated;
+}
+
+export function removeSavedCandidateApplication(id: string): CandidateApplication[] {
+  const current = getSavedCandidateApplications();
+  const updated = current.filter(a => a.id !== id);
+  saveCandidateApplications(updated);
+  return updated;
+}
+

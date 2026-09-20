@@ -705,9 +705,16 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             {/* Official Service WhatsApp Group Button */}
             <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
               <a
-                href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  try {
+                    window.open("https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK", "_blank", "noopener,noreferrer");
+                  } catch {
+                    // Fallback to anchor default
+                  }
+                }}
                 className="px-8 py-4 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-sm uppercase tracking-wider rounded-2xl transition-all shadow-xl shadow-[#25D366]/25 flex items-center justify-center gap-3 cursor-pointer active:scale-95"
               >
                 <Users className="w-5 h-5" />
@@ -1290,6 +1297,33 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           <span>{copiedKey ? 'Copied!' : 'Copy Key'}</span>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Direct Service WhatsApp Group Invitation */}
+                    <div className="bg-[#25D366]/10 border border-[#25D366]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+                          <span className="text-[10px] font-mono text-[#25D366] uppercase font-bold tracking-wider">Official Service Community</span>
+                        </div>
+                        <p className="text-white text-xs sm:text-sm font-semibold">Join S-CODERS Service WhatsApp Group</p>
+                        <p className="text-gray-400 text-[11px] font-sans">Connect with our engineering team for live architecture updates and 1-on-1 sprint coordination.</p>
+                      </div>
+                      <a
+                        href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          try {
+                            window.open("https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK", "_blank", "noopener,noreferrer");
+                          } catch {}
+                        }}
+                        className="px-4 py-2.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer shadow-md active:scale-95"
+                      >
+                        <Users className="w-4 h-4" />
+                        <span>Join Group</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">

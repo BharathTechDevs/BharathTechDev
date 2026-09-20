@@ -1436,6 +1436,30 @@ async function startServer() {
     }
   });
 
+  // 2b. Lookup Application by ID, Agreement Reference, Token, or Email (for Pass Key / Link Lookup)
+  app.get("/api/careers/lookup", (req, res) => {
+    try {
+      const q = String(req.query.query || req.query.key || req.query.appId || "").trim().toUpperCase();
+      if (!q) {
+        return res.status(400).json({ success: false, error: "Lookup query is required." });
+      }
+      const apps = getStoredApplications();
+      const match = apps.find(a => 
+        (a.id && a.id.toUpperCase() === q) ||
+        (a.agreementReferenceId && a.agreementReferenceId.toUpperCase() === q) ||
+        (a.onboardingToken && a.onboardingToken.toUpperCase() === q) ||
+        (a.email && a.email.toUpperCase() === q)
+      );
+      if (!match) {
+        return res.status(404).json({ success: false, error: "No application found matching the provided pass key or link." });
+      }
+      res.json({ success: true, application: match });
+    } catch (err: any) {
+      console.error("Lookup Application Error:", err);
+      res.status(500).json({ success: false, error: "Failed to lookup application." });
+    }
+  });
+
   // 3. Shortlist Candidate & Schedule Online Interview (Admin Action - Stage 3 & 4)
   app.post("/api/careers/shortlist", async (req, res) => {
     try {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Mail, MessageSquare, Send, CheckCircle, ChevronDown, ChevronUp,
   Instagram, MessageCircle, Youtube, Twitter, Linkedin, Github, MapPin, 
-  Sparkles, ShieldCheck, Phone
+  Sparkles, ShieldCheck, Phone, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { FAQS } from '../data';
