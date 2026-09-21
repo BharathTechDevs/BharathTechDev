@@ -416,6 +416,23 @@ export default function Careers({ onNavigate }: CareersProps) {
   const [showDeleteAppModal, setShowDeleteAppModal] = useState(false);
   const [savedActionNotice, setSavedActionNotice] = useState<string | null>(null);
 
+  // Check admin authorization (My Application Forms is restricted to admins only)
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('scoders_admin_auth') === 'true';
+  });
+
+  useEffect(() => {
+    const checkAdmin = () => {
+      setIsAdmin(localStorage.getItem('scoders_admin_auth') === 'true');
+    };
+    window.addEventListener('storage', checkAdmin);
+    window.addEventListener('scoders_admin_change', checkAdmin);
+    return () => {
+      window.removeEventListener('storage', checkAdmin);
+      window.removeEventListener('scoders_admin_change', checkAdmin);
+    };
+  }, []);
+
   // Sync saved applications across browser tabs & db changes
   useEffect(() => {
     const handleSavedSync = () => {
@@ -757,7 +774,7 @@ export default function Careers({ onNavigate }: CareersProps) {
   const [agreementVersion] = useState('v2.4 - 2026');
 
   // 2. S-CODERS Company Information (Contracting Party)
-  const [companyLegalName] = useState('S-CODERS (Bharath Tech Developers)');
+  const [companyLegalName] = useState('S-CODERS (Bharat Tech Developers)');
   const [companyAddress] = useState('Bengaluru, Karnataka, India - 560060');
   const [companyCin] = useState('UDYAM-KR-03-018249');
   const [companyGstin] = useState('29AABCXXXXX1Z5');
@@ -875,7 +892,7 @@ export default function Careers({ onNavigate }: CareersProps) {
       return false;
     }
     if (!whyJoinScoders.trim()) {
-      setErrorBanner('Please share why you want to join S-CODERS (Bharath Tech Developers).');
+      setErrorBanner('Please share why you want to join S-CODERS (Bharat Tech Developers).');
       return false;
     }
     // impressiveAchievement is OPTIONAL (especially for content creators, writers, video editors)
@@ -1247,20 +1264,24 @@ export default function Careers({ onNavigate }: CareersProps) {
               <span>Apply for Roles</span>
             </button>
 
-            <button
-              onClick={() => {
-                setActiveCareersTab('saved_forms');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`relative px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap z-10 flex items-center gap-2 ${
-                activeCareersTab === 'saved_forms'
-                  ? 'text-brand-dark bg-brand-teal shadow-md shadow-brand-teal/20'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>My Application Forms ({savedApplications.length})</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigate) {
+                    onNavigate('admin');
+                  } else {
+                    setActiveCareersTab('saved_forms');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                className="relative px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap z-10 flex items-center gap-2 text-brand-teal bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark border border-brand-teal/30 shadow-md"
+                title="Application Forms tab is restricted to Admins only and placed under Admin Page"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>My Application Forms (Admin Page)</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1310,9 +1331,37 @@ export default function Careers({ onNavigate }: CareersProps) {
         )}
 
         {/* ============================================================ */}
-        {/* TAB 1: SAVED APPLICATION FORMS (SAVED SEPARATELY LIKE EVENT TICKETS) */}
+        {/* TAB 1: SAVED APPLICATION FORMS (ACCESSIBLE BY ADMINS ONLY UNDER ADMIN PAGE) */}
         {/* ============================================================ */}
         {activeCareersTab === 'saved_forms' && (
+          !isAdmin ? (
+            <div className="text-center py-16 bg-brand-card/50 border border-brand-teal/20 rounded-3xl p-8 space-y-4 max-w-xl mx-auto my-8 shadow-2xl">
+              <div className="w-16 h-16 rounded-2xl bg-brand-teal/10 border border-brand-teal/30 flex items-center justify-center text-brand-teal mx-auto">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h3 className="text-2xl font-display font-extrabold text-white">Admin Access Restricted</h3>
+              <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                The "My Application Forms" collection and candidate dossiers are restricted exclusively to authorized administrators under the Admin Page.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.('admin')}
+                  className="px-6 py-3 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 flex items-center gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Admin Page Login</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveCareersTab('form')}
+                  className="px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                >
+                  Back to Open Roles
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
               <div>
@@ -1551,6 +1600,7 @@ export default function Careers({ onNavigate }: CareersProps) {
               </div>
             )}
           </div>
+          )
         )}
 
         {/* ============================================================ */}
@@ -3393,7 +3443,7 @@ export default function Careers({ onNavigate }: CareersProps) {
               <div className="space-y-4 text-xs text-gray-300 bg-brand-dark/50 p-4 rounded-xl border border-white/10 max-h-48 overflow-y-auto leading-relaxed">
                 <p className="font-semibold text-white">Non-Disclosure & Confidentiality Obligations:</p>
                 <p>
-                  The candidate acknowledges that in connection with their engagement at S-CODERS (Bharath Tech Developers), they will have access to confidential software architectures, proprietary LLM prompt workflows, private repositories, and client project specifications. The candidate agrees not to disclose, replicate, reverse-engineer, or distribute any proprietary material without prior written authorization from the founders.
+                  The candidate acknowledges that in connection with their engagement at S-CODERS (Bharat Tech Developers), they will have access to confidential software architectures, proprietary LLM prompt workflows, private repositories, and client project specifications. The candidate agrees not to disclose, replicate, reverse-engineer, or distribute any proprietary material without prior written authorization from the founders.
                 </p>
                 <p className="font-semibold text-white">Intellectual Property (IP) Assignment:</p>
                 <p>

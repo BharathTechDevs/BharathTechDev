@@ -164,10 +164,10 @@ export default function App() {
     try {
       if (targetView === 'careers') {
         window.history.pushState({ view: 'careers' }, '', '/careers');
-        document.title = 'Careers & Recruitment Portal | S-CODERS (Bharath Tech Developers)';
+        document.title = 'Careers & Recruitment Portal | S-CODERS (Bharat Tech Developers)';
       } else if (targetView === 'home') {
         window.history.pushState({ view: 'home' }, '', '/');
-        document.title = 'S-CODERS | Bharath Tech Developers';
+        document.title = 'S-CODERS | Bharat Tech Developers';
       } else {
         window.history.pushState({ view: targetView }, '', `/?view=${targetView}`);
       }
@@ -180,7 +180,7 @@ export default function App() {
       const detectedView = resolveViewFromUrl();
       setCurrentView(detectedView);
       if (detectedView === 'careers') {
-        document.title = 'Careers & Recruitment Portal | S-CODERS (Bharath Tech Developers)';
+        document.title = 'Careers & Recruitment Portal | S-CODERS (Bharat Tech Developers)';
       }
     };
 
@@ -188,7 +188,7 @@ export default function App() {
     window.addEventListener('hashchange', handleUrlChange);
 
     if (currentView === 'careers') {
-      document.title = 'Careers & Recruitment Portal | S-CODERS (Bharath Tech Developers)';
+      document.title = 'Careers & Recruitment Portal | S-CODERS (Bharat Tech Developers)';
     }
 
     // Sync candidate applications from backend server database
@@ -723,7 +723,7 @@ export default function App() {
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-3">
                 <p className="text-[10px] text-gray-500 font-mono">
-                  BHARATH TECH DEVELOPERS © 2026. ALL RIGHTS RESERVED.
+                  BHARAT TECH DEVELOPERS © 2026. ALL RIGHTS RESERVED.
                 </p>
                 {user?.role === 'admin' && (
                   <>
@@ -788,18 +788,13 @@ export default function App() {
       <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
         {/* Instant WhatsApp Community & Support trigger (Context-Aware Routing) */}
         {(() => {
-          const isService = currentView === 'services';
           const isWorkshop = currentView === 'workshops';
-          const waLink = isService
-            ? "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
-            : isWorkshop
+          const waLink = isWorkshop
             ? "https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
-            : "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4";
-          const waTitle = isService
-            ? "Join S-CODERS Service WhatsApp Group"
-            : isWorkshop
+            : "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK";
+          const waTitle = isWorkshop
             ? "Join S-CODERS Workshop Community Group"
-            : "Join S-CODERS Customer Care & Support WhatsApp Group";
+            : "Join S-CODERS Service WhatsApp Group";
 
           return (
             <a

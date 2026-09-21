@@ -75,7 +75,7 @@ export default function Logo({
     
   const subtitleColor = lightBg 
     ? 'text-[#1E293B] font-semibold' 
-    : 'text-slate-100 font-medium'; // "Bharath Tech Developers"
+    : 'text-slate-100 font-medium'; // "Bharat Tech Developers"
     
   const sparkleColor = lightBg ? 'text-slate-900' : 'text-[#E0F2FE]'; // Glowing 4-point star
 
@@ -164,7 +164,7 @@ export default function Logo({
         </div>
       </div>
 
-      {/* Subtitle Row "Bharath Tech Developers" */}
+      {/* Subtitle Row "Bharat Tech Developers" */}
       {showSubtitle && (
         <div className={`flex items-center gap-1.5 ${horizontal ? 'mt-0 ml-1' : 'mt-1'}`}>
           {horizontal && (
@@ -175,7 +175,7 @@ export default function Logo({
               ? 'text-[11px] sm:text-xs md:text-[13px]' 
               : currentSize.subtitle
           }`}>
-            Bharath Tech Developers
+            Bharat Tech Developers
           </span>
           {onAdminClick && (
             <button

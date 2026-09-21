@@ -642,28 +642,28 @@ export default function Team() {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: '-50px' }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 mb-20"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-20"
         >
           {TEAM_MEMBERS.map((member) => (
             <motion.div
               key={member.id}
               variants={cardVariants}
               whileHover={{ y: -8, transition: { duration: 0.25 } }}
-              className="glass-panel rounded-3xl border border-white/10 hover:border-brand-teal/40 overflow-hidden flex flex-col sm:flex-row group transition-all duration-300 shadow-xl hover:shadow-brand-teal/10 relative"
+              className="glass-panel rounded-3xl border border-white/10 hover:border-brand-teal/40 overflow-hidden flex flex-col sm:flex-row lg:flex-col group transition-all duration-300 shadow-xl hover:shadow-brand-teal/10 relative"
             >
               {/* Profile image column */}
-              <div className="sm:w-2/5 relative h-64 sm:h-auto overflow-hidden">
+              <div className="sm:w-2/5 lg:w-full relative h-64 sm:h-auto lg:h-64 overflow-hidden">
                 <img
                   src={member.photoUrl}
                   alt={member.name}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-brand-dark via-brand-dark/40 to-transparent opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r lg:bg-gradient-to-t from-brand-dark via-brand-dark/40 to-transparent opacity-80" />
               </div>
 
               {/* Bio & Details Column */}
-              <div className="p-8 sm:w-3/5 flex flex-col justify-between relative z-10">
+              <div className="p-6 sm:p-8 sm:w-3/5 lg:w-full flex flex-col justify-between flex-1 relative z-10">
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <h3 className="font-display font-bold text-xl text-white group-hover:text-brand-teal transition-colors">

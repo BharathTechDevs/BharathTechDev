@@ -57,6 +57,7 @@ export default function Contact() {
   };
 
   const socialLinks = [
+    { name: 'Service WhatsApp Group', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Customer Care Support', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Email Support', icon: <Mail className="w-5 h-5" />, href: 'mailto:scoders82@gmail.com', color: 'hover:text-brand-teal hover:border-brand-teal' },
     { name: 'WhatsApp (Bhuvan)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/916363905989', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
@@ -87,13 +88,13 @@ export default function Contact() {
         <div className="text-center max-w-3xl mx-auto mb-20">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
             <Mail className="w-3.5 h-3.5" />
-            <span>CONNECT WITH S-CODERS • BHARATH TECH DEVELOPERS</span>
+            <span>CONNECT WITH S-CODERS • BHARAT TECH DEVELOPERS</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-white tracking-tight mb-6">
             Let’s Engineer Your <span className="text-brand-teal">Next Breakthrough</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            Have an application concept, a custom automation criteria, or want to host a coding session? Reach out to Suhas & the S-CODERS • Bharath Tech Developers team.
+            Have an application concept, a custom automation criteria, or want to host a coding session? Reach out to Suhas & the S-CODERS • Bharat Tech Developers team.
           </p>
         </div>
 
@@ -108,9 +109,9 @@ export default function Contact() {
               <div className="absolute top-0 right-0 p-6 text-brand-teal/10">
                 <Sparkles className="w-16 h-16" />
               </div>
-              <h3 className="font-display font-bold text-xl text-white mb-4">S-CODERS • BHARATH TECH HQ</h3>
+              <h3 className="font-display font-bold text-xl text-white mb-4">S-CODERS • BHARAT TECH HQ</h3>
               <p className="text-gray-400 font-sans font-light text-sm sm:text-base leading-relaxed mb-6">
-                Based out of the tech capital of India, S-CODERS • Bharath Tech Developers operates inside Bengaluru’s vibrant startup network.
+                Based out of the tech capital of India, S-CODERS • Bharat Tech Developers operates inside Bengaluru’s vibrant startup network.
               </p>
               
               <div className="space-y-4">
@@ -162,16 +163,16 @@ export default function Contact() {
                   <a href="mailto:scoders82@gmail.com" className="hover:text-brand-teal transition-colors">scoders82@gmail.com</a>
                 </div>
 
-                {/* Instant WhatsApp Group & Support Card */}
+                {/* Instant Service WhatsApp Group & Support Card */}
                 <div className="pt-2">
                   <a
-                    href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                    href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3 px-4 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4 text-black" />
-                    <span>Customer Care Support WhatsApp Group</span>
+                    <span>Service WhatsApp Group</span>
                   </a>
                 </div>
               </div>
@@ -216,7 +217,7 @@ export default function Contact() {
                   </div>
                   <h3 className="font-display font-extrabold text-white text-2xl mb-3">Enquiry Registered!</h3>
                   <p className="text-gray-400 text-sm font-sans font-light max-w-md mx-auto mb-6">
-                    Your request has been successfully saved to our Bengaluru dispatch database. Suhas Gowda or an S-CODERS • Bharath Tech Developers lead coordinator will reach out to you within 24 hours.
+                    Your request has been successfully saved to our Bengaluru dispatch database. Suhas Gowda or an S-CODERS • Bharat Tech Developers lead coordinator will reach out to you within 24 hours.
                   </p>
                   <button
                     onClick={() => setSubmitted(false)}

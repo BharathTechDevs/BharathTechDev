@@ -25,6 +25,7 @@ import {
   FileRecord, EnquiryItem, TeamMemberRecord, GalleryMediaItem 
 } from '../utils/dbEngine';
 import RecruitmentAdmin from './RecruitmentAdmin';
+import ApplicationFormsAdmin from './ApplicationFormsAdmin';
 
 interface AdminConsoleProps {
   onClose: () => void;
@@ -39,7 +40,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [adminId, setAdminId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState<'recruitment' | 'services' | 'workshops' | 'invoices' | 'payments' | 'leads' | 'networking' | 'database'>('recruitment');
+  const [activeTab, setActiveTab] = useState<'recruitment' | 'application_forms' | 'services' | 'workshops' | 'invoices' | 'payments' | 'leads' | 'networking' | 'database'>('recruitment');
   const [dbSubView, setDbSubView] = useState<'explorer' | 'dashboard'>('dashboard');
 
   // Relational Database Explorer States
@@ -762,6 +763,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
               {[
                 { id: 'database', label: 'Relational Database Engine', icon: <Database className="w-4 h-4 text-brand-teal" /> },
                 { id: 'recruitment', label: 'Talent & Induction Agreements', icon: <Briefcase className="w-4 h-4 text-brand-teal" /> },
+                { id: 'application_forms', label: 'My Application Forms', icon: <FileText className="w-4 h-4 text-brand-teal" /> },
                 { id: 'services', label: 'Services Catalog', icon: <Cpu className="w-4 h-4" /> },
                 { id: 'workshops', label: 'Workshops/Events', icon: <Calendar className="w-4 h-4" /> },
                 { id: 'networking', label: 'Networking & Photos', icon: <Camera className="w-4 h-4" /> },
@@ -1869,6 +1871,10 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                   onDeleteApplication={handleDeleteCandidate}
                   onRefresh={loadAllData}
                 />
+              )}
+
+              {activeTab === 'application_forms' && (
+                <ApplicationFormsAdmin onRefreshParent={loadAllData} />
               )}
 
               {activeTab === 'services' && (

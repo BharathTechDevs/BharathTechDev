@@ -431,7 +431,7 @@ export default function TenantDashboard() {
       subject: `🎓 Payment Done Successfully - S-CODERS Workshop Key (${generatedKey})`,
       title: activeWorkshop.title,
       uniqueKey: generatedKey,
-      messageText: "Your payment has been done successfully and thank you for choosing S-CODERS Bharath tech developers. Your classroom sandbox, downloadable assets, and Zoom meeting access are now unlocked!",
+      messageText: "Your payment has been done successfully and thank you for choosing S-CODERS Bharat tech developers. Your classroom sandbox, downloadable assets, and Zoom meeting access are now unlocked!",
       amount: totalAmount,
       actionText: "Enter Workshop & Sandbox",
       onAction: () => {
@@ -747,7 +747,7 @@ export default function TenantDashboard() {
             Workshops & Classroom Portal
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            S-CODERS • Bharath Tech Developers is heavily active in Bengaluru's academic and development circles. View our seminars, register to access live sandboxes, and download blueprints.
+            S-CODERS • Bharat Tech Developers is heavily active in Bengaluru's academic and development circles. View our seminars, register to access live sandboxes, and download blueprints.
           </p>
         </div>
 
@@ -983,7 +983,7 @@ export default function TenantDashboard() {
                         {(activeWorkshop.usefulness || [
                           'Master core full-stack software development workflows',
                           'Build real-world production prototypes live during class',
-                          'Receive official S-CODERS • Bharath Tech Developers Certification'
+                          'Receive official S-CODERS • Bharat Tech Developers Certification'
                         ]).map((outcome, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-xs text-gray-300 font-sans">
                             <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
@@ -1266,7 +1266,7 @@ export default function TenantDashboard() {
                           </div>
 
                           <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                            founder, s-coders (bharath tech developers). shipped multiple production systems and ai agents. teaches practical architecture, workflows, and high-impact developer tooling.
+                            founder, s-coders (bharat tech developers). shipped multiple production systems and ai agents. teaches practical architecture, workflows, and high-impact developer tooling.
                           </p>
                         </div>
 

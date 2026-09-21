@@ -15,7 +15,7 @@ export default function About({ onNavigate }: AboutProps) {
     {
       period: 'April 2024 - Early 2025',
       title: 'The Seed & Genesis in Bengaluru',
-      description: 'S-CODERS (Bharath Tech Developers) originated in Bengaluru, India as a high-velocity developer group passionate about building real-world software beyond standard textbook theory. We focused on hands-on practical execution, shipping custom web portals, and solving complex client software challenges.',
+      description: 'S-CODERS (Bharat Tech Developers) originated in Bengaluru, India as a high-velocity developer group passionate about building real-world software beyond standard textbook theory. We focused on hands-on practical execution, shipping custom web portals, and solving complex client software challenges.',
     },
     {
       period: 'Late 2025 - Mid 2026',
@@ -117,7 +117,7 @@ export default function About({ onNavigate }: AboutProps) {
         <div className="text-center max-w-3xl mx-auto space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono uppercase tracking-widest">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>ABOUT S-CODERS • BHARATH TECH DEVELOPERS</span>
+            <span>ABOUT S-CODERS • BHARAT TECH DEVELOPERS</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-display font-black tracking-tight text-white leading-tight">
             A Company Built Around <span className="text-brand-teal">Practical Innovation</span> & Community Growth
@@ -133,7 +133,7 @@ export default function About({ onNavigate }: AboutProps) {
             <span className="text-xs font-mono text-brand-teal uppercase tracking-widest font-bold block mb-2">GENESIS & EVOLUTION</span>
             <h2 className="text-2xl sm:text-4xl font-display font-extrabold text-white mb-4">Our Journey</h2>
             <p className="text-gray-300 font-sans font-light text-sm sm:text-base leading-relaxed">
-              Founded in Bengaluru, India, S-CODERS (Bharath Tech Developers) began as a dedicated group of software engineers and student innovators who wanted to explore coding and AI beyond traditional textbooks. Through consistent project building, collaboration, and real-world client deliverables, our team cultivated a strong culture of technical rigor and rapid execution.
+              Founded in Bengaluru, India, S-CODERS (Bharat Tech Developers) began as a dedicated group of software engineers and student innovators who wanted to explore coding and AI beyond traditional textbooks. Through consistent project building, collaboration, and real-world client deliverables, our team cultivated a strong culture of technical rigor and rapid execution.
             </p>
           </div>
 

@@ -308,7 +308,7 @@ const SEED_APPLICATIONS: CandidateApplication[] = [
     agreementDuration: '12 Months',
     agreementJurisdiction: 'Bengaluru, Karnataka, India',
     agreementVersion: 'v2.4 - 2026',
-    companyLegalName: 'S-CODERS (Bharath Tech Developers)',
+    companyLegalName: 'S-CODERS (Bharat Tech Developers)',
     companyAddress: 'Bengaluru, Karnataka, India - 560060',
     companyCin: 'UDYAM-KR-03-018249',
     companyGstin: '29AABCXXXXX1Z5',

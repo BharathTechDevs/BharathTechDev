@@ -76,7 +76,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-teal opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-teal"></span>
           </span>
-          <span className="font-semibold">S-CODERS • Bharath Tech Developers</span>
+          <span className="font-semibold">S-CODERS • Bharat Tech Developers</span>
           <Sparkles className="w-3.5 h-3.5 text-brand-teal group-hover:rotate-180 transition-transform duration-700" />
         </motion.div>
 
@@ -97,7 +97,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
           transition={{ duration: 0.8, delay: 0.3 }}
           className="text-base sm:text-lg text-slate-300 font-sans font-normal max-w-2xl mx-auto mb-12 leading-relaxed"
         >
-          S-CODERS (Bharath Tech Developers) crafts customized AI agents, mobile applications, and high-performance full-stack web architectures for founders, enterprises, and visionary teams globally.
+          S-CODERS (Bharat Tech Developers) crafts customized AI agents, mobile applications, and high-performance full-stack web architectures for founders, enterprises, and visionary teams globally.
         </motion.p>
 
         {/* Call to action controls & Underlined Action Link */}

@@ -142,7 +142,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                 </span>
               </div>
               <span className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2 py-0.5 rounded">
-                S-CODERS Bharath Tech Developers
+                S-CODERS Bharat Tech Developers
               </span>
             </div>
 
@@ -175,7 +175,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                   <span>CODERS</span>
                 </h4>
                 <p className="text-[10px] sm:text-xs font-mono text-gray-400 uppercase tracking-wider">
-                  Bharath Tech Developers • Bengaluru, India
+                  Bharat Tech Developers • Bengaluru, India
                 </p>
               </div>
               <div className="p-2 bg-brand-teal/15 rounded-xl border border-brand-teal/30 text-brand-teal">

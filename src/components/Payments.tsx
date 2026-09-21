@@ -647,7 +647,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                     <CheckCircle className="w-8 h-8 text-brand-teal" />
                   </div>
                   <h3 className="text-2xl font-display font-black text-white">Payment Received Successfully!</h3>
-                  <p className="text-gray-400 font-sans text-xs mt-1">S-CODERS Bharath Tech Developers Dispatch Ledger</p>
+                  <p className="text-gray-400 font-sans text-xs mt-1">S-CODERS Bharat Tech Developers Dispatch Ledger</p>
                   
                   {/* Email dispatch badge */}
                   <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono">
@@ -1385,7 +1385,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                         <div className="flex justify-between items-start relative">
                           <div>
                             <span className="text-[10px] font-mono tracking-widest text-brand-teal font-black block">S-CODERS MERCHANT</span>
-                            <span className="text-[8px] font-mono text-gray-500 block uppercase">Bharath Tech Systems</span>
+                            <span className="text-[8px] font-mono text-gray-500 block uppercase">Bharat Tech Systems</span>
                           </div>
                           
                           {/* Card Chip graphic design */}

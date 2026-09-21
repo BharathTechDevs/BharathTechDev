@@ -37,7 +37,7 @@ function getServiceAcceptanceEmailHtml({
               <tr>
                 <td style="padding: 32px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #22D3EE;">
                   <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
-                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharath Tech Developers • Bengaluru, India</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharat Tech Developers • Bengaluru, India</p>
                 </td>
               </tr>
               <tr>
@@ -53,7 +53,7 @@ function getServiceAcceptanceEmailHtml({
                 <td style="padding: 0 32px 20px 32px;">
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
                   <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                    Your project idea has been got registered and our team will contact you within 24hrs thank you for choosing S-CODERS Bharath tech developers.
+                    Your project idea has been got registered and our team will contact you within 24hrs thank you for choosing S-CODERS Bharat tech developers.
                   </p>
                   <p style="font-size: 13px; color: #94A3B8; margin: 0;">
                     Project Scope: <strong>${serviceTitle}</strong>
@@ -88,7 +88,7 @@ function getServiceAcceptanceEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -157,7 +157,7 @@ function getWorkshopEmailHtml({
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
                   ${isSuccess ? `
                     <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                      Your payment has been done successfully and thank you for choosing S-CODERS Bharath tech developers and you can continue with the workshop session.
+                      Your payment has been done successfully and thank you for choosing S-CODERS Bharat tech developers and you can continue with the workshop session.
                     </p>
                   ` : `
                     <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
@@ -199,7 +199,7 @@ function getWorkshopEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -315,7 +315,7 @@ function getEventEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -372,7 +372,7 @@ function getPaymentEmailHtml({
                     S <span style="color: #2563EB;">⚡</span> CODERS
                   </h1>
                   <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; letter-spacing: 1.5px; text-transform: uppercase;">
-                    Bharath Tech Developers • Bengaluru, India
+                    Bharat Tech Developers • Bengaluru, India
                   </p>
                 </td>
               </tr>
@@ -394,7 +394,7 @@ function getPaymentEmailHtml({
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
                   <p style="font-size: 14px; color: #94A3B8; line-height: 1.6; margin: 0;">
                     ${isSuccess 
-                      ? `Thank you for your payment to <strong>S-CODERS (Bharath Tech Developers)</strong>. Your transaction has been processed and confirmed via Razorpay.` 
+                      ? `Thank you for your payment to <strong>S-CODERS (Bharat Tech Developers)</strong>. Your transaction has been processed and confirmed via Razorpay.` 
                       : `Your recent payment attempt with <strong>S-CODERS</strong> was not completed. Please review the details below.`}
                   </p>
                 </td>
@@ -448,7 +448,7 @@ function getPaymentEmailHtml({
                     bhuvanmbhuvanm15@gmail.com • Bengaluru, Karnataka, India
                   </p>
                   <p style="font-size: 10px; color: #475569; margin-top: 16px;">
-                    © 2026 S-CODERS (Bharath Tech Developers). All rights reserved.
+                    © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.
                   </p>
                 </td>
               </tr>
@@ -476,7 +476,7 @@ async function sendEmailNotification({
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const port = Number(process.env.SMTP_PORT) || 587;
-  const from = process.env.SMTP_FROM || '"S-CODERS (Bharath Tech Developers)" <scoders82@gmail.com>';
+  const from = process.env.SMTP_FROM || '"S-CODERS (Bharat Tech Developers)" <scoders82@gmail.com>';
 
   let transporter;
   if (host && user && pass) {
@@ -1159,7 +1159,7 @@ async function startServer() {
 
       const emailResult = await sendEmailNotification({
         to: email || "client@example.com",
-        subject: `❌ Payment Attempt Failed - S-CODERS (Bharath Tech Developers)`,
+        subject: `❌ Payment Attempt Failed - S-CODERS (Bharat Tech Developers)`,
         html: getPaymentEmailHtml({
           status: "FAILED",
           clientName: clientName || "Valued Client",
@@ -1854,7 +1854,7 @@ async function startServer() {
         });
       }
 
-      const systemInstruction = `You are the S-CODERS AI Agent, an interactive technology consultant representing S-CODERS (Bharath Tech Developers), a premier software and AI startup based in Bengaluru, Karnataka.
+      const systemInstruction = `You are the S-CODERS AI Agent, an interactive technology consultant representing S-CODERS (Bharat Tech Developers), a premier software and AI startup based in Bengaluru, Karnataka.
 
 S-CODERS specialize in AI Agent Development, Mobile App Dev (React Native), Website Dev (Next.js, React), Custom Software, UI/UX design, and Technical Workshops.
 

@@ -670,7 +670,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             Elite Capabilities, <span className="text-brand-teal">Custom Engineered</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-base sm:text-lg">
-            S-CODERS • Bharath Tech Developers translates complex software architectures and agent logic into elegant commercial assets. Explore our solutions.
+            S-CODERS • Bharat Tech Developers translates complex software architectures and agent logic into elegant commercial assets. Explore our solutions.
           </p>
         </div>
 
@@ -925,7 +925,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                 Shipped Systems & Portfolio Showcase
               </h3>
               <p className="text-gray-400 text-sm font-sans font-light max-w-2xl mx-auto">
-                Explore custom software systems engineered and delivered by S-CODERS • Bharath Tech Developers across mobile, web, and single-page architectures.
+                Explore custom software systems engineered and delivered by S-CODERS • Bharat Tech Developers across mobile, web, and single-page architectures.
               </p>
             </div>
 
@@ -2456,7 +2456,7 @@ function ApiClientPlayground() {
           status: 'success',
           usersCount: 4,
           results: [
-            { id: 'usr_879a', name: 'Bhuvan M', role: 'Premium Client', company: 'S-CODERS • Bharath Tech Developers' },
+            { id: 'usr_879a', name: 'Bhuvan M', role: 'Premium Client', company: 'S-CODERS • Bharat Tech Developers' },
             { id: 'usr_102d', name: 'Suhas Gowda', role: 'System Admin', company: 'S-CODERS HQ' },
             { id: 'usr_443c', name: 'Aishwarya S', role: 'Instructor Lead', company: 'Microsoft Reactor' },
             { id: 'usr_901e', name: 'Manoj Kumar', role: 'Developer Lead', company: 'S-CODERS Core' }
@@ -2768,7 +2768,7 @@ function ConsultancyAdvisorPlayground() {
 
 ---
 
-*Prepared by Suhas Gowda & the S-CODERS • Bharath Tech Developers technical board.*`;
+*Prepared by Suhas Gowda & the S-CODERS • Bharat Tech Developers technical board.*`;
 
     let cursor = 0;
     const interval = setInterval(() => {
@@ -2997,6 +2997,17 @@ export function ServiceProjectSpaceDashboard({
         <p className="text-gray-200 text-sm sm:text-base leading-relaxed max-w-5xl">
           Your registered project is officially initiated in our engineering pipeline. Pricing and milestones are determined dynamically after direct 1-on-1 requirements alignment. Our lead developers will connect with you via Call / WhatsApp and Zoom meeting to coordinate.
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <a
+            href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
+          >
+            <MessageCircle className="w-4 h-4 text-black" />
+            <span>Join Service WhatsApp Group</span>
+          </a>
+        </div>
       </div>
 
       {/* 2. DEVELOPERS SECTION - MATCHING IMAGE 1 DESIGN */}
@@ -3038,7 +3049,7 @@ export function ServiceProjectSpaceDashboard({
               </div>
 
               <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                founder, s-coders (bharath tech developers). shipped multiple production systems and ai agents. direct 1-on-1 architecture alignment, project coordination, and custom development.
+                founder, s-coders (bharat tech developers). shipped multiple production systems and ai agents. direct 1-on-1 architecture alignment, project coordination, and custom development.
               </p>
             </div>
 
