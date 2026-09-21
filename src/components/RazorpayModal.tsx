@@ -1187,7 +1187,7 @@ export default function RazorpayModal({
                     <div className="pt-1">
                       <button
                         type="button"
-                        onClick={handleInitiateUpiApp}
+                        onClick={() => handleInitiateUpiApp()}
                         className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-extrabold text-sm tracking-wider uppercase rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <Sparkles className="w-4 h-4 text-amber-300" />

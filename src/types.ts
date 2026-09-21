@@ -248,7 +248,9 @@ export interface CandidateApplication {
   bankName?: string;
   accountHolderName?: string;
   accountNumber?: string;
+  bankAccountNumber?: string;
   ifscCode?: string;
+  bankIfsc?: string;
   branchName?: string;
   upiId?: string;
 

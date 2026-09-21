@@ -1428,11 +1428,11 @@ export default function Careers({ onNavigate }: CareersProps) {
                       {/* Card Header: Status + Date + Delete */}
                       <div className="flex items-center justify-between border-b border-white/10 pb-3 gap-2">
                         <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          app.status === 'Onboarding Completed' || app.status === 'Hired'
+                          (app.status as any) === 'Onboarding Completed' || (app.status as any) === 'Hired'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : app.status === 'Approved for Onboarding'
+                            : (app.status as any) === 'Approved for Onboarding'
                             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                            : app.status === 'Shortlisted for Interview'
+                            : app.status === 'Shortlisted' || (app.status as any) === 'Shortlisted for Interview'
                             ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}>
@@ -3906,11 +3906,11 @@ export default function Careers({ onNavigate }: CareersProps) {
 
                 <div className="flex items-center gap-2">
                   <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
-                    viewingSavedApp.status === 'Onboarding Completed' || viewingSavedApp.status === 'Hired'
+                    (viewingSavedApp.status as any) === 'Onboarding Completed' || (viewingSavedApp.status as any) === 'Hired'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : viewingSavedApp.status === 'Approved for Onboarding'
+                      : (viewingSavedApp.status as any) === 'Approved for Onboarding'
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                      : viewingSavedApp.status === 'Shortlisted for Interview'
+                      : viewingSavedApp.status === 'Shortlisted' || (viewingSavedApp.status as any) === 'Shortlisted for Interview'
                       ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                       : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   }`}>

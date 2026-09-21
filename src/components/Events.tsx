@@ -1392,7 +1392,7 @@ export default function Events() {
                             const currentPhone = getPhoneNumberForUpi(activeVpa);
                             const isBhuvan = activeVpa.includes('6363905989');
                             const evtPriceFormatted = (selectedEvent.ticketPrice || 0).toFixed(2);
-                            const evtCleanTitle = (selectedEvent.name || selectedEvent.title || 'Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
+                            const evtCleanTitle = (selectedEvent.name || (selectedEvent as any).title || 'Event Pass').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
                             const evtUpiUniversal = `upi://pay?pa=${activeVpa}&pn=${encodeURIComponent(currentBankingName)}&am=${evtPriceFormatted}&cu=INR&tn=${encodeURIComponent(evtCleanTitle)}`;
 
                             return (
