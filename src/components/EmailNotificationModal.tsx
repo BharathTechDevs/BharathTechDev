@@ -41,7 +41,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
     ? "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
     : isWorkshop
     ? "https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
-    : "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4";
+    : "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4";
 
   const groupTitle = isService
     ? "Join S-CODERS Service WhatsApp Group"

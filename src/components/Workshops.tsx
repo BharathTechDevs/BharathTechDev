@@ -646,7 +646,7 @@ export default function TenantDashboard() {
     // Initial messages set
     const mockMessages: ChatMessage[] = [
       { id: '1', sender: 'Aravind K', role: 'SDE-2, Swiggy', text: 'Wait, does the Gemini Node SDK support streaming responses out of the box?', time: '10:41 AM' },
-      { id: '2', sender: 'Instructor Aishwarya', role: 'S-CODERS Lead', text: 'Yes, absolutely! Use `ai.models.generateContentStream` instead of `generateContent` for real-time output streams.', time: '10:42 AM' },
+      { id: '2', sender: 'Instructor Shreyas', role: 'S-CODERS Founder & CEO', text: 'Yes, absolutely! Use `ai.models.generateContentStream` instead of `generateContent` for real-time output streams.', time: '10:42 AM' },
       { id: '3', sender: 'Nisha Hegde', role: 'Student, RVCE', text: 'The n8n custom WhatsApp webhook nodes worked perfectly on the sandbox. This is super fast.', time: '10:43 AM' },
       { id: '4', sender: 'Meghana R', role: 'Intern, Dell', text: 'Do we get a certification record of attendance once we finish the final sandbox test?', time: '10:44 AM' }
     ];
@@ -659,10 +659,10 @@ export default function TenantDashboard() {
 
     const interval = setInterval(() => {
       const randomChats = [
-        { sender: 'Bhuvan M', role: 'Founder, AgroSmart AI', text: 'Is anyone deploying sub-agents? What is your prompt strategy for avoiding loops?' },
-        { sender: 'Instructor Aishwarya', role: 'S-CODERS Lead', text: 'Make sure your agent has a clear exit node or a system constraint specifying: Maximum 5 loop turns.' },
+        { sender: 'Bhuvan M', role: 'Tech Lead, S-CODERS', text: 'Is anyone deploying sub-agents? What is your prompt strategy for avoiding loops?' },
+        { sender: 'Instructor Shreyas', role: 'S-CODERS Founder & CEO', text: 'Make sure your agent has a clear exit node or a system constraint specifying: Maximum 5 loop turns.' },
         { sender: 'Nithin Rao', role: 'Backend Dev, Zerodha', text: 'Just finished compiling the Postgres pool configurations. Working nicely!' },
-        { sender: 'Suhas Gowda', role: 'Co-Founder', text: 'Amazing work everyone. Keep experimenting with the n8n webhook nodes!' }
+        { sender: 'Lokesh A', role: 'Co-Founder, S-CODERS', text: 'Amazing work everyone. Keep experimenting with the n8n webhook nodes!' }
       ];
 
       const chosen = randomChats[Math.floor(Math.random() * randomChats.length)];
@@ -1435,7 +1435,7 @@ export default function TenantDashboard() {
                       required
                       value={authorName}
                       onChange={(e) => setAuthorName(e.target.value)}
-                      placeholder="e.g. Suhas Gowda"
+                      placeholder="e.g. Rahul Sharma"
                       className="w-full bg-brand-dark/60 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                     />
                   </div>
@@ -1693,7 +1693,7 @@ export default function TenantDashboard() {
                             disabled={!!currentUser}
                             value={regName}
                             onChange={(e) => setRegName(e.target.value)}
-                            placeholder="e.g. Suhas Gowda"
+                            placeholder="e.g. Rahul Sharma"
                             className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
                           />
                         </div>

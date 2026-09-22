@@ -58,7 +58,7 @@ export default function Contact() {
 
   const socialLinks = [
     { name: 'Service WhatsApp Group', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
-    { name: 'Customer Care Support', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
+    { name: 'Customer Care Support', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Email Support', icon: <Mail className="w-5 h-5" />, href: 'mailto:scoders82@gmail.com', color: 'hover:text-brand-teal hover:border-brand-teal' },
     { name: 'WhatsApp (Bhuvan)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/916363905989', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
     { name: 'WhatsApp (Shreyas)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/918310463417', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
@@ -94,7 +94,7 @@ export default function Contact() {
             Let’s Engineer Your <span className="text-brand-teal">Next Breakthrough</span>
           </h2>
           <p className="text-gray-400 font-sans font-light text-lg">
-            Have an application concept, a custom automation criteria, or want to host a coding session? Reach out to Suhas & the S-CODERS • Bharat Tech Developers team.
+            Have an application concept, a custom automation criteria, or want to host a coding session? Reach out to Shreyas & the S-CODERS • Bharat Tech Developers team.
           </p>
         </div>
 
@@ -217,7 +217,7 @@ export default function Contact() {
                   </div>
                   <h3 className="font-display font-extrabold text-white text-2xl mb-3">Enquiry Registered!</h3>
                   <p className="text-gray-400 text-sm font-sans font-light max-w-md mx-auto mb-6">
-                    Your request has been successfully saved to our Bengaluru dispatch database. Suhas Gowda or an S-CODERS • Bharat Tech Developers lead coordinator will reach out to you within 24 hours.
+                    Your request has been successfully saved to our Bengaluru dispatch database. Shreyas M. or an S-CODERS • Bharat Tech Developers lead coordinator will reach out to you within 24 hours.
                   </p>
                   <button
                     onClick={() => setSubmitted(false)}

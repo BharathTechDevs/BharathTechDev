@@ -171,7 +171,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         clientEmail: 'contact@edvantage.io',
         registrationId: 'REG-SVC-1002',
         rating: 5,
-        review: 'S-CODERS delivered our Next.js multi-tenant platform in under 3 weeks. Prathiksha and Suhas ensured top-tier UI fidelity and seamless database integration.',
+        review: 'S-CODERS delivered our Next.js multi-tenant platform in under 3 weeks. Shreyas, Lokesh, and Bhuvan ensured top-tier UI fidelity and seamless database integration.',
         submissionDate: '2026-07-20'
       },
       {
@@ -181,7 +181,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         clientEmail: 'ketan@ruralagritech.org',
         registrationId: 'REG-SVC-1003',
         rating: 5,
-        review: 'Working with Suhas and the team was an absolute pleasure. High communication, clean architecture, and transparent milestone updates.',
+        review: 'Working with Shreyas and the team was an absolute pleasure. High communication, clean architecture, and transparent milestone updates.',
         submissionDate: '2026-07-28'
       }
     ];
@@ -429,7 +429,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         registrationId: regId,
         reference: registeringService.title,
         messages: [
-          { id: 'msg-init-1', sender: 'team', content: `Welcome ${regName} to S-CODERS! We have created a separate database and conversation workspace for your project '${registeringService.title}'. Our team has reviewed your requirements: "${regRequirements}". Suhas Gowda (Founder) and Manoj Kumar (Lead Dev) will reach out shortly.`, timestamp: new Date().toISOString() }
+          { id: 'msg-init-1', sender: 'team', content: `Welcome ${regName} to S-CODERS! We have created a separate database and conversation workspace for your project '${registeringService.title}'. Our team has reviewed your requirements: "${regRequirements}". Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) will reach out shortly.`, timestamp: new Date().toISOString() }
         ],
         lastUpdated: new Date().toISOString()
       };
@@ -1110,7 +1110,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                         required
                         value={feedAuthorName}
                         onChange={(e) => setFeedAuthorName(e.target.value)}
-                        placeholder="e.g. Suhas M or Company Name"
+                        placeholder="e.g. Rahul Sharma or Company Name"
                         className="w-full bg-brand-dark/80 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                       />
                     </div>
@@ -1396,7 +1396,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                             disabled={!!currentUser}
                             value={regName}
                             onChange={(e) => setRegName(e.target.value)}
-                            placeholder="e.g. Suhas Gowda"
+                            placeholder="e.g. Rahul Sharma"
                             className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
                           />
                         </div>
@@ -1515,7 +1515,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               type="text"
                               value={regName}
                               onChange={(e) => setRegName(e.target.value)}
-                              placeholder="e.g. Suhas Gowda"
+                              placeholder="e.g. Rahul Sharma"
                               className="w-full bg-brand-dark/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
                             />
                           </div>
@@ -2456,10 +2456,9 @@ function ApiClientPlayground() {
           status: 'success',
           usersCount: 4,
           results: [
-            { id: 'usr_879a', name: 'Bhuvan M', role: 'Premium Client', company: 'S-CODERS • Bharat Tech Developers' },
-            { id: 'usr_102d', name: 'Suhas Gowda', role: 'System Admin', company: 'S-CODERS HQ' },
-            { id: 'usr_443c', name: 'Aishwarya S', role: 'Instructor Lead', company: 'Microsoft Reactor' },
-            { id: 'usr_901e', name: 'Manoj Kumar', role: 'Developer Lead', company: 'S-CODERS Core' }
+            { id: 'usr_879a', name: 'Bhuvan M', role: 'Tech Lead', company: 'S-CODERS • Bharat Tech Developers' },
+            { id: 'usr_102d', name: 'Shreyas M', role: 'Founder & CEO', company: 'S-CODERS HQ' },
+            { id: 'usr_443c', name: 'Lokesh A', role: 'Co-Founder', company: 'S-CODERS Core' }
           ]
         },
         payload: ''
@@ -2488,11 +2487,11 @@ function ApiClientPlayground() {
           status: 'success',
           transactionId: 'TXN-RAZOR-908123A',
           transfersLinked: [
-            { id: 'sub_pay_1', recipient: 'Suhas Gowda', amount: 15000, status: 'transferred' },
-            { id: 'sub_pay_2', recipient: 'Prathiksha R', amount: 10000, status: 'transferred' }
+            { id: 'sub_pay_1', recipient: 'Shreyas M', amount: 15000, status: 'transferred' },
+            { id: 'sub_pay_2', recipient: 'Bhuvan M', amount: 10000, status: 'transferred' }
           ]
         },
-        payload: JSON.stringify({ invoiceId: 'INV-2026-004', amount: 25000, recipientSplits: ['suhas', 'prathiksha'] }, null, 2)
+        payload: JSON.stringify({ invoiceId: 'INV-2026-004', amount: 25000, recipientSplits: ['shreyas', 'bhuvan'] }, null, 2)
       }
     }
   };
@@ -2768,7 +2767,7 @@ function ConsultancyAdvisorPlayground() {
 
 ---
 
-*Prepared by Suhas Gowda & the S-CODERS • Bharat Tech Developers technical board.*`;
+*Prepared by Shreyas M. & the S-CODERS • Bharat Tech Developers technical board.*`;
 
     let cursor = 0;
     const interval = setInterval(() => {
@@ -2928,10 +2927,10 @@ export function ServiceProjectSpaceDashboard({
     // Simulate smart team response after 1.5 seconds
     setTimeout(() => {
       const responses = [
-        "That sounds like an excellent design consideration! I've added this detail directly to our technical spec sheet. Suhas will address this in our next Zoom meet.",
-        "Understood. We are aligning the UI layouts accordingly. I'll ask Suhas to update the progress PDFs so you can review the change shortly.",
+        "That sounds like an excellent design consideration! I've added this detail directly to our technical spec sheet. Shreyas will address this in our next Zoom meet.",
+        "Understood. We are aligning the UI layouts accordingly. I'll ask Bhuvan to update the progress designs so you can review the change shortly.",
         "Perfect. Regarding the timeline, we can expedite the database schema creation to match your requirements. I will WhatsApp you with a draft link.",
-        "Received. Suhas is currently writing the core AI routing graph. We will showcase the functional prototype during our next milestone demo!"
+        "Received. Shreyas is currently writing the core AI routing graph. We will showcase the functional prototype during our next milestone demo!"
       ];
       const randomResponse = responses[Math.floor(Math.random() * responses.length)];
       setMessages(prev => [...prev, { sender: 'scoders', text: randomResponse, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
@@ -3283,7 +3282,7 @@ export function ServiceProjectSpaceDashboard({
                   required
                   value={feedName}
                   onChange={(e) => setFeedName(e.target.value)}
-                  placeholder="e.g. Suhas Gowda"
+                  placeholder="e.g. Rahul Sharma"
                   className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                 />
               </div>

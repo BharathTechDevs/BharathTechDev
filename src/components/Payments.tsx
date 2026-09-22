@@ -856,7 +856,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                         required
                         value={clientName}
                         onChange={(e) => setClientName(e.target.value)}
-                        placeholder="e.g. Suhas Gowda Developments"
+                        placeholder="e.g. Rahul Sharma Developments"
                         className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                       />
                     </div>
@@ -972,7 +972,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                           required
                           value={clientName}
                           onChange={(e) => setClientName(e.target.value)}
-                          placeholder="e.g. Suhas Gowda"
+                          placeholder="e.g. Rahul Sharma"
                           className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                         />
                       </div>
@@ -1429,7 +1429,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                             required
                             value={cardHolder}
                             onChange={(e) => setCardHolder(e.target.value)}
-                            placeholder="e.g. Suhas Gowda"
+                            placeholder="e.g. Rahul Sharma"
                             className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                           />
                         </div>

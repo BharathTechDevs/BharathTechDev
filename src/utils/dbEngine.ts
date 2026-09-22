@@ -172,39 +172,6 @@ const SEED_TEAM: TeamMemberRecord[] = [
     joiningDate: '01/01/2026',
     assignedProjects: ['AgroSmart AI Cloud Core', 'Real-time WebSocket Engine'],
     currentProjectStatus: 'Active & Architecting'
-  },
-  {
-    id: 'T4',
-    name: 'Prathiksha R',
-    role: 'Head of UI/UX',
-    department: 'Design',
-    contact: 'prathiksha@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300&h=300',
-    joiningDate: '01/01/2026',
-    assignedProjects: ['S-CODERS Branding System', 'EdVantage LMS Mockups'],
-    currentProjectStatus: 'Delivering Prototypes'
-  },
-  {
-    id: 'T5',
-    name: 'Manoj Kumar',
-    role: 'Lead Full-Stack Developer',
-    department: 'Engineering',
-    contact: 'manoj@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300',
-    joiningDate: '02/10/2026',
-    assignedProjects: ['Durable Database Engine', 'Razorpay Payments API'],
-    currentProjectStatus: 'Refactoring Backend Systems'
-  },
-  {
-    id: 'T6',
-    name: 'Aishwarya Shenoy',
-    role: 'AI Automation & Workshop Lead',
-    department: 'AI & Automation',
-    contact: 'aishwarya@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=300&h=300',
-    joiningDate: '03/05/2026',
-    assignedProjects: ['Microsoft Reactor Series', 'WhatsApp Bot Pipelines'],
-    currentProjectStatus: 'Scheduling Tech Bootcamps'
   }
 ];
 
@@ -254,7 +221,7 @@ const SEED_ENQUIRIES: EnquiryItem[] = [
     email: 'ketan@ruralagritech.org',
     phone: '+91 98765 12345',
     subject: 'AI Agent for soil moisture and nutrient tracking',
-    message: 'Greetings S-CODERS! We are looking to develop a custom conversational agent that integrates with our soil sensors and alerts farmers in Marathi. Please let us know if your chief AI architect Suhas is available for a quick consult next week.',
+    message: 'Greetings S-CODERS! We are looking to develop a custom conversational agent that integrates with our soil sensors and alerts farmers in Marathi. Please let us know if your chief AI architect Shreyas is available for a quick consult next week.',
     timestamp: '2026-07-15T11:45:00Z',
     replyStatus: 'Pending',
     replyMessage: null,
@@ -266,10 +233,10 @@ const SEED_ENQUIRIES: EnquiryItem[] = [
     email: 'shruti@learnwell.co',
     phone: '+91 88990 01122',
     subject: 'Requesting Quotes for Next.js Website & Portfolio System',
-    message: 'We require a stunning, fast, and responsive React/Next.js educational portal for school kids. The UI needs to be beautiful and highly interactive. Prathiksha\'s portfolio looks excellent, so we want her to direct the UI/UX.',
+    message: 'We require a stunning, fast, and responsive React/Next.js educational portal for school kids. The UI needs to be beautiful and highly interactive. Bhuvan\'s portfolio looks excellent, so we want him to direct the UI/UX.',
     timestamp: '2026-07-17T16:20:00Z',
     replyStatus: 'Responded',
-    replyMessage: 'Hi Shruti, thank you for reaching out! Prathiksha and our team would love to design this child-friendly LMS platform. S-CODERS can certainly build and launch this Next.js app. I have sent an introductory meeting invite to your email.',
+    replyMessage: 'Hi Shruti, thank you for reaching out! Bhuvan and our engineering team would love to design this child-friendly LMS platform. S-CODERS can certainly build and launch this Next.js app. I have sent an introductory meeting invite to your email.',
     replyDate: '2026-07-18T08:30:00Z'
   }
 ];
@@ -338,7 +305,7 @@ const SEED_APPLICATIONS: CandidateApplication[] = [
     agreedToCodeOfConduct: true,
     agreedToIpAssignment: true,
     declarationConfirmed: true,
-    adminNotes: 'Impressed by her live demo of the Gemini agent. Scheduled for Technical Round with Suhas Gowda.',
+    adminNotes: 'Impressed by her live demo of the Gemini agent. Scheduled for Technical Round with Shreyas M.',
     reviewedBy: 'Bhuvan M.'
   }
 ];
@@ -395,7 +362,7 @@ const SEED_CHATS: ChatConversation[] = [
     reference: 'AI Agent & LLM Orchestration',
     messages: [
       { id: 'm1', sender: 'client', content: 'Hi Team, did we start training the model on our custom crop dataset?', timestamp: '2026-07-11T10:00:00Z' },
-      { id: 'm2', sender: 'team', content: 'Hello! Yes, Manoj has configured the Firestore pipeline, and Suhas is refining the temperature parameters using Gemini 3.5 Flash. We are seeing 94% accuracy in crop diagnostic answers.', timestamp: '2026-07-11T10:15:00Z' },
+      { id: 'm2', sender: 'team', content: 'Hello! Yes, Bhuvan has configured the database pipeline, and Shreyas is refining the temperature parameters using Gemini 3.5 Flash. We are seeing 94% accuracy in crop diagnostic answers.', timestamp: '2026-07-11T10:15:00Z' },
       { id: 'm3', sender: 'client', content: 'That sounds spectacular! Looking forward to the milestone 1 review.', timestamp: '2026-07-11T11:00:00Z' }
     ],
     lastUpdated: '2026-07-11T11:00:00Z'

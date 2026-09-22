@@ -485,7 +485,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                       </p>
                       <div className="pt-2">
                         <a
-                          href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4"
+                          href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-emerald-400 text-black rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all"
@@ -500,7 +500,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                   <div className="space-y-2 pt-2">
                     <h4 className="font-display font-bold text-sm text-white">Need Assistance With a Booking?</h4>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      For any questions regarding our return and refund policy, email us with your order/claim ID at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong> or contact our customer support team directly via our <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Official WhatsApp Community</a>.
+                      For any questions regarding our return and refund policy, email us with your order/claim ID at <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong> or contact our customer support team directly via our <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Official WhatsApp Community</a>.
                     </p>
                   </div>
                 </div>
@@ -690,7 +690,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         </p>
                         <p>
                           <span className="text-gray-500 uppercase block">Customer Care Support (WhatsApp):</span>
-                          <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Join Customer Care Support WhatsApp Group</a>
+                          <a href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">Join Customer Care Support WhatsApp Group</a>
                         </p>
                         <p>
                           <span className="text-gray-500 uppercase block">Response Time:</span>
@@ -758,7 +758,7 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                         <span>X / Twitter (@SCODERSozws)</span>
                       </a>
                       <a 
-                        href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4" 
+                        href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 px-4 py-2 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-black border border-[#25D366]/30 rounded-xl text-xs font-mono font-bold transition-all duration-300"

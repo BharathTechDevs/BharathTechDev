@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { 
-  X, Send, Bot, RefreshCw, Sparkles, MessageCircle, ExternalLink
+  X, Send, Bot, RefreshCw, Sparkles, MessageCircle, ExternalLink, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -14,6 +14,76 @@ interface AIAssistantProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+interface TopicItem {
+  id: number;
+  title: string;
+  query: string;
+  desc: string;
+}
+
+const CORE_TOPICS: TopicItem[] = [
+  {
+    id: 1,
+    title: 'About S-CODERS Startup',
+    query: 'About S-CODERS startup',
+    desc: 'Bengaluru roots, enterprise mission, leadership, and proven track record.'
+  },
+  {
+    id: 2,
+    title: 'About Services & Pricing',
+    query: 'About services & pricing',
+    desc: 'AI Agents, Mobile Apps, SaaS Platforms, Custom Software & UI/UX solutions.'
+  },
+  {
+    id: 3,
+    title: 'About Workshops & Masterclasses',
+    query: 'About workshops & masterclasses',
+    desc: 'Hands-on developer cohorts at Microsoft Reactor, RVCE, and eChai Ventures.'
+  },
+  {
+    id: 4,
+    title: 'About Us & Our Story',
+    query: 'About us & our story',
+    desc: 'Our founding journey, engineering values, and flagship production deployments.'
+  },
+  {
+    id: 5,
+    title: 'The Crew & Hiring Opportunities',
+    query: 'The crew & hiring opportunities',
+    desc: 'Founders Shreyas M., Lokesh A., Bhuvan M., and open 12-month paid internships.'
+  },
+  {
+    id: 6,
+    title: 'Community & WhatsApp Groups',
+    query: 'Community & WhatsApp groups',
+    desc: 'Official WhatsApp groups, customer care channels, and student developer chapters.'
+  },
+  {
+    id: 7,
+    title: 'Rules & Refund Policy',
+    query: 'Rules & refund policy',
+    desc: 'Terms of service, privacy protections, instant digital delivery, and refund guidelines.'
+  },
+  {
+    id: 8,
+    title: 'Networking & Achievements',
+    query: 'Networking & achievements',
+    desc: 'GOAT Founder Club, NASSCOM Startups, and TiE Bangalore ecosystem affiliations.'
+  },
+  {
+    id: 9,
+    title: 'Upcoming Events & Hackathons',
+    query: 'Upcoming events & hackathons',
+    desc: '48-Hour SaaS Hackathons, demo sprints, and statewide technical conferences.'
+  },
+  {
+    id: 10,
+    title: 'Get in Touch & Contact Details',
+    query: 'Get in touch & contact details',
+    desc: 'Direct WhatsApp lines, official email (scoders82@gmail.com), and 24-hr response SLA.'
+  }
+];
 
 export default function AIAssistant({ isOpen, onClose }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
@@ -279,11 +349,6 @@ Founded in Bengaluru by passionate software craftsmen, **S-CODERS (Bharat Tech D
 * **Bhuvan M. — Tech Lead:**
   Full-Stack Web Developer, UI/UX Architect, and Digital Product Builder. Solely designed and developed the entire S-CODERS digital platform, web motion architecture, and responsive frontend systems. *(Direct WhatsApp/Call: +91 6363905989)*.
 
-#### Core Engineering & Design Crew:
-* **Prathiksha R — Head of UI/UX:** Design systems lead specializing in pixel-perfect Figma wireframes, accessible component libraries, and Framer Motion micro-interactions.
-* **Manoj Kumar — Lead Full-Stack Developer:** Architect of scalable backend systems, PostgreSQL schemas, Firebase integration, and high-performance React Native mobile apps.
-* **Aishwarya Shenoy — AI Automation & Workshop Lead:** n8n workflow specialist and developer educator bridging client operational needs with automated AI agents.
-
 #### Careers & Hiring Program:
 We are actively hiring passionate developers and designers across **6 Core Sectors**:
 1. **AI & Automation Engineering** (AI Agent & LLM Workflow Engineer, Prompt Engineer, n8n Specialist)
@@ -314,7 +379,7 @@ Join our active community of 1,200+ developers, startup founders, and software e
 
 #### Official WhatsApp Groups:
 * **Service WhatsApp Community:** [Join Service Group](https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK) — Connect with clients, tech collaborators, and founders.
-* **Customer Care Support WhatsApp:** [Join Support Group](https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4) — Immediate support, event ticket verifications, and technical queries.
+* **Customer Care Support WhatsApp:** [Join Support Group](https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4) — Immediate support, event ticket verifications, and technical queries.
 
 #### Verified Social Media Channels:
 * **YouTube:** [@S-CODERS](https://www.youtube.com/@S-CODERS) — Video tutorials, live coding streams, and event highlights.
@@ -455,7 +520,7 @@ We would love to discuss your next breakthrough project or workshop collaboratio
 
 #### Official Communities & Support:
 * **Service WhatsApp Group:** [Join Service Community](https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK)
-* **Customer Care Support:** [Join Customer Care WhatsApp](https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4)
+* **Customer Care Support:** [Join Customer Care WhatsApp](https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4)
 
 #### Response Commitment:
 All project inquiries submitted through our website contact form receive a dedicated response from our engineering leadership within **24 business hours**.`;
@@ -513,7 +578,7 @@ Please let me know which of these topics you would like to explore in detail, or
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-            className="relative w-full max-w-2xl h-[88vh] max-h-[720px] bg-brand-card/98 border border-white/10 rounded-2xl shadow-2xl flex flex-col z-10 overflow-hidden backdrop-blur-xl"
+            className="relative w-full max-w-3xl h-[92vh] max-h-[760px] bg-brand-card/98 border border-white/10 rounded-2xl shadow-2xl flex flex-col z-10 overflow-hidden backdrop-blur-xl"
           >
             {/* Header branding */}
             <div className="p-4 bg-brand-dark/90 border-b border-white/5 flex items-center justify-between">
@@ -530,21 +595,50 @@ Please let me know which of these topics you would like to explore in detail, or
                 </div>
               </div>
               
-              <button
-                onClick={onClose}
-                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
-                title="Close Chat"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setMessages([
+                    {
+                      role: 'model',
+                      content: `### Welcome to S-CODERS • Bharat Tech Developers! ⚡
+
+I am your **AI Technology & Strategic Consultant**. I can assist you with comprehensive details on:
+
+* **About S-CODERS Startup**: Our Bengaluru roots, enterprise mission, and proven track record.
+* **Services & Pricing**: AI Agents, Mobile Apps, SaaS Platforms, Custom Software & UI/UX.
+* **Hands-on Workshops**: Masterclasses at Microsoft Reactor, RVCE, and eChai Ventures.
+* **About Us & Story**: Our journey, architectural values, and flagship production deployments.
+* **The Crew, Careers & Hiring**: Meet our founders & crew, or explore open 12-month internships.
+* **Community**: Official WhatsApp groups, student chapters, and verified channels.
+* **Rules & Policy**: Terms, privacy, instant digital delivery, and refund guidelines.
+* **Networking & Achievements**: GOAT Founder Club, NASSCOM Startups, and TiE Bangalore.
+* **Events**: 48-Hour SaaS Hackathons, demo sprints, and technical conferences.
+* **Get in Touch**: Direct WhatsApp, phone lines, email, and 24-hour callback SLAs.
+
+How can I help you today? Feel free to ask any question or tap a topic below!`
+                    }
+                  ])}
+                  className="p-2 text-gray-400 hover:text-brand-teal rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Reset Conversation & View Topics"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Close Chat"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Chat workspace area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               {messages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`flex gap-3 max-w-[92%] ${
+                  className={`flex gap-3 max-w-[95%] ${
                     msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'
                   }`}
                 >
@@ -556,15 +650,53 @@ Please let me know which of these topics you would like to explore in detail, or
                   )}
                   
                   <div
-                    className={`p-4 rounded-2xl text-xs sm:text-sm font-sans leading-relaxed ${
+                    className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm font-sans leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-brand-teal text-brand-dark rounded-br-none font-medium whitespace-pre-line shadow-md'
                         : 'bg-white/5 text-gray-200 border border-white/10 rounded-bl-none shadow-sm'
                     }`}
                   >
                     {msg.role === 'model' ? (
-                      <div className="markdown-body space-y-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_strong]:text-brand-teal [&_strong]:font-semibold [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-white [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-white [&_h4]:text-xs [&_h4]:font-bold [&_h4]:text-brand-teal [&_h4]:uppercase [&_h4]:tracking-wider [&_a]:text-brand-teal [&_a]:underline hover:[&_a]:text-white [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:bg-white/10 [&_code]:rounded [&_code]:text-brand-teal [&_code]:font-mono">
-                        <Markdown>{msg.content}</Markdown>
+                      <div className="space-y-4">
+                        <div className="markdown-body space-y-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_strong]:text-brand-teal [&_strong]:font-semibold [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-white [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-white [&_h4]:text-xs [&_h4]:font-bold [&_h4]:text-brand-teal [&_h4]:uppercase [&_h4]:tracking-wider [&_a]:text-brand-teal [&_a]:underline hover:[&_a]:text-white [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:bg-white/10 [&_code]:rounded [&_code]:text-brand-teal [&_code]:font-mono">
+                          <Markdown>{msg.content}</Markdown>
+                        </div>
+
+                        {/* Interactive Topic Cards directly inside welcome message for unobstructed view */}
+                        {index === 0 && (
+                          <div className="pt-3 border-t border-white/10">
+                            <div className="text-[10px] font-mono text-brand-teal uppercase tracking-widest mb-3 flex items-center gap-1.5 font-bold">
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Select Any Topic To Consult Immediately:</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {CORE_TOPICS.map((topic) => (
+                                <button
+                                  key={topic.id}
+                                  onClick={() => handleSendMessage(topic.query)}
+                                  className="text-left p-3 rounded-xl bg-black/40 hover:bg-brand-teal/15 border border-white/10 hover:border-brand-teal/40 transition-all group flex flex-col justify-between cursor-pointer"
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-teal/15 text-brand-teal border border-brand-teal/30">
+                                        #{topic.id}
+                                      </span>
+                                      <span className="text-xs font-mono font-semibold text-white group-hover:text-brand-teal transition-colors">
+                                        {topic.title}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-gray-500 group-hover:text-brand-teal group-hover:translate-x-0.5 transition-all">
+                                      →
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-gray-400 font-sans leading-relaxed group-hover:text-gray-200 transition-colors pl-6">
+                                    {topic.desc}
+                                  </p>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       msg.content
@@ -593,29 +725,24 @@ Please let me know which of these topics you would like to explore in detail, or
               <div ref={messageEndRef} />
             </div>
 
-            {/* Suggested Prompts Grid */}
-            {messages.length === 1 && !isLoading && (
-              <div className="px-4 py-3 border-t border-white/5 bg-brand-dark/40 space-y-2">
-                <div className="text-[10px] font-mono text-gray-400 uppercase tracking-widest pl-1 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-brand-teal" />
-                  <span>Explore Key Topics:</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-32 overflow-y-auto pr-1">
-                  {suggestedQuestions.map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSendMessage(q)}
-                      className="text-left px-2.5 py-1.5 bg-white/5 border border-white/5 hover:border-brand-teal/30 text-[11px] text-gray-300 rounded-lg font-sans transition-all hover:bg-brand-teal/10 hover:text-white text-ellipsis overflow-hidden whitespace-nowrap cursor-pointer"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Quick Topic Chips Strip (1-line horizontal scroll, never covers content) */}
+            <div className="px-3 py-2 bg-brand-dark/95 border-t border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest shrink-0 flex items-center gap-1 pl-1">
+                <Sparkles className="w-3 h-3 text-brand-teal" /> Topics:
+              </span>
+              {CORE_TOPICS.map((topic) => (
+                <button
+                  key={topic.id}
+                  onClick={() => handleSendMessage(topic.query)}
+                  className="shrink-0 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 text-[11px] font-mono text-gray-300 hover:text-white transition-all cursor-pointer whitespace-nowrap"
+                >
+                  #{topic.id} {topic.title}
+                </button>
+              ))}
+            </div>
 
             {/* Form input messaging controls */}
-            <div className="p-4 bg-brand-dark/90 border-t border-white/5">
+            <div className="p-4 bg-brand-dark/90 border-t border-white/5 shrink-0">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

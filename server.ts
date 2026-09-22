@@ -950,7 +950,8 @@ function getOnboardingCompleteEmailHtml({
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const isProduction = process.env.NODE_ENV === "production" || (typeof __filename !== "undefined" && __filename.includes("dist"));
+  const PORT = Number(isProduction ? (process.env.PORT || 8080) : 3000);
 
   app.use(express.json());
 
@@ -1969,11 +1970,6 @@ Executive Leadership:
 - Lokesh A. — Co-Founder: Vibe Coder, AI-Assisted Developer, and Rapid Prototyping Specialist. Focuses on turning ideas into functional software, smart automations, and practical digital product delivery.
 - Bhuvan M. — Tech Lead: Full-Stack Web Developer, UI/UX Architect, and Digital Product Builder. Solely designed and engineered the entire S-CODERS digital platform, frontend motion design, and responsive web systems. (WhatsApp/Call: +91 6363905989).
 
-Core Engineering & Design Crew:
-- Prathiksha R — Head of UI/UX: Design systems lead specializing in pixel-perfect Figma wireframes, Framer Motion micro-interactions, and visual storytelling.
-- Manoj Kumar — Lead Full-Stack Developer: Architect of backend pipelines, PostgreSQL schemas, Firebase integration, and high-performance React Native mobile apps.
-- Aishwarya Shenoy — AI Automation & Workshop Lead: n8n automation maven, developer educator, and community presenter bridging technical systems with partner needs.
-
 Careers & Hiring Program:
 - S-CODERS has an active online application portal directly on the website under the Careers section.
 - Six Active Sectors:
@@ -2057,7 +2053,7 @@ S-CODERS is actively plugged into premier startup networks:
   * Bhuvan M. (Tech Lead): +91 6363905989 (Direct WhatsApp: https://wa.me/916363905989)
   * Shreyas M. (Founder & CEO): +91 8310463417 (Direct WhatsApp: https://wa.me/918310463417)
 - Official WhatsApp Community: https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK
-- Customer Care Support: https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4
+- Customer Care Support: https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4
 - Physical Location: Bengaluru, Karnataka, India
 - Response Commitment: All website contact form submissions and inquiries receive a personalized response within 24 business hours.
 
@@ -2152,8 +2148,22 @@ RESPONSE GUIDELINES:
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT} [production=${isProduction}]`);
   });
+
+  // In production, also bind port 3000 if different from PORT, catching any error gracefully
+  if (isProduction && PORT !== 3000) {
+    try {
+      const secondaryServer = app.listen(3000, "0.0.0.0", () => {
+        console.log(`Secondary listener active on port 3000`);
+      });
+      secondaryServer.on("error", (e: any) => {
+        console.log(`Secondary port 3000 bypassed: ${e.message}`);
+      });
+    } catch {
+      // ignore
+    }
+  }
 }
 
 startServer().catch((err) => {

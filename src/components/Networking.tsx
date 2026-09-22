@@ -57,7 +57,7 @@ export default function Networking() {
     },
     {
       id: 'preset-3',
-      name: 'Suhas Keynote Presentation',
+      name: 'Shreyas Keynote Presentation',
       url: 'https://images.unsplash.com/photo-1492538368577-8b5fd600d805?auto=format&fit=crop&q=80&w=800&h=500',
     },
     {
@@ -371,7 +371,7 @@ export default function Networking() {
                           rows={3}
                           value={newDescription}
                           onChange={(e) => setNewDescription(e.target.value)}
-                          placeholder="Provide context. What did Suhas and the crew demonstrate? Who did we collaborate with to drive client trust?"
+                          placeholder="Provide context. What did Shreyas and the crew demonstrate? Who did we collaborate with to drive client trust?"
                           className="w-full bg-brand-dark/50 border border-white/10 rounded-xl p-4 text-xs text-white focus:outline-none focus:border-brand-teal transition-colors resize-none leading-relaxed"
                         />
                       </div>
@@ -881,7 +881,7 @@ export default function Networking() {
                 </div>
                 <h4 className="font-display font-bold text-white text-lg">Official Microsoft Reactor Venue Host</h4>
                 <p className="text-gray-400 text-xs leading-relaxed font-sans font-light">
-                  Formally authorized developer coordinates enabling Suhas Gowda to coordinate large-scale developer sprints, code reviews, and production-tier AI-pipeline hackathons in Bengaluru physical hubs.
+                  Formally authorized developer coordinates enabling Shreyas M. to coordinate large-scale developer sprints, code reviews, and production-tier AI-pipeline hackathons in Bengaluru physical hubs.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">

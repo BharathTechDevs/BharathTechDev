@@ -2465,7 +2465,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                             required
                             value={invoiceClient}
                             onChange={(e) => setInvoiceClient(e.target.value)}
-                            placeholder="Suhas Agro Farms"
+                            placeholder="AgroSmart Farms"
                             className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-colors"
                           />
                         </div>

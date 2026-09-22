@@ -7,6 +7,7 @@ export interface TeamMember {
   expertise: string[];
   linkedin: string;
   github: string;
+  email?: string;
   contribution: string;
 }
 

@@ -1256,7 +1256,7 @@ export default function Events() {
                             required
                             value={regName}
                             onChange={e => setRegName(e.target.value)}
-                            placeholder="e.g. Suhas Gowda"
+                            placeholder="e.g. Rahul Sharma"
                             className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-xs font-mono focus:border-brand-teal focus:outline-none"
                           />
                         </div>
@@ -2270,7 +2270,7 @@ export default function Events() {
                     required
                     value={fbName}
                     onChange={e => setFbName(e.target.value)}
-                    placeholder="e.g. Suhas Gowda"
+                    placeholder="e.g. Rahul Sharma"
                     className="w-full p-3 bg-black/50 border border-white/10 rounded-xl text-white focus:border-amber-400 focus:outline-none"
                   />
                 </div>
