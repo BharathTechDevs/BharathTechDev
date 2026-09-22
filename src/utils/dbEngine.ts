@@ -146,7 +146,7 @@ const SEED_TEAM: TeamMemberRecord[] = [
     role: 'Founder & CEO — S-CODERS',
     department: 'Management',
     contact: 'shreyas@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300',
+    photoUrl: '/founder.jpg',
     joiningDate: '01/01/2026',
     assignedProjects: ['S-CODERS Core AI Platform', 'Bharat Tech Developers Systems'],
     currentProjectStatus: 'Directing & Expanding'
@@ -157,7 +157,7 @@ const SEED_TEAM: TeamMemberRecord[] = [
     role: 'Co-Founder — S-CODERS',
     department: 'Management',
     contact: 'lokesh@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300&h=300',
+    photoUrl: '/cofounder.jpg',
     joiningDate: '01/01/2026',
     assignedProjects: ['Vibe Coder AI Workflows', 'Rapid Prototyping Systems'],
     currentProjectStatus: 'Building Real-World Products'

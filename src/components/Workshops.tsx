@@ -1249,7 +1249,7 @@ export default function TenantDashboard() {
                           <div className="flex items-center gap-4">
                             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
                               <img 
-                                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200" 
+                                src="/founder.jpg" 
                                 alt="Shreyas.M" 
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 referrerPolicy="no-referrer"
