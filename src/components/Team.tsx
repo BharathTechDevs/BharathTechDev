@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Linkedin, Github, Mail, Users2, ExternalLink, Check, Copy, HeartHandshake,
   Sparkles, CheckCircle2
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getLeaderPhoto } from '../utils/leaderPhotos';
 
 interface LeaderInfo {
   id: 'shreyas' | 'lokesh' | 'bhuvan';
@@ -66,7 +67,7 @@ const CREW_MEMBERS: LeaderInfo[] = [
     badgeColor: 'bg-cyan-400 text-brand-dark',
     accentBorder: 'border-cyan-400/30 hover:border-cyan-400/60',
     accentGlow: 'hover:shadow-cyan-400/10',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600&h=600',
+    photoUrl: '/techlead.jpg',
     bio: 'Full-Stack Web Developer & UI/UX Architect. Solely designed and developed the entire S-CODERS web platform, user interfaces, and interactive systems.',
     expertise: ['Full-Stack Web Dev', 'UI/UX Architecture', 'React / Next.js', 'Digital Platforms'],
     githubUrl: 'https://github.com/Bhuvanm28',
@@ -80,6 +81,28 @@ const CREW_MEMBERS: LeaderInfo[] = [
 export default function Team() {
   const [selectedLeader, setSelectedLeader] = useState<'all' | 'shreyas' | 'lokesh' | 'bhuvan'>('all');
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Record<string, string>>({
+    shreyas: getLeaderPhoto('shreyas'),
+    lokesh: getLeaderPhoto('lokesh'),
+    bhuvan: getLeaderPhoto('bhuvan')
+  });
+
+  useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id: 'shreyas' | 'lokesh' | 'bhuvan'; photoUrl: string }>;
+      if (customEvent.detail?.id) {
+        setPhotos(prev => ({ ...prev, [customEvent.detail.id]: customEvent.detail.photoUrl }));
+      } else {
+        setPhotos({
+          shreyas: getLeaderPhoto('shreyas'),
+          lokesh: getLeaderPhoto('lokesh'),
+          bhuvan: getLeaderPhoto('bhuvan')
+        });
+      }
+    };
+    window.addEventListener('scoders_leader_photo_updated', handleUpdate);
+    return () => window.removeEventListener('scoders_leader_photo_updated', handleUpdate);
+  }, []);
 
   const handleCopyEmail = (email: string) => {
     navigator.clipboard.writeText(email);
@@ -179,14 +202,16 @@ export default function Team() {
               <div>
                 {/* Photo & Role Badge */}
                 <div className="relative mb-6">
-                  <div className="w-full aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+                  <div className="w-full aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-lg relative bg-black/40">
                     <img
-                      src={member.photoUrl}
+                      src={photos[member.id] || member.photoUrl}
                       alt={member.name}
                       className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
                   </div>
+
+                  {/* Role Badge */}
                   <div className={`absolute bottom-3 right-3 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider shadow-md ${member.badgeColor}`}>
                     {member.badge}
                   </div>

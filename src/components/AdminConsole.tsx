@@ -4,7 +4,8 @@ import {
   ClipboardCheck, Mail, Plus, Trash2, Edit2, Check, ArrowLeft, 
   X, RefreshCw, Sparkles, DollarSign, IndianRupee, Eye, ListFilter, Camera,
   Star, Database, BarChart as BarChartIcon, TrendingUp, Users as UsersIcon, Upload,
-  Briefcase, FileText, CheckCircle2, AlertCircle, Building2, Landmark, User, Download, ExternalLink
+  Briefcase, FileText, CheckCircle2, AlertCircle, Building2, Landmark, User, Download, ExternalLink,
+  Users2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -26,6 +27,7 @@ import {
 } from '../utils/dbEngine';
 import RecruitmentAdmin from './RecruitmentAdmin';
 import ApplicationFormsAdmin from './ApplicationFormsAdmin';
+import CrewPhotosAdmin from './CrewPhotosAdmin';
 
 interface AdminConsoleProps {
   onClose: () => void;
@@ -40,7 +42,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [adminId, setAdminId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState<'recruitment' | 'application_forms' | 'services' | 'workshops' | 'invoices' | 'payments' | 'leads' | 'networking' | 'database'>('recruitment');
+  const [activeTab, setActiveTab] = useState<'recruitment' | 'application_forms' | 'crew_photos' | 'services' | 'workshops' | 'invoices' | 'payments' | 'leads' | 'networking' | 'database'>('recruitment');
   const [dbSubView, setDbSubView] = useState<'explorer' | 'dashboard'>('dashboard');
 
   // Relational Database Explorer States
@@ -764,6 +766,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                 { id: 'database', label: 'Relational Database Engine', icon: <Database className="w-4 h-4 text-brand-teal" /> },
                 { id: 'recruitment', label: 'Talent & Induction Agreements', icon: <Briefcase className="w-4 h-4 text-brand-teal" /> },
                 { id: 'application_forms', label: 'My Application Forms', icon: <FileText className="w-4 h-4 text-brand-teal" /> },
+                { id: 'crew_photos', label: 'Crew & Leadership Photos', icon: <Users2 className="w-4 h-4 text-brand-teal" /> },
                 { id: 'services', label: 'Services Catalog', icon: <Cpu className="w-4 h-4" /> },
                 { id: 'workshops', label: 'Workshops/Events', icon: <Calendar className="w-4 h-4" /> },
                 { id: 'networking', label: 'Networking & Photos', icon: <Camera className="w-4 h-4" /> },
@@ -1655,7 +1658,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                                       department: (newDbFields.department as any) || 'Engineering',
                                       contact: '+91 99999 00000',
                                       currentProjectStatus: 'Available',
-                                      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                                      photoUrl: '/techlead.jpg',
                                       joiningDate: new Date().toISOString().split('T')[0],
                                       assignedProjects: []
                                     };
@@ -1875,6 +1878,10 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
 
               {activeTab === 'application_forms' && (
                 <ApplicationFormsAdmin onRefreshParent={loadAllData} />
+              )}
+
+              {activeTab === 'crew_photos' && (
+                <CrewPhotosAdmin />
               )}
 
               {activeTab === 'services' && (

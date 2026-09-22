@@ -36,7 +36,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
     id: '3',
     name: 'Bhuvan M.',
     role: 'Tech Lead',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600&h=600',
+    photoUrl: '/techlead.jpg',
     bio: 'Full-Stack Web Developer, UI/UX Architect, and Digital Product Builder. Solely designed and developed the entire S-CODERS digital platform, web motion architecture, and responsive frontend systems.',
     expertise: ['Full-Stack Web Development', 'React / Next.js', 'UI/UX Architecture', 'Motion Systems', 'Digital Products'],
     linkedin: 'https://www.linkedin.com/in/bhuvan-m-8ba340316?utm_source=share_via&utm_content=profile&utm_medium=android_app',

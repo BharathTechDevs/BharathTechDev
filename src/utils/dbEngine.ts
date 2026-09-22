@@ -1,4 +1,5 @@
 import { AppUser, Service, WorkshopEvent, CandidateApplication } from '../types';
+import { getLeaderPhoto } from './leaderPhotos';
 
 // ==========================================
 // 1. DATABASE SCHEMA TYPES
@@ -168,7 +169,7 @@ const SEED_TEAM: TeamMemberRecord[] = [
     role: 'Tech Lead • Backend & AI',
     department: 'AI & Automation',
     contact: 'bhuvan@scoders.com',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300',
+    photoUrl: '/techlead.jpg',
     joiningDate: '01/01/2026',
     assignedProjects: ['AgroSmart AI Cloud Core', 'Real-time WebSocket Engine'],
     currentProjectStatus: 'Active & Architecting'
@@ -620,7 +621,13 @@ export class DatabaseEngine {
 
   // --- Collection 8: Team Members ---
   public static getTeamMembers(): TeamMemberRecord[] {
-    return this.getStored('db_team_members', SEED_TEAM);
+    const list = this.getStored('db_team_members', SEED_TEAM);
+    return list.map(member => {
+      if (member.id === 'T1') return { ...member, photoUrl: getLeaderPhoto('shreyas') };
+      if (member.id === 'T2') return { ...member, photoUrl: getLeaderPhoto('lokesh') };
+      if (member.id === 'T3') return { ...member, photoUrl: getLeaderPhoto('bhuvan') };
+      return member;
+    });
   }
 
   public static saveTeamMembers(data: TeamMemberRecord[]): void {

@@ -16,6 +16,7 @@ import { ServiceEnquiry, Service, AppUser } from '../types';
 import { DatabaseEngine, ServiceRegistration, EnquiryItem, PaymentTransaction, ChatConversation, FileRecord } from '../utils/dbEngine';
 import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp, generateUpiUrl, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
+import { getLeaderPhoto } from '../utils/leaderPhotos';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -3031,7 +3032,7 @@ export function ServiceProjectSpaceDashboard({
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
                   <img 
-                    src="/founder.jpg" 
+                    src={getLeaderPhoto('shreyas')} 
                     alt="Shreyas.M" 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
@@ -3104,7 +3105,7 @@ export function ServiceProjectSpaceDashboard({
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-brand-teal/60 shrink-0 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
                   <img 
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300" 
+                    src={getLeaderPhoto('bhuvan')} 
                     alt="Bhuvan M" 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
