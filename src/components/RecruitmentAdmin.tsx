@@ -3,10 +3,23 @@ import {
   Briefcase, Search, RefreshCw, CheckCircle2, 
   Clock, AlertCircle, Trash2, Building2, User, Landmark, 
   FileText, ShieldCheck, Download, Sparkles,
-  Mail, Key, Lock, Check, Copy, ExternalLink, Calendar, Video, ThumbsUp, ThumbsDown, XCircle, Send
+  Mail, Key, Lock, Check, Copy, ExternalLink, Calendar, Video, ThumbsUp, ThumbsDown, XCircle, Send,
+  Users, MessageSquare, Plus, Edit2, Play, Hash, Globe
 } from 'lucide-react';
-import { CandidateApplication } from '../types';
+import { CandidateApplication, DepartmentConfig, DepartmentMeeting } from '../types';
 import { DatabaseEngine } from '../utils/dbEngine';
+import { 
+  getStoredDepartmentConfigs, 
+  saveStoredDepartmentConfigs, 
+  getStoredDepartmentMeetings, 
+  saveStoredDepartmentMeetings, 
+  getStoredMainWhatsAppCommunity, 
+  saveStoredMainWhatsAppCommunity,
+  generateDepartmentReferenceId,
+  getDepartmentPrefix
+} from '../utils/departmentData';
+import DepartmentVerificationsAdmin from './admin/DepartmentVerificationsAdmin';
+import DepartmentMeetingsAdmin from './admin/DepartmentMeetingsAdmin';
 
 interface RecruitmentAdminProps {
   applications: CandidateApplication[];
@@ -43,6 +56,35 @@ export default function RecruitmentAdmin({
   const [auditNote, setAuditNote] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateFeedback, setUpdateFeedback] = useState<string | null>(null);
+
+  // Section 4 Admin Subtabs
+  const [adminTab, setAdminTab] = useState<'candidates' | 'department_verifications' | 'meetings' | 'dept_configs'>('candidates');
+  const [deptFilterStatus, setDeptFilterStatus] = useState<string>('ALL');
+
+  // Department Verification Modal States
+  const [showVerifyDeptModal, setShowVerifyDeptModal] = useState(false);
+  const [candidateToVerify, setCandidateToVerify] = useState<CandidateApplication | null>(null);
+  const [verifyDeptRefIdInput, setVerifyDeptRefIdInput] = useState('');
+  const [verifyDeptSelectedName, setVerifyDeptSelectedName] = useState('');
+  const [showDeptRejectModal, setShowDeptRejectModal] = useState(false);
+  const [deptRejectionReason, setDeptRejectionReason] = useState('Department requirements and qualifications not met.');
+
+  // Meetings Management States
+  const [meetings, setMeetings] = useState<DepartmentMeeting[]>(() => getStoredDepartmentMeetings());
+  const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
+  const [meetingDept, setMeetingDept] = useState('Front-End Developer');
+  const [meetingTopic, setMeetingTopic] = useState('');
+  const [meetingInstructions, setMeetingInstructions] = useState('Interactive screen sharing, live code walkthrough, and team sprint review.');
+  const [meetingDate, setMeetingDate] = useState('2026-09-28');
+  const [meetingTime, setMeetingTime] = useState('04:30 PM IST');
+  const [meetingZoom, setMeetingZoom] = useState('https://zoom.us/j/scoders-work-hub');
+  const [meetingStatus, setMeetingStatus] = useState<'Upcoming' | 'Live Now' | 'Completed' | 'Cancelled'>('Upcoming');
+
+  // Department Configs Management States
+  const [departmentConfigs, setDepartmentConfigs] = useState<DepartmentConfig[]>(() => getStoredDepartmentConfigs());
+  const [mainWhatsappCommunity, setMainWhatsappCommunity] = useState<string>(() => getStoredMainWhatsAppCommunity());
+  const [configSaveNotice, setConfigSaveNotice] = useState<string | null>(null);
 
   // 7-Stage Workflow Modal States
   const [showShortlistModal, setShowShortlistModal] = useState(false);
@@ -227,9 +269,242 @@ export default function RecruitmentAdmin({
     window.print();
   };
 
+  // ==========================================
+  // SECTION 4 HANDLERS: DEPARTMENT VERIFICATION & MEETINGS
+  // ==========================================
+  const handleVerifyDepartment = async (
+    targetApp: CandidateApplication,
+    status: 'Approved' | 'Rejected',
+    customRefId?: string,
+    rejectionReason?: string
+  ) => {
+    setIsUpdating(true);
+    try {
+      const deptName = targetApp.departmentSelection || targetApp.sector || 'Front-End Developer';
+      const existingRefIds = applications.map(a => a.departmentReferenceId || '');
+      const assignedId = customRefId || targetApp.departmentReferenceId || generateDepartmentReferenceId(deptName, existingRefIds);
+
+      const res = await fetch('/api/careers/verify-department', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: targetApp.id,
+          status,
+          departmentReferenceId: assignedId,
+          rejectionReason,
+          approvedBy: 'Recruitment Admin Desk'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.candidate) {
+          DatabaseEngine.addCandidateApplication(data.candidate);
+        }
+      } else {
+        DatabaseEngine.updateCandidateDepartmentVerification(
+          targetApp.id,
+          status,
+          assignedId,
+          deptName,
+          rejectionReason,
+          'Recruitment Admin Desk'
+        );
+      }
+
+      setUpdateFeedback(
+        status === 'Approved'
+          ? `✓ Department approved! Reference ID [${assignedId}] generated & email notice dispatched.`
+          : `✓ Department request marked as declined.`
+      );
+      setTimeout(() => setUpdateFeedback(null), 4000);
+      onRefresh();
+    } catch (e: any) {
+      console.error('Verify dept error:', e);
+      DatabaseEngine.updateCandidateDepartmentVerification(
+        targetApp.id,
+        status,
+        undefined,
+        targetApp.departmentSelection,
+        rejectionReason,
+        'Recruitment Admin Desk'
+      );
+      onRefresh();
+    } finally {
+      setIsUpdating(false);
+      setShowVerifyDeptModal(false);
+      setShowDeptRejectModal(false);
+    }
+  };
+
+  const handleSaveMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!meetingTopic.trim() || !meetingZoom.trim()) {
+      alert('Meeting topic and Zoom meeting link are required.');
+      return;
+    }
+
+    const newMeeting: DepartmentMeeting = {
+      id: editingMeetingId || `meet-${Date.now().toString(36)}`,
+      department: meetingDept,
+      topic: meetingTopic.trim(),
+      instructions: meetingInstructions.trim(),
+      meetingDate,
+      meetingTime,
+      zoomLink: meetingZoom.trim(),
+      status: meetingStatus,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await fetch('/api/careers/meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMeeting)
+      });
+    } catch (e) {
+      console.warn('Remote meeting save error:', e);
+    }
+
+    const filtered = meetings.filter(m => m.id !== newMeeting.id);
+    const updated = [newMeeting, ...filtered];
+    setMeetings(updated);
+    saveStoredDepartmentMeetings(updated);
+
+    setShowAddMeetingModal(false);
+    setEditingMeetingId(null);
+    setMeetingTopic('');
+    setUpdateFeedback('✓ Online meeting scheduled & saved!');
+    setTimeout(() => setUpdateFeedback(null), 3000);
+  };
+
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (!confirm('Are you sure you want to delete this meeting?')) return;
+    try {
+      await fetch(`/api/careers/meetings/${encodeURIComponent(meetingId)}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('Remote meeting delete error:', e);
+    }
+    const updated = meetings.filter(m => m.id !== meetingId);
+    setMeetings(updated);
+    saveStoredDepartmentMeetings(updated);
+    setUpdateFeedback('Meeting deleted.');
+    setTimeout(() => setUpdateFeedback(null), 2500);
+  };
+
+  const handleSaveDepartmentConfigs = async () => {
+    saveStoredDepartmentConfigs(departmentConfigs);
+    saveStoredMainWhatsAppCommunity(mainWhatsappCommunity);
+    try {
+      await fetch('/api/careers/departments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departments: departmentConfigs })
+      });
+    } catch (e) {
+      console.warn('Remote dept configs save error:', e);
+    }
+    setConfigSaveNotice('✓ All Department WhatsApp subgroups, Zoom links & community links saved successfully!');
+    setTimeout(() => setConfigSaveNotice(null), 4000);
+  };
+
+  const pendingDeptVerificationsCount = applications.filter(a => a.departmentSelection && a.departmentStatus !== 'Approved').length;
+
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Metrics Banner */}
+      {/* Subtab Navigation Bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-brand-dark/70 border border-white/10 p-2.5 rounded-2xl backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setAdminTab('candidates')}
+          className={`px-4 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+            adminTab === 'candidates'
+              ? 'bg-brand-teal text-brand-dark shadow-md shadow-brand-teal/20'
+              : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Candidate Screening & 7-Stage Workflow</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            adminTab === 'candidates' ? 'bg-brand-dark/20 text-brand-dark font-bold' : 'bg-white/10 text-gray-300'
+          }`}>
+            {applications.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAdminTab('department_verifications')}
+          className={`px-4 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+            adminTab === 'department_verifications'
+              ? 'bg-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20'
+              : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Section 4: Department Verifications & Reference IDs</span>
+          {pendingDeptVerificationsCount > 0 ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-brand-dark font-bold animate-pulse">
+              {pendingDeptVerificationsCount} Pending
+            </span>
+          ) : (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+              adminTab === 'department_verifications' ? 'bg-brand-dark/20 text-brand-dark font-bold' : 'bg-white/10 text-gray-300'
+            }`}>
+              {applications.filter(a => a.departmentSelection).length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAdminTab('meetings')}
+          className={`px-4 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+            adminTab === 'meetings'
+              ? 'bg-cyan-500 text-brand-dark shadow-md shadow-cyan-500/20'
+              : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          <span>Department Online Meetings & Links</span>
+        </button>
+      </div>
+
+      {updateFeedback && (
+        <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-mono text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{updateFeedback}</span>
+        </div>
+      )}
+
+      {/* SUBTAB: DEPARTMENT VERIFICATIONS */}
+      {adminTab === 'department_verifications' && (
+        <DepartmentVerificationsAdmin
+          applications={applications}
+          onRefresh={onRefresh}
+          onUpdateFeedback={(msg) => {
+            setUpdateFeedback(msg);
+            setTimeout(() => setUpdateFeedback(null), 4000);
+          }}
+        />
+      )}
+
+      {/* SUBTAB: MEETINGS & WORK LINKS */}
+      {adminTab === 'meetings' && (
+        <DepartmentMeetingsAdmin
+          onUpdateFeedback={(msg) => {
+            setUpdateFeedback(msg);
+            setTimeout(() => setUpdateFeedback(null), 4000);
+          }}
+        />
+      )}
+
+      {/* SUBTAB: CANDIDATES & INDUCTION QUEUE */}
+      {adminTab === 'candidates' && (
+        <>
+          {/* Metrics Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 bg-brand-dark/50 border border-white/5 rounded-2xl flex items-center justify-between">
           <div>
@@ -1117,6 +1392,8 @@ export default function RecruitmentAdmin({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

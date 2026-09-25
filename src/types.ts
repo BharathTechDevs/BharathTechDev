@@ -262,11 +262,43 @@ export interface CandidateApplication {
   agreedToIpAssignment?: boolean;
   declarationConfirmed?: boolean;
 
+  // Stage 8 / Section 4: Department Selection, Admin Verification & WhatsApp/Zoom Access
+  departmentSelection?: string;
+  departmentStatus?: 'Not Requested' | 'Pending Verification' | 'Approved' | 'Rejected';
+  departmentReferenceId?: string; // e.g. "GHZ-2026-A17"
+  departmentRequestedAt?: string;
+  departmentApprovedAt?: string;
+  departmentApprovedBy?: string;
+  departmentRejectionReason?: string;
+
   // Admin audit
   adminNotes?: string;
   reviewedBy?: string;
   createdAt?: string;
   lastUpdated?: string;
 }
+
+export interface DepartmentConfig {
+  id: string; // e.g. 'frontend'
+  name: string; // e.g. 'Front-End Developer'
+  codePrefix: string; // e.g. 'GHZ'
+  referenceFormat: string; // e.g. 'GHZ-2026-XXX'
+  whatsappSubgroupLink: string;
+  zoomMeetingLink: string;
+  description: string;
+}
+
+export interface DepartmentMeeting {
+  id: string;
+  department: string; // e.g. 'Front-End Developer' or 'ALL'
+  topic: string;
+  instructions: string;
+  meetingDate: string;
+  meetingTime: string;
+  zoomLink: string;
+  status: 'Upcoming' | 'Live Now' | 'Completed' | 'Cancelled';
+  createdAt?: string;
+}
+
 
 

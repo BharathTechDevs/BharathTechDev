@@ -80,14 +80,18 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
 
   const filteredApplications = React.useMemo(() => {
     return combinedApplications.filter(app => {
+      const q = searchQuery.toLowerCase();
       const matchesSearch = 
         !searchQuery ||
-        app.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.roleTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.sector?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.keySkills?.toLowerCase().includes(searchQuery.toLowerCase());
+        app.fullName?.toLowerCase().includes(q) ||
+        app.id?.toLowerCase().includes(q) ||
+        app.email?.toLowerCase().includes(q) ||
+        app.roleTitle?.toLowerCase().includes(q) ||
+        app.sector?.toLowerCase().includes(q) ||
+        app.keySkills?.toLowerCase().includes(q) ||
+        app.agreementReferenceId?.toLowerCase().includes(q) ||
+        app.departmentReferenceId?.toLowerCase().includes(q) ||
+        app.departmentSelection?.toLowerCase().includes(q);
 
       const matchesSector = filterSector === 'ALL' || app.sector === filterSector;
       const matchesStatus = filterStatus === 'ALL' || app.status === filterStatus;
@@ -416,36 +420,87 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
                   </div>
                 </div>
 
-                {/* Reference ID and Passkey */}
-                <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/5 border border-white/10">
-                  <div className="space-y-1.5 text-xs font-mono flex-1 min-w-0">
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider">Application Reference ID:</div>
-                    <div className="flex items-center gap-2">
-                      <code className="text-brand-teal font-bold text-xs bg-black/60 px-2.5 py-1 rounded border border-brand-teal/30 truncate">
-                        {app.id}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyId(app.id)}
-                        className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all shrink-0"
-                        title="Copy ID"
-                      >
-                        {copiedId === app.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    {app.onboardingToken && (
-                      <div className="text-[10px] text-amber-300 pt-0.5">
-                        Security Token: <code className="text-white bg-black/40 px-1 rounded">{app.onboardingToken}</code>
+                {/* Reference IDs & Dossier QR */}
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-2 text-xs font-mono flex-1 min-w-0">
+                      {/* First Reference ID */}
+                      <div>
+                        <div className="text-[9px] text-gray-400 uppercase tracking-wider">1st Ref ID (Initial App):</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <code className="text-brand-teal font-bold text-xs bg-black/60 px-2 py-0.5 rounded border border-brand-teal/30 truncate">
+                            {app.id}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyId(app.id)}
+                            className="p-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all shrink-0 cursor-pointer"
+                            title="Copy 1st Ref ID"
+                          >
+                            {copiedId === app.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* QR Code Canvas */}
-                  <div className="bg-white p-2 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-md text-black">
-                    <UpiQrCanvas upiString={`${window.location.origin}/careers?appId=${app.id}`} size={64} />
-                    <span className="text-[7px] font-mono text-gray-700 font-bold mt-0.5 uppercase tracking-tighter">
-                      Scan Dossier
-                    </span>
+                      {/* Second Reference ID */}
+                      {app.agreementReferenceId && (
+                        <div>
+                          <div className="text-[9px] text-cyan-400 uppercase tracking-wider">2nd Ref ID (Joining App):</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <code className="text-cyan-300 font-bold text-xs bg-black/60 px-2 py-0.5 rounded border border-cyan-500/30 truncate">
+                              {app.agreementReferenceId}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyId(app.agreementReferenceId || '')}
+                              className="p-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all shrink-0 cursor-pointer"
+                              title="Copy 2nd Ref ID"
+                            >
+                              {copiedId === app.agreementReferenceId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Department Reference ID or Selection */}
+                      {app.departmentReferenceId ? (
+                        <div>
+                          <div className="text-[9px] text-emerald-400 uppercase tracking-wider">Dept Ref ID (Section 4):</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <code className="text-emerald-300 font-bold text-xs bg-black/60 px-2 py-0.5 rounded border border-emerald-500/30 truncate">
+                              {app.departmentReferenceId}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyId(app.departmentReferenceId || '')}
+                              className="p-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all shrink-0 cursor-pointer"
+                              title="Copy Dept Ref ID"
+                            >
+                              {copiedId === app.departmentReferenceId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                      ) : app.departmentSelection ? (
+                        <div className="text-[10px] text-amber-300 flex items-center gap-1.5 pt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <span>Dept Requested: <strong>{app.departmentSelection}</strong> (Pending Admin Verification)</span>
+                        </div>
+                      ) : null}
+
+                      {app.onboardingToken && (
+                        <div className="text-[10px] text-amber-300 pt-0.5">
+                          Security Token: <code className="text-white bg-black/40 px-1 rounded">{app.onboardingToken}</code>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* QR Code Canvas */}
+                    <div className="bg-white p-2 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-md text-black">
+                      <UpiQrCanvas upiString={`${window.location.origin}/careers?appId=${app.id}`} size={64} />
+                      <span className="text-[7px] font-mono text-gray-700 font-bold mt-0.5 uppercase tracking-tighter">
+                        Scan Dossier
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -504,6 +559,17 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
                   >
                     <Phone className="w-3 h-3 text-emerald-400" />
                     <span>Share WhatsApp</span>
+                  </a>
+
+                  <a
+                    href="https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-1.5 px-2 rounded-lg bg-[#25D366]/20 hover:bg-[#25D366] text-[#25D366] hover:text-black font-mono text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-[#25D366]/30 text-center"
+                    title="Open Official Department WhatsApp Group"
+                  >
+                    <Phone className="w-3 h-3" />
+                    <span>WhatsApp Group</span>
                   </a>
                 </div>
               </div>
@@ -578,6 +644,88 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
                     <option value="Hired">Hired</option>
                     <option value="Rejected">Rejected</option>
                   </select>
+                </div>
+              </div>
+
+              {/* SECTION: Official Reference Credentials */}
+              <div className="space-y-3">
+                <h4 className="font-mono text-xs uppercase tracking-widest text-brand-teal font-bold flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Official Reference IDs & Department Credentials</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-black/40 border border-brand-teal/20 rounded-2xl text-xs font-mono">
+                  {/* First Reference ID */}
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5 space-y-1">
+                    <span className="text-gray-400 uppercase text-[9px] block">1st Ref ID (Initial App):</span>
+                    <div className="flex items-center justify-between">
+                      <code className="text-brand-teal font-bold text-xs truncate">{viewingApp.id}</code>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyId(viewingApp.id)}
+                        className="text-gray-400 hover:text-white p-1"
+                        title="Copy 1st Ref ID"
+                      >
+                        {copiedId === viewingApp.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Second Reference ID */}
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5 space-y-1">
+                    <span className="text-cyan-400 uppercase text-[9px] block">2nd Ref ID (Joining App):</span>
+                    <div className="flex items-center justify-between">
+                      <code className="text-cyan-300 font-bold text-xs truncate">
+                        {viewingApp.agreementReferenceId || 'Pending Step 2'}
+                      </code>
+                      {viewingApp.agreementReferenceId && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyId(viewingApp.agreementReferenceId || '')}
+                          className="text-gray-400 hover:text-white p-1"
+                          title="Copy 2nd Ref ID"
+                        >
+                          {copiedId === viewingApp.agreementReferenceId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Department Reference ID */}
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/5 space-y-1">
+                    <span className="text-emerald-400 uppercase text-[9px] block">Dept Ref ID (Section 4):</span>
+                    <div className="flex items-center justify-between">
+                      <code className="text-emerald-300 font-bold text-xs truncate">
+                        {viewingApp.departmentReferenceId || 'Pending Admin Verification'}
+                      </code>
+                      {viewingApp.departmentReferenceId && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyId(viewingApp.departmentReferenceId || '')}
+                          className="text-gray-400 hover:text-white p-1"
+                          title="Copy Dept Ref ID"
+                        >
+                          {copiedId === viewingApp.departmentReferenceId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Department WhatsApp Access */}
+                <div className="p-3 bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl flex items-center justify-between">
+                  <div className="text-xs font-mono text-gray-300">
+                    <span>Department WhatsApp Channel: <strong className="text-white">{viewingApp.departmentSelection || viewingApp.sector || 'All-Hands'}</strong></span>
+                  </div>
+                  <a
+                    href="https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5 fill-black" />
+                    <span>Open WhatsApp Group</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
 

@@ -501,6 +501,8 @@ const SEED_WORKSHOPS_REG: WorkshopRegistration[] = [
 // ==========================================
 
 export class DatabaseEngine {
+  private static isSyncing = false;
+
   private static getStored<T>(key: string, defaultValue: T): T {
     try {
       const saved = localStorage.getItem(key);
@@ -522,6 +524,83 @@ export class DatabaseEngine {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('scoders_db_change'));
       window.dispatchEvent(new Event('scoders_data_change'));
+
+      // Asynchronously synchronize with server for multi-user/multi-device persistence
+      fetch('/api/app-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value })
+      }).catch(err => console.warn(`Server sync failed for [${key}]:`, err));
+    }
+  }
+
+  public static async syncWithServer(): Promise<void> {
+    if (typeof window === 'undefined' || this.isSyncing) return;
+    this.isSyncing = true;
+    try {
+      const res = await fetch('/api/app-state', {
+        cache: 'no-store',
+        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && data.state) {
+        let changed = false;
+        const serverState = data.state;
+        
+        // 1. Sync from server to local
+        for (const [key, val] of Object.entries(serverState)) {
+          const localValStr = localStorage.getItem(key);
+          const serverValStr = JSON.stringify(val);
+          if (localValStr !== serverValStr) {
+            localStorage.setItem(key, serverValStr);
+            changed = true;
+          }
+        }
+
+        // 2. If local has existing collections not yet on server, push them
+        const localPushEntries: Record<string, any> = {};
+        const trackedKeys = [
+          'db_service_registrations', 'db_workshop_registrations', 'db_payments',
+          'db_feedbacks', 'db_chats', 'db_files', 'db_enquiries', 'db_team_members',
+          'db_gallery_media', 'db_candidate_applications', 'scoders_dynamic_events',
+          'scoders_dynamic_services', 'scoders_dynamic_workshops', 'scoders_dynamic_invoices',
+          'scoders_dynamic_networking', 'scoders_saved_candidate_applications',
+          'scoders_registered_services', 'scoders_registered_workshops', 'scoders_enquiries',
+          'scoders_department_configs', 'scoders_department_meetings', 'scoders_main_whatsapp_community'
+        ];
+
+        for (const key of trackedKeys) {
+          if (serverState[key] === undefined) {
+            const localStr = localStorage.getItem(key);
+            if (localStr) {
+              try {
+                localPushEntries[key] = JSON.parse(localStr);
+              } catch {}
+            }
+          }
+        }
+
+        if (Object.keys(localPushEntries).length > 0) {
+          fetch('/api/app-state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries: localPushEntries })
+          }).catch(() => {});
+        }
+
+        if (changed) {
+          window.dispatchEvent(new Event('scoders_db_change'));
+          window.dispatchEvent(new Event('scoders_data_change'));
+          window.dispatchEvent(new Event('scoders_departments_change'));
+          window.dispatchEvent(new Event('scoders_meetings_change'));
+          window.dispatchEvent(new Event('scoders_saved_applications_change'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error syncing database with server:', e);
+    } finally {
+      this.isSyncing = false;
     }
   }
 
@@ -676,6 +755,35 @@ export class DatabaseEngine {
     return updated;
   }
 
+  public static updateCandidateDepartmentVerification(
+    id: string,
+    departmentStatus: 'Not Requested' | 'Pending Verification' | 'Approved' | 'Rejected',
+    departmentReferenceId?: string,
+    departmentSelection?: string,
+    rejectionReason?: string,
+    approvedBy?: string
+  ): CandidateApplication[] {
+    const apps = this.getCandidateApplications();
+    const now = new Date().toISOString();
+    const updated = apps.map(app => {
+      if (app.id === id) {
+        return {
+          ...app,
+          departmentStatus,
+          departmentReferenceId: departmentReferenceId || app.departmentReferenceId,
+          departmentSelection: departmentSelection || app.departmentSelection,
+          departmentApprovedAt: departmentStatus === 'Approved' ? now : app.departmentApprovedAt,
+          departmentApprovedBy: departmentStatus === 'Approved' ? (approvedBy || 'Admin Desk') : app.departmentApprovedBy,
+          departmentRejectionReason: departmentStatus === 'Rejected' ? rejectionReason : undefined,
+          lastUpdated: now
+        };
+      }
+      return app;
+    });
+    this.saveCandidateApplications(updated);
+    return updated;
+  }
+
   /**
    * Synchronize candidate applications with backend server database (/api/careers/applications).
    * Ensures that applications filled by candidates using the direct career link on any device are loaded.
@@ -796,3 +904,19 @@ export class DatabaseEngine {
     this.saveCandidateApplications(SEED_APPLICATIONS);
   }
 }
+
+// Auto-sync database with server on load, focus, and every 6 seconds for multi-device sync
+if (typeof window !== 'undefined') {
+  DatabaseEngine.syncWithServer();
+  DatabaseEngine.syncApplicationsFromServer();
+  window.addEventListener('focus', () => {
+    DatabaseEngine.syncWithServer();
+    DatabaseEngine.syncApplicationsFromServer();
+  });
+  // Background interval so changes made by another admin or friend appear automatically
+  setInterval(() => {
+    DatabaseEngine.syncWithServer();
+    DatabaseEngine.syncApplicationsFromServer();
+  }, 6000);
+}
+

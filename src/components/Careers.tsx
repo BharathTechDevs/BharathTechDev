@@ -6,7 +6,7 @@ import {
   Download, Printer, Check, Copy, ExternalLink, RefreshCw,
   Layout, Terminal, Code, Video, Megaphone, PenTool, TrendingUp, Film,
   Calendar, Rocket, Link2, Share2, Lock, Key, Mail, Clock, ChevronRight,
-  ShieldCheck, HelpCircle, X, Search, Trash2, Eye, QrCode
+  ShieldCheck, HelpCircle, X, Search, Trash2, Eye, QrCode, MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CandidateApplication } from '../types';
@@ -18,6 +18,8 @@ import {
   addSavedCandidateApplication, 
   removeSavedCandidateApplication 
 } from '../utils/dynamicData';
+import CareersSection3ReferenceIds from './careers/CareersSection3ReferenceIds';
+import CareersSection4DepartmentWork from './careers/CareersSection4DepartmentWork';
 
 interface CareersProps {
   onNavigate?: (view: string) => void;
@@ -381,7 +383,11 @@ const ALL_PREDEFINED_ROLES = Array.from(
 );
 
 export default function Careers({ onNavigate }: CareersProps) {
-  const [currentStep, setCurrentStep] = useState<1 | 'submitted_stage1' | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 'submitted_stage1' | 2 | 3 | 4>(1);
+  const [section3TargetFirstId, setSection3TargetFirstId] = useState<string>('');
+  const [section4TargetSecondId, setSection4TargetSecondId] = useState<string>('');
+  const [activeCandidateForSection4, setActiveCandidateForSection4] = useState<CandidateApplication | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [successApp, setSuccessApp] = useState<CandidateApplication | null>(null);
@@ -473,8 +479,18 @@ export default function Careers({ onNavigate }: CareersProps) {
       const appId = params.get('appId');
       const token = params.get('token');
       const key = params.get('key');
+      const secRef = params.get('secRef') || params.get('secondRef') || params.get('secondRefId');
 
-      if (stage === 'onboarding' && appId && token) {
+      if (stage === 'department' || stage === 'section4' || stage === 'whatsapp') {
+        if (secRef || key || appId) {
+          setSection4TargetSecondId(secRef || key || appId || '');
+        }
+        setCurrentStep(4);
+      } else if (stage === 'section3' || stage === 'reference') {
+        if (appId) setSection3TargetFirstId(appId);
+        if (secRef || key) setSection4TargetSecondId(secRef || key || '');
+        setCurrentStep(3);
+      } else if (stage === 'onboarding' && appId && token) {
         verifyOnboardingToken(appId, token);
       } else if (appId || key) {
         handleLookupApplication(appId || key || '');
@@ -720,9 +736,9 @@ export default function Careers({ onNavigate }: CareersProps) {
     }
   };
 
-  // Generate an initial unique Agreement Reference ID
+  // Generate an initial unique Agreement / Second Reference ID
   const [agreementRefId] = useState<string>(() => {
-    return `SCD-AGR-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    return `SCD-JOIN-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
   });
 
   const todayDate = new Date().toISOString().split('T')[0];
@@ -1193,6 +1209,9 @@ export default function Careers({ onNavigate }: CareersProps) {
       setSavedApplications(updatedSaved);
 
       setSuccessApp(updatedRecord);
+      setSection4TargetSecondId(updatedRecord.agreementReferenceId || updatedRecord.id);
+      setActiveCandidateForSection4(updatedRecord);
+      setSection3TargetFirstId(updatedRecord.id);
       setCurrentStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
@@ -1217,6 +1236,9 @@ export default function Careers({ onNavigate }: CareersProps) {
       const updatedSavedFallback = addSavedCandidateApplication(fallbackRecord);
       setSavedApplications(updatedSavedFallback);
       setSuccessApp(fallbackRecord);
+      setSection4TargetSecondId(fallbackRecord.agreementReferenceId || fallbackRecord.id);
+      setActiveCandidateForSection4(fallbackRecord);
+      setSection3TargetFirstId(fallbackRecord.id);
       setCurrentStep(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -1750,77 +1772,128 @@ export default function Careers({ onNavigate }: CareersProps) {
           </div>
         </div>
 
-        {/* Step Progress Tracker */}
-        <div className="mb-10 bg-brand-card/70 border border-white/10 rounded-2xl p-4 sm:p-6 backdrop-blur-md">
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 relative">
+        {/* Step Progress Tracker (4-Step Flow: Initial -> Joining -> Reference IDs -> WhatsApp & Online Work) */}
+        <div className="mb-10 bg-brand-card/70 border border-white/10 rounded-2xl p-3 sm:p-5 backdrop-blur-md">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 relative">
             {/* Step 1 Pill */}
-            <div className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-              currentStep === 1 
-                ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal' 
-                : currentStep === 'submitted_stage1' || currentStep > 1 
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
-                  : 'bg-white/5 text-gray-500'
-            }`}>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentStep(1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentStep === 1 
+                  ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal shadow-md shadow-brand-teal/10' 
+                  : currentStep === 'submitted_stage1' || (typeof currentStep === 'number' && currentStep > 1)
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
+                    : 'bg-white/5 text-gray-500 hover:bg-white/10'
+              }`}
+            >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
                 currentStep === 1 
-                  ? 'bg-brand-teal text-brand-dark' 
-                  : currentStep === 'submitted_stage1' || currentStep > 1 
+                  ? 'bg-brand-teal text-brand-dark font-bold' 
+                  : currentStep === 'submitted_stage1' || (typeof currentStep === 'number' && currentStep > 1)
                     ? 'bg-emerald-500 text-brand-dark' 
                     : 'bg-white/10 text-gray-400'
               }`}>
-                {currentStep === 'submitted_stage1' || currentStep > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '01'}
+                {currentStep === 'submitted_stage1' || (typeof currentStep === 'number' && currentStep > 1) ? <Check className="w-4 h-4 stroke-[3]" /> : '01'}
               </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-[11px] font-mono uppercase tracking-wider">Step 1</p>
-                <p className="text-xs font-semibold text-white truncate">Profile & Application</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Step 1</p>
+                <p className="text-xs font-semibold text-white truncate">Initial Application</p>
               </div>
-            </div>
+            </button>
 
             {/* Step 2 Pill */}
-            <div className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-              currentStep === 2 
-                ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal' 
-                : currentStep === 3 
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
-                  : currentStep === 'submitted_stage1'
-                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                    : 'bg-white/5 text-gray-500'
-            }`}>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentStep(2);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentStep === 2 
+                  ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal shadow-md shadow-brand-teal/10' 
+                  : (typeof currentStep === 'number' && currentStep > 2)
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
+                    : currentStep === 'submitted_stage1'
+                      ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                      : 'bg-white/5 text-gray-500 hover:bg-white/10'
+              }`}
+            >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
                 currentStep === 2 
-                  ? 'bg-brand-teal text-brand-dark' 
-                  : currentStep === 3 
+                  ? 'bg-brand-teal text-brand-dark font-bold' 
+                  : (typeof currentStep === 'number' && currentStep > 2)
                     ? 'bg-emerald-500 text-brand-dark' 
                     : currentStep === 'submitted_stage1'
                       ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                       : 'bg-white/10 text-gray-400'
               }`}>
-                {currentStep === 3 ? <Check className="w-4 h-4 stroke-[3]" /> : currentStep === 'submitted_stage1' ? <Lock className="w-3.5 h-3.5" /> : '02'}
+                {(typeof currentStep === 'number' && currentStep > 2) ? <Check className="w-4 h-4 stroke-[3]" /> : currentStep === 'submitted_stage1' ? <Lock className="w-3.5 h-3.5" /> : '02'}
               </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-[11px] font-mono uppercase tracking-wider">Step 2</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Step 2</p>
                 <p className="text-xs font-semibold text-white truncate">
-                  {currentStep === 'submitted_stage1' ? 'Legal & Banking (Locked)' : 'Legal & Induction Agreement'}
+                  {currentStep === 'submitted_stage1' ? 'Joining Form' : 'Joining Application'}
                 </p>
               </div>
-            </div>
+            </button>
 
             {/* Step 3 Pill */}
-            <div className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-              currentStep === 3 
-                ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400' 
-                : 'bg-white/5 text-gray-500'
-            }`}>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentStep(3);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentStep === 3 
+                  ? 'bg-brand-teal/15 border border-brand-teal/40 text-brand-teal shadow-md shadow-brand-teal/10' 
+                  : (typeof currentStep === 'number' && currentStep > 3)
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                    : 'bg-white/5 text-gray-500 hover:bg-white/10'
+              }`}
+            >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
-                currentStep === 3 ? 'bg-emerald-500 text-brand-dark' : 'bg-white/10 text-gray-400'
+                currentStep === 3 
+                  ? 'bg-brand-teal text-brand-dark font-bold' 
+                  : (typeof currentStep === 'number' && currentStep > 3)
+                    ? 'bg-emerald-500 text-brand-dark'
+                    : 'bg-white/10 text-gray-400'
               }`}>
-                03
+                {(typeof currentStep === 'number' && currentStep > 3) ? <Check className="w-4 h-4 stroke-[3]" /> : '03'}
               </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-[11px] font-mono uppercase tracking-wider">Step 3</p>
-                <p className="text-xs font-semibold text-white truncate">Dossier Confirmation</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Step 3</p>
+                <p className="text-xs font-semibold text-white truncate">Reference IDs Portal</p>
               </div>
-            </div>
+            </button>
+
+            {/* Step 4 Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentStep(4);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all text-left cursor-pointer ${
+                currentStep === 4 
+                  ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 shadow-md shadow-emerald-500/10' 
+                  : 'bg-white/5 text-gray-500 hover:bg-white/10'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
+                currentStep === 4 ? 'bg-emerald-500 text-brand-dark font-bold' : 'bg-white/10 text-gray-400'
+              }`}>
+                04
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Step 4</p>
+                <p className="text-xs font-semibold text-white truncate">WhatsApp & Online Work</p>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -2664,7 +2737,18 @@ export default function Careers({ onNavigate }: CareersProps) {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                <a
+                  href="https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-[#25D366]/20"
+                >
+                  <MessageSquare className="w-4 h-4 fill-black" />
+                  <span>Join Department WhatsApp Group</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -3675,7 +3759,32 @@ export default function Careers({ onNavigate }: CareersProps) {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
+                <a
+                  href="https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#25D366]/20 transition-all cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4 fill-black" />
+                  <span>Join Department WhatsApp Group</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSection4TargetSecondId(successApp.agreementReferenceId || successApp.id);
+                    setActiveCandidateForSection4(successApp);
+                    setCurrentStep(4);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-brand-teal text-brand-dark font-mono font-bold text-xs uppercase tracking-wider hover:brightness-110 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+                >
+                  <span>👉 Proceed to Section 4: WhatsApp & Online Work</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => window.print()}
@@ -3694,10 +3803,9 @@ export default function Careers({ onNavigate }: CareersProps) {
                       window.location.href = '/?view=home';
                     }
                   }}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-xs uppercase tracking-wider hover:bg-white transition-all cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/10 text-white font-mono font-bold text-xs uppercase tracking-wider hover:bg-white/20 transition-all cursor-pointer"
                 >
-                  <span>Return to Website Home</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Return Home</span>
                 </button>
               </div>
             </div>
@@ -3709,8 +3817,8 @@ export default function Careers({ onNavigate }: CareersProps) {
                   <FileText className="w-5 h-5 text-brand-teal" />
                   Executed Induction Dossier Summary
                 </h3>
-                <span className="text-xs font-mono text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
-                  Status: Under Technical Review
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
+                  Status: Section 2 Onboarding Finalized
                 </span>
               </div>
 
@@ -3758,13 +3866,16 @@ export default function Careers({ onNavigate }: CareersProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveCareersTab('saved_forms');
+                    setSection4TargetSecondId(successApp.agreementReferenceId || successApp.id);
+                    setActiveCandidateForSection4(successApp);
+                    setCurrentStep(4);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-xs hover:bg-white transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 text-brand-dark font-mono font-bold text-xs hover:bg-emerald-400 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
                 >
-                  <FileText className="w-4 h-4" />
-                  <span>View in My Application Forms ({savedApplications.length})</span>
+                  <Users className="w-4 h-4" />
+                  <span>Open Section 4: WhatsApp & Online Work</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -3791,6 +3902,60 @@ export default function Careers({ onNavigate }: CareersProps) {
                 </div>
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* SECTION 3: APPLICATION & DEPARTMENT REFERENCE IDS PORTAL */}
+        {currentStep === 3 && (
+          <motion.div
+            key="section3"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="mt-8"
+          >
+            <CareersSection3ReferenceIds
+              initialFirstRefId={section3TargetFirstId || successApp?.id || ''}
+              initialSecondRefId={section4TargetSecondId || successApp?.agreementReferenceId || ''}
+              onProceedToSection4={(secRef, cand) => {
+                setSection4TargetSecondId(secRef);
+                if (cand) setActiveCandidateForSection4(cand);
+                setCurrentStep(4);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onProceedToSection2={(appId, token) => {
+                setAuthorizedAppId(appId);
+                if (token) setAuthorizedToken(token);
+                setOnboardingAuthorized(true);
+                setCurrentStep(2);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateTab={(step) => {
+                setCurrentStep(step);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          </motion.div>
+        )}
+
+        {/* SECTION 4: DEPARTMENT WHATSAPP GROUP & ONLINE WORK */}
+        {currentStep === 4 && (
+          <motion.div
+            key="section4"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+          >
+            <CareersSection4DepartmentWork
+              initialSecondRefId={section4TargetSecondId || successApp?.agreementReferenceId || ''}
+              candidateRecord={activeCandidateForSection4 || successApp}
+              onNavigateTab={(step) => {
+                setCurrentStep(step);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           </motion.div>
         )}
 

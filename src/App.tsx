@@ -24,6 +24,7 @@ import AuthPortal from './components/AuthPortal';
 import Policies from './components/Policies';
 import Careers from './components/Careers';
 import { DatabaseEngine } from './utils/dbEngine';
+import { initLeaderPhotosSync } from './utils/leaderPhotos';
 
 type AppView = 'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies' | 'careers';
 
@@ -191,8 +192,10 @@ export default function App() {
       document.title = 'Careers & Recruitment Portal | S-CODERS (Bharat Tech Developers)';
     }
 
-    // Sync candidate applications from backend server database
+    // Sync database state, applications, and leader photos from backend server
+    DatabaseEngine.syncWithServer().catch(() => {});
     DatabaseEngine.syncApplicationsFromServer().catch(() => {});
+    initLeaderPhotosSync().catch(() => {});
 
     return () => {
       window.removeEventListener('popstate', handleUrlChange);

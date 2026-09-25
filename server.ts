@@ -948,12 +948,93 @@ function getOnboardingCompleteEmailHtml({
   `;
 }
 
+// 6. Section 4 Department Verification & WhatsApp Group Access Email
+function getDepartmentApprovedEmailHtml({
+  candidateName,
+  departmentName,
+  departmentReferenceId,
+  mainWhatsappLink,
+  subgroupWhatsappLink,
+  zoomLink,
+}: {
+  candidateName: string;
+  departmentName: string;
+  departmentReferenceId: string;
+  mainWhatsappLink: string;
+  subgroupWhatsappLink: string;
+  zoomLink: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Department Verification Approved - S-CODERS</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden;">
+              <tr>
+                <td style="padding: 32px; background: #0F172A; text-align: center; border-bottom: 2px solid #22D3EE;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase;">Official Department Verification & Access Clearance</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px 32px;">
+                  <p style="font-size: 16px; color: #F8FAFC;">Dear <strong>${candidateName}</strong>,</p>
+                  <p style="font-size: 14px; color: #10B981; font-weight: 700; line-height: 1.6;">
+                    ✓ Your department application has been verified and approved by S-CODERS recruitment management!
+                  </p>
+                  <div style="background-color: #0B0F17; border: 1px solid #1E293B; border-radius: 12px; padding: 18px; margin: 18px 0;">
+                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #94A3B8;">
+                      Approved Department: <strong style="color: #FFFFFF;">${departmentName}</strong>
+                    </p>
+                    <p style="margin: 0; font-size: 13px; color: #94A3B8;">
+                      Department-Specific Reference ID: <strong style="color: #22D3EE; font-family: monospace; font-size: 16px;">${departmentReferenceId}</strong>
+                    </p>
+                  </div>
+                  <p style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                    You are now authorized to join the official WhatsApp Community and your exclusive department subgroup, as well as participate in departmental Zoom online work sessions.
+                  </p>
+                  <div style="margin: 24px 0; text-align: center;">
+                    <a href="${subgroupWhatsappLink}" style="display: inline-block; background-color: #25D366; color: #000000; font-weight: 800; font-size: 13px; padding: 12px 24px; border-radius: 10px; text-decoration: none; margin-right: 8px;">
+                      Join ${departmentName} WhatsApp Subgroup →
+                    </a>
+                  </div>
+                  <div style="background-color: #0F172A; border: 1px dashed #334155; border-radius: 8px; padding: 12px 16px; margin-top: 16px;">
+                    <p style="margin: 0; font-size: 12px; color: #94A3B8;">
+                      Department Zoom Work Link: <a href="${zoomLink}" style="color: #38BDF8; font-family: monospace;">${zoomLink}</a>
+                    </p>
+                    <p style="margin: 6px 0 0 0; font-size: 12px; color: #94A3B8;">
+                      Main WhatsApp Community: <a href="${mainWhatsappLink}" style="color: #25D366;">${mainWhatsappLink}</a>
+                    </p>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 11px; color: #64748B; margin: 0;">S-CODERS Engineering Operations • scoders82@gmail.com</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
 async function startServer() {
   const app = express();
   const isProduction = process.env.NODE_ENV === "production" || (typeof __filename !== "undefined" && __filename.includes("dist"));
   const PORT = Number(isProduction ? (process.env.PORT || 8080) : 3000);
 
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
   // Safe lazy initializer for Gemini Client
   let aiClient: GoogleGenAI | null = null;
@@ -978,9 +1059,9 @@ async function startServer() {
   // Safe lazy initializer for Razorpay
   let razorpayInstance: Razorpay | null = null;
   function getRazorpayInstance(): Razorpay | null {
-    const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_live_scoders_ybl';
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'scoders_demo_secret';
-    if (!razorpayInstance) {
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!razorpayInstance && key_id && key_secret) {
       try {
         razorpayInstance = new Razorpay({
           key_id,
@@ -998,18 +1079,165 @@ async function startServer() {
     res.json({ status: "ok", startup: "S-CODERS", razorpay: true, merchantUpiId: "scoders@ybl" });
   });
 
-  // Razorpay Create Order Endpoint
-  app.post("/api/razorpay/create-order", async (req, res) => {
+  // Shared Data Storage Helpers
+  const leaderPhotosFilePath = path.resolve(process.cwd(), "data", "leader-photos.json");
+  const appStateFilePath = path.resolve(process.cwd(), "data", "app-state.json");
+
+  function getStoredLeaderPhotos(): Record<string, string> {
+    const defaults = {
+      shreyas: "/founder.jpg",
+      lokesh: "/cofounder.jpg",
+      bhuvan: "/techlead.jpg",
+    };
     try {
-      const { amount, currency = "INR", receipt, notes } = req.body;
-      const amountInPaise = Math.round(Number(amount || 1000) * 100);
+      if (fs.existsSync(leaderPhotosFilePath)) {
+        const content = fs.readFileSync(leaderPhotosFilePath, "utf-8");
+        return { ...defaults, ...JSON.parse(content || "{}") };
+      }
+    } catch (e) {
+      console.error("Error reading leader photos file:", e);
+    }
+    return defaults;
+  }
+
+  function saveStoredLeaderPhotos(photos: Record<string, string>): void {
+    try {
+      const dataDir = path.dirname(leaderPhotosFilePath);
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(leaderPhotosFilePath, JSON.stringify(photos, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error writing leader photos file:", e);
+    }
+  }
+
+  function getStoredAppState(): Record<string, any> {
+    try {
+      if (fs.existsSync(appStateFilePath)) {
+        const content = fs.readFileSync(appStateFilePath, "utf-8");
+        return JSON.parse(content || "{}");
+      }
+    } catch (e) {
+      console.error("Error reading app state file:", e);
+    }
+    return {};
+  }
+
+  function saveStoredAppState(state: Record<string, any>): void {
+    try {
+      const dataDir = path.dirname(appStateFilePath);
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(appStateFilePath, JSON.stringify(state, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error writing app state file:", e);
+    }
+  }
+
+  // 1. Shared Leader Photos Endpoints
+  app.get("/api/leader-photos", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.json({ success: true, photos: getStoredLeaderPhotos() });
+  });
+
+  app.post("/api/leader-photos", (req, res) => {
+    try {
+      const { id, photoUrl } = req.body;
+      if (!id || !photoUrl || !['shreyas', 'lokesh', 'bhuvan'].includes(id)) {
+        return res.status(400).json({ error: "Invalid leader ID or photo URL" });
+      }
+      const current = getStoredLeaderPhotos();
+      current[id] = photoUrl;
+      saveStoredLeaderPhotos(current);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, photos: current });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/leader-photos/reset", (req, res) => {
+    try {
+      const { id } = req.body;
+      const defaults: Record<string, string> = {
+        shreyas: "/founder.jpg",
+        lokesh: "/cofounder.jpg",
+        bhuvan: "/techlead.jpg",
+      };
+      const current = getStoredLeaderPhotos();
+      if (id && defaults[id]) {
+        current[id] = defaults[id];
+      } else {
+        Object.assign(current, defaults);
+      }
+      saveStoredLeaderPhotos(current);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, photos: current });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 2. Shared Global App State Sync Endpoints (Database, Workshops, Services, Invoices, Agreements)
+  app.get("/api/app-state", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.json({ success: true, state: getStoredAppState() });
+  });
+
+  app.post("/api/app-state", (req, res) => {
+    try {
+      const { key, value, entries } = req.body;
+      const current = getStoredAppState();
+      if (entries && typeof entries === 'object') {
+        Object.assign(current, entries);
+      } else if (key && value !== undefined) {
+        current[key] = value;
+      }
+      saveStoredAppState(current);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, count: Object.keys(current).length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Razorpay Configuration and Status Endpoint (Never returns Key Secret)
+  app.get("/api/payments/config", (req, res) => {
+    const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder";
+    const hasSecret = Boolean(process.env.RAZORPAY_KEY_SECRET);
+    const isLive = keyId.startsWith("rzp_live");
+    res.json({
+      success: true,
+      keyId,
+      key_id: keyId,
+      isLive,
+      isConfigured: Boolean(process.env.RAZORPAY_KEY_ID && hasSecret),
+      currency: "INR",
+      merchantName: "S-CODERS (Bharat Tech Developers)",
+    });
+  });
+
+  // Shared Helper for Creating Razorpay Orders
+  const handleCreateOrder = async (req: express.Request, res: express.Response) => {
+    try {
+      const { amount, currency = "INR", receipt, notes, purpose, productId, workshopId, customer } = req.body;
+      
+      // Server-side amount validation
+      let numericAmount = Number(amount);
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        numericAmount = 1000; // Default fallback
+      }
+
+      // Convert amount in INR to paise
+      const amountInPaise = Math.round(numericAmount * 100);
       const keyId = process.env.RAZORPAY_KEY_ID || "rzp_live_scoders_ybl";
 
-      const mergedNotes = {
-        merchant_upi_id: "scoders@ybl",
-        merchant_vpa: "scoders@ybl",
-        merchant_name: "S-CODERS Technologies",
-        settlement_bank: "Bank of Baroda - 2145",
+      const mergedNotes: Record<string, string> = {
+        merchant_name: "S-CODERS Technologies (Bharat Tech Developers)",
+        merchant_platform: "S-CODERS Portal",
+        purpose: purpose || notes?.purpose || "Service & Workshop Payment",
+        client_name: customer?.name || notes?.clientName || "Valued Client",
+        client_email: customer?.email || notes?.email || "",
+        ...(productId ? { product_id: String(productId) } : {}),
+        ...(workshopId ? { workshop_id: String(workshopId) } : {}),
         ...(notes || {})
       };
 
@@ -1020,41 +1248,47 @@ async function startServer() {
           const order = await rzp.orders.create({
             amount: amountInPaise,
             currency: currency,
-            receipt: receipt || `rcpt_${Date.now()}`,
+            receipt: receipt || `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
             notes: mergedNotes,
           });
 
           return res.json({
+            success: true,
             orderId: order.id,
+            order_id: order.id,
             amount: order.amount,
             currency: order.currency,
             keyId: keyId,
+            key_id: keyId,
             merchantUpiId: "scoders@ybl",
             isLive: true,
           });
         } catch (rzpErr: any) {
-          console.warn("Razorpay API order creation failed, switching to scoders gateway mode:", rzpErr.message);
+          console.warn("Razorpay API order creation warning, generating valid test order payload:", rzpErr.message);
         }
       }
 
-      // Sandbox order fallback for preview environment linked to scanner ID
-      const sandboxOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      // Fallback order ID for testing / development
+      const sandboxOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       res.json({
+        success: true,
         orderId: sandboxOrderId,
+        order_id: sandboxOrderId,
         amount: amountInPaise,
         currency: currency,
         keyId: keyId,
+        key_id: keyId,
         merchantUpiId: "scoders@ybl",
         isLive: false,
       });
     } catch (err: any) {
       console.error("Create Razorpay Order Error:", err);
-      res.status(500).json({ error: "Failed to create Razorpay order." });
+      res.status(500).json({ success: false, error: "Failed to create Razorpay order." });
     }
-  });
+  };
 
-  // Razorpay Verify Payment Endpoint
-  app.post("/api/razorpay/verify-payment", async (req, res) => {
+  // Shared Helper for Payment Verification
+  const handleVerifyPayment = async (req: express.Request, res: express.Response) => {
     try {
       const {
         razorpay_order_id,
@@ -1068,11 +1302,19 @@ async function startServer() {
         merchantUpiId,
       } = req.body;
 
+      if (!razorpay_payment_id) {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          error: "Missing razorpay_payment_id.",
+        });
+      }
+
       const activeMerchantUpi = merchantUpiId || "6363905989@ybl";
       const secret = process.env.RAZORPAY_KEY_SECRET;
       let isSignatureValid = true;
 
-      // Allow scoders bypass / demo signature in preview or test mode
+      // Verify HMAC SHA256 Signature strictly when secret is configured
       if (
         secret &&
         razorpay_order_id &&
@@ -1093,55 +1335,186 @@ async function startServer() {
       }
 
       if (!isSignatureValid) {
-        // Send failure email notice
-        await sendEmailNotification({
-          to: email || "client@example.com",
-          subject: `❌ Payment Verification Failed - S-CODERS (Ref: ${razorpay_order_id})`,
-          html: getPaymentEmailHtml({
-            status: "FAILED",
-            clientName: clientName || "Valued Client",
-            purpose: purpose || "Service / Workshop Payment",
-            amount: Number(amount) || 0,
-            currency,
-            paymentId: razorpay_payment_id || "N/A",
-            orderId: razorpay_order_id || "N/A",
-            reason: "Payment signature mismatch or unauthorized transaction.",
-          }),
-        });
+        // Send failure email notification
+        if (email) {
+          await sendEmailNotification({
+            to: email,
+            subject: `❌ Payment Verification Failed - S-CODERS (Ref: ${razorpay_order_id || 'N/A'})`,
+            html: getPaymentEmailHtml({
+              status: "FAILED",
+              clientName: clientName || "Valued Client",
+              purpose: purpose || "Service / Workshop Payment",
+              amount: Number(amount) || 0,
+              currency,
+              paymentId: razorpay_payment_id || "N/A",
+              orderId: razorpay_order_id || "N/A",
+              reason: "Payment signature mismatch or unauthorized transaction.",
+            }),
+          }).catch((e) => console.warn("Email notify error on failed payment:", e));
+        }
 
         return res.status(400).json({
           success: false,
-          error: "Invalid payment signature.",
+          verified: false,
+          status: "FAILED",
+          error: "Invalid payment signature. Verification failed.",
         });
       }
 
-      const finalPaymentId = razorpay_payment_id || `pay_rzp_scoders_${Date.now()}`;
+      const finalPaymentId = razorpay_payment_id;
+      const finalOrderId = razorpay_order_id || `ord_${Date.now()}`;
+      const nowIso = new Date().toISOString();
 
-      // Success email dispatch
-      const emailResult = await sendEmailNotification({
-        to: email || "client@example.com",
-        subject: `✅ Payment Confirmation & Receipt - S-CODERS (Merchant: ${activeMerchantUpi} | Txn: ${finalPaymentId})`,
-        html: getPaymentEmailHtml({
-          status: "SUCCESS",
+      // Persist verified payment in server database state
+      try {
+        const appState = getStoredAppState();
+        const paymentsList = Array.isArray(appState['db_payments']) ? [...appState['db_payments']] : [];
+        
+        // Check for duplicate payment record
+        const existingIdx = paymentsList.findIndex((p: any) => p.id === finalPaymentId || p.razorpayPaymentId === finalPaymentId);
+        const paymentRecord = {
+          id: finalPaymentId,
+          clientId: email || "client@scoders.dev",
           clientName: clientName || "Valued Client",
-          purpose: `${purpose || 'Service Payment'} (Merchant UPI: ${activeMerchantUpi})`,
+          clientEmail: email || "client@scoders.dev",
           amount: Number(amount) || 0,
           currency,
-          paymentId: finalPaymentId,
-          orderId: razorpay_order_id || `ord_${Date.now()}`,
-        }),
-      });
+          paymentMethod: "Razorpay Standard Gateway",
+          status: "Successful",
+          timestamp: new Date().toLocaleString(),
+          reference: purpose || "Service / Workshop Payment",
+          interrupted: false,
+          failureReason: null,
+          razorpayOrderId: finalOrderId,
+          razorpayPaymentId: finalPaymentId,
+          razorpaySignature: razorpay_signature || "verified",
+          paymentVerifiedAt: nowIso,
+        };
+
+        if (existingIdx >= 0) {
+          paymentsList[existingIdx] = { ...paymentsList[existingIdx], ...paymentRecord };
+        } else {
+          paymentsList.unshift(paymentRecord);
+        }
+
+        appState['db_payments'] = paymentsList;
+        saveStoredAppState(appState);
+      } catch (dbErr) {
+        console.warn("Could not write payment to app-state.json:", dbErr);
+      }
+
+      // Success email dispatch
+      let emailResult: { success: boolean; messageId?: string; simulated?: boolean; error?: any } = { success: false };
+      if (email) {
+        emailResult = await sendEmailNotification({
+          to: email,
+          subject: `✅ Payment Confirmation & Receipt - S-CODERS (Txn: ${finalPaymentId})`,
+          html: getPaymentEmailHtml({
+            status: "SUCCESS",
+            clientName: clientName || "Valued Client",
+            purpose: `${purpose || 'Service Payment'}`,
+            amount: Number(amount) || 0,
+            currency,
+            paymentId: finalPaymentId,
+            orderId: finalOrderId,
+          }),
+        });
+      }
 
       res.json({
         success: true,
-        message: "Payment verified successfully and confirmation email sent.",
+        verified: true,
+        status: "PAID",
+        message: "Payment verified successfully and receipt generated.",
         emailSent: emailResult.success,
         paymentId: finalPaymentId,
+        orderId: finalOrderId,
         merchantUpiId: activeMerchantUpi,
       });
     } catch (err: any) {
       console.error("Verify Payment Error:", err);
-      res.status(500).json({ error: "Failed to verify payment." });
+      res.status(500).json({ success: false, verified: false, error: "Failed to verify payment." });
+    }
+  };
+
+  // Razorpay Create Order Endpoints (Standard & Legacy)
+  app.post("/api/payments/create-order", handleCreateOrder);
+  app.post("/api/razorpay/create-order", handleCreateOrder);
+
+  // Razorpay Verify Payment Endpoints (Standard & Legacy)
+  app.post("/api/payments/verify", handleVerifyPayment);
+  app.post("/api/razorpay/verify-payment", handleVerifyPayment);
+
+  // Razorpay Webhook Endpoint for Asynchronous Gateway Events
+  app.post("/api/payments/webhook", async (req, res) => {
+    try {
+      const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+      const signature = req.headers["x-razorpay-signature"] as string;
+
+      if (webhookSecret && signature) {
+        const bodyStr = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
+        const expectedSignature = crypto
+          .createHmac("sha256", webhookSecret)
+          .update(bodyStr)
+          .digest("hex");
+
+        if (expectedSignature !== signature) {
+          console.warn("Razorpay Webhook: Signature mismatch rejected.");
+          return res.status(400).json({ error: "Invalid webhook signature" });
+        }
+      }
+
+      const event = req.body?.event;
+      const payload = req.body?.payload;
+
+      console.log(`Razorpay Webhook Event Received: ${event}`);
+
+      if (event === "payment.captured" || event === "order.paid") {
+        const payment = payload?.payment?.entity;
+        const order = payload?.order?.entity;
+        const paymentId = payment?.id;
+        const orderId = order?.id || payment?.order_id;
+        const amount = payment?.amount ? payment.amount / 100 : 0;
+        const email = payment?.email || order?.notes?.client_email;
+        const name = payment?.notes?.client_name || order?.notes?.client_name || "Client";
+
+        if (paymentId) {
+          try {
+            const appState = getStoredAppState();
+            const paymentsList = Array.isArray(appState['db_payments']) ? [...appState['db_payments']] : [];
+            const existing = paymentsList.find((p: any) => p.id === paymentId || p.razorpayPaymentId === paymentId);
+
+            if (!existing) {
+              paymentsList.unshift({
+                id: paymentId,
+                clientId: email || "client@scoders.dev",
+                clientName: name,
+                clientEmail: email || "client@scoders.dev",
+                amount,
+                currency: payment?.currency || "INR",
+                paymentMethod: `Razorpay Webhook (${payment?.method || 'Standard'})`,
+                status: "Successful",
+                timestamp: new Date().toLocaleString(),
+                reference: payment?.description || order?.notes?.purpose || "Razorpay Payment",
+                interrupted: false,
+                failureReason: null,
+                razorpayOrderId: orderId,
+                razorpayPaymentId: paymentId,
+                paymentVerifiedAt: new Date().toISOString(),
+              });
+              appState['db_payments'] = paymentsList;
+              saveStoredAppState(appState);
+            }
+          } catch (dbErr) {
+            console.warn("Webhook app-state update error:", dbErr);
+          }
+        }
+      }
+
+      res.json({ status: "ok", received: true });
+    } catch (err: any) {
+      console.error("Razorpay Webhook Error:", err);
+      res.status(500).json({ error: "Webhook handling failed." });
     }
   });
 
@@ -1448,6 +1821,7 @@ async function startServer() {
       const match = apps.find(a => 
         (a.id && a.id.toUpperCase() === q) ||
         (a.agreementReferenceId && a.agreementReferenceId.toUpperCase() === q) ||
+        (a.departmentReferenceId && a.departmentReferenceId.toUpperCase() === q) ||
         (a.onboardingToken && a.onboardingToken.toUpperCase() === q) ||
         (a.email && a.email.toUpperCase() === q)
       );
@@ -1842,6 +2216,443 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // SECTION 4: DEPARTMENT, WHATSAPP & ONLINE WORK MEETINGS API
+  // ==========================================
+  const departmentConfigsFilePath = path.join(process.cwd(), "data", "department_configs.json");
+  const departmentMeetingsFilePath = path.join(process.cwd(), "data", "department_meetings.json");
+
+  const DEFAULT_SERVER_DEPARTMENTS = [
+    {
+      id: 'frontend',
+      name: 'Front-End Developer',
+      codePrefix: 'GHZ',
+      referenceFormat: 'GHZ-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-frontend-work',
+      description: 'Modern React 19, TypeScript, Tailwind CSS, motion design, and responsive web user interfaces.'
+    },
+    {
+      id: 'backend',
+      name: 'Back-End Developer',
+      codePrefix: 'HAX',
+      referenceFormat: 'HAX-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-backend-work',
+      description: 'Server architectures, Node.js, Express, PostgreSQL, Redis caching, gRPC, and REST API microservices.'
+    },
+    {
+      id: 'fullstack',
+      name: 'Full-Stack Developer',
+      codePrefix: 'FSD',
+      referenceFormat: 'FSD-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-fullstack-work',
+      description: 'End-to-end full stack web applications, Next.js, MERN systems, database schemas, and cloud deployment.'
+    },
+    {
+      id: 'video_editor',
+      name: 'Video Editor',
+      codePrefix: 'KAG',
+      referenceFormat: 'KAG-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-video-editing-work',
+      description: 'High-production tech product trailers, YouTube long-form, social reels, motion graphics, and color grading.'
+    },
+    {
+      id: 'content_writer',
+      name: 'Content Writer',
+      codePrefix: 'CTW',
+      referenceFormat: 'CTW-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-content-writing-work',
+      description: 'Technical whitepapers, developer documentation, API tutorials, and architectural engineering blogs.'
+    },
+    {
+      id: 'content_creator',
+      name: 'Content Creator',
+      codePrefix: 'CCR',
+      referenceFormat: 'CCR-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-content-creators-work',
+      description: 'Developer advocacy, tech shorts, podcast production, live coding demos, and social storytelling.'
+    },
+    {
+      id: 'ui_ux_designer',
+      name: 'UI/UX Designer',
+      codePrefix: 'UIX',
+      referenceFormat: 'UIX-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-uiux-design-work',
+      description: 'Figma design systems, responsive wireframes, design tokens, micro-interactions, and design-to-code pipelines.'
+    },
+    {
+      id: 'digital_marketing',
+      name: 'Digital Marketing',
+      codePrefix: 'MKT',
+      referenceFormat: 'MKT-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-digital-marketing-work',
+      description: 'Performance growth, dev community acquisition, SEO strategies, paid funnels, and marketing analytics.'
+    },
+    {
+      id: 'software_developer',
+      name: 'Software Developer',
+      codePrefix: 'SDE',
+      referenceFormat: 'SDE-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-software-devs-work',
+      description: 'Core platform algorithms, CLI tools, systems programming, and high-performance automation utilities.'
+    },
+    {
+      id: 'documentation',
+      name: 'Documentation',
+      codePrefix: 'DOC',
+      referenceFormat: 'DOC-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-documentation-work',
+      description: 'Software specifications, system architecture diagrams, onboarding manuals, and knowledge bases.'
+    },
+    {
+      id: 'event_management',
+      name: 'Event Management',
+      codePrefix: 'EVM',
+      referenceFormat: 'EVM-2026-XXX',
+      whatsappSubgroupLink: 'https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q',
+      zoomMeetingLink: 'https://zoom.us/j/scoders-event-management-work',
+      description: 'Developer hackathons, tech workshops, campus partnerships, speaker curation, and logistics.'
+    }
+  ];
+
+  const DEFAULT_SERVER_MEETINGS = [
+    {
+      id: 'meet-fe-01',
+      department: 'Front-End Developer',
+      topic: 'Front-End Sprint: UI Design System & Component Library',
+      instructions: 'Interactive screen sharing session to review React 19 component tokens, Tailwind utility structures, and responsive layouts. Please have your local dev server running.',
+      meetingDate: '2026-09-28',
+      meetingTime: '04:30 PM IST',
+      zoomLink: 'https://zoom.us/j/scoders-frontend-work',
+      status: 'Upcoming',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'meet-be-02',
+      department: 'Back-End Developer',
+      topic: 'Back-End Architecture: API Endpoints & PostgreSQL Connection Pool',
+      instructions: 'Live architectural review covering database queries, transaction rollbacks, and webhook security. Active discussions and code walkthrough.',
+      meetingDate: '2026-09-29',
+      meetingTime: '05:00 PM IST',
+      zoomLink: 'https://zoom.us/j/scoders-backend-work',
+      status: 'Upcoming',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'meet-fsd-03',
+      department: 'Full-Stack Developer',
+      topic: 'Full-Stack End-to-End Feature Deployment & Integration',
+      instructions: 'Live debugging, state synchronization, and Docker deployment test. Screen sharing enabled for all verified developers.',
+      meetingDate: '2026-09-30',
+      meetingTime: '06:00 PM IST',
+      zoomLink: 'https://zoom.us/j/scoders-fullstack-work',
+      status: 'Upcoming',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'meet-vid-04',
+      department: 'Video Editor',
+      topic: 'Video Editing & Motion Graphics Workshop',
+      instructions: 'Review 4K rendering timelines, Premiere Pro/DaVinci presets, and audio ducking. We will screen share the latest tech promo cut.',
+      meetingDate: '2026-09-28',
+      meetingTime: '03:00 PM IST',
+      zoomLink: 'https://zoom.us/j/scoders-video-editing-work',
+      status: 'Upcoming',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'meet-ctw-05',
+      department: 'Content Writer',
+      topic: 'Editorial Review: Tech Articles & Developer Documentation',
+      instructions: 'Content review and tone-of-voice alignment for tech blogs and onboarding documentation. Bring your draft outlines.',
+      meetingDate: '2026-09-29',
+      meetingTime: '11:30 AM IST',
+      zoomLink: 'https://zoom.us/j/scoders-content-writing-work',
+      status: 'Upcoming',
+      createdAt: new Date().toISOString()
+    }
+  ];
+
+  function getStoredDepartmentConfigs(): any[] {
+    try {
+      if (fs.existsSync(departmentConfigsFilePath)) {
+        const c = fs.readFileSync(departmentConfigsFilePath, "utf-8");
+        return JSON.parse(c || "[]");
+      }
+    } catch (e) {
+      console.error("Error reading department configs:", e);
+    }
+    return DEFAULT_SERVER_DEPARTMENTS;
+  }
+
+  function saveStoredDepartmentConfigs(configs: any[]): void {
+    try {
+      fs.writeFileSync(departmentConfigsFilePath, JSON.stringify(configs, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error saving department configs:", e);
+    }
+  }
+
+  function getStoredDepartmentMeetings(): any[] {
+    try {
+      if (fs.existsSync(departmentMeetingsFilePath)) {
+        const c = fs.readFileSync(departmentMeetingsFilePath, "utf-8");
+        return JSON.parse(c || "[]");
+      }
+    } catch (e) {
+      console.error("Error reading department meetings:", e);
+    }
+    return DEFAULT_SERVER_MEETINGS;
+  }
+
+  function saveStoredDepartmentMeetings(meetings: any[]): void {
+    try {
+      fs.writeFileSync(departmentMeetingsFilePath, JSON.stringify(meetings, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error saving department meetings:", e);
+    }
+  }
+
+  function getServerDepartmentPrefix(deptName: string): string {
+    const normalized = (deptName || '').toLowerCase().trim();
+    if (normalized.includes('front')) return 'GHZ';
+    if (normalized.includes('back')) return 'HAX';
+    if (normalized.includes('full') || normalized.includes('mern')) return 'FSD';
+    if (normalized.includes('video') || normalized.includes('edit')) return 'KAG';
+    if (normalized.includes('writer') || normalized.includes('writing')) return 'CTW';
+    if (normalized.includes('creator') || normalized.includes('social')) return 'CCR';
+    if (normalized.includes('ui') || normalized.includes('ux') || normalized.includes('design')) return 'UIX';
+    if (normalized.includes('market') || normalized.includes('growth')) return 'MKT';
+    if (normalized.includes('soft') || normalized.includes('sde') || normalized.includes('engineer')) return 'SDE';
+    if (normalized.includes('doc')) return 'DOC';
+    if (normalized.includes('event')) return 'EVM';
+    return 'SCD';
+  }
+
+  function generateUniqueDepartmentReferenceId(deptName: string, existingApps: any[]): string {
+    const prefix = getServerDepartmentPrefix(deptName);
+    const existingIds = new Set(
+      existingApps.map(a => (a.departmentReferenceId || '').toUpperCase().trim())
+    );
+
+    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    for (let i = 0; i < 500; i++) {
+      const letter = letters[Math.floor(Math.random() * letters.length)];
+      const num = Math.floor(10 + Math.random() * 90);
+      const candidateId = `${prefix}-2026-${letter}${num}`;
+      if (!existingIds.has(candidateId)) {
+        return candidateId;
+      }
+    }
+    return `${prefix}-2026-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+  }
+
+  // 11. Candidate submits Second Reference ID to request/select Department (Section 4)
+  app.post("/api/careers/request-department", async (req, res) => {
+    try {
+      const { secondRefId, selectedDepartment } = req.body;
+      if (!secondRefId || !selectedDepartment) {
+        return res.status(400).json({ error: "Second Reference ID and selected department are required." });
+      }
+
+      const cleanRef = String(secondRefId).trim().toUpperCase();
+      const apps = getStoredApplications();
+      const match = apps.find(a => 
+        (a.agreementReferenceId && a.agreementReferenceId.toUpperCase() === cleanRef) ||
+        (a.id && a.id.toUpperCase() === cleanRef)
+      );
+
+      if (!match) {
+        return res.status(404).json({ 
+          error: "No joining application found matching this Second Reference ID. Please submit your Stage 2 Joining Application first." 
+        });
+      }
+
+      const now = new Date().toISOString();
+      const updatedMatch = {
+        ...match,
+        departmentSelection: selectedDepartment,
+        departmentStatus: match.departmentStatus === 'Approved' ? 'Approved' : 'Pending Verification',
+        departmentRequestedAt: now,
+        lastUpdated: now,
+      };
+
+      const updatedApps = apps.map(a => a.id === match.id ? updatedMatch : a);
+      saveStoredApplications(updatedApps);
+
+      res.json({
+        success: true,
+        message: match.departmentStatus === 'Approved'
+          ? "Department already verified and active."
+          : "Department verification request submitted. S-CODERS admin will review and approve your WhatsApp group access.",
+        candidate: updatedMatch
+      });
+    } catch (err: any) {
+      console.error("Request Department Error:", err);
+      res.status(500).json({ error: "Failed to submit department request: " + err.message });
+    }
+  });
+
+  // 12. Admin verifies & approves candidate department (Section 4 Admin Action)
+  app.post("/api/careers/verify-department", async (req, res) => {
+    try {
+      const { id, status, departmentReferenceId, rejectionReason, approvedBy } = req.body;
+      if (!id || !status) {
+        return res.status(400).json({ error: "Candidate ID and status (Approved/Rejected) are required." });
+      }
+
+      const apps = getStoredApplications();
+      const candidate = apps.find(a => a.id === id);
+      if (!candidate) {
+        return res.status(404).json({ error: "Candidate application not found." });
+      }
+
+      const deptName = candidate.departmentSelection || candidate.sector || 'Front-End Developer';
+      const now = new Date().toISOString();
+
+      let assignedRefId = candidate.departmentReferenceId;
+      if (status === 'Approved' && !assignedRefId) {
+        assignedRefId = departmentReferenceId || generateUniqueDepartmentReferenceId(deptName, apps);
+      }
+
+      const updatedCandidate = {
+        ...candidate,
+        departmentStatus: status,
+        departmentReferenceId: status === 'Approved' ? assignedRefId : candidate.departmentReferenceId,
+        departmentApprovedAt: status === 'Approved' ? now : candidate.departmentApprovedAt,
+        departmentApprovedBy: status === 'Approved' ? (approvedBy || 'Admin Desk') : candidate.departmentApprovedBy,
+        departmentRejectionReason: status === 'Rejected' ? rejectionReason : undefined,
+        lastUpdated: now,
+      };
+
+      const updatedApps = apps.map(a => a.id === id ? updatedCandidate : a);
+      saveStoredApplications(updatedApps);
+
+      // If approved, dispatch notification email with WhatsApp links and Zoom link
+      if (status === 'Approved' && updatedCandidate.email) {
+        const configs = getStoredDepartmentConfigs();
+        const deptConfig = configs.find(c => c.name.toLowerCase() === deptName.toLowerCase()) || configs[0];
+        const mainWhatsapp = "https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q";
+        const subgroupWhatsapp = deptConfig?.whatsappSubgroupLink || "https://chat.whatsapp.com/BwGu8qFYW7yHA9v0NUd84Q";
+        const zoomLink = deptConfig?.zoomMeetingLink || "https://zoom.us/j/scoders-work-hub";
+
+        sendEmailNotification({
+          to: updatedCandidate.email,
+          subject: `✓ Department Verified & WhatsApp Group Unlocked - S-CODERS (Ref: ${assignedRefId})`,
+          html: getDepartmentApprovedEmailHtml({
+            candidateName: updatedCandidate.fullName,
+            departmentName: deptName,
+            departmentReferenceId: assignedRefId,
+            mainWhatsappLink: mainWhatsapp,
+            subgroupWhatsappLink: subgroupWhatsapp,
+            zoomLink,
+          }),
+        }).catch(e => console.error("Department Approved Email Error:", e.message));
+      }
+
+      res.json({
+        success: true,
+        message: `Candidate department successfully marked as "${status}".`,
+        candidate: updatedCandidate,
+        departmentReferenceId: assignedRefId
+      });
+    } catch (err: any) {
+      console.error("Verify Department Error:", err);
+      res.status(500).json({ error: "Failed to verify department: " + err.message });
+    }
+  });
+
+  // 13. Get all department configurations
+  app.get("/api/careers/departments", (req, res) => {
+    try {
+      const configs = getStoredDepartmentConfigs();
+      res.json({ success: true, departments: configs });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to get department configs" });
+    }
+  });
+
+  // 14. Update department configurations (Admin)
+  app.post("/api/careers/departments", (req, res) => {
+    try {
+      const { departments } = req.body;
+      if (!Array.isArray(departments)) {
+        return res.status(400).json({ error: "Invalid departments array" });
+      }
+      saveStoredDepartmentConfigs(departments);
+      res.json({ success: true, message: "Department configurations updated", departments });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to save department configs" });
+    }
+  });
+
+  // 15. Get department meetings
+  app.get("/api/careers/meetings", (req, res) => {
+    try {
+      const { department } = req.query;
+      let meetings = getStoredDepartmentMeetings();
+      if (department && department !== 'ALL') {
+        const d = String(department).toLowerCase().trim();
+        meetings = meetings.filter(m => 
+          m.department?.toLowerCase().trim() === d || 
+          m.department === 'ALL' || 
+          m.department === 'All Departments / All-Hands'
+        );
+      }
+      res.json({ success: true, count: meetings.length, meetings });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to get meetings" });
+    }
+  });
+
+  // 16. Create or update meeting (Admin)
+  app.post("/api/careers/meetings", (req, res) => {
+    try {
+      const meetingData = req.body;
+      if (!meetingData || !meetingData.topic || !meetingData.zoomLink || !meetingData.meetingDate || !meetingData.meetingTime) {
+        return res.status(400).json({ error: "Topic, Zoom link, meeting date, and time are required." });
+      }
+
+      const meetings = getStoredDepartmentMeetings();
+      const meetingId = meetingData.id || `meet-${Date.now().toString(36)}`;
+      const newMeeting = {
+        ...meetingData,
+        id: meetingId,
+        createdAt: meetingData.createdAt || new Date().toISOString()
+      };
+
+      const filtered = meetings.filter(m => m.id !== meetingId);
+      const updated = [newMeeting, ...filtered];
+      saveStoredDepartmentMeetings(updated);
+
+      res.json({ success: true, message: "Meeting saved successfully", meeting: newMeeting });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to save meeting: " + e.message });
+    }
+  });
+
+  // 17. Delete meeting (Admin)
+  app.delete("/api/careers/meetings/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const meetings = getStoredDepartmentMeetings();
+      const updated = meetings.filter(m => m.id !== id);
+      saveStoredDepartmentMeetings(updated);
+      res.json({ success: true, message: "Meeting deleted successfully." });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to delete meeting: " + e.message });
+    }
+  });
+
   // Chat agent endpoint
   app.post("/api/chat", async (req, res) => {
     try {
@@ -2122,6 +2933,10 @@ RESPONSE GUIDELINES:
     });
   } else {
     const distPath = path.join(process.cwd(), "dist");
+    const publicPath = path.join(process.cwd(), "public");
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath));
+    }
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
       app.get("*", (req, res) => {

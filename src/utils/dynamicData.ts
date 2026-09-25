@@ -122,6 +122,16 @@ const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
   }
 ];
 
+function syncToBackend(key: string, value: any): void {
+  if (typeof window !== 'undefined') {
+    fetch('/api/app-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value })
+    }).catch(e => console.warn(`Error syncing ${key} to server:`, e));
+  }
+}
+
 export function getDynamicEvents(): SCODERSEvent[] {
   try {
     const saved = localStorage.getItem('scoders_dynamic_events');
@@ -140,6 +150,7 @@ export function saveDynamicEvents(events: SCODERSEvent[]): void {
   } catch (e) {
     console.error('Error saving dynamic events:', e);
   }
+  syncToBackend('scoders_dynamic_events', events);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
   }
@@ -163,6 +174,7 @@ export function saveEventTickets(tickets: EventTicket[]): void {
   } catch (e) {
     console.error('Error saving event tickets:', e);
   }
+  syncToBackend('scoders_event_tickets', tickets);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
   }
@@ -217,6 +229,7 @@ export function saveDynamicServices(services: Service[]): void {
   } catch (e) {
     console.error('Error saving dynamic services:', e);
   }
+  syncToBackend('scoders_dynamic_services', services);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
     window.dispatchEvent(new Event('scoders_data_change'));
@@ -241,6 +254,7 @@ export function saveDynamicWorkshops(workshops: WorkshopEvent[]): void {
   } catch (e) {
     console.error('Error saving dynamic workshops:', e);
   }
+  syncToBackend('scoders_dynamic_workshops', workshops);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
     window.dispatchEvent(new Event('scoders_data_change'));
@@ -265,6 +279,7 @@ export function saveDynamicInvoices(invoices: DynamicInvoice[]): void {
   } catch (e) {
     console.error('Error saving dynamic invoices:', e);
   }
+  syncToBackend('scoders_dynamic_invoices', invoices);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
     window.dispatchEvent(new Event('scoders_data_change'));
@@ -340,6 +355,7 @@ export function saveDynamicNetworking(items: NetworkingAchievement[]): void {
   } catch (e) {
     console.error('Error saving dynamic networking:', e);
   }
+  syncToBackend('scoders_dynamic_networking', items);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
   }
@@ -364,6 +380,7 @@ export function saveCandidateApplications(apps: CandidateApplication[]): void {
   } catch (e) {
     console.error('Error saving candidate applications:', e);
   }
+  syncToBackend('scoders_saved_candidate_applications', apps);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_saved_applications_change'));
     window.dispatchEvent(new Event('scoders_db_change'));

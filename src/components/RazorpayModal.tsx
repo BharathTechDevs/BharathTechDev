@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Lock, X, CheckCircle, ArrowRight, QrCode, 
   CreditCard, Building2, Wallet, RefreshCw, AlertCircle, 
-  Check, Copy, Sparkles, Smartphone, ChevronRight, Info, AlertTriangle, ArrowLeft, ExternalLink
+  Check, Copy, Sparkles, Smartphone, ChevronRight, Info, AlertTriangle, ArrowLeft, ExternalLink, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import UpiQrCanvas from './UpiQrCanvas';
@@ -18,6 +18,7 @@ import {
   getBankingNameForUpi, 
   getPhoneNumberForUpi 
 } from '../utils/paymentLinks';
+import { launchRazorpayCheckout } from '../services/razorpay';
 
 export interface RazorpayPaymentSuccessData {
   razorpay_payment_id: string;
@@ -176,6 +177,53 @@ export default function RazorpayModal({
     navigator.clipboard.writeText(merchantUpi);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
+  };
+
+  const handleLaunchStandardPopup = async () => {
+    setIsProcessing(true);
+    setProcessingStage('Opening Razorpay Standard Checkout Popup...');
+    try {
+      await launchRazorpayCheckout(
+        {
+          amount: amount,
+          currency: currency,
+          name: 'S-CODERS (Bharat Tech Developers)',
+          description: paymentDetails.purpose,
+          customer: {
+            name: paymentDetails.clientName,
+            email: paymentDetails.email,
+            contact: paymentDetails.phone || '6363905989',
+          },
+          notes: {
+            merchant_vpa: merchantUpi,
+            purpose: paymentDetails.purpose,
+          },
+          onSuccess: (data) => {
+            setIsProcessing(false);
+            onSuccess({
+              ...data,
+              method: data.method || 'Razorpay Standard Checkout',
+            });
+          },
+          onFailure: (err) => {
+            setIsProcessing(false);
+            if (err.description) {
+              setUpiError(err.description);
+            }
+          },
+          onDismiss: () => {
+            setIsProcessing(false);
+          },
+        },
+        (loading, stage) => {
+          setIsProcessing(loading);
+          if (stage) setProcessingStage(stage);
+        }
+      );
+    } catch (err: any) {
+      setIsProcessing(false);
+      setUpiError(err.message || 'Could not open standard checkout popup.');
+    }
   };
 
   const handleUserCancelPayment = (reason: string = "Payment cancelled or not completed by client") => {
@@ -633,6 +681,29 @@ export default function RazorpayModal({
 
           {/* Modal Main Body */}
           <div className="p-5 sm:p-6 overflow-y-auto max-h-[60vh] space-y-5">
+            {/* Standard Checkout Instant Trigger Banner */}
+            {!isAwaitingUpiConfirmation && !isAwaitingCardOtp && !isAwaitingNetbankingAuth && !isAwaitingWalletOtp && !isProcessing && (
+              <div className="bg-gradient-to-r from-blue-600/20 via-cyan-500/10 to-indigo-600/20 border border-cyan-400/30 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center shrink-0">
+                    <Zap className="w-4 h-4 text-cyan-300" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Official Razorpay Standard Popup</span>
+                    <span className="text-[10px] text-cyan-200/80 font-sans block">Launch direct multi-method gateway modal</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLaunchStandardPopup}
+                  className="px-3.5 py-2 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md shadow-cyan-500/20 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <span>Launch Popup</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
             {/* Loading Overlay if processing */}
             {isProcessing ? (
               <div className="py-12 px-4 text-center space-y-4 flex flex-col items-center justify-center">
