@@ -306,10 +306,12 @@ export default function Events() {
     };
 
     window.addEventListener('scoders_db_change', handleDbUpdate);
+    window.addEventListener('scoders_data_change', handleDbUpdate);
     window.addEventListener('storage', handleDbUpdate);
 
     return () => {
       window.removeEventListener('scoders_db_change', handleDbUpdate);
+      window.removeEventListener('scoders_data_change', handleDbUpdate);
       window.removeEventListener('storage', handleDbUpdate);
     };
   }, []);

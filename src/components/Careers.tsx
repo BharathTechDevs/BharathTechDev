@@ -412,17 +412,12 @@ export default function Careers({ onNavigate }: CareersProps) {
   const [accessVerifiedBanner, setAccessVerifiedBanner] = useState<string | null>(null);
   const [showTokenUnlockDialog, setShowTokenUnlockDialog] = useState(false);
 
-  // Saved application forms collection (identical to Event Tickets structure)
+  // Saved application forms collection (synced with dynamic data engine)
   const [savedApplications, setSavedApplications] = useState<CandidateApplication[]>(() => {
     return getSavedCandidateApplications();
   });
-  const [activeCareersTab, setActiveCareersTab] = useState<'form' | 'saved_forms'>('form');
-  const [viewingSavedApp, setViewingSavedApp] = useState<CandidateApplication | null>(null);
-  const [appToDelete, setAppToDelete] = useState<CandidateApplication | null>(null);
-  const [showDeleteAppModal, setShowDeleteAppModal] = useState(false);
-  const [savedActionNotice, setSavedActionNotice] = useState<string | null>(null);
 
-  // Check admin authorization (My Application Forms is restricted to admins only)
+  // Check admin authorization
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('scoders_admin_auth') === 'true';
   });
@@ -559,11 +554,9 @@ export default function Careers({ onNavigate }: CareersProps) {
       }
 
       if (found) {
-        // Automatically save to candidate's saved applications collection (just like event tickets)
+        // Automatically save to candidate's saved applications collection
         const updatedSaved = addSavedCandidateApplication(found);
         setSavedApplications(updatedSaved);
-        setSavedActionNotice(`✓ Application Form #${found.id} for ${found.fullName} has been saved to your "My Application Forms" collection!`);
-        setTimeout(() => setSavedActionNotice(null), 6000);
 
         setShowKeyModal(false);
         setManualAccessInput('');
@@ -572,10 +565,9 @@ export default function Careers({ onNavigate }: CareersProps) {
         if (found.status === 'Onboarding Completed' || found.status === 'Hired' || found.bankName || found.candidateDigitalSignature) {
           setSuccessApp(found);
           setCurrentStep(3);
-          setActiveCareersTab('saved_forms');
           setKeyLookupNotice({
             type: 'SUCCESS',
-            message: `✓ Verified Application & Executed Dossier [${found.id}] for ${found.fullName} unlocked & saved!`
+            message: `✓ Verified Application & Executed Dossier [${found.id}] for ${found.fullName} unlocked!`
           });
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
@@ -590,10 +582,9 @@ export default function Careers({ onNavigate }: CareersProps) {
             setAuthorizedAppId(found.id);
             setCurrentStep(2);
           }
-          setActiveCareersTab('form');
           setKeyLookupNotice({
             type: 'SUCCESS',
-            message: `✓ Onboarding verified for ${found.fullName}. Saved to your dossier. Proceed with Stage 2 Induction & Banking details.`
+            message: `✓ Onboarding verified for ${found.fullName}. Proceed with Stage 2 Induction & Banking details.`
           });
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
@@ -602,10 +593,9 @@ export default function Careers({ onNavigate }: CareersProps) {
         // If candidate application is under review (Stage 1 submitted)
         setSubmittedStage1App(found);
         setCurrentStep('submitted_stage1');
-        setActiveCareersTab('saved_forms');
         setKeyLookupNotice({
           type: 'SUCCESS',
-          message: `✓ Application [${found.id}] for ${found.fullName} saved to your dossier. Status: ${found.status}.`
+          message: `✓ Application [${found.id}] for ${found.fullName} found. Status: ${found.status}.`
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
@@ -697,16 +687,6 @@ export default function Careers({ onNavigate }: CareersProps) {
     } finally {
       setIsVerifyingToken(false);
     }
-  };
-
-  const confirmDeleteApplication = () => {
-    if (!appToDelete) return;
-    const updated = removeSavedCandidateApplication(appToDelete.id);
-    setSavedApplications(updated);
-    setSavedActionNotice(`Application Form #${appToDelete.id} was removed from your saved forms.`);
-    setTimeout(() => setSavedActionNotice(null), 4000);
-    setShowDeleteAppModal(false);
-    setAppToDelete(null);
   };
 
   const handleCopyShareLink = () => {
@@ -1268,42 +1248,19 @@ export default function Careers({ onNavigate }: CareersProps) {
           </p>
         </div>
 
-        {/* Navigation Tabs Bar (Matching Event Section: Form vs My Application Forms) */}
+        {/* Candidate Actions Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-black/60 border border-white/10 p-3 rounded-2xl backdrop-blur-xl shadow-2xl">
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar py-1">
             <button
               onClick={() => {
-                setActiveCareersTab('form');
+                setCurrentStep(1);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`relative px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap z-10 flex items-center gap-2 ${
-                activeCareersTab === 'form'
-                  ? 'text-brand-dark bg-brand-teal shadow-md shadow-brand-teal/20'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
+              className="relative px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap z-10 flex items-center gap-2 text-brand-dark bg-brand-teal shadow-md shadow-brand-teal/20"
             >
               <Briefcase className="w-4 h-4" />
-              <span>Apply for Roles</span>
+              <span>Explore Roles & Apply</span>
             </button>
-
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onNavigate) {
-                    onNavigate('admin');
-                  } else {
-                    setActiveCareersTab('saved_forms');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
-                }}
-                className="relative px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap z-10 flex items-center gap-2 text-brand-teal bg-brand-teal/10 hover:bg-brand-teal hover:text-brand-dark border border-brand-teal/30 shadow-md"
-                title="Application Forms tab is restricted to Admins only and placed under Admin Page"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>My Application Forms (Admin Page)</span>
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1315,22 +1272,10 @@ export default function Careers({ onNavigate }: CareersProps) {
               className="w-full sm:w-auto px-4 py-2.5 bg-brand-teal/20 hover:bg-brand-teal text-brand-teal hover:text-brand-dark border border-brand-teal/40 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
             >
               <Lock className="w-4 h-4" />
-              <span>🔑 Paste Unique Link / Enter Key</span>
+              <span>🔑 Paste Unique Link / Enter Pass Key</span>
             </button>
           </div>
         </div>
-
-        {savedActionNotice && (
-          <div className="mb-6 p-4 rounded-2xl font-mono text-xs flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{savedActionNotice}</span>
-            </div>
-            <button onClick={() => setSavedActionNotice(null)} className="text-gray-400 hover:text-white cursor-pointer">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
 
         {keyLookupNotice && (
           <div className={`mb-6 p-4 rounded-2xl font-mono text-xs flex items-center justify-between gap-3 border ${
@@ -1351,285 +1296,6 @@ export default function Careers({ onNavigate }: CareersProps) {
             </button>
           </div>
         )}
-
-        {/* ============================================================ */}
-        {/* TAB 1: SAVED APPLICATION FORMS (ACCESSIBLE BY ADMINS ONLY UNDER ADMIN PAGE) */}
-        {/* ============================================================ */}
-        {activeCareersTab === 'saved_forms' && (
-          !isAdmin ? (
-            <div className="text-center py-16 bg-brand-card/50 border border-brand-teal/20 rounded-3xl p-8 space-y-4 max-w-xl mx-auto my-8 shadow-2xl">
-              <div className="w-16 h-16 rounded-2xl bg-brand-teal/10 border border-brand-teal/30 flex items-center justify-center text-brand-teal mx-auto">
-                <ShieldCheck className="w-8 h-8" />
-              </div>
-              <h3 className="text-2xl font-display font-extrabold text-white">Admin Access Restricted</h3>
-              <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                The "My Application Forms" collection and candidate dossiers are restricted exclusively to authorized administrators under the Admin Page.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => onNavigate?.('admin')}
-                  className="px-6 py-3 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 flex items-center gap-2"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>Admin Page Login</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCareersTab('form')}
-                  className="px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                >
-                  Back to Open Roles
-                </button>
-              </div>
-            </div>
-          ) : (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-              <div>
-                <h2 className="text-2xl font-display font-extrabold text-white flex items-center gap-2.5">
-                  <FileText className="w-6 h-6 text-brand-teal" />
-                  <span>My Saved Application Forms</span>
-                </h2>
-                <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1">
-                  Your submitted candidate dossiers, induction records, and unique access keys saved on this device.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setShowKeyModal(true)}
-                  className="px-4 py-2.5 bg-brand-teal/20 hover:bg-brand-teal text-brand-teal hover:text-brand-dark border border-brand-teal/40 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>+ Paste Link to Add Form</span>
-                </button>
-              </div>
-            </div>
-
-            {savedApplications.length === 0 ? (
-              <div className="text-center py-16 bg-brand-card/50 border border-white/10 rounded-3xl p-8 space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center text-brand-teal mx-auto">
-                  <FileText className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-display font-bold text-white">No Application Forms Saved Yet</h3>
-                <p className="text-gray-400 text-xs sm:text-sm max-w-md mx-auto leading-relaxed">
-                  When you submit an application or paste your unique application link, it is saved here as a separate verifiable application form dossier — just like event tickets in the event section.
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  <button
-                    onClick={() => setShowKeyModal(true)}
-                    className="px-5 py-2.5 bg-brand-teal text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all cursor-pointer shadow-lg shadow-brand-teal/20 flex items-center gap-2"
-                  >
-                    <Key className="w-4 h-4" />
-                    <span>Paste Unique Link or Pass Key</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveCareersTab('form');
-                      setCurrentStep(1);
-                    }}
-                    className="px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                  >
-                    Apply for Open Positions
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {savedApplications.map((app) => (
-                  <div
-                    key={app.id}
-                    className="bg-brand-card/90 border border-brand-teal/30 hover:border-brand-teal/60 rounded-3xl p-6 sm:p-7 relative overflow-hidden shadow-2xl flex flex-col justify-between space-y-6 transition-all"
-                  >
-                    {/* Ambient accent */}
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-brand-teal/5 rounded-full blur-2xl pointer-events-none" />
-
-                    <div className="space-y-4 relative z-10">
-                      {/* Card Header: Status + Date + Delete */}
-                      <div className="flex items-center justify-between border-b border-white/10 pb-3 gap-2">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          (app.status as any) === 'Onboarding Completed' || (app.status as any) === 'Hired'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : (app.status as any) === 'Approved for Onboarding'
-                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                            : app.status === 'Shortlisted' || (app.status as any) === 'Shortlisted for Interview'
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}>
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>{app.status || 'Submitted'}</span>
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-mono text-gray-400">{app.submissionDate || 'Recent'}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAppToDelete(app);
-                              setShowDeleteAppModal(true);
-                            }}
-                            title="Remove from saved forms"
-                            className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition-all cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Sector & Role Title */}
-                      <div>
-                        <span className="text-[10px] font-mono uppercase text-brand-teal font-bold tracking-wider block mb-1">
-                          {app.sector}
-                        </span>
-                        <h3 className="text-xl font-display font-extrabold text-white tracking-tight">
-                          {app.roleTitle || 'Candidate Application'}
-                        </h3>
-                      </div>
-
-                      {/* Candidate Snapshot Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono bg-black/40 p-3.5 rounded-xl border border-white/5">
-                        <div>
-                          <span className="text-gray-500 text-[10px] block uppercase">Applicant Name</span>
-                          <span className="text-white font-bold truncate block">{app.fullName}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-[10px] block uppercase">Contact Email</span>
-                          <span className="text-gray-300 truncate block">{app.email}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-[10px] block uppercase">Phone / WhatsApp</span>
-                          <span className="text-gray-300">{app.whatsapp || app.phone || 'N/A'}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-[10px] block uppercase">Expected Salary</span>
-                          <span className="text-brand-teal font-bold">{app.expectedCompensation || '< ₹20,000 / Month'}</span>
-                        </div>
-                      </div>
-
-                      {/* Pass Key & Scannable QR code */}
-                      <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/5 border border-white/10">
-                        <div className="space-y-1.5 text-xs font-mono flex-1 min-w-0">
-                          <div className="text-[10px] text-gray-400 uppercase tracking-wider">Application Reference ID:</div>
-                          <div className="flex items-center gap-2">
-                            <code className="text-brand-teal font-bold text-xs bg-black/60 px-2.5 py-1 rounded border border-brand-teal/30 truncate">
-                              {app.id}
-                            </code>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(app.id);
-                                setCopiedKey(app.id);
-                                setTimeout(() => setCopiedKey(null), 2000);
-                              }}
-                              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all shrink-0"
-                              title="Copy ID"
-                            >
-                              {copiedKey === app.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                          {app.onboardingToken && (
-                            <div className="text-[10px] text-amber-300 pt-0.5">
-                              Security Token: <code className="text-white bg-black/40 px-1 rounded">{app.onboardingToken}</code>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Verified Scannable QR Code Canvas */}
-                        <div className="bg-white p-2 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-md text-black">
-                          <UpiQrCanvas upiString={`${window.location.origin}/careers?appId=${app.id}`} size={64} />
-                          <span className="text-[7px] font-mono text-gray-700 font-bold mt-0.5 uppercase tracking-tighter">
-                            Scan Dossier
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions Bar */}
-                    <div className="space-y-2 pt-2 border-t border-white/10 relative z-10">
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setViewingSavedApp(app)}
-                          className="py-2.5 px-3 rounded-xl bg-brand-teal text-brand-dark font-mono font-bold text-xs uppercase tracking-wider hover:bg-white transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View Form</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (app.status === 'Onboarding Completed' || app.status === 'Hired' || app.bankName) {
-                              setSuccessApp(app);
-                              setCurrentStep(3);
-                            } else if (app.onboardingAuthorized || app.onboardingToken) {
-                              setAuthorizedAppId(app.id);
-                              setOnboardingAuthorized(true);
-                              setCurrentStep(2);
-                            } else {
-                              setSubmittedStage1App(app);
-                              setAuthorizedAppId(app.id);
-                              setCurrentStep('submitted_stage1');
-                            }
-                            setActiveCareersTab('form');
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                          className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border border-white/15 cursor-pointer"
-                        >
-                          <ArrowRight className="w-3.5 h-3.5 text-brand-teal" />
-                          <span>Open In Portal</span>
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const directLink = `${window.location.origin}/careers?appId=${encodeURIComponent(app.id)}`;
-                            navigator.clipboard.writeText(directLink);
-                            setSavedActionNotice(`✓ Unique link for Application #${app.id} copied to clipboard!`);
-                            setTimeout(() => setSavedActionNotice(null), 3000);
-                          }}
-                          className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-mono text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                        >
-                          <Copy className="w-3 h-3 text-brand-teal" />
-                          <span>Copy Link</span>
-                        </button>
-
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent(
-                            `*S-CODERS Candidate Application Form Dossier*\n\n` +
-                            `*Applicant:* ${app.fullName}\n` +
-                            `*Role:* ${app.roleTitle || app.sector}\n` +
-                            `*Application ID:* ${app.id}\n` +
-                            `*Status:* ${app.status}\n\n` +
-                            `*Direct Access Link:* ${window.location.origin}/careers?appId=${app.id}\n\n` +
-                            `Official HR: scoders82@gmail.com`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 font-mono text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                        >
-                          <Share2 className="w-3 h-3 text-emerald-400" />
-                          <span>WhatsApp</span>
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          )
-        )}
-
-        {/* ============================================================ */}
-        {/* TAB 2: RECRUITMENT APPLICATION STAGES & PORTAL */}
-        {/* ============================================================ */}
-        {activeCareersTab === 'form' && (
-          <div>
 
         {/* Dedicated Separate Link & Database Sync Banner */}
         <div className="mb-10 bg-brand-card/80 border border-brand-teal/30 rounded-2xl p-4 sm:p-6 backdrop-blur-md shadow-xl relative overflow-hidden">
@@ -3959,12 +3625,9 @@ export default function Careers({ onNavigate }: CareersProps) {
           </motion.div>
         )}
 
-          </div>
-        )}
-
       </div>
 
-      {/* ENTER PASS KEY / PASTE UNIQUE APPLICATION LINK MODAL (EXACT SAME FORMAT AS EVENT SECTION) */}
+      {/* ENTER PASS KEY / PASTE UNIQUE APPLICATION LINK MODAL */}
       <AnimatePresence>
         {showKeyModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -3992,13 +3655,13 @@ export default function Careers({ onNavigate }: CareersProps) {
               </h3>
 
               <p className="text-gray-300 text-xs font-sans leading-relaxed">
-                Enter your unique S-CODERS candidate pass key (e.g. <code className="text-brand-teal font-bold font-mono">SCD-APP-2026-XXXX</code>, <code className="text-brand-teal font-bold font-mono">SCD-AGR-XXXX</code>) or paste your direct link to unlock and save your verified application form.
+                Enter your unique S-CODERS candidate pass key (e.g. <code className="text-brand-teal font-bold font-mono">SCD-APP-2026-XXXX</code>, <code className="text-brand-teal font-bold font-mono">SCD-AGR-XXXX</code>) or paste your direct link to unlock and resume your verified application form.
               </p>
 
               <div className="p-3 bg-brand-teal/10 border border-brand-teal/30 rounded-xl text-[11px] font-sans text-brand-teal/90 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-brand-teal mt-0.5" />
                 <span>
-                  <strong>Automatic Dossier Saving:</strong> Pasting your unique application link will automatically save your application form into your <strong>My Application Forms</strong> collection (just like tickets in the events section).
+                  <strong>Application Access:</strong> Pasting your unique application link or pass key will look up your candidate record and immediately open your application stage.
                 </span>
               </div>
 
@@ -4028,306 +3691,16 @@ export default function Careers({ onNavigate }: CareersProps) {
                   {isLookingUp ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying & Saving Application...</span>
+                      <span>Verifying Application...</span>
                     </>
                   ) : (
                     <>
                       <Key className="w-4 h-4" />
-                      <span>Unlock & Save Application Form</span>
+                      <span>Unlock Application Record</span>
                     </>
                   )}
                 </button>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* FULL CANDIDATE APPLICATION FORM DOSSIER MODAL */}
-      <AnimatePresence>
-        {viewingSavedApp && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-[#0B0F17] border-2 border-brand-teal/40 rounded-3xl max-w-3xl w-full p-6 sm:p-8 relative shadow-[0_0_50px_rgba(20,184,166,0.2)] my-auto text-white font-sans max-h-[90vh] overflow-y-auto"
-            >
-              {/* Top Bar with Close Button */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-teal/15 border border-brand-teal/30 flex items-center justify-center text-brand-teal">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-extrabold text-lg sm:text-xl text-white">
-                      Candidate Application Form
-                    </h3>
-                    <p className="text-xs font-mono text-gray-400">
-                      ID: <span className="text-brand-teal font-bold">{viewingSavedApp.id}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
-                    (viewingSavedApp.status as any) === 'Onboarding Completed' || (viewingSavedApp.status as any) === 'Hired'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : (viewingSavedApp.status as any) === 'Approved for Onboarding'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                      : viewingSavedApp.status === 'Shortlisted' || (viewingSavedApp.status as any) === 'Shortlisted for Interview'
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  }`}>
-                    {viewingSavedApp.status || 'Submitted'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setViewingSavedApp(null)}
-                    className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-white transition-all cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Printable Application Content */}
-              <div id="printable-candidate-dossier" className="space-y-6 text-xs sm:text-sm font-sans">
-                {/* Header info block */}
-                <div className="p-4 rounded-2xl bg-black/50 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase text-brand-teal font-bold tracking-widest block mb-0.5">
-                      {viewingSavedApp.sector}
-                    </span>
-                    <h4 className="text-lg font-display font-bold text-white">
-                      {viewingSavedApp.roleTitle || 'Candidate Application'}
-                    </h4>
-                    <p className="text-xs text-gray-400 font-mono mt-0.5">
-                      Submitted on: {viewingSavedApp.submissionDate || 'Recent'}
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-2 rounded-xl flex items-center gap-3 text-black">
-                    <UpiQrCanvas upiString={`${window.location.origin}/careers?appId=${viewingSavedApp.id}`} size={64} />
-                    <div className="text-left font-mono">
-                      <span className="text-[8px] uppercase tracking-tighter text-gray-500 font-bold block">Digital Verifier</span>
-                      <span className="text-[10px] font-bold text-brand-dark">{viewingSavedApp.id}</span>
-                      <span className="text-[8px] text-emerald-600 font-bold block mt-0.5">✓ Authenticated</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 1: Personal & Contact Profile */}
-                <div className="space-y-2">
-                  <h5 className="font-mono text-xs uppercase tracking-wider text-brand-teal font-bold flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5" />
-                    <span>Applicant Identity & Communication</span>
-                  </h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 font-mono text-xs">
-                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <span className="text-gray-500 text-[10px] block uppercase">Full Legal Name</span>
-                      <span className="text-white font-bold">{viewingSavedApp.fullName}</span>
-                    </div>
-                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <span className="text-gray-500 text-[10px] block uppercase">Official Email</span>
-                      <span className="text-gray-200 truncate block">{viewingSavedApp.email}</span>
-                    </div>
-                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <span className="text-gray-500 text-[10px] block uppercase">Phone / WhatsApp</span>
-                      <span className="text-gray-200">{viewingSavedApp.whatsapp || viewingSavedApp.phone || 'N/A'}</span>
-                    </div>
-                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <span className="text-gray-500 text-[10px] block uppercase">Current City / Location</span>
-                      <span className="text-gray-200">{viewingSavedApp.currentCity || 'N/A'}</span>
-                    </div>
-                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <span className="text-gray-500 text-[10px] block uppercase">Expected Salary</span>
-                      <span className="text-brand-teal font-bold">{viewingSavedApp.expectedCompensation || '< ₹20,000 / Month'}</span>
-                    </div>
-                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <span className="text-gray-500 text-[10px] block uppercase">Joining Notice</span>
-                      <span className="text-gray-200">{viewingSavedApp.availabilityNotice || 'Immediate'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 2: Technical / Creative Deliverables & Portfolio */}
-                <div className="space-y-2">
-                  <h5 className="font-mono text-xs uppercase tracking-wider text-brand-teal font-bold flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5" />
-                    <span>Skills, Experience & Work Samples</span>
-                  </h5>
-                  <div className="space-y-2 font-mono text-xs">
-                    {viewingSavedApp.keySkills && (
-                      <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Core Skills & Tools</span>
-                        <p className="text-gray-200 font-sans text-xs mt-1 leading-relaxed">{viewingSavedApp.keySkills}</p>
-                      </div>
-                    )}
-                    {viewingSavedApp.portfolioUrl && viewingSavedApp.portfolioUrl !== 'N/A' && (
-                      <div className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between gap-2">
-                        <div>
-                          <span className="text-gray-500 text-[10px] block uppercase">Portfolio / Work Drive Link</span>
-                          <a
-                            href={viewingSavedApp.portfolioUrl.startsWith('http') ? viewingSavedApp.portfolioUrl : `https://${viewingSavedApp.portfolioUrl}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-brand-teal hover:underline truncate block"
-                          >
-                            {viewingSavedApp.portfolioUrl}
-                          </a>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-brand-teal shrink-0" />
-                      </div>
-                    )}
-                    {viewingSavedApp.previousProjects && (
-                      <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Featured Project / Creative Work</span>
-                        <p className="text-gray-200 font-sans text-xs mt-1 leading-relaxed">{viewingSavedApp.previousProjects}</p>
-                      </div>
-                    )}
-                    {viewingSavedApp.impressiveAchievement && (
-                      <div className="p-3 bg-black/40 border border-white/5 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Notable Achievement</span>
-                        <p className="text-gray-200 font-sans text-xs mt-1 leading-relaxed">{viewingSavedApp.impressiveAchievement}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Section 3: Legal Induction & Banking Coordinates (If executed) */}
-                {(viewingSavedApp.bankName || viewingSavedApp.candidateDigitalSignature || viewingSavedApp.agreementReferenceId) && (
-                  <div className="space-y-2">
-                    <h5 className="font-mono text-xs uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Stage 2: Talent Induction & Banking Coordinates</span>
-                    </h5>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 font-mono text-xs">
-                      <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Disbursement Bank</span>
-                        <span className="text-white font-bold">{viewingSavedApp.bankName}</span>
-                      </div>
-                      <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Bank Account Number</span>
-                        <span className="text-gray-200">{viewingSavedApp.accountNumber ? `••••${viewingSavedApp.accountNumber.slice(-4)}` : 'Recorded'}</span>
-                      </div>
-                      <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">IFSC Code</span>
-                        <span className="text-gray-200">{viewingSavedApp.ifscCode}</span>
-                      </div>
-                      <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Agreement Reference</span>
-                        <span className="text-brand-teal font-bold">{viewingSavedApp.agreementReferenceId || viewingSavedApp.id}</span>
-                      </div>
-                      <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Digital Signature</span>
-                        <span className="text-brand-teal font-bold font-display">{viewingSavedApp.candidateDigitalSignature}</span>
-                      </div>
-                      <div className="p-3 bg-black/40 border border-emerald-500/20 rounded-xl">
-                        <span className="text-gray-500 text-[10px] block uppercase">Execution Date</span>
-                        <span className="text-gray-200">{viewingSavedApp.effectiveDate || viewingSavedApp.submissionDate}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-white/10 mt-6">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all"
-                  >
-                    <Printer className="w-4 h-4" />
-                    <span>Print Form</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const directLink = `${window.location.origin}/careers?appId=${encodeURIComponent(viewingSavedApp.id)}`;
-                      navigator.clipboard.writeText(directLink);
-                      setSavedActionNotice(`✓ Direct link for Application #${viewingSavedApp.id} copied to clipboard!`);
-                      setTimeout(() => setSavedActionNotice(null), 3000);
-                    }}
-                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-brand-teal text-brand-dark hover:bg-white rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
-                  >
-                    <Copy className="w-4 h-4" />
-                    <span>Copy Unique Link</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setViewingSavedApp(null)}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* APPLICATION FORM DELETION CONFIRMATION MODAL (MATCHING EVENT TICKETS FORMAT) */}
-      <AnimatePresence>
-        {showDeleteAppModal && appToDelete && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 15 }}
-              className="bg-[#0B0F17] border-2 border-red-500/60 rounded-3xl max-w-lg w-full p-6 sm:p-8 relative shadow-[0_0_50px_rgba(239,68,68,0.3)] my-auto text-white font-sans"
-            >
-              <div className="flex items-center gap-3 text-red-400 mb-4">
-                <div className="p-3 bg-red-500/20 rounded-2xl border border-red-500/40">
-                  <Trash2 className="w-6 h-6 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="font-display font-extrabold text-xl text-white">Remove Saved Application</h3>
-                  <p className="text-xs font-mono text-gray-400">Application Reference ID: #{appToDelete.id}</p>
-                </div>
-              </div>
-
-              {/* Candidate Application Snapshot */}
-              <div className="bg-black/50 border border-white/10 rounded-2xl p-4 mb-5 font-mono text-xs space-y-1.5">
-                <p className="text-white font-bold text-sm">{appToDelete.roleTitle || appToDelete.sector}</p>
-                <p className="text-gray-400">Applicant: <span className="text-gray-200">{appToDelete.fullName}</span> ({appToDelete.email})</p>
-                <p className="text-gray-400">Date: <span className="text-gray-200">{appToDelete.submissionDate || 'Recent'}</span></p>
-              </div>
-
-              {/* Privacy & Retention Warning Banner */}
-              <div className="bg-amber-500/10 border-l-4 border-amber-400 p-4 rounded-r-2xl mb-6 space-y-2 text-xs">
-                <p className="font-mono font-bold text-amber-300 uppercase tracking-wide">
-                  ⚠️ Privacy & Application Retention Policy:
-                </p>
-                <p className="text-amber-100 font-semibold leading-relaxed">
-                  "If you remove this application form from your saved collection, the reference will be erased from this device session. You can restore it anytime by pasting your unique link or pass key."
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={confirmDeleteApplication}
-                  className="flex-1 py-3.5 bg-red-600 hover:bg-red-500 text-white font-mono font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-red-600/30"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Yes, Remove From Saved</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDeleteAppModal(false);
-                    setAppToDelete(null);
-                  }}
-                  className="py-3.5 px-6 bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white font-mono text-xs sm:text-sm font-bold uppercase rounded-xl transition-colors cursor-pointer text-center"
-                >
-                  Keep My Application Form
-                </button>
-              </div>
             </motion.div>
           </div>
         )}

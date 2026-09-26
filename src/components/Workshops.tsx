@@ -163,14 +163,32 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     }
   }, [currentUser, showRegModal]);
 
-  // Listen to external database changes
+  // Leader photos state
+  const [leaderPhotos, setLeaderPhotos] = useState<Record<string, string>>({
+    shreyas: getLeaderPhoto('shreyas'),
+    bhuvan: getLeaderPhoto('bhuvan')
+  });
+
+  // Listen to external database changes and photo updates
   useEffect(() => {
     const reloadWorkshops = () => {
       setWorkshops(getDynamicWorkshops());
     };
+    const updatePhotos = () => {
+      setLeaderPhotos({
+        shreyas: getLeaderPhoto('shreyas'),
+        bhuvan: getLeaderPhoto('bhuvan')
+      });
+    };
     window.addEventListener('scoders_data_change', reloadWorkshops);
+    window.addEventListener('scoders_db_change', reloadWorkshops);
+    window.addEventListener('scoders_leader_photo_updated', updatePhotos);
+    window.addEventListener('storage', reloadWorkshops);
     return () => {
       window.removeEventListener('scoders_data_change', reloadWorkshops);
+      window.removeEventListener('scoders_db_change', reloadWorkshops);
+      window.removeEventListener('scoders_leader_photo_updated', updatePhotos);
+      window.removeEventListener('storage', reloadWorkshops);
     };
   }, []);
 

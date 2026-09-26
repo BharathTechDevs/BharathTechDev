@@ -153,6 +153,8 @@ export function saveDynamicEvents(events: SCODERSEvent[]): void {
   syncToBackend('scoders_dynamic_events', events);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
+    window.dispatchEvent(new Event('scoders_data_change'));
+    window.dispatchEvent(new Event('storage'));
   }
 }
 
@@ -177,6 +179,8 @@ export function saveEventTickets(tickets: EventTicket[]): void {
   syncToBackend('scoders_event_tickets', tickets);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('scoders_db_change'));
+    window.dispatchEvent(new Event('scoders_data_change'));
+    window.dispatchEvent(new Event('storage'));
   }
 }
 

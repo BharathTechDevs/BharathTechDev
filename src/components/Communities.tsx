@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Network, Sparkles, Presentation, Lightbulb, BadgeCheck, ArrowRight,
   TrendingUp, Compass, Award 
@@ -7,9 +7,43 @@ import { motion, AnimatePresence } from 'motion/react';
 import { STARTUP_COMMUNITIES } from '../data';
 
 export default function Communities() {
-  const [selectedCommunityId, setSelectedCommunityId] = useState<string>(STARTUP_COMMUNITIES[0].id);
+  const [communities, setCommunities] = useState(() => {
+    try {
+      const saved = localStorage.getItem('scoders_dynamic_communities');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return STARTUP_COMMUNITIES;
+  });
 
-  const activeCommunity = STARTUP_COMMUNITIES.find(c => c.id === selectedCommunityId) || STARTUP_COMMUNITIES[0];
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string>(() => {
+    return communities[0]?.id || 'comm-echai';
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const saved = localStorage.getItem('scoders_dynamic_communities');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCommunities(parsed);
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('scoders_data_change', handleUpdate);
+    window.addEventListener('scoders_db_change', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('scoders_data_change', handleUpdate);
+      window.removeEventListener('scoders_db_change', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const activeCommunity = communities.find(c => c.id === selectedCommunityId) || communities[0] || STARTUP_COMMUNITIES[0];
 
   return (
     <section id="communities" className="py-24 bg-brand-dark/95 relative overflow-hidden">

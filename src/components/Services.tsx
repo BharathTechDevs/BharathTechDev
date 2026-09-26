@@ -131,8 +131,12 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       setServices(getDynamicServices());
     };
     window.addEventListener('scoders_data_change', reloadServices);
+    window.addEventListener('scoders_db_change', reloadServices);
+    window.addEventListener('storage', reloadServices);
     return () => {
       window.removeEventListener('scoders_data_change', reloadServices);
+      window.removeEventListener('scoders_db_change', reloadServices);
+      window.removeEventListener('storage', reloadServices);
     };
   }, []);
 

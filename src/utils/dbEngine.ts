@@ -124,6 +124,12 @@ export interface TeamMemberRecord {
   joiningDate: string;
   assignedProjects: string[]; // Project IDs/titles
   currentProjectStatus: string;
+  bio?: string;
+  expertise?: string[];
+  githubUrl?: string;
+  githubHandle?: string;
+  linkedinUrl?: string;
+  linkedinHandle?: string;
 }
 
 export interface GalleryMediaItem {
@@ -172,7 +178,11 @@ const SEED_TEAM: TeamMemberRecord[] = [
     photoUrl: '/techlead.jpg',
     joiningDate: '01/01/2026',
     assignedProjects: ['AgroSmart AI Cloud Core', 'Real-time WebSocket Engine'],
-    currentProjectStatus: 'Active & Architecting'
+    currentProjectStatus: 'Active & Architecting',
+    githubUrl: 'https://github.com/Gowda487',
+    githubHandle: 'Gowda487',
+    linkedinUrl: 'https://www.linkedin.com/in/bhuvan-m-102835326/',
+    linkedinHandle: 'Bhuvan M.'
   }
 ];
 
@@ -567,7 +577,8 @@ export class DatabaseEngine {
           'scoders_dynamic_services', 'scoders_dynamic_workshops', 'scoders_dynamic_invoices',
           'scoders_dynamic_networking', 'scoders_saved_candidate_applications',
           'scoders_registered_services', 'scoders_registered_workshops', 'scoders_enquiries',
-          'scoders_department_configs', 'scoders_department_meetings', 'scoders_main_whatsapp_community'
+          'scoders_department_configs', 'scoders_department_meetings', 'scoders_main_whatsapp_community',
+          'scoders_photo_shreyas', 'scoders_photo_lokesh', 'scoders_photo_bhuvan', 'scoders_team_photos'
         ];
 
         for (const key of trackedKeys) {
@@ -595,6 +606,8 @@ export class DatabaseEngine {
           window.dispatchEvent(new Event('scoders_departments_change'));
           window.dispatchEvent(new Event('scoders_meetings_change'));
           window.dispatchEvent(new Event('scoders_saved_applications_change'));
+          window.dispatchEvent(new Event('scoders_team_change'));
+          window.dispatchEvent(new Event('storage'));
         }
       }
     } catch (e) {
@@ -905,7 +918,7 @@ export class DatabaseEngine {
   }
 }
 
-// Auto-sync database with server on load, focus, and every 6 seconds for multi-device sync
+// Auto-sync database with server on load, focus, visibility change, and every 3.5 seconds for multi-device sync
 if (typeof window !== 'undefined') {
   DatabaseEngine.syncWithServer();
   DatabaseEngine.syncApplicationsFromServer();
@@ -913,10 +926,16 @@ if (typeof window !== 'undefined') {
     DatabaseEngine.syncWithServer();
     DatabaseEngine.syncApplicationsFromServer();
   });
-  // Background interval so changes made by another admin or friend appear automatically
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      DatabaseEngine.syncWithServer();
+      DatabaseEngine.syncApplicationsFromServer();
+    }
+  });
+  // Background interval so changes made by admin or tech head appear on all client devices automatically
   setInterval(() => {
     DatabaseEngine.syncWithServer();
     DatabaseEngine.syncApplicationsFromServer();
-  }, 6000);
+  }, 3500);
 }
 

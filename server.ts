@@ -1084,7 +1084,7 @@ async function startServer() {
   const appStateFilePath = path.resolve(process.cwd(), "data", "app-state.json");
 
   function getStoredLeaderPhotos(): Record<string, string> {
-    const defaults = {
+    const defaults: Record<string, string> = {
       shreyas: "/founder.jpg",
       lokesh: "/cofounder.jpg",
       bhuvan: "/techlead.jpg",
@@ -1114,7 +1114,10 @@ async function startServer() {
     try {
       if (fs.existsSync(appStateFilePath)) {
         const content = fs.readFileSync(appStateFilePath, "utf-8");
-        return JSON.parse(content || "{}");
+        const parsed = JSON.parse(content || "{}");
+        if (parsed && typeof parsed === "object") {
+          return parsed;
+        }
       }
     } catch (e) {
       console.error("Error reading app state file:", e);
@@ -1132,19 +1135,34 @@ async function startServer() {
     }
   }
 
-  // 1. Shared Leader Photos Endpoints
+  // 1. Shared Leader Photos Endpoints (Available to all visitors & admin sync)
   app.get("/api/leader-photos", (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.json({ success: true, photos: getStoredLeaderPhotos() });
   });
 
   app.post("/api/leader-photos", (req, res) => {
     try {
-      const { id, photoUrl } = req.body;
-      if (!id || !photoUrl || !['shreyas', 'lokesh', 'bhuvan'].includes(id)) {
-        return res.status(400).json({ error: "Invalid leader ID or photo URL" });
-      }
       const current = getStoredLeaderPhotos();
+      const { id, photoUrl, photos } = req.body;
+
+      if (photos && typeof photos === 'object') {
+        Object.entries(photos).forEach(([k, v]) => {
+          if (typeof v === 'string' && v.trim().length > 0) {
+            current[k] = v.trim();
+          }
+        });
+        saveStoredLeaderPhotos(current);
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        return res.json({ success: true, photos: current });
+      }
+
+      if (!id || !photoUrl) {
+        return res.status(400).json({ error: "Missing leader ID or photo URL" });
+      }
+
       current[id] = photoUrl;
       saveStoredLeaderPhotos(current);
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -1165,6 +1183,8 @@ async function startServer() {
       const current = getStoredLeaderPhotos();
       if (id && defaults[id]) {
         current[id] = defaults[id];
+      } else if (id) {
+        delete current[id];
       } else {
         Object.assign(current, defaults);
       }

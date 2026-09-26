@@ -125,11 +125,19 @@ export default function Contact() {
                   <Phone className="w-5 h-5 text-brand-teal shrink-0 mt-0.5" />
                   <div>
                     <span className="text-[11px] font-mono uppercase text-brand-teal font-bold block">Bhuvan M • Tech Lead (+91 6363905989)</span>
-                    <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-3 mt-1">
                       <a href="tel:+916363905989" className="hover:text-brand-teal font-bold font-mono transition-colors">+91 6363905989</a>
                       <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="text-[#25D366] text-xs font-mono hover:underline flex items-center gap-1">
                         <MessageCircle className="w-3 h-3" />
                         <span>Chat on WhatsApp</span>
+                      </a>
+                      <a href="https://github.com/Gowda487" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white text-xs font-mono hover:underline flex items-center gap-1">
+                        <Github className="w-3 h-3 text-white" />
+                        <span>GitHub</span>
+                      </a>
+                      <a href="https://www.linkedin.com/in/bhuvan-m-102835326/" target="_blank" rel="noopener noreferrer" className="text-[#38bdf8] text-xs font-mono hover:underline flex items-center gap-1">
+                        <Linkedin className="w-3 h-3" />
+                        <span>LinkedIn</span>
                       </a>
                     </div>
                   </div>
