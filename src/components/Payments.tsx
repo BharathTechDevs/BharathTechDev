@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { 
   CreditCard, QrCode, CheckCircle, ArrowRight, Lock, ShieldCheck, 
-  Copy, Check, FileText, Upload, Download, Search, Receipt, 
-  Sparkles, IndianRupee, DollarSign, Wallet, RefreshCw, Star, Mail 
+  Copy, Check, FileText, Upload, Search, Receipt, 
+  Sparkles, Wallet, RefreshCw, Mail, AlertTriangle, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getDynamicWorkshops, getDynamicInvoices } from '../utils/dynamicData';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import PhonePeScannerCard from './PhonePeScannerCard';
-import { openUpiApp, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI, getBankingNameForUpi } from '../utils/paymentLinks';
+import PaymentFailureCard, { FallbackPaymentOption } from './PaymentFailureCard';
+import { openUpiApp, getActiveMerchantUpi, getBankingNameForUpi } from '../utils/paymentLinks';
+import {
+  PaymentState,
+  PaymentFailureDetails,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  checkRazorpayOrderStatus,
+  classifyPaymentFailure,
+} from '../services/razorpay';
 
 interface PaymentHistoryItem {
   txnId: string;
@@ -49,6 +58,12 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   
   // Payment methods: 'razorpay' | 'upi' | 'card' | 'bank'
   const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'upi' | 'card' | 'bank'>('razorpay');
+
+  // Authoritative Payment State Machine (Section 1)
+  const [paymentState, setPaymentState] = useState<PaymentState>('IDLE');
+  const [failureDetails, setFailureDetails] = useState<PaymentFailureDetails | null>(null);
+  const [alreadyPaidNotice, setAlreadyPaidNotice] = useState<string | null>(null);
+  const [statusCheckLoading, setStatusCheckLoading] = useState(false);
 
   // Razorpay email status notification feedback state
   const [razorpayEmailNotice, setRazorpayEmailNotice] = useState<{
@@ -100,6 +115,10 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   const [receiptFile, setReceiptFile] = useState<string | null>(null);
   const [receiptName, setReceiptName] = useState('');
 
+  // UPI UTR / Reference input for custom UPI verification
+  const [utrInput, setUtrInput] = useState('');
+  const [validationNotice, setValidationNotice] = useState<string | null>(null);
+
   // State managers
   const [loading, setLoading] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -112,6 +131,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     amount: number;
     currency: string;
     keyId?: string;
+    applicationOrderKey?: string;
   } | null>(null);
   const [razorpayPaymentDetails, setRazorpayPaymentDetails] = useState<{
     amount: number;
@@ -131,9 +151,146 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   const [ruyGatewayStep, setRuyGatewayStep] = useState<'idle' | 'awaiting' | 'processing' | 'success'>('idle');
   const [ruyTimer, setRuyTimer] = useState(300); // 5 minutes (300 seconds)
 
+  // Local transaction records
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>(() => {
+    const saved = localStorage.getItem('scoders_payments');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Calculate workshop total
+  const selectedWorkshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
+  const ticketPrice = selectedWorkshopObj?.price ?? 1499;
+  const workshopTotal = ticketQty * ticketPrice;
+
+  // Deterministic Application Order Key for Duplicate Payment Protection (Section 9)
+  const getCurrentApplicationOrderKey = () => {
+    const isWorkshop = activeTab === 'workshop';
+    const workshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
+    const finalEmail = (isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail).trim().toLowerCase();
+    const finalAmount = isWorkshop ? workshopTotal : amount;
+    const targetKey = isWorkshop
+      ? `workshop_${workshopObj?.id || 'default'}_${ticketQty}`
+      : `invoice_${selectedInvoiceId || purpose.trim().toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 32)}`;
+    return `app_ord_${targetKey}_${finalEmail}_${finalAmount}`;
+  };
+
+  // Helper to ensure an authoritative Razorpay order exists (reusing valid order or creating new one)
+  const ensureAuthoritativeOrder = async (forceNewOrder = false): Promise<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId?: string;
+    applicationOrderKey: string;
+    alreadyPaid?: boolean;
+    paymentId?: string;
+  } | null> => {
+    const isWorkshop = activeTab === 'workshop';
+    const workshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
+    const finalClientName = isWorkshop ? clientName || 'Workshop Attendee' : clientName;
+    const finalEmail = isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail;
+    const purposeText = isWorkshop 
+      ? `Booking: ${ticketQty}x Seats for ${workshopObj?.title || 'S-CODERS Workshop'}` 
+      : purpose;
+    const finalAmount = isWorkshop ? workshopTotal : amount;
+    const finalCurrency = isWorkshop ? 'INR' : currency;
+    const applicationOrderKey = getCurrentApplicationOrderKey();
+
+    // Reuse existing order if parameters match and not forcing a new order
+    if (
+      !forceNewOrder &&
+      razorpayOrderData?.orderId &&
+      razorpayOrderData.applicationOrderKey === applicationOrderKey &&
+      razorpayOrderData.amount === finalAmount
+    ) {
+      const statusRes = await checkRazorpayOrderStatus(
+        razorpayOrderData.orderId,
+        applicationOrderKey
+      );
+      if (statusRes.status === 'PAID' || statusRes.verified) {
+        return {
+          ...razorpayOrderData,
+          applicationOrderKey,
+          alreadyPaid: true,
+          paymentId: statusRes.paymentId,
+        };
+      }
+      if (statusRes.reusable !== false && statusRes.status !== 'EXPIRED') {
+        return {
+          ...razorpayOrderData,
+          applicationOrderKey,
+        };
+      }
+    }
+
+    setPaymentState('CREATING_ORDER');
+    const orderRes = await createRazorpayOrder({
+      amount: finalAmount,
+      currency: finalCurrency,
+      receipt: `rcpt_${Date.now()}`,
+      purpose: purposeText,
+      workshopId: isWorkshop ? selectedWorkshopId : undefined,
+      productId: !isWorkshop ? (selectedInvoiceId || undefined) : undefined,
+      applicationOrderKey,
+      existingOrderId: !forceNewOrder ? razorpayOrderData?.orderId : undefined,
+      forceNewOrder,
+      customer: {
+        name: finalClientName,
+        email: finalEmail,
+      },
+      notes: {
+        clientName: finalClientName,
+        email: finalEmail,
+        purpose: purposeText,
+        applicationOrderKey,
+      },
+    });
+
+    if (orderRes.alreadyPaid) {
+      return {
+        orderId: orderRes.orderId || razorpayOrderData?.orderId || '',
+        amount: finalAmount,
+        currency: finalCurrency,
+        keyId: orderRes.keyId,
+        applicationOrderKey,
+        alreadyPaid: true,
+        paymentId: orderRes.paymentId,
+      };
+    }
+
+    if (!orderRes.success || !orderRes.orderId) {
+      const classified = classifyPaymentFailure({
+        rawReason: orderRes.error || 'Could not initialize payment order.',
+        failedMethod: paymentMethod === 'upi' ? selectedUpiApp || 'UPI' : 'Razorpay',
+      });
+      setPaymentState('FAILED');
+      setFailureDetails(classified);
+      return null;
+    }
+
+    const newOrderObj = {
+      orderId: orderRes.orderId,
+      amount: finalAmount,
+      currency: finalCurrency,
+      keyId: orderRes.keyId || 'rzp_live_scoders_ybl',
+      applicationOrderKey,
+    };
+    setRazorpayOrderData(newOrderObj);
+    setRazorpayPaymentDetails({
+      amount: finalAmount,
+      currency: finalCurrency,
+      clientName: finalClientName,
+      email: finalEmail,
+      purpose: purposeText,
+      merchantUpiId: getActiveMerchantUpi(),
+    });
+    return newOrderObj;
+  };
+
   // Razorpay Live Checkout & Automated Email Handler
   const handleRazorpayCheckout = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setValidationNotice(null);
+    setAlreadyPaidNotice(null);
 
     const isWorkshop = activeTab === 'workshop';
     const workshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
@@ -145,72 +302,54 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       : purpose;
 
     const finalAmount = isWorkshop ? workshopTotal : amount;
-    const finalCurrency = isWorkshop ? 'INR' : currency;
 
     if (!finalClientName.trim() || !finalEmail.trim() || !purposeText.trim() || finalAmount <= 0) {
-      alert('Please fill out your Name, Email ID, Purpose, and Amount before proceeding.');
+      setValidationNotice('Please fill out your Name, Email ID, Purpose, and Amount before proceeding.');
       return;
     }
 
     setLoading(true);
     setRazorpayEmailNotice(null);
+    setFailureDetails(null);
 
     try {
-      // 1. Call backend order API
-      const orderRes = await fetch('/api/razorpay/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: finalAmount,
-          currency: finalCurrency,
-          receipt: `rcpt_${Date.now()}`,
-          notes: { clientName: finalClientName, email: finalEmail, purpose: purposeText }
-        })
-      });
-
-      const orderData = await orderRes.json();
-
-      setRazorpayOrderData({
-        orderId: orderData?.orderId || `ord_${Date.now()}`,
-        amount: finalAmount,
-        currency: finalCurrency,
-        keyId: orderData?.keyId || 'rzp_live_scoders_ybl'
-      });
-
-      setRazorpayPaymentDetails({
-        amount: finalAmount,
-        currency: finalCurrency,
-        clientName: finalClientName,
-        email: finalEmail,
-        purpose: purposeText,
-        merchantUpiId: getActiveMerchantUpi()
-      });
-
-      setShowRazorpayModal(true);
+      const orderInfo = await ensureAuthoritativeOrder(false);
       setLoading(false);
+
+      if (!orderInfo) {
+        return;
+      }
+
+      if (orderInfo.alreadyPaid) {
+        setPaymentState('ALREADY_PAID');
+        setAlreadyPaidNotice('Payment already completed.');
+        setRazorpayEmailNotice({
+          sent: true,
+          email: finalEmail,
+          type: 'SUCCESS',
+          message: 'Payment already completed for this order. Duplicate payments are prevented.',
+        });
+        return;
+      }
+
+      setPaymentState('CHECKOUT_OPEN');
+      setShowRazorpayModal(true);
     } catch (err: any) {
-      console.warn("Using offline Razorpay order initialization:", err);
-      setRazorpayOrderData({
-        orderId: `ord_${Date.now()}`,
-        amount: finalAmount,
-        currency: finalCurrency,
-        keyId: 'rzp_live_scoders_ybl'
-      });
-      setRazorpayPaymentDetails({
-        amount: finalAmount,
-        currency: finalCurrency,
-        clientName: finalClientName,
-        email: finalEmail,
-        purpose: purposeText,
-        merchantUpiId: getActiveMerchantUpi()
-      });
-      setShowRazorpayModal(true);
       setLoading(false);
+      const classified = classifyPaymentFailure({
+        rawReason: err?.message || 'Unable to start checkout.',
+        failedMethod: 'Razorpay Checkout',
+      });
+      setPaymentState('FAILED');
+      setFailureDetails(classified);
     }
   };
 
   const handleRazorpaySuccess = (data: RazorpayPaymentSuccessData) => {
     setShowRazorpayModal(false);
+    setPaymentState('SUCCESS');
+    setFailureDetails(null);
+    setRuyGatewayStep('idle');
     const activeVpa = getActiveMerchantUpi();
 
     const newTxn: PaymentHistoryItem = {
@@ -259,17 +398,6 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     });
     setShowEmailNotice(true);
   };
-  
-  // Local transaction records
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>(() => {
-    const saved = localStorage.getItem('scoders_payments');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Calculate workshop total
-  const selectedWorkshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
-  const ticketPrice = selectedWorkshopObj?.price ?? 1499;
-  const workshopTotal = ticketQty * ticketPrice;
 
   // Invoice autofill handler
   const handleLookupInvoice = (id: string) => {
@@ -281,6 +409,9 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       setAmount(inv.amount);
       setCurrency(inv.currency);
       setSelectedInvoiceId(inv.id);
+      setAlreadyPaidNotice(null);
+      setFailureDetails(null);
+      setPaymentState('IDLE');
     } else {
       setSelectedInvoiceId(null);
     }
@@ -299,172 +430,283 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       interval = setInterval(() => {
         setRuyTimer((prev) => prev - 1);
       }, 1000);
-    } else if (ruyTimer === 0) {
+    } else if (ruyGatewayStep === 'awaiting' && ruyTimer === 0) {
       setRuyGatewayStep('idle');
-      alert('Ruy Secure Checkout Session has timed out. Please select your app again.');
+      setPaymentState('UNKNOWN');
+      setFailureDetails(
+        classifyPaymentFailure({
+          isUncertain: true,
+          failedMethod: selectedUpiApp ? selectedUpiApp.toUpperCase() : 'UPI App',
+          orderId: razorpayOrderData?.orderId,
+        })
+      );
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [ruyGatewayStep, ruyTimer]);
+  }, [ruyGatewayStep, ruyTimer, selectedUpiApp, razorpayOrderData?.orderId]);
 
-  // Helper to generate the most robust device-specific UPI deep link
-  const getUpiDeviceLink = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic', address: string, name: string, amount: number, note: string) => {
-    const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-    const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    
-    const cleanBankingName = getBankingNameForUpi(address);
-    const encodedName = encodeURIComponent(cleanBankingName);
-    const cleanAmount = (amount || 0).toFixed(2);
-    const cleanNote = (note || 'SCODERS Payment').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
-    const encodedNote = encodeURIComponent(cleanNote);
-    const params = `pa=${address}&pn=${encodedName}&am=${cleanAmount}&cu=INR&tn=${encodedNote}`;
-    
-    if (isAndroid) {
-      if (app === 'phonepe') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.phonepe.app;action=android.intent.action.VIEW;end;`;
-      } else if (app === 'gpay') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
-      } else if (app === 'paytm') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
-      } else if (app === 'bhim') {
-        return `intent://pay?${params}#Intent;scheme=upi;package=in.org.npci.upiapp;action=android.intent.action.VIEW;end;`;
-      }
-      return `upi://pay?${params}`;
-    } else if (isIOS) {
-      if (app === 'phonepe') {
-        return `phonepe://pay?${params}`;
-      } else if (app === 'gpay') {
-        return `tez://upi/pay?${params}`;
-      } else if (app === 'paytm') {
-        return `paytmmp://pay?${params}`;
-      }
-      return `upi://pay?${params}`;
-    } else {
-      return `upi://pay?${params}`;
-    }
-  };
+  // Initiate Ruy Pay app redirect associated with an authoritative Razorpay Order (Section 12 & 13)
+  const handleRuyAppRedirect = async (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic') => {
+    setValidationNotice(null);
+    setAlreadyPaidNotice(null);
 
-  // Initiate Ruy Pay app redirect
-  const handleRuyAppRedirect = (app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'generic') => {
-    // Check form parameters if paying invoice
     if (activeTab === 'invoice') {
       if (!clientName.trim() || !clientEmail.trim() || !purpose.trim() || amount <= 0) {
-        alert('Please fill out all invoice parameters first.');
-        return;
-      }
-    }
-
-    setSelectedUpiApp(app);
-    setRuyGatewayStep('awaiting');
-    setRuyTimer(300); // Reset countdown to 5 minutes
-    
-    // Generate UPI standard payload
-    const payeeAddress = getActiveMerchantUpi();
-    const payeeName = getBankingNameForUpi(payeeAddress);
-    const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
-    const note = (activeTab === 'workshop' ? `Workshop Booking` : purpose).slice(0, 25);
-    
-    const scheme = app === 'phonepe' ? 'phonepe' : app === 'gpay' ? 'gpay' : app === 'paytm' ? 'paytm' : app === 'bhim' ? 'bhim' : 'universal';
-    
-    openUpiApp({
-      pa: payeeAddress,
-      pn: payeeName,
-      am: payAmount,
-      tn: note
-    }, scheme);
-  };
-
-  const handleRuyPaymentComplete = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    
-    // Validations
-    if (activeTab === 'invoice') {
-      if (!clientName.trim() || !clientEmail.trim() || !purpose.trim() || amount <= 0) {
-        alert('Please fill out all invoice parameters.');
+        setValidationNotice('Please fill out all invoice parameters (Client Name, Email, Purpose, Amount) first.');
         return;
       }
     }
 
     setLoading(true);
+    const orderInfo = await ensureAuthoritativeOrder(false);
+    setLoading(false);
+
+    if (!orderInfo) return;
+
+    if (orderInfo.alreadyPaid) {
+      setPaymentState('ALREADY_PAID');
+      setAlreadyPaidNotice('Payment already completed.');
+      return;
+    }
+
+    setSelectedUpiApp(app);
+    setFailureDetails(null);
+    setPaymentState('PROCESSING');
+    setRuyGatewayStep('awaiting');
+    setRuyTimer(300); // Reset countdown to 5 minutes
+    
+    // On desktop, do not force-launch a mobile-only intent; openUpiApp safely handles mobile devices
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      const payeeAddress = getActiveMerchantUpi();
+      const payeeName = getBankingNameForUpi(payeeAddress);
+      const payAmount = activeTab === 'workshop' ? workshopTotal : amount;
+      const note = (activeTab === 'workshop' ? `Workshop Booking` : purpose).slice(0, 25);
+      const scheme = app === 'phonepe' ? 'phonepe' : app === 'gpay' ? 'gpay' : app === 'paytm' ? 'paytm' : app === 'bhim' ? 'bhim' : 'universal';
+      
+      openUpiApp({
+        pa: payeeAddress,
+        pn: payeeName,
+        am: payAmount,
+        tn: note
+      }, scheme);
+    }
+  };
+
+  // Authoritative verification for custom UPI tab (never marks PAID without backend Razorpay verification)
+  const handleRuyPaymentComplete = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setValidationNotice(null);
+
+    if (activeTab === 'invoice') {
+      if (!clientName.trim() || !clientEmail.trim() || !purpose.trim() || amount <= 0) {
+        setValidationNotice('Please fill out all invoice parameters.');
+        return;
+      }
+    }
+
+    const cleanUtr = utrInput.trim();
+    if (!cleanUtr || cleanUtr.length < 6) {
+      setValidationNotice('Please enter your 12-digit UPI Reference / UTR Number from your UPI app to verify payment with the server, or use Razorpay Checkout.');
+      return;
+    }
+
+    setLoading(true);
+    setPaymentState('VERIFYING');
     setRuyGatewayStep('processing');
 
-    setTimeout(() => {
+    try {
+      const orderInfo = await ensureAuthoritativeOrder(false);
+      if (!orderInfo) {
+        setLoading(false);
+        setRuyGatewayStep('idle');
+        return;
+      }
+
+      if (orderInfo.alreadyPaid) {
+        setLoading(false);
+        setPaymentState('ALREADY_PAID');
+        setAlreadyPaidNotice('Payment already completed.');
+        setRuyGatewayStep('idle');
+        return;
+      }
+
       const isWorkshop = activeTab === 'workshop';
       const workshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
-      
+      const finalClientName = isWorkshop ? clientName || 'Workshop Attendee' : clientName;
+      const finalEmail = isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail;
       const purposeText = isWorkshop 
         ? `Booking: ${ticketQty}x Seats for ${workshopObj?.title || 'S-CODERS Workshop'}` 
         : purpose;
-
       const finalAmount = isWorkshop ? workshopTotal : amount;
       const finalCurrency = isWorkshop ? 'INR' : currency;
 
-      let modeLabel = 'Ruy Pay Instant UPI';
+      let modeLabel = 'UPI Verified';
       if (selectedUpiApp) {
-        modeLabel = `Ruy Pay (${selectedUpiApp === 'gpay' ? 'GPay' : selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'paytm' ? 'Paytm' : selectedUpiApp === 'bhim' ? 'BHIM UPI' : 'UPI Link'})`;
-      } else if (paymentMethod === 'card') {
-        modeLabel = `Ruy Secure Card (${getCardBrand()})`;
-      } else if (paymentMethod === 'bank') {
-        modeLabel = 'Ruy NetBanking';
+        modeLabel = `${selectedUpiApp === 'gpay' ? 'Google Pay' : selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'paytm' ? 'Paytm' : selectedUpiApp === 'bhim' ? 'BHIM UPI' : 'UPI'} (UTR: ${cleanUtr})`;
       }
 
-      const newTxn: PaymentHistoryItem = {
-        txnId: `SCO-TXN-${Math.floor(100000000 + Math.random() * 900000000)}`,
-        clientName: isWorkshop ? clientName || 'Workshop Attendee' : clientName,
-        email: isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail,
-        purpose: purposeText,
+      const paymentId = `pay_upi_${cleanUtr}`;
+      const verifyResult = await verifyRazorpayPayment({
+        razorpay_order_id: orderInfo.orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: `upi_verified_sig_${orderInfo.orderId}`,
+        clientName: finalClientName,
+        email: finalEmail,
         amount: finalAmount,
         currency: finalCurrency,
-        method: modeLabel,
-        timestamp: new Date().toLocaleString(),
-        status: 'SUCCESS'
-      };
-
-      // Save to state & localstorage
-      const updatedHistory = [newTxn, ...paymentHistory];
-      setPaymentHistory(updatedHistory);
-      localStorage.setItem('scoders_payments', JSON.stringify(updatedHistory));
-
-      setSuccessTxn(newTxn);
-      if (onSuccess) {
-        onSuccess(newTxn);
-      }
-      setLoading(false);
-      setRuyGatewayStep('success');
-
-      // Trigger Email Notice
-      const targetReturnView = prefilledInvoice?.returnView || (isWorkshop ? 'workshops' : 'services');
-      setEmailNoticeData({
-        type: isWorkshop ? 'workshop' : 'service',
-        recipientEmail: isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail,
-        recipientName: isWorkshop ? clientName || 'Workshop Attendee' : clientName,
-        subject: `✅ Payment Done Successfully - S-CODERS (Ref: ${newTxn.txnId})`,
-        title: purposeText,
-        uniqueKey: newTxn.txnId,
-        messageText: `Your payment of ₹${finalAmount.toLocaleString()} has been received and logged in the immutable ledger. An official receipt has been dispatched from scoders82@gmail.com.`,
-        amount: finalAmount,
-        actionText: isModal ? "Return & Continue Work" : `Return to ${targetReturnView === 'workshops' ? 'Workshops' : targetReturnView === 'services' ? 'Services' : 'Workspace'}`,
-        onAction: () => {
-          if (onClose) onClose();
-          if (onNavigate && targetReturnView) onNavigate(targetReturnView);
-        }
+        purpose: purposeText,
+        paymentMethodLabel: modeLabel,
+        merchantUpiId: getActiveMerchantUpi(),
       });
-      setShowEmailNotice(true);
 
-      // Reset specific forms
-      setInvoiceLookup('');
-      setClientName('');
-      setClientEmail('');
-      setPurpose('');
-      setCardNumber('');
-      setCardHolder('');
-      setCardExpiry('');
-      setCardCvv('');
-      setReceiptFile(null);
-      setReceiptName('');
-      setSelectedUpiApp(null);
-    }, 2000);
+      setLoading(false);
+
+      if (verifyResult.verified) {
+        setPaymentState('SUCCESS');
+        setRuyGatewayStep('success');
+        setUtrInput('');
+        handleRazorpaySuccess({
+          razorpay_payment_id: verifyResult.paymentId || paymentId,
+          razorpay_order_id: orderInfo.orderId,
+          razorpay_signature: `upi_verified_sig_${orderInfo.orderId}`,
+          amount: finalAmount,
+          currency: finalCurrency,
+          clientName: finalClientName,
+          email: finalEmail,
+          purpose: purposeText,
+          method: modeLabel,
+        });
+      } else if (verifyResult.isUncertain) {
+        setPaymentState('UNKNOWN');
+        setRuyGatewayStep('idle');
+        setFailureDetails(
+          classifyPaymentFailure({
+            isUncertain: true,
+            failedMethod: modeLabel,
+            orderId: orderInfo.orderId,
+          })
+        );
+      } else {
+        const classified = classifyPaymentFailure({
+          rawReason: verifyResult.error || 'Payment verification failed.',
+          failedMethod: modeLabel,
+          orderId: orderInfo.orderId,
+          paymentCapturedConfirmedFalse: true,
+        });
+        setPaymentState('FAILED');
+        setRuyGatewayStep('idle');
+        setFailureDetails(classified);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setPaymentState('UNKNOWN');
+      setRuyGatewayStep('idle');
+      setFailureDetails(
+        classifyPaymentFailure({
+          isUncertain: true,
+          failedMethod: selectedUpiApp || 'UPI',
+          orderId: razorpayOrderData?.orderId,
+        })
+      );
+    }
+  };
+
+  // Report a UPI App Decline (e.g. PhonePe/Google Pay bank security or limit decline)
+  const handleReportUpiDecline = (reasonType: 'bank_security' | 'cancelled' | 'uncertain') => {
+    const appLabel =
+      selectedUpiApp === 'phonepe'
+        ? 'PhonePe'
+        : selectedUpiApp === 'gpay'
+        ? 'Google Pay'
+        : selectedUpiApp === 'paytm'
+        ? 'Paytm'
+        : selectedUpiApp === 'bhim'
+        ? 'BHIM UPI'
+        : 'UPI App';
+
+    setRuyGatewayStep('idle');
+
+    if (reasonType === 'uncertain') {
+      setPaymentState('UNKNOWN');
+      setFailureDetails(
+        classifyPaymentFailure({
+          isUncertain: true,
+          failedMethod: appLabel,
+          orderId: razorpayOrderData?.orderId,
+        })
+      );
+      return;
+    }
+
+    if (reasonType === 'cancelled') {
+      const details = classifyPaymentFailure({
+        rawReason: 'The payment was cancelled.',
+        isCancelled: true,
+        failedMethod: appLabel,
+        orderId: razorpayOrderData?.orderId,
+        paymentCapturedConfirmedFalse: true,
+      });
+      setPaymentState('CANCELLED');
+      setFailureDetails(details);
+      return;
+    }
+
+    const details = classifyPaymentFailure({
+      rawReason: 'Your payment is declined for security reasons or bank limit.',
+      code: 'BAD_REQUEST_ERROR',
+      failedMethod: appLabel,
+      orderId: razorpayOrderData?.orderId,
+      paymentCapturedConfirmedFalse: true,
+    });
+    setPaymentState('FAILED');
+    setFailureDetails(details);
+  };
+
+  // Check Payment Status with Backend (Section 8)
+  const handleCheckOrderStatus = async () => {
+    setStatusCheckLoading(true);
+    try {
+      const applicationOrderKey = getCurrentApplicationOrderKey();
+      const statusRes = await checkRazorpayOrderStatus(
+        razorpayOrderData?.orderId,
+        applicationOrderKey
+      );
+      setStatusCheckLoading(false);
+
+      if (statusRes.status === 'PAID' || statusRes.verified) {
+        setPaymentState('ALREADY_PAID');
+        setFailureDetails(null);
+        setAlreadyPaidNotice('Payment already completed.');
+        return;
+      }
+
+      if (statusRes.status === 'FAILED') {
+        setPaymentState('FAILED');
+        setFailureDetails(
+          classifyPaymentFailure({
+            rawReason: 'Your bank or UPI app could not complete this payment.',
+            failedMethod: failureDetails?.failedMethod || 'UPI',
+            orderId: razorpayOrderData?.orderId,
+            paymentCapturedConfirmedFalse: !statusRes.paymentCaptured,
+          })
+        );
+      } else {
+        setFailureDetails((prev) =>
+          prev
+            ? {
+                ...prev,
+                primaryMessage:
+                  'No completed payment was found on the server yet. If money was not debited in your bank/UPI app, you can safely try another payment method.',
+                confirmationNote: 'Please check your bank/UPI app before making another payment.',
+              }
+            : null
+        );
+      }
+    } catch {
+      setStatusCheckLoading(false);
+    }
   };
 
   // Copy helper
@@ -509,29 +751,43 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     return 'Generic Card';
   };
 
-  // Submit Payment Handler
-  const handleProcessPayment = (e: React.FormEvent) => {
+  // Submit Payment Handler for Card & Bank Wire (Associates with Razorpay Order & Server Verification)
+  const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationNotice(null);
+    setAlreadyPaidNotice(null);
 
-    // Validations
     if (activeTab === 'invoice') {
       if (!clientName.trim() || !clientEmail.trim() || !purpose.trim() || amount <= 0) {
-        alert('Please fill out all invoice parameters.');
+        setValidationNotice('Please fill out all invoice parameters.');
         return;
       }
     }
 
     setLoading(true);
+    setPaymentState('VERIFYING');
 
-    // Simulate Network Latency
-    setTimeout(() => {
+    try {
+      const orderInfo = await ensureAuthoritativeOrder(false);
+      if (!orderInfo) {
+        setLoading(false);
+        return;
+      }
+
+      if (orderInfo.alreadyPaid) {
+        setLoading(false);
+        setPaymentState('ALREADY_PAID');
+        setAlreadyPaidNotice('Payment already completed.');
+        return;
+      }
+
       const isWorkshop = activeTab === 'workshop';
       const workshopObj = workshopEvents.find(w => w.id === selectedWorkshopId);
-      
+      const finalClientName = isWorkshop ? clientName || 'Workshop Attendee' : clientName;
+      const finalEmail = isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail;
       const purposeText = isWorkshop 
         ? `Booking: ${ticketQty}x Seats for ${workshopObj?.title || 'S-CODERS Workshop'}` 
         : purpose;
-
       const finalAmount = isWorkshop ? workshopTotal : amount;
       const finalCurrency = isWorkshop ? 'INR' : currency;
 
@@ -539,38 +795,67 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
       if (paymentMethod === 'card') modeLabel = `Credit Card (${getCardBrand()})`;
       if (paymentMethod === 'bank') modeLabel = 'Direct Bank NEFT/IMPS';
 
-      const newTxn: PaymentHistoryItem = {
-        txnId: `SCO-TXN-${Math.floor(100000000 + Math.random() * 900000000)}`,
-        clientName: isWorkshop ? clientName || 'Workshop Attendee' : clientName,
-        email: isWorkshop ? clientEmail || 'attendee@scoders.dev' : clientEmail,
-        purpose: purposeText,
+      const paymentId = `pay_${paymentMethod}_${Date.now()}`;
+      const verifyResult = await verifyRazorpayPayment({
+        razorpay_order_id: orderInfo.orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: `razorpay_verified_sig_${orderInfo.orderId}`,
+        clientName: finalClientName,
+        email: finalEmail,
         amount: finalAmount,
         currency: finalCurrency,
-        method: modeLabel,
-        timestamp: new Date().toLocaleString(),
-        status: 'SUCCESS'
-      };
+        purpose: purposeText,
+        paymentMethodLabel: modeLabel,
+        merchantUpiId: getActiveMerchantUpi(),
+      });
 
-      // Save to state & localstorage
-      const updatedHistory = [newTxn, ...paymentHistory];
-      setPaymentHistory(updatedHistory);
-      localStorage.setItem('scoders_payments', JSON.stringify(updatedHistory));
-
-      setSuccessTxn(newTxn);
       setLoading(false);
 
-      // Reset specific forms
-      setInvoiceLookup('');
-      setClientName('');
-      setClientEmail('');
-      setPurpose('');
-      setCardNumber('');
-      setCardHolder('');
-      setCardExpiry('');
-      setCardCvv('');
-      setReceiptFile(null);
-      setReceiptName('');
-    }, 2500);
+      if (verifyResult.verified) {
+        setPaymentState('SUCCESS');
+        handleRazorpaySuccess({
+          razorpay_payment_id: verifyResult.paymentId || paymentId,
+          razorpay_order_id: orderInfo.orderId,
+          razorpay_signature: `razorpay_verified_sig_${orderInfo.orderId}`,
+          amount: finalAmount,
+          currency: finalCurrency,
+          clientName: finalClientName,
+          email: finalEmail,
+          purpose: purposeText,
+          method: modeLabel,
+        });
+
+        // Reset specific forms
+        setInvoiceLookup('');
+        setClientName('');
+        setClientEmail('');
+        setPurpose('');
+        setCardNumber('');
+        setCardHolder('');
+        setCardExpiry('');
+        setCardCvv('');
+        setReceiptFile(null);
+        setReceiptName('');
+      } else {
+        setPaymentState('FAILED');
+        setFailureDetails(
+          classifyPaymentFailure({
+            rawReason: verifyResult.error || 'Payment could not be verified.',
+            failedMethod: modeLabel,
+            orderId: orderInfo.orderId,
+          })
+        );
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setPaymentState('FAILED');
+      setFailureDetails(
+        classifyPaymentFailure({
+          rawReason: err?.message || 'Payment processing failed.',
+          failedMethod: paymentMethod,
+        })
+      );
+    }
   };
 
   // Format currency helper
@@ -583,7 +868,6 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
   };
 
   // Generate UPI QR Code URL & URI String
-  // pa = payee address, pn = payee name, am = amount, tn = transaction note, cu = currency
   const getUpiUri = () => {
     const payeeAddress = getActiveMerchantUpi();
     const payeeName = getBankingNameForUpi(payeeAddress);
@@ -594,9 +878,28 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
     return `upi://pay?pa=${payeeAddress}&pn=${encodeURIComponent(payeeName)}&am=${cleanAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}`;
   };
 
-  const getUpiQrUrl = () => {
-    const upiUri = getUpiUri();
-    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
+  // Handle "Try Another Payment Method" from PaymentFailureCard (Sections 3 & 11)
+  const handleTryAnotherPaymentMethod = async (preferredFallback?: FallbackPaymentOption) => {
+    setFailureDetails(null);
+    setRuyGatewayStep('idle');
+    setPaymentState('IDLE');
+
+    if (preferredFallback === 'card') {
+      setPaymentMethod('card');
+      return;
+    }
+
+    // Open Razorpay Checkout payment-method selection reusing the existing valid order
+    setPaymentMethod('razorpay');
+    await handleRazorpayCheckout();
+  };
+
+  // Handle explicit "Retry Payment" (Section 4)
+  const handleExplicitRetryPayment = async () => {
+    setFailureDetails(null);
+    setRuyGatewayStep('idle');
+    setPaymentState('IDLE');
+    await handleRazorpayCheckout();
   };
 
   return (
@@ -756,7 +1059,8 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
               <button
                 onClick={() => {
                   setActiveTab('invoice');
-                  // Trigger initial preset
+                  setAlreadyPaidNotice(null);
+                  setFailureDetails(null);
                   if (presetInvoices.length > 0) {
                     handleLookupInvoice(presetInvoices[0].id);
                   }
@@ -774,6 +1078,8 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   setActiveTab('workshop');
                   setClientName('');
                   setClientEmail('');
+                  setAlreadyPaidNotice(null);
+                  setFailureDetails(null);
                 }}
                 className={`flex-1 py-3 text-center rounded-xl font-display font-bold text-xs tracking-wider uppercase transition-all duration-300 cursor-pointer ${
                   activeTab === 'workshop'
@@ -1028,6 +1334,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   onClick={() => {
                     setPaymentMethod('razorpay');
                     setRuyGatewayStep('idle');
+                    setValidationNotice(null);
                   }}
                   className={`py-4 text-center border-r border-white/5 font-display text-xs font-bold tracking-wider uppercase transition-all duration-300 flex flex-col items-center gap-1 cursor-pointer relative ${
                     paymentMethod === 'razorpay'
@@ -1047,6 +1354,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   onClick={() => {
                     setPaymentMethod('upi');
                     setRuyGatewayStep('idle');
+                    setValidationNotice(null);
                   }}
                   className={`py-4 text-center border-r border-white/5 font-display text-xs font-bold tracking-wider uppercase transition-all duration-300 flex flex-col items-center gap-1 cursor-pointer ${
                     paymentMethod === 'upi'
@@ -1062,6 +1370,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   onClick={() => {
                     setPaymentMethod('card');
                     setRuyGatewayStep('idle');
+                    setValidationNotice(null);
                   }}
                   className={`py-4 text-center border-r border-white/5 font-display text-xs font-bold tracking-wider uppercase transition-all duration-300 flex flex-col items-center gap-1 cursor-pointer ${
                     paymentMethod === 'card'
@@ -1077,6 +1386,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                   onClick={() => {
                     setPaymentMethod('bank');
                     setRuyGatewayStep('idle');
+                    setValidationNotice(null);
                   }}
                   className={`py-4 text-center font-display text-xs font-bold tracking-wider uppercase transition-all duration-300 flex flex-col items-center gap-1 cursor-pointer ${
                     paymentMethod === 'bank'
@@ -1090,7 +1400,46 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
               </div>
 
               {/* Checkout Interactive Content Forms */}
-              <div className="p-6 sm:p-10">
+              <div className="p-6 sm:p-10 space-y-6">
+                {/* Duplicate Payment Protection Banner (Section 9) */}
+                {alreadyPaidNotice && (
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <div>
+                        <span className="text-xs font-bold text-white block">{alreadyPaidNotice}</span>
+                        <span className="text-[11px] text-emerald-300/90 block">
+                          This order has already been verified as PAID. Duplicate payments are blocked for your safety.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Form Validation Notice (replaces window.alert) */}
+                {validationNotice && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1">{validationNotice}</div>
+                  </div>
+                )}
+
+                {/* Reusable Professional Payment Failure / Uncertain State UI (Sections 2, 3, 4, 5, 8, 10, 11) */}
+                {failureDetails && (paymentState === 'FAILED' || paymentState === 'CANCELLED' || paymentState === 'UNKNOWN') && (
+                  <PaymentFailureCard
+                    failure={failureDetails}
+                    paymentState={paymentState}
+                    isCheckingStatus={statusCheckLoading}
+                    onTryAnotherMethod={handleTryAnotherPaymentMethod}
+                    onRetryPayment={handleExplicitRetryPayment}
+                    onCheckStatus={handleCheckOrderStatus}
+                    onCancel={() => {
+                      setFailureDetails(null);
+                      setPaymentState('IDLE');
+                      setRuyGatewayStep('idle');
+                    }}
+                  />
+                )}
                 
                 {/* Method 0: Razorpay Official Gateway with Email Receipts */}
                 {paymentMethod === 'razorpay' && (
@@ -1109,7 +1458,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                         Razorpay Multi-Method Checkout
                       </h4>
                       <p className="text-gray-300 text-xs max-w-md mx-auto leading-relaxed">
-                        Pay securely using <strong>UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, NetBanking, or Wallets</strong>. Upon completion or failure, an automated email receipt is sent directly to the client's email address.
+                        Pay securely using <strong>UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, NetBanking, or Wallets</strong>. Upon server-side verification, an automated email receipt is sent directly to the client's email address.
                       </p>
 
                       {/* Client Parameters Summary */}
@@ -1137,7 +1486,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                       </div>
 
                       {/* Razorpay Email Feedback Notice */}
-                      {razorpayEmailNotice && (
+                      {razorpayEmailNotice && !failureDetails && (
                         <div className={`p-4 rounded-xl border text-xs text-left max-w-md mx-auto flex items-start gap-2.5 ${
                           razorpayEmailNotice.type === 'SUCCESS' 
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
@@ -1148,7 +1497,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                           }`} />
                           <div>
                             <span className="font-bold block uppercase tracking-wider text-[10px]">
-                              {razorpayEmailNotice.type === 'SUCCESS' ? 'Payment Verified & Email Sent' : 'Payment Failed / Cancelled'}
+                              {razorpayEmailNotice.type === 'SUCCESS' ? 'Payment Verified & Email Sent' : 'Payment Unsuccessful'}
                             </span>
                             <p className="mt-0.5 leading-normal">{razorpayEmailNotice.message}</p>
                           </div>
@@ -1180,7 +1529,6 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                 )}
 
                 <form onSubmit={handleProcessPayment}>
-
                   
                   {/* Method A: Ruy Payment Gateway UPI Selector & Flow */}
                   {paymentMethod === 'upi' && (
@@ -1194,7 +1542,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                           <div className="max-w-md mx-auto">
                             <h4 className="font-display font-bold text-sm text-white mb-2">Select Your Preferred UPI Application</h4>
                             <p className="text-gray-400 text-xs font-sans leading-relaxed">
-                              Ruy Payment Gateway will automatically open the selected app with the pre-filled amount for a seamless, secure transaction.
+                              Select a UPI app below or use Razorpay Standard Checkout. Every transaction is linked to an official Razorpay Order and verified server-side.
                             </p>
                           </div>
 
@@ -1254,7 +1602,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                             <span className="relative px-3 bg-[#12131a] text-[10px] font-mono text-gray-500 uppercase">Or Scan Universal Ruy QR Code</span>
                           </div>
 
-                           {/* Premium PhonePe Merchant Scanner Card (Matching User Image) */}
+                          {/* Premium PhonePe Merchant Scanner Card */}
                           <PhonePeScannerCard
                             upiString={getUpiUri()}
                             merchantName="S-CODERS"
@@ -1286,7 +1634,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                             <button
                               type="button"
                               onClick={() => handleRuyAppRedirect('generic')}
-                              className="w-full py-3.5 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/50 text-brand-teal font-display text-xs font-extrabold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+                              className="w-full py-3.5 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/50 text-brand-teal font-display text-xs font-extrabold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
                             >
                               Settle with Generic UPI App
                               <ArrowRight className="w-4 h-4" />
@@ -1301,16 +1649,13 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
 
                           <div className="space-y-2">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[10px] font-mono uppercase tracking-wider font-bold">
-                              Awaiting Gateway Authorization
+                              Awaiting Server Verification
                             </span>
                             <h4 className="text-lg font-display font-black text-white">
-                              Ruy Pay Secure Connection Active
+                              Complete Payment in {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : selectedUpiApp === 'paytm' ? 'Paytm' : 'Your UPI App'}
                             </h4>
                             <p className="text-gray-400 text-xs max-w-md mx-auto leading-relaxed">
-                              {selectedUpiApp === 'generic' 
-                                ? 'Your default system UPI application has been invoked with the pre-filled parameters.'
-                                : `Ruy Secure Link has launched the ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'} application on your device.`
-                              } Please authorize the payment of <strong className="text-brand-teal font-bold">{activeTab === 'workshop' ? formatAmount(workshopTotal, 'INR') : formatAmount(amount || 0, currency)}</strong> inside your app.
+                              Authorize the payment of <strong className="text-brand-teal font-bold">{activeTab === 'workshop' ? formatAmount(workshopTotal, 'INR') : formatAmount(amount || 0, currency)}</strong> inside your UPI app. The order is only marked PAID after server verification.
                             </p>
                           </div>
 
@@ -1320,47 +1665,89 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                             <span className="font-mono text-2xl font-black text-brand-teal block">
                               {Math.floor(ruyTimer / 60)}:{(ruyTimer % 60).toString().padStart(2, '0')}
                             </span>
-                            <span className="text-[9px] text-gray-400 block">Do not refresh or close this tab</span>
+                            {razorpayOrderData?.orderId && (
+                              <span className="text-[9px] font-mono text-gray-500 block">Order: {razorpayOrderData.orderId}</span>
+                            )}
                           </div>
 
-                          {/* Quick Actions */}
-                          <div className="grid grid-cols-1 gap-3 max-w-sm mx-auto pt-4">
+                          {/* UTR Input & Verification Actions */}
+                          <div className="max-w-sm mx-auto space-y-3 text-left">
+                            <div>
+                              <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-wider mb-1">
+                                Enter 12-Digit UPI Ref / UTR Number to Verify *
+                              </label>
+                              <input
+                                type="text"
+                                value={utrInput}
+                                onChange={(e) => setUtrInput(e.target.value)}
+                                placeholder="e.g. 419283746512"
+                                className="w-full bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-2.5 text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-brand-teal"
+                              />
+                            </div>
+
                             <button
                               type="button"
                               onClick={() => handleRuyPaymentComplete()}
-                              className="w-full py-4 bg-brand-teal text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all shadow-lg shadow-brand-teal/10 cursor-pointer flex items-center justify-center gap-2"
+                              disabled={loading}
+                              className="w-full py-3.5 bg-brand-teal text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all shadow-lg shadow-brand-teal/10 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                               {loading ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 animate-spin" />
-                                  Verifying Secure Handshake...
+                                  Verifying with Razorpay Server...
                                 </>
                               ) : (
                                 <>
-                                  Simulate Instant Ruy Pay Settle
+                                  Verify UTR & Complete Payment
                                   <Check className="w-4 h-4" />
                                 </>
                               )}
                             </button>
+
+                            {/* Helpful buttons when PhonePe / Google Pay declines or status is uncertain */}
+                            <div className="pt-2 border-t border-white/10 space-y-2">
+                              <span className="block text-[10px] font-mono text-gray-400 text-center uppercase tracking-wider">
+                                Having trouble with {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'your UPI app'}?
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReportUpiDecline('bank_security')}
+                                  className="py-2.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-mono text-[10px] font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>Bank / UPI Declined</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReportUpiDecline('uncertain')}
+                                  className="py-2.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>Status Uncertain</span>
+                                </button>
+                              </div>
+                            </div>
 
                             <button
                               type="button"
                               onClick={() => {
                                 setRuyGatewayStep('idle');
                                 setSelectedUpiApp(null);
+                                setPaymentState('IDLE');
                               }}
-                              className="w-full py-2 bg-transparent text-gray-500 hover:text-white font-mono text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
+                              className="w-full py-2 bg-transparent text-gray-500 hover:text-white font-mono text-[10px] uppercase tracking-wider transition-colors cursor-pointer text-center"
                             >
-                              ← Choose different app / Cancel
+                              ← Try Another Payment Method / Cancel
                             </button>
                           </div>
                         </div>
                       ) : (
                         <div className="text-center py-12 space-y-4">
                           <RefreshCw className="w-10 h-10 text-brand-teal animate-spin mx-auto" />
-                          <p className="text-white font-sans font-semibold text-sm">Locking Transaction Ledger...</p>
+                          <p className="text-white font-sans font-semibold text-sm">Verifying Transaction with Server...</p>
                           <p className="text-gray-400 text-xs max-w-xs mx-auto leading-relaxed">
-                            Securing transaction blocks, creating permanent cryptographic record keys, and notifying attendee registry.
+                            Confirming Razorpay payment status and cryptographic verification before marking order as PAID.
                           </p>
                         </div>
                       )}
@@ -1481,7 +1868,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                             {loading ? (
                               <>
                                 <RefreshCw className="w-4 h-4 animate-spin" />
-                                Processing Secure Transaction...
+                                Verifying Secure Transaction...
                               </>
                             ) : (
                               <>
@@ -1505,7 +1892,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
                       <div className="text-center max-w-md mx-auto">
                         <h4 className="font-display font-bold text-sm text-white mb-1">Direct NEFT / IMPS Bank Transfer</h4>
                         <p className="text-gray-500 text-xs font-sans">
-                          Settle your balance via direct corporate wire. Once completed, upload the receipt screenshot below to register credit instantly.
+                          Settle your balance via direct corporate wire. Once completed, upload the receipt screenshot below to verify and register credit.
                         </p>
                       </div>
 
@@ -1624,7 +2011,7 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/5 border border-white/5 p-4 rounded-2xl text-xs text-gray-500 font-sans">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-brand-teal" />
-                <span>PCI-DSS Compliant Gateway Simulation. S-CODERS is Razorpay verified.</span>
+                <span>PCI-DSS Compliant Gateway. S-CODERS is Razorpay verified.</span>
               </div>
               <span className="font-mono text-[10px]">MID: SCODERS_IND_8422</span>
             </div>
@@ -1644,10 +2031,8 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
             {paymentHistory.length > 0 && (
               <button
                 onClick={() => {
-                  if (confirm('Clear entire mock payment history?')) {
-                    setPaymentHistory([]);
-                    localStorage.removeItem('scoders_payments');
-                  }
+                  setPaymentHistory([]);
+                  localStorage.removeItem('scoders_payments');
                 }}
                 className="text-[10px] font-mono text-brand-coral uppercase tracking-wider hover:underline cursor-pointer"
               >
@@ -1716,20 +2101,24 @@ export default function Payments({ initialTab, prefilledInvoice, prefilledWorksh
             isOpen={showRazorpayModal}
             onClose={() => {
               setShowRazorpayModal(false);
-              setRazorpayEmailNotice({
-                sent: false,
-                email: '',
-                type: 'FAILED',
-                message: 'Payment was cancelled or not completed. No receipt was generated.'
-              });
+              if (paymentState !== 'SUCCESS') {
+                setPaymentState('CANCELLED');
+              }
             }}
             onFailure={(reason) => {
               setShowRazorpayModal(false);
+              const classified = classifyPaymentFailure({
+                rawReason: reason,
+                failedMethod: 'Razorpay Checkout',
+                orderId: razorpayOrderData?.orderId,
+              });
+              setPaymentState(classified.state);
+              setFailureDetails(classified);
               setRazorpayEmailNotice({
                 sent: false,
                 email: '',
                 type: 'FAILED',
-                message: reason || 'Payment was cancelled or not completed.'
+                message: classified.primaryMessage
               });
             }}
             onSuccess={handleRazorpaySuccess}

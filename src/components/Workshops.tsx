@@ -455,6 +455,12 @@ export default function TenantDashboard() {
       actionText: "Enter Workshop & Sandbox",
       onAction: () => {
         setShowEmailNotice(false);
+        setTimeout(() => {
+          const el = document.getElementById('workshop-classroom-section');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
       }
     });
     setShowEmailNotice(true);
@@ -1015,7 +1021,7 @@ export default function TenantDashboard() {
 
                   {/* GATE CONTROL: If registered, reveal interactive classroom. If not, show Register banner */}
                   {isRegistered ? (
-                    <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
+                    <div id="workshop-classroom-section" className="pt-8 mt-8 border-t border-white/5 space-y-6">
                       <div className="bg-brand-dark/80 p-5 rounded-2xl border border-brand-teal/20 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20">

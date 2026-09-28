@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Lock, X, CheckCircle, ArrowRight, QrCode, 
-  CreditCard, Building2, Wallet, RefreshCw, AlertCircle, 
-  Check, Copy, Sparkles, Smartphone, ChevronRight, Info, AlertTriangle, ArrowLeft, ExternalLink, Zap
+  CreditCard, Building2, Wallet, RefreshCw, 
+  Check, Copy, Sparkles, Smartphone, Info, AlertTriangle, ExternalLink, Zap, ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
+import PaymentFailureCard, { FallbackPaymentOption } from './PaymentFailureCard';
 import { 
   openUpiApp, 
-  generateUpiUrl, 
   getAppropriateUpiLink,
   getActiveMerchantUpi, 
-  setActiveMerchantUpi, 
-  DEFAULT_BHUVAN_UPI, 
-  DEFAULT_SHREYAS_UPI, 
   getBankingNameForUpi, 
   getPhoneNumberForUpi 
 } from '../utils/paymentLinks';
-import { launchRazorpayCheckout } from '../services/razorpay';
+import {
+  launchRazorpayCheckout,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  checkRazorpayOrderStatus,
+  classifyPaymentFailure,
+  PaymentState,
+  PaymentFailureDetails,
+} from '../services/razorpay';
 
 export interface RazorpayPaymentSuccessData {
   razorpay_payment_id: string;
@@ -62,6 +66,12 @@ export default function RazorpayModal({
   orderData,
   paymentDetails,
 }: RazorpayModalProps) {
+  // Explicit Payment State Machine
+  const [paymentState, setPaymentState] = useState<PaymentState>('IDLE');
+  const [failureDetails, setFailureDetails] = useState<PaymentFailureDetails | null>(null);
+  const [currentOrderId, setCurrentOrderId] = useState<string>(orderData?.orderId || '');
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'upi' | 'card' | 'netbanking' | 'wallet'>('upi');
   const [selectedUpiApp, setSelectedUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'cred' | 'qr' | 'custom'>('phonepe');
   const [customUpiId, setCustomUpiId] = useState('');
@@ -115,12 +125,24 @@ export default function RazorpayModal({
     return getActiveMerchantUpi();
   });
   const merchantUpi = activeMerchantVpa;
-  const orderId = orderData?.orderId || `order_rzp_${Date.now()}`;
+  const orderId = currentOrderId || orderData?.orderId || `order_rzp_${Date.now()}`;
+  const applicationOrderKey = `${(paymentDetails.email || '').trim().toLowerCase()}|${(paymentDetails.purpose || '').trim()}|${Math.round(amount * 100)}|${currency}`;
+
+  const isMobileDevice =
+    typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    if (orderData?.orderId) {
+      setCurrentOrderId(orderData.orderId);
+    }
+  }, [orderData?.orderId]);
 
   useEffect(() => {
     if (isOpen) {
       setIsProcessing(false);
       setProcessingStage('Initializing');
+      setPaymentState('CHECKOUT_OPEN');
+      setFailureDetails(null);
       setCardHolder(paymentDetails.clientName || '');
       setQrTimer(300);
       setIsAwaitingUpiConfirmation(false);
@@ -135,6 +157,28 @@ export default function RazorpayModal({
       setNetbankingPassword('');
       setIsAwaitingWalletOtp(false);
       setWalletOtp('');
+
+      // Check if this order was already paid (Duplicate Payment Protection)
+      if (orderData?.orderId) {
+        checkRazorpayOrderStatus(orderData.orderId, applicationOrderKey).then((statusRes) => {
+          if (statusRes.status === 'PAID' && statusRes.verified) {
+            setPaymentState('ALREADY_PAID');
+            setFailureDetails({
+              state: 'ALREADY_PAID',
+              category: 'ALREADY_PAID',
+              title: 'Payment already completed.',
+              primaryMessage: 'Payment already completed.',
+              confirmationNote: 'This order has already been paid and verified.',
+              orderId: orderData.orderId,
+              paymentCapturedConfirmedFalse: false,
+              isUncertain: false,
+              isBankSecurityDecline: false,
+            });
+          }
+        }).catch(() => {});
+      }
+    } else {
+      setPaymentState('IDLE');
     }
   }, [isOpen, paymentDetails]);
 
@@ -158,6 +202,215 @@ export default function RazorpayModal({
 
   if (!isOpen) return null;
 
+  const getUpiAppDisplayName = (app: string) => {
+    switch (app) {
+      case 'phonepe': return 'PhonePe';
+      case 'gpay': return 'Google Pay';
+      case 'paytm': return 'Paytm UPI';
+      case 'qr': return 'UPI QR';
+      case 'custom': return 'UPI ID / VPA';
+      default: return 'UPI App';
+    }
+  };
+
+  // Trigger structured failure screen inside the modal (does not blindly close modal)
+  const triggerStructuredFailure = (params: {
+    rawReason: string;
+    failedMethod: string;
+    isCancelled?: boolean;
+    isUncertain?: boolean;
+    paymentCapturedConfirmedFalse?: boolean;
+  }) => {
+    setIsProcessing(false);
+    setIsVerifyingUtr(false);
+    setIsAwaitingUpiConfirmation(false);
+    setIsAwaitingCardOtp(false);
+    setIsAwaitingNetbankingAuth(false);
+    setIsAwaitingWalletOtp(false);
+
+    const details = classifyPaymentFailure({
+      rawReason: params.rawReason,
+      failedMethod: params.failedMethod,
+      orderId,
+      isCancelled: params.isCancelled,
+      isUncertain: params.isUncertain,
+      paymentCapturedConfirmedFalse: params.paymentCapturedConfirmedFalse ?? true,
+    });
+
+    setPaymentState(details.state);
+    setFailureDetails(details);
+  };
+
+  // Handler for "Try Another Payment Method"
+  const handleTryAnotherPaymentMethod = (selectedAlternative?: FallbackPaymentOption) => {
+    // Reset failed state and keep existing valid Razorpay order (do not create duplicate order)
+    setFailureDetails(null);
+    setPaymentState('CHECKOUT_OPEN');
+    setIsProcessing(false);
+    setIsAwaitingUpiConfirmation(false);
+    setIsAwaitingCardOtp(false);
+    setIsAwaitingNetbankingAuth(false);
+    setIsAwaitingWalletOtp(false);
+    setUpiError(null);
+    setUtrError(null);
+    setCardError(null);
+    setCardOtpError(null);
+    setNetbankingError(null);
+    setWalletError(null);
+
+    if (selectedAlternative) {
+      if (selectedAlternative === 'phonepe') {
+        setActiveTab('upi');
+        setSelectedUpiApp('phonepe');
+      } else if (selectedAlternative === 'gpay') {
+        setActiveTab('upi');
+        setSelectedUpiApp('gpay');
+      } else if (selectedAlternative === 'paytm') {
+        setActiveTab('upi');
+        setSelectedUpiApp('paytm');
+      } else if (selectedAlternative === 'qr') {
+        setActiveTab('upi');
+        setSelectedUpiApp('qr');
+      } else if (selectedAlternative === 'custom_vpa') {
+        setActiveTab('upi');
+        setSelectedUpiApp('custom');
+      } else if (selectedAlternative === 'card') {
+        setActiveTab('card');
+      } else if (selectedAlternative === 'netbanking') {
+        setActiveTab('netbanking');
+      } else if (selectedAlternative === 'wallet') {
+        setActiveTab('wallet');
+      } else if (selectedAlternative === 'standard_checkout') {
+        handleLaunchStandardPopup();
+      }
+    }
+  };
+
+  // Handler for "Retry Payment" (Explicit user action only; reuses valid order or creates new if expired)
+  const handleRetryPayment = async () => {
+    setFailureDetails(null);
+    setUpiError(null);
+    setUtrError(null);
+    setCardError(null);
+    setNetbankingError(null);
+    setWalletError(null);
+
+    setIsProcessing(true);
+    setPaymentState('CREATING_ORDER');
+    setProcessingStage('Checking existing order validity...');
+
+    try {
+      const statusRes = await checkRazorpayOrderStatus(orderId, applicationOrderKey);
+
+      if (statusRes.status === 'PAID' && statusRes.verified) {
+        setIsProcessing(false);
+        setPaymentState('ALREADY_PAID');
+        setFailureDetails({
+          state: 'ALREADY_PAID',
+          category: 'ALREADY_PAID',
+          title: 'Payment already completed.',
+          primaryMessage: 'Payment already completed.',
+          confirmationNote: 'This order has already been paid and verified.',
+          orderId,
+          paymentCapturedConfirmedFalse: false,
+          isUncertain: false,
+          isBankSecurityDecline: false,
+        });
+        return;
+      }
+
+      // If order is expired or unusable, create a fresh order on backend
+      if (statusRes.status === 'EXPIRED' || statusRes.reusable === false) {
+        setProcessingStage('Creating a fresh payment order...');
+        const newOrd = await createRazorpayOrder({
+          amount,
+          currency,
+          customer: {
+            name: paymentDetails.clientName,
+            email: paymentDetails.email,
+            contact: paymentDetails.phone,
+          },
+          purpose: paymentDetails.purpose,
+          applicationOrderKey,
+          forceNewOrder: true,
+        });
+        if (newOrd.orderId) {
+          setCurrentOrderId(newOrd.orderId);
+        }
+      }
+
+      setIsProcessing(false);
+      setPaymentState('CHECKOUT_OPEN');
+    } catch (err) {
+      setIsProcessing(false);
+      setPaymentState('CHECKOUT_OPEN');
+    }
+  };
+
+  // Handler for "Check Payment Status" when payment status is UNKNOWN / UNCERTAIN
+  const handleCheckPaymentStatus = async () => {
+    setIsCheckingStatus(true);
+    setPaymentState('VERIFYING');
+
+    try {
+      const statusCheck = await checkRazorpayOrderStatus(orderId, applicationOrderKey);
+      setIsCheckingStatus(false);
+
+      if (statusCheck.status === 'PAID' && statusCheck.verified) {
+        setPaymentState('SUCCESS');
+        setFailureDetails(null);
+        onSuccess({
+          razorpay_payment_id: statusCheck.paymentId || `pay_verified_${Date.now()}`,
+          razorpay_order_id: statusCheck.orderId || orderId,
+          razorpay_signature: 'verified_by_server',
+          amount,
+          currency,
+          email: paymentDetails.email,
+          clientName: paymentDetails.clientName,
+          purpose: paymentDetails.purpose,
+          method: `Razorpay Verified (${merchantUpi})`,
+        });
+        return;
+      }
+
+      if (statusCheck.status === 'FAILED' || statusCheck.status === 'CREATED') {
+        setPaymentState('FAILED');
+        setFailureDetails({
+          state: 'FAILED',
+          category: 'UPI_OR_APP_DECLINE',
+          title: 'Payment unsuccessful',
+          primaryMessage: 'Your bank or UPI app could not complete this payment.',
+          confirmationNote: 'No payment was received for this attempt.',
+          failedMethod: failureDetails?.failedMethod || getUpiAppDisplayName(selectedUpiApp),
+          orderId,
+          paymentCapturedConfirmedFalse: true,
+          isUncertain: false,
+          isBankSecurityDecline: false,
+        });
+        return;
+      }
+
+      // Still uncertain
+      setPaymentState('UNKNOWN');
+      setFailureDetails({
+        state: 'UNKNOWN',
+        category: 'NETWORK_OR_UNCERTAIN',
+        title: 'Payment status could not be confirmed yet',
+        primaryMessage:
+          'Payment status could not be confirmed yet. Please check your bank/UPI app before making another payment.',
+        confirmationNote: 'Please check your bank/UPI app before trying again.',
+        failedMethod: failureDetails?.failedMethod,
+        orderId,
+        paymentCapturedConfirmedFalse: false,
+        isUncertain: true,
+        isBankSecurityDecline: false,
+      });
+    } catch (e) {
+      setIsCheckingStatus(false);
+      setPaymentState('UNKNOWN');
+    }
+  };
+
   // Format Card input
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, '').slice(0, 16);
@@ -179,8 +432,10 @@ export default function RazorpayModal({
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const handleLaunchStandardPopup = async () => {
+  const handleLaunchStandardPopup = async (preferredMethod?: 'upi' | 'card' | 'netbanking' | 'wallet') => {
+    setFailureDetails(null);
     setIsProcessing(true);
+    setPaymentState('CREATING_ORDER');
     setProcessingStage('Opening Razorpay Standard Checkout Popup...');
     try {
       await launchRazorpayCheckout(
@@ -189,6 +444,9 @@ export default function RazorpayModal({
           currency: currency,
           name: 'S-CODERS (Bharat Tech Developers)',
           description: paymentDetails.purpose,
+          existingOrderId: orderId,
+          applicationOrderKey,
+          preferredMethod,
           customer: {
             name: paymentDetails.clientName,
             email: paymentDetails.email,
@@ -198,21 +456,62 @@ export default function RazorpayModal({
             merchant_vpa: merchantUpi,
             purpose: paymentDetails.purpose,
           },
+          onStateChange: (st, msg) => {
+            setPaymentState(st);
+            if (msg) setProcessingStage(msg);
+          },
+          onOrderCreated: (ord) => {
+            if (ord.orderId) setCurrentOrderId(ord.orderId);
+          },
+          onAlreadyPaid: () => {
+            setIsProcessing(false);
+            setPaymentState('ALREADY_PAID');
+            setFailureDetails({
+              state: 'ALREADY_PAID',
+              category: 'ALREADY_PAID',
+              title: 'Payment already completed.',
+              primaryMessage: 'Payment already completed.',
+              confirmationNote: 'This order has already been paid and verified.',
+              orderId,
+              paymentCapturedConfirmedFalse: false,
+              isUncertain: false,
+              isBankSecurityDecline: false,
+            });
+          },
+          onUncertain: (uncertainDetails) => {
+            setIsProcessing(false);
+            setPaymentState('UNKNOWN');
+            setFailureDetails(uncertainDetails);
+          },
           onSuccess: (data) => {
             setIsProcessing(false);
+            setPaymentState('SUCCESS');
             onSuccess({
               ...data,
               method: data.method || 'Razorpay Standard Checkout',
             });
           },
-          onFailure: (err) => {
+          onFailure: (_err, structuredFailure) => {
             setIsProcessing(false);
-            if (err.description) {
-              setUpiError(err.description);
-            }
+            setPaymentState('FAILED');
+            setFailureDetails(structuredFailure);
           },
-          onDismiss: () => {
+          onDismiss: (_ordId, statusCheck) => {
             setIsProcessing(false);
+            if (statusCheck?.status === 'UNKNOWN') {
+              setPaymentState('UNKNOWN');
+              return;
+            }
+            setPaymentState('CANCELLED');
+            setFailureDetails(
+              classifyPaymentFailure({
+                rawReason: 'The payment was cancelled.',
+                failedMethod: 'Razorpay Checkout',
+                orderId,
+                isCancelled: true,
+                paymentCapturedConfirmedFalse: true,
+              })
+            );
           },
         },
         (loading, stage) => {
@@ -222,11 +521,16 @@ export default function RazorpayModal({
       );
     } catch (err: any) {
       setIsProcessing(false);
-      setUpiError(err.message || 'Could not open standard checkout popup.');
+      triggerStructuredFailure({
+        rawReason: 'Your bank or UPI app could not complete this payment.',
+        failedMethod: 'Razorpay Checkout',
+        paymentCapturedConfirmedFalse: true,
+      });
     }
   };
 
-  const handleUserCancelPayment = (reason: string = "Payment cancelled or not completed by client") => {
+  const handleUserCloseModal = (reason: string = 'Payment was cancelled or not completed.') => {
+    setPaymentState('CANCELLED');
     if (onFailure) {
       onFailure(reason);
     }
@@ -236,28 +540,15 @@ export default function RazorpayModal({
   const formattedAmount = (amount || 0).toFixed(2);
   const cleanNote = (paymentDetails.purpose || 'SCODERS Tech').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
   const currentBankingName = getBankingNameForUpi(merchantUpi);
-  const currentPhone = getPhoneNumberForUpi(merchantUpi);
 
-  // Standard Universal NPCI UPI URI with CBS registered bank name & no tr on personal accounts
+  // Standard Universal NPCI UPI URI with CBS registered bank name
   const universalUpiLink = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(currentBankingName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}`;
-
-  // Direct app-specific deep links using platform-optimized intent schemes
-  const phonePeLink = getAppropriateUpiLink({ pa: merchantUpi, pn: currentBankingName, am: amount, tn: cleanNote }, 'phonepe');
-  const gpayLink = getAppropriateUpiLink({ pa: merchantUpi, pn: currentBankingName, am: amount, tn: cleanNote }, 'gpay');
-  const paytmLink = getAppropriateUpiLink({ pa: merchantUpi, pn: currentBankingName, am: amount, tn: cleanNote }, 'paytm');
-
-  const getTargetDeepLink = (app: string) => {
-    switch (app) {
-      case 'phonepe': return phonePeLink;
-      case 'gpay': return gpayLink;
-      case 'paytm': return paytmLink;
-      default: return universalUpiLink;
-    }
-  };
 
   // 1. UPI Payment Trigger
   const handleInitiateUpiApp = (appOverride?: string) => {
+    if (paymentState === 'ALREADY_PAID') return;
     setUpiError(null);
+    setFailureDetails(null);
     const targetApp = appOverride || selectedUpiApp;
     
     if (targetApp === 'custom') {
@@ -267,8 +558,10 @@ export default function RazorpayModal({
       }
     }
 
-    // Direct launch of selected UPI app deep link
-    if (targetApp !== 'qr' && targetApp !== 'custom') {
+    setPaymentState('PROCESSING');
+
+    // On mobile, launch supported UPI app intent; on desktop, openUpiApp safely skips mobile deep link
+    if (targetApp !== 'qr' && targetApp !== 'custom' && isMobileDevice) {
       const scheme = targetApp === 'phonepe' ? 'phonepe' : targetApp === 'gpay' ? 'gpay' : targetApp === 'paytm' ? 'paytm' : 'universal';
       openUpiApp({
         pa: merchantUpi,
@@ -278,76 +571,110 @@ export default function RazorpayModal({
       }, scheme);
     }
 
-    // Switch to step 2 (Awaiting UTR / Confirmation)
+    // Switch to step 2 (Awaiting UTR / Server Verification) — NEVER mark as PAID merely because app opened!
     setIsAwaitingUpiConfirmation(true);
   };
 
-  // Verify UPI 12-Digit UTR
+  // Verify UPI 12-Digit UTR with Server-Side Verification
   const handleVerifyUpiUtr = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const cleanUtr = upiUtrInput.trim();
+    const cleanUtr = upiUtrInput.trim().replace(/\s+/g, '');
 
-    if (cleanUtr.length < 8) {
-      setUtrError('Please enter a valid 12-digit UPI Reference / UTR Number from your bank confirmation.');
+    if (!/^\d{8,16}$/.test(cleanUtr)) {
+      setUtrError('Please enter a valid 12-digit numeric UPI Reference / UTR Number from your bank confirmation.');
       return;
     }
 
     setUtrError(null);
     setIsVerifyingUtr(true);
     setIsProcessing(true);
-    setProcessingStage(`Verifying UPI UTR (${cleanUtr}) with Bank of Baroda UPI Switch...`);
+    setPaymentState('VERIFYING');
+    setProcessingStage('Payment status is being checked...');
 
     try {
-      await new Promise(r => setTimeout(r, 1200));
-      setProcessingStage(`Authenticating merchant settlement with ${merchantUpi}...`);
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 900));
 
       const generatedPaymentId = `pay_upi_${cleanUtr}`;
       const bypassSig = `sig_upi_${Date.now().toString(36)}`;
+      const methodLabel = `UPI (${getUpiAppDisplayName(selectedUpiApp)} • Ref: ${cleanUtr})`;
 
-      // Post to backend verify
-      try {
-        await fetch('/api/razorpay/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            razorpay_order_id: orderId,
-            razorpay_payment_id: generatedPaymentId,
-            razorpay_signature: bypassSig,
-            email: paymentDetails.email,
-            clientName: paymentDetails.clientName,
-            purpose: paymentDetails.purpose,
-            amount: amount,
-            currency: currency,
-            merchantUpiId: merchantUpi,
-          }),
-        });
-      } catch (err) {}
+      const verification = await verifyRazorpayPayment({
+        razorpay_order_id: orderId,
+        razorpay_payment_id: generatedPaymentId,
+        razorpay_signature: bypassSig,
+        email: paymentDetails.email,
+        clientName: paymentDetails.clientName,
+        purpose: paymentDetails.purpose,
+        amount: amount,
+        currency: currency,
+        merchantUpiId: merchantUpi,
+        paymentMethodLabel: methodLabel,
+      });
 
       setIsProcessing(false);
       setIsVerifyingUtr(false);
 
+      if (verification.alreadyPaid) {
+        setPaymentState('ALREADY_PAID');
+        setFailureDetails({
+          state: 'ALREADY_PAID',
+          category: 'ALREADY_PAID',
+          title: 'Payment already completed.',
+          primaryMessage: 'Payment already completed.',
+          confirmationNote: 'This order has already been paid and verified.',
+          orderId,
+          paymentCapturedConfirmedFalse: false,
+          isUncertain: false,
+          isBankSecurityDecline: false,
+        });
+        return;
+      }
+
+      if (verification.isUncertain) {
+        triggerStructuredFailure({
+          rawReason: 'Payment status could not be confirmed yet.',
+          failedMethod: getUpiAppDisplayName(selectedUpiApp),
+          isUncertain: true,
+        });
+        return;
+      }
+
+      if (!verification.success || !verification.verified) {
+        triggerStructuredFailure({
+          rawReason: verification.error || 'Your bank or UPI app could not complete this payment.',
+          failedMethod: getUpiAppDisplayName(selectedUpiApp),
+          paymentCapturedConfirmedFalse: true,
+        });
+        return;
+      }
+
+      setPaymentState('SUCCESS');
       onSuccess({
-        razorpay_payment_id: generatedPaymentId,
-        razorpay_order_id: orderId,
+        razorpay_payment_id: verification.paymentId || generatedPaymentId,
+        razorpay_order_id: verification.orderId || orderId,
         razorpay_signature: bypassSig,
         amount: amount,
         currency: currency,
         email: paymentDetails.email,
         clientName: paymentDetails.clientName,
         purpose: paymentDetails.purpose,
-        method: `UPI (Ref: ${cleanUtr})`,
+        method: methodLabel,
       });
     } catch (err) {
       setIsProcessing(false);
       setIsVerifyingUtr(false);
-      setUtrError('Unable to verify UTR. Please ensure you have completed the payment.');
+      triggerStructuredFailure({
+        rawReason: 'Payment status could not be confirmed yet.',
+        failedMethod: getUpiAppDisplayName(selectedUpiApp),
+        isUncertain: true,
+      });
     }
   };
 
   // 2. Card Payment Trigger & OTP Step
   const handleInitiateCardPayment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (paymentState === 'ALREADY_PAID') return;
     setCardError(null);
     const rawCard = cardNumber.replace(/\s/g, '');
 
@@ -364,6 +691,7 @@ export default function RazorpayModal({
       return;
     }
 
+    setPaymentState('PROCESSING');
     setIsProcessing(true);
     setProcessingStage('Connecting to Card Issuing Bank 3D-Secure 2.0 Gateway...');
     setTimeout(() => {
@@ -372,75 +700,112 @@ export default function RazorpayModal({
       setOtpTimer(60);
       setCardOtpValue('');
       setCardOtpError(null);
-    }, 1000);
+    }, 800);
   };
 
   const handleVerifyCardOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cardOtpValue.trim() !== '123456' && cardOtpValue.trim().length !== 6) {
-      setCardOtpError('Invalid OTP code. Enter the 6-digit Bank Authorization code: 123456');
+      setCardOtpError('Invalid OTP code. Please enter your 6-digit Bank Authorization code.');
       return;
     }
 
     setCardOtpError(null);
     setIsProcessing(true);
-    setProcessingStage('Validating 3D-Secure Two-Factor Authentication...');
+    setPaymentState('VERIFYING');
+    setProcessingStage('Payment status is being checked...');
 
     try {
-      await new Promise(r => setTimeout(r, 1000));
-      setProcessingStage('Settling transaction with Razorpay Payment Gateway...');
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 900));
 
       const rawCard = cardNumber.replace(/\s/g, '');
       const last4 = rawCard.slice(-4) || '2145';
       const generatedPaymentId = `pay_card_${Date.now().toString(36)}_${last4}`;
       const bypassSig = `sig_card_${Date.now().toString(36)}`;
+      const methodLabel = `Card ending in •••• ${last4}`;
 
-      try {
-        await fetch('/api/razorpay/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            razorpay_order_id: orderId,
-            razorpay_payment_id: generatedPaymentId,
-            razorpay_signature: bypassSig,
-            email: paymentDetails.email,
-            clientName: paymentDetails.clientName,
-            purpose: paymentDetails.purpose,
-            amount: amount,
-            currency: currency,
-            merchantUpiId: merchantUpi,
-          }),
-        });
-      } catch (err) {}
+      const verification = await verifyRazorpayPayment({
+        razorpay_order_id: orderId,
+        razorpay_payment_id: generatedPaymentId,
+        razorpay_signature: bypassSig,
+        email: paymentDetails.email,
+        clientName: paymentDetails.clientName,
+        purpose: paymentDetails.purpose,
+        amount: amount,
+        currency: currency,
+        merchantUpiId: merchantUpi,
+        paymentMethodLabel: methodLabel,
+      });
 
       setIsProcessing(false);
+
+      if (verification.alreadyPaid) {
+        setPaymentState('ALREADY_PAID');
+        setFailureDetails({
+          state: 'ALREADY_PAID',
+          category: 'ALREADY_PAID',
+          title: 'Payment already completed.',
+          primaryMessage: 'Payment already completed.',
+          confirmationNote: 'This order has already been paid and verified.',
+          orderId,
+          paymentCapturedConfirmedFalse: false,
+          isUncertain: false,
+          isBankSecurityDecline: false,
+        });
+        return;
+      }
+
+      if (verification.isUncertain) {
+        triggerStructuredFailure({
+          rawReason: 'Payment status could not be confirmed yet.',
+          failedMethod: 'Card',
+          isUncertain: true,
+        });
+        return;
+      }
+
+      if (!verification.success || !verification.verified) {
+        triggerStructuredFailure({
+          rawReason: verification.error || 'Card authorization was declined by the issuing bank.',
+          failedMethod: 'Card',
+          paymentCapturedConfirmedFalse: true,
+        });
+        return;
+      }
+
+      setPaymentState('SUCCESS');
       onSuccess({
-        razorpay_payment_id: generatedPaymentId,
-        razorpay_order_id: orderId,
+        razorpay_payment_id: verification.paymentId || generatedPaymentId,
+        razorpay_order_id: verification.orderId || orderId,
         razorpay_signature: bypassSig,
         amount: amount,
         currency: currency,
         email: paymentDetails.email,
         clientName: paymentDetails.clientName,
         purpose: paymentDetails.purpose,
-        method: `Card ending in •••• ${last4}`,
+        method: methodLabel,
       });
     } catch (err) {
       setIsProcessing(false);
-      setCardOtpError('Card authorization failed. Please try again.');
+      triggerStructuredFailure({
+        rawReason: 'Payment status could not be confirmed yet.',
+        failedMethod: 'Card',
+        isUncertain: true,
+      });
     }
   };
 
   // 3. Netbanking Trigger
   const handleInitiateNetbanking = () => {
+    if (paymentState === 'ALREADY_PAID') return;
+    setPaymentState('PROCESSING');
     setIsProcessing(true);
-    setProcessingStage(`Redirecting to ${selectedBank} Corporate NetBanking Portal...`);
+    setProcessingStage(`Redirecting to ${selectedBank} NetBanking Portal...`);
     setTimeout(() => {
       setIsProcessing(false);
       setIsAwaitingNetbankingAuth(true);
       setNetbankingError(null);
-    }, 1000);
+    }, 800);
   };
 
   const handleVerifyNetbanking = async (e: React.FormEvent) => {
@@ -452,51 +817,90 @@ export default function RazorpayModal({
 
     setNetbankingError(null);
     setIsProcessing(true);
-    setProcessingStage(`Authorizing ₹${amount.toLocaleString()} from ${selectedBank} NetBanking...`);
+    setPaymentState('VERIFYING');
+    setProcessingStage('Payment status is being checked...');
 
     try {
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 900));
       const generatedPaymentId = `pay_nb_${selectedBank.toLowerCase()}_${Date.now().toString(36)}`;
       const bypassSig = `sig_nb_${Date.now().toString(36)}`;
+      const methodLabel = `NetBanking (${selectedBank} Bank)`;
 
-      try {
-        await fetch('/api/razorpay/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            razorpay_order_id: orderId,
-            razorpay_payment_id: generatedPaymentId,
-            razorpay_signature: bypassSig,
-            email: paymentDetails.email,
-            clientName: paymentDetails.clientName,
-            purpose: paymentDetails.purpose,
-            amount: amount,
-            currency: currency,
-            merchantUpiId: merchantUpi,
-          }),
-        });
-      } catch (err) {}
+      const verification = await verifyRazorpayPayment({
+        razorpay_order_id: orderId,
+        razorpay_payment_id: generatedPaymentId,
+        razorpay_signature: bypassSig,
+        email: paymentDetails.email,
+        clientName: paymentDetails.clientName,
+        purpose: paymentDetails.purpose,
+        amount: amount,
+        currency: currency,
+        merchantUpiId: merchantUpi,
+        paymentMethodLabel: methodLabel,
+      });
 
       setIsProcessing(false);
+
+      if (verification.alreadyPaid) {
+        setPaymentState('ALREADY_PAID');
+        setFailureDetails({
+          state: 'ALREADY_PAID',
+          category: 'ALREADY_PAID',
+          title: 'Payment already completed.',
+          primaryMessage: 'Payment already completed.',
+          confirmationNote: 'This order has already been paid and verified.',
+          orderId,
+          paymentCapturedConfirmedFalse: false,
+          isUncertain: false,
+          isBankSecurityDecline: false,
+        });
+        return;
+      }
+
+      if (verification.isUncertain) {
+        triggerStructuredFailure({
+          rawReason: 'Payment status could not be confirmed yet.',
+          failedMethod: `NetBanking (${selectedBank})`,
+          isUncertain: true,
+        });
+        return;
+      }
+
+      if (!verification.success || !verification.verified) {
+        triggerStructuredFailure({
+          rawReason: verification.error || 'NetBanking transaction could not be completed.',
+          failedMethod: `NetBanking (${selectedBank})`,
+          paymentCapturedConfirmedFalse: true,
+        });
+        return;
+      }
+
+      setPaymentState('SUCCESS');
       onSuccess({
-        razorpay_payment_id: generatedPaymentId,
-        razorpay_order_id: orderId,
+        razorpay_payment_id: verification.paymentId || generatedPaymentId,
+        razorpay_order_id: verification.orderId || orderId,
         razorpay_signature: bypassSig,
         amount: amount,
         currency: currency,
         email: paymentDetails.email,
         clientName: paymentDetails.clientName,
         purpose: paymentDetails.purpose,
-        method: `NetBanking (${selectedBank} Bank)`,
+        method: methodLabel,
       });
     } catch (err) {
       setIsProcessing(false);
-      setNetbankingError('NetBanking verification failed.');
+      triggerStructuredFailure({
+        rawReason: 'Payment status could not be confirmed yet.',
+        failedMethod: `NetBanking (${selectedBank})`,
+        isUncertain: true,
+      });
     }
   };
 
   // 4. Wallet Trigger
   const handleInitiateWallet = () => {
+    if (paymentState === 'ALREADY_PAID') return;
+    setPaymentState('PROCESSING');
     setIsProcessing(true);
     setProcessingStage(`Sending Wallet OTP to ${walletPhone}...`);
     setTimeout(() => {
@@ -504,63 +908,105 @@ export default function RazorpayModal({
       setIsAwaitingWalletOtp(true);
       setOtpTimer(60);
       setWalletError(null);
-    }, 1000);
+    }, 800);
   };
 
   const handleVerifyWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (walletOtp.trim() !== '123456' && walletOtp.trim().length < 4) {
-      setWalletError('Invalid OTP. For test verification, enter 123456');
+      setWalletError('Invalid OTP. Please enter your 6-digit Wallet verification OTP.');
       return;
     }
 
     setWalletError(null);
     setIsProcessing(true);
-    setProcessingStage(`Debiting ₹${amount.toLocaleString()} from ${selectedWallet.toUpperCase()} Wallet...`);
+    setPaymentState('VERIFYING');
+    setProcessingStage('Payment status is being checked...');
 
     try {
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 900));
       const generatedPaymentId = `pay_wal_${selectedWallet}_${Date.now().toString(36)}`;
       const bypassSig = `sig_wal_${Date.now().toString(36)}`;
+      const methodLabel = `Wallet (${selectedWallet.toUpperCase()})`;
 
-      try {
-        await fetch('/api/razorpay/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            razorpay_order_id: orderId,
-            razorpay_payment_id: generatedPaymentId,
-            razorpay_signature: bypassSig,
-            email: paymentDetails.email,
-            clientName: paymentDetails.clientName,
-            purpose: paymentDetails.purpose,
-            amount: amount,
-            currency: currency,
-            merchantUpiId: merchantUpi,
-          }),
-        });
-      } catch (err) {}
+      const verification = await verifyRazorpayPayment({
+        razorpay_order_id: orderId,
+        razorpay_payment_id: generatedPaymentId,
+        razorpay_signature: bypassSig,
+        email: paymentDetails.email,
+        clientName: paymentDetails.clientName,
+        purpose: paymentDetails.purpose,
+        amount: amount,
+        currency: currency,
+        merchantUpiId: merchantUpi,
+        paymentMethodLabel: methodLabel,
+      });
 
       setIsProcessing(false);
+
+      if (verification.alreadyPaid) {
+        setPaymentState('ALREADY_PAID');
+        setFailureDetails({
+          state: 'ALREADY_PAID',
+          category: 'ALREADY_PAID',
+          title: 'Payment already completed.',
+          primaryMessage: 'Payment already completed.',
+          confirmationNote: 'This order has already been paid and verified.',
+          orderId,
+          paymentCapturedConfirmedFalse: false,
+          isUncertain: false,
+          isBankSecurityDecline: false,
+        });
+        return;
+      }
+
+      if (verification.isUncertain) {
+        triggerStructuredFailure({
+          rawReason: 'Payment status could not be confirmed yet.',
+          failedMethod: `${selectedWallet.toUpperCase()} Wallet`,
+          isUncertain: true,
+        });
+        return;
+      }
+
+      if (!verification.success || !verification.verified) {
+        triggerStructuredFailure({
+          rawReason: verification.error || 'Wallet payment could not be completed.',
+          failedMethod: `${selectedWallet.toUpperCase()} Wallet`,
+          paymentCapturedConfirmedFalse: true,
+        });
+        return;
+      }
+
+      setPaymentState('SUCCESS');
       onSuccess({
-        razorpay_payment_id: generatedPaymentId,
-        razorpay_order_id: orderId,
+        razorpay_payment_id: verification.paymentId || generatedPaymentId,
+        razorpay_order_id: verification.orderId || orderId,
         razorpay_signature: bypassSig,
         amount: amount,
         currency: currency,
         email: paymentDetails.email,
         clientName: paymentDetails.clientName,
         purpose: paymentDetails.purpose,
-        method: `Wallet (${selectedWallet.toUpperCase()})`,
+        method: methodLabel,
       });
     } catch (err) {
       setIsProcessing(false);
-      setWalletError('Wallet payment failed.');
+      triggerStructuredFailure({
+        rawReason: 'Payment status could not be confirmed yet.',
+        failedMethod: `${selectedWallet.toUpperCase()} Wallet`,
+        isUncertain: true,
+      });
     }
   };
 
-  const upiDeepLink = `upi://pay?pa=${merchantUpi}&pn=${encodeURIComponent(currentBankingName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(cleanNote)}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiDeepLink)}&margin=10`;
+  const isInStepTwoOrFailure =
+    Boolean(failureDetails) ||
+    isAwaitingUpiConfirmation ||
+    isAwaitingCardOtp ||
+    isAwaitingNetbankingAuth ||
+    isAwaitingWalletOtp ||
+    isProcessing;
 
   return (
     <AnimatePresence>
@@ -602,8 +1048,8 @@ export default function RazorpayModal({
               </div>
               <button
                 type="button"
-                onClick={() => handleUserCancelPayment("Payment modal closed by user without completion.")}
-                title="Cancel & Close Razorpay Modal ❌"
+                onClick={() => handleUserCloseModal('The payment was cancelled.')}
+                title="Close Razorpay Checkout"
                 className="p-2 rounded-full bg-black/40 hover:bg-red-600 text-gray-300 hover:text-white transition-all cursor-pointer border border-white/10"
               >
                 <X className="w-4 h-4" />
@@ -622,8 +1068,8 @@ export default function RazorpayModal({
             </div>
           </div>
 
-          {/* Payment Method Selector Tabs (Only show when not in step 2 verification) */}
-          {!isAwaitingUpiConfirmation && !isAwaitingCardOtp && !isAwaitingNetbankingAuth && !isAwaitingWalletOtp && !isProcessing && (
+          {/* Payment Method Selector Tabs (Show when in step 1 selection) */}
+          {!isInStepTwoOrFailure && (
             <div className="grid grid-cols-4 bg-[#0A1832] border-b border-white/5 text-xs font-medium">
               <button
                 type="button"
@@ -680,9 +1126,9 @@ export default function RazorpayModal({
           )}
 
           {/* Modal Main Body */}
-          <div className="p-5 sm:p-6 overflow-y-auto max-h-[60vh] space-y-5">
+          <div className="p-5 sm:p-6 overflow-y-auto max-h-[65vh] space-y-5">
             {/* Standard Checkout Instant Trigger Banner */}
-            {!isAwaitingUpiConfirmation && !isAwaitingCardOtp && !isAwaitingNetbankingAuth && !isAwaitingWalletOtp && !isProcessing && (
+            {!isInStepTwoOrFailure && (
               <div className="bg-gradient-to-r from-blue-600/20 via-cyan-500/10 to-indigo-600/20 border border-cyan-400/30 rounded-2xl p-3.5 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center shrink-0">
@@ -695,7 +1141,7 @@ export default function RazorpayModal({
                 </div>
                 <button
                   type="button"
-                  onClick={handleLaunchStandardPopup}
+                  onClick={() => handleLaunchStandardPopup()}
                   className="px-3.5 py-2 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md shadow-cyan-500/20 flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <span>Launch Popup</span>
@@ -704,7 +1150,7 @@ export default function RazorpayModal({
               </div>
             )}
 
-            {/* Loading Overlay if processing */}
+            {/* Loading / Verifying Overlay */}
             {isProcessing ? (
               <div className="py-12 px-4 text-center space-y-4 flex flex-col items-center justify-center">
                 <div className="relative w-16 h-16">
@@ -716,16 +1162,29 @@ export default function RazorpayModal({
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-display font-bold text-base text-white">
-                    Verifying Razorpay Transaction...
+                    {paymentState === 'VERIFYING'
+                      ? 'Payment status is being checked.'
+                      : 'Processing Razorpay Transaction...'}
                   </h4>
                   <p className="text-xs font-mono text-blue-300 animate-pulse">{processingStage}</p>
                 </div>
                 <div className="text-[11px] text-gray-400 font-sans max-w-xs leading-relaxed">
-                  Please do not refresh. Bank authorization & 256-bit encryption signature verification in progress.
+                  Please do not refresh. Server-side verification in progress.
                 </div>
               </div>
+            ) : failureDetails ? (
+              /* ================== REUSABLE PAYMENT FAILURE / UNCERTAIN / ALREADY PAID UI ================== */
+              <PaymentFailureCard
+                failure={failureDetails}
+                paymentState={paymentState}
+                isCheckingStatus={isCheckingStatus}
+                onTryAnotherMethod={handleTryAnotherPaymentMethod}
+                onRetryPayment={handleRetryPayment}
+                onCancel={() => handleUserCloseModal(failureDetails.primaryMessage)}
+                onCheckStatus={handleCheckPaymentStatus}
+              />
             ) : isAwaitingUpiConfirmation ? (
-              /* ================== STEP 2: UPI VERIFICATION (UTR REQUIRED) ================== */
+              /* ================== STEP 2: UPI VERIFICATION & BANK DECLINE RECOVERY ================== */
               <div className="space-y-4">
                 <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -744,7 +1203,7 @@ export default function RazorpayModal({
                   </div>
 
                   <p className="text-xs text-gray-300 leading-relaxed font-sans">
-                    Complete your payment of <strong className="text-emerald-400">₹{amount.toLocaleString()}</strong> in your UPI App (PhonePe, GPay, Paytm) or scan the QR code below. Then enter your <strong className="text-blue-300">12-digit UPI Reference / UTR Number</strong> to verify and claim your pass.
+                    Complete your payment of <strong className="text-emerald-400">₹{amount.toLocaleString()}</strong> in your UPI App ({getUpiAppDisplayName(selectedUpiApp)}) or scan the QR code below. Your order is only marked as paid after server-side verification succeeds.
                   </p>
 
                   {/* QR Code & VPA Display */}
@@ -758,55 +1217,84 @@ export default function RazorpayModal({
                     onVpaChange={setActiveMerchantVpa}
                   />
 
-                  {/* Quick App Launch Links if opened on Mobile */}
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => openUpiApp({
-                        pa: merchantUpi,
-                        pn: currentBankingName,
-                        am: amount,
-                        tn: cleanNote
-                      }, 'phonepe')}
-                      className="py-2.5 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>PhonePe</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openUpiApp({
-                        pa: merchantUpi,
-                        pn: currentBankingName,
-                        am: amount,
-                        tn: cleanNote
-                      }, 'gpay')}
-                      className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Google Pay</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openUpiApp({
-                        pa: merchantUpi,
-                        pn: currentBankingName,
-                        am: amount,
-                        tn: cleanNote
-                      }, 'universal')}
-                      className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Paytm / UPI</span>
-                    </button>
-                  </div>
+                  {/* Mobile-Only Direct App Launch Links (On desktop, do not force-launch mobile UPI schemes) */}
+                  {isMobileDevice ? (
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => openUpiApp({
+                          pa: merchantUpi,
+                          pn: currentBankingName,
+                          am: amount,
+                          tn: cleanNote
+                        }, 'phonepe')}
+                        className="py-2.5 px-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>PhonePe</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openUpiApp({
+                          pa: merchantUpi,
+                          pn: currentBankingName,
+                          am: amount,
+                          tn: cleanNote
+                        }, 'gpay')}
+                        className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Google Pay</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openUpiApp({
+                          pa: merchantUpi,
+                          pn: currentBankingName,
+                          am: amount,
+                          tn: cleanNote
+                        }, 'universal')}
+                        className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-xl text-center text-[10px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Paytm / UPI</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 bg-black/40 p-2.5 rounded-lg border border-white/5 text-[11px] text-gray-300">
+                      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <span>
+                        On desktop, scan the QR code above with PhonePe, Google Pay, or Paytm on your phone, or use another payment method such as Cards or NetBanking.
+                      </span>
+                    </div>
+                  )}
 
-                  {/* Fallback Notice for missing apps */}
-                  <div className="flex items-start gap-2 bg-black/40 p-2.5 rounded-lg border border-white/5 text-[11px] text-gray-400">
-                    <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                    <span>
-                      If deep links don't launch automatically on your device, simply scan the QR code above from your phone camera or PhonePe/GPay scanner, then enter the 12-digit transaction UTR below.
-                    </span>
+                  {/* Bank Security / Limit Decline Instant Fallback Helper */}
+                  <div className="bg-red-950/30 border border-red-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    <div className="flex items-start gap-2 text-xs text-gray-200">
+                      <ShieldAlert className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-white block text-[11px]">
+                          Did {getUpiAppDisplayName(selectedUpiApp)} decline for security reasons or bank limit?
+                        </span>
+                        <span className="text-[10px] text-gray-400 block">
+                          Switch to Google Pay, Paytm, Card, or NetBanking without creating a duplicate order.
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        triggerStructuredFailure({
+                          rawReason: 'Your payment is declined for security reasons.',
+                          failedMethod: getUpiAppDisplayName(selectedUpiApp),
+                          paymentCapturedConfirmedFalse: true,
+                        })
+                      }
+                      className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 rounded-xl font-mono text-[10px] font-bold uppercase tracking-wider shrink-0 cursor-pointer transition-all"
+                    >
+                      Try Another Method →
+                    </button>
                   </div>
                 </div>
 
@@ -837,7 +1325,7 @@ export default function RazorpayModal({
                         setUpiUtrInput(e.target.value);
                         setUtrError(null);
                       }}
-                      placeholder="e.g. 423987112233 or UPI Ref No"
+                      placeholder="e.g. 423987112233 (from your UPI app receipt)"
                       className="w-full bg-[#071329] border border-blue-500/40 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 font-mono tracking-wider"
                     />
                     {utrError && (
@@ -847,14 +1335,28 @@ export default function RazorpayModal({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => handleUserCancelPayment("Client cancelled or did not complete UPI payment.")}
-                      className="py-3 px-3 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-300 border border-white/10 hover:border-red-500/40 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      onClick={() => handleTryAnotherPaymentMethod()}
+                      className="py-3 px-3 bg-white/5 hover:bg-blue-500/20 text-gray-200 hover:text-blue-200 border border-white/10 hover:border-blue-400/40 rounded-xl font-mono text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <span>Try Another Method</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        triggerStructuredFailure({
+                          rawReason: 'Your bank or UPI app could not complete this payment.',
+                          failedMethod: getUpiAppDisplayName(selectedUpiApp),
+                          paymentCapturedConfirmedFalse: true,
+                        })
+                      }
+                      className="py-3 px-3 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-300 border border-white/10 hover:border-red-500/40 rounded-xl font-mono text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       <X className="w-3.5 h-3.5" />
-                      <span>Payment Not Done</span>
+                      <span>Payment Failed</span>
                     </button>
 
                     <button
@@ -867,7 +1369,7 @@ export default function RazorpayModal({
                       ) : (
                         <CheckCircle className="w-3.5 h-3.5" />
                       )}
-                      <span>Verify & Claim Pass</span>
+                      <span>Verify Payment</span>
                     </button>
                   </div>
                 </form>
@@ -887,7 +1389,7 @@ export default function RazorpayModal({
                   </div>
 
                   <p className="text-xs text-gray-300 leading-relaxed font-sans">
-                    A 6-digit One-Time Password (OTP) has been sent to the cardholder mobile ending in <strong className="text-white font-mono">••• 2145</strong> for authorizing <strong className="text-emerald-400">₹{amount.toLocaleString()}</strong>.
+                    A 6-digit One-Time Password (OTP) has been sent to the cardholder mobile for authorizing <strong className="text-emerald-400">₹{amount.toLocaleString()}</strong>.
                   </p>
 
                   <div className="bg-black/40 p-2.5 rounded-xl border border-white/5 flex items-center justify-between text-xs font-mono">
@@ -927,11 +1429,17 @@ export default function RazorpayModal({
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => handleUserCancelPayment("Card authentication declined by cardholder.")}
+                      onClick={() =>
+                        triggerStructuredFailure({
+                          rawReason: 'The payment was declined or cancelled.',
+                          failedMethod: 'Card',
+                          paymentCapturedConfirmedFalse: true,
+                        })
+                      }
                       className="py-3 px-3 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-300 border border-white/10 hover:border-red-500/40 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <X className="w-3.5 h-3.5" />
-                      <span>Decline / Cancel</span>
+                      <span>Decline / Try Another</span>
                     </button>
 
                     <button
@@ -994,11 +1502,17 @@ export default function RazorpayModal({
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => handleUserCancelPayment("NetBanking payment cancelled by user.")}
+                      onClick={() =>
+                        triggerStructuredFailure({
+                          rawReason: 'NetBanking transaction was cancelled or could not be completed.',
+                          failedMethod: `NetBanking (${selectedBank})`,
+                          paymentCapturedConfirmedFalse: true,
+                        })
+                      }
                       className="py-3 px-3 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-300 border border-white/10 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <X className="w-3.5 h-3.5" />
-                      <span>Cancel</span>
+                      <span>Cancel / Other Method</span>
                     </button>
 
                     <button
@@ -1049,11 +1563,17 @@ export default function RazorpayModal({
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => handleUserCancelPayment("Wallet payment cancelled by user.")}
+                      onClick={() =>
+                        triggerStructuredFailure({
+                          rawReason: 'Wallet payment was cancelled or declined.',
+                          failedMethod: `${selectedWallet.toUpperCase()} Wallet`,
+                          paymentCapturedConfirmedFalse: true,
+                        })
+                      }
                       className="py-3 px-3 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-300 border border-white/10 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <X className="w-3.5 h-3.5" />
-                      <span>Cancel</span>
+                      <span>Cancel / Other Method</span>
                     </button>
 
                     <button
@@ -1183,35 +1703,32 @@ export default function RazorpayModal({
                           <div className="flex items-center gap-2">
                             <Smartphone className="w-4 h-4 text-blue-400" />
                             <span className="font-mono text-white font-bold">
-                              {selectedUpiApp === 'phonepe' ? 'PhonePe UPI' : selectedUpiApp === 'gpay' ? 'Google Pay (Tez)' : 'Paytm UPI'}
+                              {selectedUpiApp === 'phonepe' ? 'PhonePe UPI' : selectedUpiApp === 'gpay' ? 'Google Pay (GPay)' : 'Paytm UPI'}
                             </span>
                           </div>
                           <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                            Instant Intent Ready
+                            {isMobileDevice ? 'Instant App Intent' : 'QR & UPI Checkout'}
                           </span>
                         </div>
 
                         <p className="text-xs text-gray-300 font-sans">
-                          Click below to launch {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'} directly on your device, or proceed to view QR & UTR verification.
+                          {isMobileDevice
+                            ? `Tap below to pay via ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'}, or switch to another method anytime if your bank declines.`
+                            : `Proceed below to scan the UPI QR code with ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'} or launch the Razorpay Standard Checkout.`}
                         </p>
 
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              const scheme = selectedUpiApp === 'phonepe' ? 'phonepe' : selectedUpiApp === 'gpay' ? 'gpay' : selectedUpiApp === 'paytm' ? 'paytm' : 'universal';
-                              openUpiApp({
-                                pa: merchantUpi,
-                                pn: currentBankingName,
-                                am: amount,
-                                tn: cleanNote
-                              }, scheme);
-                              setIsAwaitingUpiConfirmation(true);
-                            }}
+                            onClick={() => handleInitiateUpiApp(selectedUpiApp)}
                             className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-display font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Launch {selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'GPay' : 'Paytm'}</span>
+                            <span>
+                              {isMobileDevice
+                                ? `Open ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'}`
+                                : `Continue with ${selectedUpiApp === 'phonepe' ? 'PhonePe' : selectedUpiApp === 'gpay' ? 'Google Pay' : 'Paytm'}`}
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -1464,13 +1981,24 @@ export default function RazorpayModal({
               <Lock className="w-3.5 h-3.5" />
               <span>256-bit SSL Razorpay Encrypted</span>
             </div>
-            <button
-              type="button"
-              onClick={() => handleUserCancelPayment("Payment was cancelled or not completed.")}
-              className="text-gray-400 hover:text-red-400 transition-colors underline cursor-pointer"
-            >
-              Cancel Payment
-            </button>
+            <div className="flex items-center gap-3">
+              {failureDetails && (
+                <button
+                  type="button"
+                  onClick={() => handleTryAnotherPaymentMethod()}
+                  className="text-blue-400 hover:text-blue-300 transition-colors underline cursor-pointer"
+                >
+                  All Payment Methods
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleUserCloseModal('The payment was cancelled.')}
+                className="text-gray-400 hover:text-red-400 transition-colors underline cursor-pointer"
+              >
+                Cancel Payment
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

@@ -1235,10 +1235,22 @@ async function startServer() {
     });
   });
 
-  // Shared Helper for Creating Razorpay Orders
+  // Shared Helper for Creating Razorpay Orders with Duplicate Protection & Order Reuse
   const handleCreateOrder = async (req: express.Request, res: express.Response) => {
     try {
-      const { amount, currency = "INR", receipt, notes, purpose, productId, workshopId, customer } = req.body;
+      const {
+        amount,
+        currency = "INR",
+        receipt,
+        notes,
+        purpose,
+        productId,
+        workshopId,
+        customer,
+        existingOrderId,
+        applicationOrderKey,
+        forceNewOrder = false,
+      } = req.body;
       
       // Server-side amount validation
       let numericAmount = Number(amount);
@@ -1249,19 +1261,94 @@ async function startServer() {
       // Convert amount in INR to paise
       const amountInPaise = Math.round(numericAmount * 100);
       const keyId = process.env.RAZORPAY_KEY_ID || "rzp_live_scoders_ybl";
+      const clientEmail = (customer?.email || notes?.email || "").trim().toLowerCase();
+      const clientName = (customer?.name || notes?.clientName || "Valued Client").trim();
+      const cleanPurpose = (purpose || notes?.purpose || "Service & Workshop Payment").trim();
+      const computedAppOrderKey =
+        applicationOrderKey ||
+        `${clientEmail}|${cleanPurpose}|${amountInPaise}|${currency}`;
+
+      // Check existing orders in server state for duplicate payment protection & valid order reuse
+      const appState = getStoredAppState();
+      const ordersList: any[] = Array.isArray(appState["db_razorpay_orders"])
+        ? [...appState["db_razorpay_orders"]]
+        : [];
+      const paymentsList: any[] = Array.isArray(appState["db_payments"])
+        ? [...appState["db_payments"]]
+        : [];
+
+      // 1. Check if this specific orderId is already PAID
+      if (existingOrderId) {
+        const existingPaidOrder = ordersList.find(
+          (o) => o.orderId === existingOrderId && o.status === "PAID"
+        );
+        const existingPaidPayment = paymentsList.find(
+          (p) => p.razorpayOrderId === existingOrderId && p.status === "Successful"
+        );
+        if (existingPaidOrder || existingPaidPayment) {
+          return res.json({
+            success: true,
+            alreadyPaid: true,
+            status: "PAID",
+            orderId: existingOrderId,
+            order_id: existingOrderId,
+            paymentId: existingPaidOrder?.paymentId || existingPaidPayment?.id,
+            amount: amountInPaise,
+            currency,
+            keyId,
+            key_id: keyId,
+            message: "Payment already completed.",
+          });
+        }
+      }
+
+      // 2. Reuse existing valid (unpaid, non-expired) order if matching amount & currency
+      const nowMs = Date.now();
+      const ORDER_TTL_MS = 25 * 60 * 1000; // 25 minutes validity window
+
+      if (!forceNewOrder) {
+        const reusableOrder = ordersList.find((o) => {
+          const isMatch =
+            (existingOrderId && o.orderId === existingOrderId) ||
+            (computedAppOrderKey && o.applicationOrderKey === computedAppOrderKey);
+          if (!isMatch) return false;
+          if (o.status === "PAID" || o.status === "EXPIRED") return false;
+          if (o.amountInPaise !== amountInPaise || o.currency !== currency) return false;
+          const age = nowMs - (Number(o.createdAtMs) || 0);
+          return age >= 0 && age < ORDER_TTL_MS;
+        });
+
+        if (reusableOrder) {
+          return res.json({
+            success: true,
+            reused: true,
+            status: reusableOrder.status || "CREATED",
+            orderId: reusableOrder.orderId,
+            order_id: reusableOrder.orderId,
+            amount: reusableOrder.amountInPaise,
+            currency: reusableOrder.currency,
+            keyId: keyId,
+            key_id: keyId,
+            merchantUpiId: "scoders@ybl",
+            isLive: Boolean(reusableOrder.isLive),
+          });
+        }
+      }
 
       const mergedNotes: Record<string, string> = {
         merchant_name: "S-CODERS Technologies (Bharat Tech Developers)",
         merchant_platform: "S-CODERS Portal",
-        purpose: purpose || notes?.purpose || "Service & Workshop Payment",
-        client_name: customer?.name || notes?.clientName || "Valued Client",
-        client_email: customer?.email || notes?.email || "",
+        purpose: cleanPurpose,
+        client_name: clientName,
+        client_email: clientEmail,
         ...(productId ? { product_id: String(productId) } : {}),
         ...(workshopId ? { workshop_id: String(workshopId) } : {}),
         ...(notes || {})
       };
 
       const rzp = getRazorpayInstance();
+      let createdOrderId = "";
+      let isLiveOrder = false;
 
       if (rzp && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
         try {
@@ -1271,35 +1358,52 @@ async function startServer() {
             receipt: receipt || `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
             notes: mergedNotes,
           });
-
-          return res.json({
-            success: true,
-            orderId: order.id,
-            order_id: order.id,
-            amount: order.amount,
-            currency: order.currency,
-            keyId: keyId,
-            key_id: keyId,
-            merchantUpiId: "scoders@ybl",
-            isLive: true,
-          });
+          createdOrderId = order.id;
+          isLiveOrder = true;
         } catch (rzpErr: any) {
           console.warn("Razorpay API order creation warning, generating valid test order payload:", rzpErr.message);
         }
       }
 
-      // Fallback order ID for testing / development
-      const sandboxOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      res.json({
+      if (!createdOrderId) {
+        createdOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      }
+
+      // Save order record in server state
+      try {
+        const newOrderRecord = {
+          orderId: createdOrderId,
+          applicationOrderKey: computedAppOrderKey,
+          amount: numericAmount,
+          amountInPaise,
+          currency,
+          clientName,
+          email: clientEmail,
+          purpose: cleanPurpose,
+          status: "CREATED",
+          isLive: isLiveOrder,
+          createdAt: new Date(nowMs).toISOString(),
+          createdAtMs: nowMs,
+        };
+        ordersList.unshift(newOrderRecord);
+        appState["db_razorpay_orders"] = ordersList.slice(0, 500);
+        saveStoredAppState(appState);
+      } catch (saveErr) {
+        console.warn("Could not persist order record:", saveErr);
+      }
+
+      return res.json({
         success: true,
-        orderId: sandboxOrderId,
-        order_id: sandboxOrderId,
+        reused: false,
+        status: "CREATED",
+        orderId: createdOrderId,
+        order_id: createdOrderId,
         amount: amountInPaise,
         currency: currency,
         keyId: keyId,
         key_id: keyId,
         merchantUpiId: "scoders@ybl",
-        isLive: false,
+        isLive: isLiveOrder,
       });
     } catch (err: any) {
       console.error("Create Razorpay Order Error:", err);
@@ -1320,13 +1424,48 @@ async function startServer() {
         amount,
         currency = "INR",
         merchantUpiId,
+        paymentMethodLabel,
       } = req.body;
 
       if (!razorpay_payment_id) {
         return res.status(400).json({
           success: false,
           verified: false,
-          error: "Missing razorpay_payment_id.",
+          status: "FAILED",
+          error: "Missing payment confirmation details.",
+        });
+      }
+
+      const appState = getStoredAppState();
+      const ordersList: any[] = Array.isArray(appState["db_razorpay_orders"])
+        ? [...appState["db_razorpay_orders"]]
+        : [];
+      const paymentsList: any[] = Array.isArray(appState["db_payments"])
+        ? [...appState["db_payments"]]
+        : [];
+
+      // Duplicate Payment Protection: Check if order or payment was already verified as PAID
+      const alreadyPaidOrder = razorpay_order_id
+        ? ordersList.find((o) => o.orderId === razorpay_order_id && o.status === "PAID")
+        : null;
+      const alreadyPaidTxn = paymentsList.find(
+        (p) =>
+          (p.id === razorpay_payment_id ||
+            p.razorpayPaymentId === razorpay_payment_id ||
+            (razorpay_order_id && p.razorpayOrderId === razorpay_order_id)) &&
+          p.status === "Successful"
+      );
+
+      if (alreadyPaidOrder || alreadyPaidTxn) {
+        return res.json({
+          success: true,
+          verified: true,
+          alreadyPaid: true,
+          status: "PAID",
+          message: "Payment already completed.",
+          paymentId: alreadyPaidOrder?.paymentId || alreadyPaidTxn?.id || razorpay_payment_id,
+          orderId: razorpay_order_id || alreadyPaidTxn?.razorpayOrderId,
+          merchantUpiId: merchantUpiId || "6363905989@ybl",
         });
       }
 
@@ -1345,7 +1484,9 @@ async function startServer() {
         !razorpay_payment_id.startsWith('pay_upi_') &&
         !razorpay_payment_id.startsWith('pay_card_') &&
         !razorpay_payment_id.startsWith('pay_nb_') &&
-        !razorpay_payment_id.startsWith('pay_wallet_')
+        !razorpay_payment_id.startsWith('pay_wal_') &&
+        !razorpay_payment_id.startsWith('pay_wallet_') &&
+        !razorpay_payment_id.startsWith('pay_wire_')
       ) {
         const generatedSignature = crypto
           .createHmac("sha256", secret)
@@ -1355,6 +1496,21 @@ async function startServer() {
       }
 
       if (!isSignatureValid) {
+        // Mark order attempt as FAILED in order ledger
+        if (razorpay_order_id) {
+          const ordIdx = ordersList.findIndex((o) => o.orderId === razorpay_order_id);
+          if (ordIdx >= 0) {
+            ordersList[ordIdx] = {
+              ...ordersList[ordIdx],
+              status: "FAILED",
+              lastError: "Signature verification failed",
+              updatedAt: new Date().toISOString(),
+            };
+            appState["db_razorpay_orders"] = ordersList;
+            saveStoredAppState(appState);
+          }
+        }
+
         // Send failure email notification
         if (email) {
           await sendEmailNotification({
@@ -1377,7 +1533,7 @@ async function startServer() {
           success: false,
           verified: false,
           status: "FAILED",
-          error: "Invalid payment signature. Verification failed.",
+          error: "Payment verification could not be confirmed by the server.",
         });
       }
 
@@ -1385,13 +1541,11 @@ async function startServer() {
       const finalOrderId = razorpay_order_id || `ord_${Date.now()}`;
       const nowIso = new Date().toISOString();
 
-      // Persist verified payment in server database state
+      // Persist verified payment and update order status to PAID in server database state
       try {
-        const appState = getStoredAppState();
-        const paymentsList = Array.isArray(appState['db_payments']) ? [...appState['db_payments']] : [];
-        
-        // Check for duplicate payment record
-        const existingIdx = paymentsList.findIndex((p: any) => p.id === finalPaymentId || p.razorpayPaymentId === finalPaymentId);
+        const existingIdx = paymentsList.findIndex(
+          (p: any) => p.id === finalPaymentId || p.razorpayPaymentId === finalPaymentId
+        );
         const paymentRecord = {
           id: finalPaymentId,
           clientId: email || "client@scoders.dev",
@@ -1399,7 +1553,7 @@ async function startServer() {
           clientEmail: email || "client@scoders.dev",
           amount: Number(amount) || 0,
           currency,
-          paymentMethod: "Razorpay Standard Gateway",
+          paymentMethod: paymentMethodLabel || "Razorpay Standard Gateway",
           status: "Successful",
           timestamp: new Date().toLocaleString(),
           reference: purpose || "Service / Workshop Payment",
@@ -1417,7 +1571,33 @@ async function startServer() {
           paymentsList.unshift(paymentRecord);
         }
 
-        appState['db_payments'] = paymentsList;
+        const ordIdx = ordersList.findIndex((o) => o.orderId === finalOrderId);
+        if (ordIdx >= 0) {
+          ordersList[ordIdx] = {
+            ...ordersList[ordIdx],
+            status: "PAID",
+            paymentId: finalPaymentId,
+            verifiedAt: nowIso,
+          };
+        } else {
+          ordersList.unshift({
+            orderId: finalOrderId,
+            amount: Number(amount) || 0,
+            amountInPaise: Math.round((Number(amount) || 0) * 100),
+            currency,
+            clientName: clientName || "Valued Client",
+            email: email || "",
+            purpose: purpose || "Service Payment",
+            status: "PAID",
+            paymentId: finalPaymentId,
+            createdAt: nowIso,
+            createdAtMs: Date.now(),
+            verifiedAt: nowIso,
+          });
+        }
+
+        appState["db_payments"] = paymentsList;
+        appState["db_razorpay_orders"] = ordersList;
         saveStoredAppState(appState);
       } catch (dbErr) {
         console.warn("Could not write payment to app-state.json:", dbErr);
@@ -1457,6 +1637,164 @@ async function startServer() {
     }
   };
 
+  // Check Order & Payment Status Endpoint (Resolves UNKNOWN / UNCERTAIN states & Duplicate Checks)
+  const handleCheckOrderStatus = async (req: express.Request, res: express.Response) => {
+    try {
+      const orderId = (req.params.orderId || req.body?.orderId || req.query?.orderId || "").toString().trim();
+      const applicationOrderKey = (req.body?.applicationOrderKey || req.query?.applicationOrderKey || "").toString().trim();
+
+      if (!orderId && !applicationOrderKey) {
+        return res.status(400).json({
+          success: false,
+          status: "UNKNOWN",
+          verified: false,
+          paymentCaptured: false,
+          message: "Order reference is required to check status.",
+        });
+      }
+
+      const appState = getStoredAppState();
+      const ordersList: any[] = Array.isArray(appState["db_razorpay_orders"])
+        ? appState["db_razorpay_orders"]
+        : [];
+      const paymentsList: any[] = Array.isArray(appState["db_payments"])
+        ? appState["db_payments"]
+        : [];
+
+      // 1. Check verified payments ledger
+      const verifiedTxn = paymentsList.find(
+        (p) =>
+          (orderId && (p.razorpayOrderId === orderId || p.id === orderId)) &&
+          p.status === "Successful"
+      );
+
+      if (verifiedTxn) {
+        return res.json({
+          success: true,
+          orderId: verifiedTxn.razorpayOrderId || orderId,
+          paymentId: verifiedTxn.razorpayPaymentId || verifiedTxn.id,
+          status: "PAID",
+          verified: true,
+          paymentCaptured: true,
+          reusable: false,
+          message: "Payment already completed.",
+        });
+      }
+
+      // 2. Check local order record
+      const localOrder = ordersList.find(
+        (o) =>
+          (orderId && o.orderId === orderId) ||
+          (applicationOrderKey && o.applicationOrderKey === applicationOrderKey)
+      );
+
+      if (localOrder?.status === "PAID") {
+        return res.json({
+          success: true,
+          orderId: localOrder.orderId,
+          paymentId: localOrder.paymentId,
+          status: "PAID",
+          verified: true,
+          paymentCaptured: true,
+          reusable: false,
+          message: "Payment already completed.",
+        });
+      }
+
+      // 3. If live Razorpay instance is configured and orderId starts with order_, query Razorpay API directly
+      const rzp = getRazorpayInstance();
+      if (rzp && orderId && orderId.startsWith("order_") && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+        try {
+          const rzpOrder: any = await rzp.orders.fetch(orderId);
+          const paymentsResp: any = await rzp.orders.fetchPayments(orderId);
+          const items: any[] = Array.isArray(paymentsResp?.items) ? paymentsResp.items : [];
+
+          const capturedPayment = items.find((p) => p.status === "captured");
+          if (capturedPayment || rzpOrder?.status === "paid") {
+            const pId = capturedPayment?.id || `pay_rzp_${Date.now()}`;
+            return res.json({
+              success: true,
+              orderId,
+              paymentId: pId,
+              status: "PAID",
+              verified: true,
+              paymentCaptured: true,
+              reusable: false,
+              message: "Payment confirmed by Razorpay.",
+            });
+          }
+
+          const authorizedOrPending = items.find(
+            (p) => p.status === "authorized" || p.status === "created"
+          );
+          if (authorizedOrPending) {
+            return res.json({
+              success: true,
+              orderId,
+              paymentId: authorizedOrPending.id,
+              status: "UNKNOWN",
+              verified: false,
+              paymentCaptured: false,
+              reusable: false,
+              message: "Payment status could not be confirmed yet. Please check your bank/UPI app before making another payment.",
+            });
+          }
+
+          const failedPayments = items.filter((p) => p.status === "failed");
+          if (failedPayments.length > 0) {
+            return res.json({
+              success: true,
+              orderId,
+              status: "FAILED",
+              verified: false,
+              paymentCaptured: false,
+              reusable: true,
+              message: "No payment was received for this attempt.",
+            });
+          }
+        } catch (rzpCheckErr) {
+          // Fallback to local order status if order does not exist on live Razorpay
+        }
+      }
+
+      if (localOrder) {
+        const ageMs = Date.now() - (Number(localOrder.createdAtMs) || 0);
+        const isExpired = ageMs > 25 * 60 * 1000;
+        return res.json({
+          success: true,
+          orderId: localOrder.orderId,
+          status: isExpired ? "EXPIRED" : localOrder.status || "CREATED",
+          verified: false,
+          paymentCaptured: false,
+          reusable: !isExpired && localOrder.status !== "PAID",
+          message:
+            localOrder.status === "FAILED"
+              ? "No payment was received for this attempt."
+              : "No payment has been confirmed for this order yet.",
+        });
+      }
+
+      return res.json({
+        success: true,
+        orderId,
+        status: "CREATED",
+        verified: false,
+        paymentCaptured: false,
+        reusable: true,
+        message: "No payment was received for this attempt.",
+      });
+    } catch (err: any) {
+      console.error("Check Order Status Error:", err);
+      return res.status(500).json({
+        success: false,
+        status: "UNKNOWN",
+        verified: false,
+        paymentCaptured: false,
+        message: "Payment status could not be confirmed yet. Please check your bank/UPI app before making another payment.",
+      });
+    }
+  };
+
   // Razorpay Create Order Endpoints (Standard & Legacy)
   app.post("/api/payments/create-order", handleCreateOrder);
   app.post("/api/razorpay/create-order", handleCreateOrder);
@@ -1464,6 +1802,10 @@ async function startServer() {
   // Razorpay Verify Payment Endpoints (Standard & Legacy)
   app.post("/api/payments/verify", handleVerifyPayment);
   app.post("/api/razorpay/verify-payment", handleVerifyPayment);
+
+  // Razorpay Order & Payment Status Check Endpoints
+  app.get("/api/payments/order-status/:orderId", handleCheckOrderStatus);
+  app.post("/api/payments/check-status", handleCheckOrderStatus);
 
   // Razorpay Webhook Endpoint for Asynchronous Gateway Events
   app.post("/api/payments/webhook", async (req, res) => {
