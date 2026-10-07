@@ -29,6 +29,18 @@ export interface ServiceRegistration {
   invoiceId: string | null; // Ref to DynamicInvoice
 }
 
+export interface RevokedPassRecord {
+  passKey: string;
+  workshopId: string;
+  workshopTitle: string;
+  participantName: string;
+  participantEmail: string;
+  revokedAt: string;
+  revokedBy: string; // 'Admin'
+  reason?: string;
+  originalAmount?: number;
+}
+
 export interface WorkshopRegistration {
   id: string; // e.g. "REG-WKSP-7301"
   participantProfile: {
@@ -39,7 +51,11 @@ export interface WorkshopRegistration {
   };
   workshopId: string;
   workshopTitle: string;
-  paymentStatus: 'Pending' | 'Processing' | 'Successful' | 'Failed' | 'Cancelled' | 'Refunded';
+  paymentStatus: 'Pending' | 'Processing' | 'Successful' | 'Failed' | 'Cancelled' | 'Refunded' | 'Revoked';
+  isRevoked?: boolean;
+  revokedAt?: string;
+  revokedBy?: string;
+  revokedReason?: string;
   amountPaid: number;
   paymentMethod: string; // "UPI", "PhonePe", "Google Pay", "Credit Card"
   paymentDate: string;
@@ -647,20 +663,178 @@ export class DatabaseEngine {
 
   public static saveWorkshopRegistrations(data: WorkshopRegistration[]): void {
     this.setStored('db_workshop_registrations', data);
-    // Backward compatibility sync
+    // Backward compatibility sync - only active, non-revoked passes
     const scodersReg: Record<string, any> = {};
     data.forEach((reg) => {
-      scodersReg[reg.workshopId] = {
-        key: reg.uniqueAccessKey,
-        name: reg.participantProfile.name,
-        email: reg.participantProfile.email,
-        role: reg.participantProfile.role,
-        tickets: 1,
-        totalPaid: reg.amountPaid,
-        timestamp: reg.paymentDate
-      };
+      if (reg.paymentStatus !== 'Cancelled' && reg.paymentStatus !== 'Refunded' && reg.paymentStatus !== 'Revoked' && !reg.isRevoked) {
+        scodersReg[reg.workshopId] = {
+          key: reg.uniqueAccessKey,
+          name: reg.participantProfile?.name || 'Attendee',
+          email: reg.participantProfile?.email || '',
+          role: reg.participantProfile?.role || 'Developer',
+          tickets: 1,
+          totalPaid: reg.amountPaid,
+          timestamp: reg.paymentDate
+        };
+      }
     });
     localStorage.setItem('scoders_registered_workshops', JSON.stringify(scodersReg));
+  }
+
+  // --- Workshop Pass Revocation / Restoration (Admin Controlled) ---
+  public static getRevokedPasses(): Record<string, RevokedPassRecord> {
+    try {
+      const stored = localStorage.getItem('scoders_revoked_passes');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  public static isPassRevoked(passKey: string): boolean {
+    if (!passKey) return false;
+    const normalized = passKey.trim().toUpperCase();
+    const revoked = this.getRevokedPasses();
+    if (revoked[normalized]) return true;
+    
+    // Check in database workshop registrations
+    const regs = this.getWorkshopRegistrations();
+    return regs.some(r => r.uniqueAccessKey?.trim().toUpperCase() === normalized && (r.isRevoked || r.paymentStatus === 'Revoked'));
+  }
+
+  public static revokeWorkshopPass(
+    workshopId: string, 
+    passKey?: string, 
+    reason: string = 'Administrative Revocation', 
+    adminName: string = 'Admin'
+  ): { success: boolean; message: string } {
+    const revokedList = this.getRevokedPasses();
+    const regs = this.getWorkshopRegistrations();
+    let targetKey = passKey ? passKey.trim().toUpperCase() : '';
+    let targetName = 'Attendee';
+    let targetEmail = '';
+    let targetTitle = 'Workshop';
+    let targetAmount = 1499;
+
+    const updatedRegs = regs.map(reg => {
+      const isMatch = (workshopId && reg.workshopId === workshopId) || 
+                      (targetKey && reg.uniqueAccessKey?.trim().toUpperCase() === targetKey);
+      if (isMatch) {
+        targetKey = reg.uniqueAccessKey || targetKey;
+        targetName = reg.participantProfile?.name || targetName;
+        targetEmail = reg.participantProfile?.email || targetEmail;
+        targetTitle = reg.workshopTitle || targetTitle;
+        targetAmount = reg.amountPaid || targetAmount;
+        return {
+          ...reg,
+          paymentStatus: 'Revoked' as const,
+          isRevoked: true,
+          revokedAt: new Date().toISOString(),
+          revokedBy: adminName,
+          revokedReason: reason
+        };
+      }
+      return reg;
+    });
+
+    this.saveWorkshopRegistrations(updatedRegs);
+
+    // Also check and update scoders_registered_workshops
+    try {
+      const savedWksps = JSON.parse(localStorage.getItem('scoders_registered_workshops') || '{}');
+      if (workshopId && savedWksps[workshopId]) {
+        if (!targetKey) targetKey = savedWksps[workshopId].key;
+        if (!targetName) targetName = savedWksps[workshopId].name;
+        if (!targetEmail) targetEmail = savedWksps[workshopId].email;
+        delete savedWksps[workshopId];
+      }
+      if (targetKey) {
+        Object.keys(savedWksps).forEach(wId => {
+          if (savedWksps[wId]?.key?.trim().toUpperCase() === targetKey) {
+            delete savedWksps[wId];
+          }
+        });
+      }
+      localStorage.setItem('scoders_registered_workshops', JSON.stringify(savedWksps));
+    } catch (e) {
+      console.warn("Error updating local registered workshops on revoke:", e);
+    }
+
+    if (targetKey) {
+      revokedList[targetKey] = {
+        passKey: targetKey,
+        workshopId,
+        workshopTitle: targetTitle,
+        participantName: targetName,
+        participantEmail: targetEmail,
+        revokedAt: new Date().toISOString(),
+        revokedBy: adminName,
+        reason,
+        originalAmount: targetAmount
+      };
+      localStorage.setItem('scoders_revoked_passes', JSON.stringify(revokedList));
+    }
+
+    // Trigger window events so UI updates everywhere
+    try {
+      window.dispatchEvent(new CustomEvent('scoders_pass_revoked', { detail: { passKey: targetKey, workshopId, reason } }));
+      window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+      window.dispatchEvent(new Event('scoders_db_change'));
+    } catch (e) {}
+
+    return { success: true, message: `Pass ${targetKey || workshopId} has been successfully revoked by Admin.` };
+  }
+
+  public static restoreWorkshopPass(passKey: string): { success: boolean; message: string } {
+    if (!passKey) return { success: false, message: 'Invalid pass key' };
+    const normalized = passKey.trim().toUpperCase();
+    const revokedList = this.getRevokedPasses();
+    const record = revokedList[normalized];
+
+    delete revokedList[normalized];
+    localStorage.setItem('scoders_revoked_passes', JSON.stringify(revokedList));
+
+    const regs = this.getWorkshopRegistrations();
+    let restoredWorkshopId = record?.workshopId || '';
+    const updatedRegs = regs.map(reg => {
+      if (reg.uniqueAccessKey?.trim().toUpperCase() === normalized) {
+        restoredWorkshopId = reg.workshopId;
+        return {
+          ...reg,
+          paymentStatus: 'Successful' as const,
+          isRevoked: false,
+          revokedAt: undefined,
+          revokedBy: undefined,
+          revokedReason: undefined
+        };
+      }
+      return reg;
+    });
+    this.saveWorkshopRegistrations(updatedRegs);
+
+    if (restoredWorkshopId && record) {
+      try {
+        const savedWksps = JSON.parse(localStorage.getItem('scoders_registered_workshops') || '{}');
+        savedWksps[restoredWorkshopId] = {
+          key: normalized,
+          name: record.participantName,
+          email: record.participantEmail,
+          role: 'Registered Attendee',
+          tickets: 1,
+          totalPaid: record.originalAmount || 1499,
+          timestamp: new Date().toLocaleDateString()
+        };
+        localStorage.setItem('scoders_registered_workshops', JSON.stringify(savedWksps));
+      } catch (e) {}
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('scoders_pass_restored', { detail: { passKey: normalized } }));
+      window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+      window.dispatchEvent(new Event('scoders_db_change'));
+    } catch (e) {}
+
+    return { success: true, message: `Pass ${normalized} has been restored successfully.` };
   }
 
   // --- Collection 3: Payments ---

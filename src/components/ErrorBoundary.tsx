@@ -35,14 +35,18 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  private handleRecover = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   private handleResetState = () => {
     try {
-      localStorage.clear();
-      sessionStorage.clear();
+      localStorage.removeItem('scoders_temp_reg');
     } catch (e) {
       console.error(e);
     }
-    window.location.reload();
+    this.setState({ hasError: false, error: null });
+    window.location.href = '/';
   };
 
   public render() {
@@ -59,34 +63,27 @@ export class ErrorBoundary extends Component<Props, State> {
             </span>
 
             <h2 className="text-2xl font-serif font-bold text-white mb-3">
-              Application Session Exception
+              Application Guard Recovery
             </h2>
 
             <p className="text-slate-300 text-xs font-sans leading-relaxed mb-6">
-              An unhandled rendering exception occurred. We have contained the error safely.
+              A temporary interface state was contained safely. Tap below to resume seamlessly.
             </p>
 
-            {this.state.error?.message && (
-              <div className="p-3 bg-[#011425]/80 border border-[#5C7C89]/20 rounded-xl text-left font-mono text-[11px] text-slate-300 mb-6 overflow-x-auto max-h-32">
-                {this.state.error.message}
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-2.5">
               <button
-                onClick={this.handleReload}
-                className="flex-1 py-3 px-4 bg-[#5C7C89] hover:bg-white hover:text-[#011425] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+                onClick={this.handleRecover}
+                className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-black font-display font-extrabold rounded-xl text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg"
               >
-                <RefreshCw className="w-4 h-4" />
-                Reload Page
+                <span>Resume Application</span>
               </button>
 
               <button
-                onClick={this.handleResetState}
-                className="flex-1 py-3 px-4 bg-[#011425]/60 border border-[#5C7C89]/30 hover:border-white text-slate-300 hover:text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+                onClick={this.handleReload}
+                className="w-full py-3 px-4 bg-[#5C7C89]/40 hover:bg-[#5C7C89] text-white rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Home className="w-4 h-4" />
-                Reset & Reload
+                <RefreshCw className="w-4 h-4" />
+                Reload Page
               </button>
             </div>
           </div>

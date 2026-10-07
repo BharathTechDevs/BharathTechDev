@@ -1,1 +1,728 @@
-{}
+{
+  "db_service_registrations": [
+    {
+      "id": "REG-SVC-4712",
+      "clientProfile": {
+        "name": "Bhuvan M",
+        "email": "bhuvan@scoders.com",
+        "phone": "+91 99999 00000",
+        "company": "Independent Client"
+      },
+      "serviceId": "ai",
+      "selectedServiceTitle": "AI Agent Development",
+      "uniqueKey": "BTD-SERV-AI-1L46-ZVID",
+      "projectRequirements": "sdfghjk",
+      "budget": "fghjk",
+      "timeline": "yuj",
+      "projectStatus": "Pending",
+      "registrationDate": "2026-09-28",
+      "projectSubmissionDate": "2026-10-28",
+      "sourceCodeFileId": "FIL-SRC-4712",
+      "pdfFileId": "FIL-PDF-4712",
+      "chatId": "CHT-SVC-4712",
+      "feedbackId": null,
+      "invoiceId": "INV-2026-712"
+    },
+    {
+      "id": "REG-SVC-1001",
+      "clientProfile": {
+        "name": "AgroSmart Billing",
+        "email": "billing@agrosmart.in",
+        "phone": "+91 99001 22334",
+        "company": "AgroSmart AI Corp"
+      },
+      "serviceId": "srv-ai-agents",
+      "selectedServiceTitle": "AI Agent & LLM Orchestration",
+      "uniqueKey": "BTD-SVC-AI-AG-82910",
+      "projectRequirements": "Integrate crop diagnosis neural graphs with conversational Gemini agents and custom WhatsApp endpoints.",
+      "budget": "₹2,50,000",
+      "timeline": "4 Weeks",
+      "projectStatus": "In Progress",
+      "registrationDate": "2026-07-10",
+      "projectSubmissionDate": "2026-08-10",
+      "sourceCodeFileId": "FIL-SVC-001-SRC",
+      "pdfFileId": "FIL-SVC-001-PDF",
+      "chatId": "CHT-SVC-1001",
+      "feedbackId": "FDB-001",
+      "invoiceId": "INV-2026-001"
+    }
+  ],
+  "db_workshop_registrations": [
+    {
+      "id": "reg-wksp-1791130925724",
+      "participantProfile": {
+        "name": "Attendee",
+        "email": "attendee@scoders.com",
+        "phone": "+91 99999 00000",
+        "role": "Developer"
+      },
+      "workshopId": "w-2",
+      "workshopTitle": "Full-Stack React Native Masterclass",
+      "paymentStatus": "Successful",
+      "amountPaid": 999,
+      "paymentMethod": "Razorpay Gateway (6363905989@ybl)",
+      "paymentDate": "2026-10-04",
+      "transactionId": "pay_rzp_ALXLUTDO",
+      "uniqueAccessKey": "BTD-WKSP-W-2-3VDO-MWLB",
+      "materialsFileIds": [
+        "file-pdf-1791130925724",
+        "file-src-1791130925724"
+      ],
+      "chatId": "chat-wksp-1791130925724",
+      "feedbackId": null
+    },
+    {
+      "id": "reg-wksp-1791130154972",
+      "participantProfile": {
+        "name": "Bhuvan M",
+        "email": "bhuvan@scoders.com",
+        "phone": "+91 99999 00000",
+        "role": "Developer"
+      },
+      "workshopId": "w-2",
+      "workshopTitle": "Full-Stack React Native Masterclass",
+      "paymentStatus": "Successful",
+      "amountPaid": 999,
+      "paymentMethod": "Razorpay Gateway (6363905989@ybl)",
+      "paymentDate": "2026-10-04",
+      "transactionId": "pay_rzp_XUK1948D",
+      "uniqueAccessKey": "BTD-WKSP-W-2-NCNV-1OEA",
+      "materialsFileIds": [
+        "file-pdf-1791130154972",
+        "file-src-1791130154972"
+      ],
+      "chatId": "chat-wksp-1791130154972",
+      "feedbackId": null
+    },
+    {
+      "id": "reg-wksp-1790487060763",
+      "participantProfile": {
+        "name": "Bhuvan M",
+        "email": "bhuvan@scoders.com",
+        "phone": "+91 99999 00000",
+        "role": "Developer"
+      },
+      "workshopId": "w-1",
+      "workshopTitle": "Building Real-world AI Agents with n8n & Gemini",
+      "paymentStatus": "Successful",
+      "amountPaid": 1,
+      "paymentMethod": "Razorpay Gateway (6363905989@ybl)",
+      "paymentDate": "2026-09-27",
+      "transactionId": "pay_TgwjOdIRcVpXci",
+      "uniqueAccessKey": "BTD-WKSP-W-1-RLZU-H9TA",
+      "materialsFileIds": [
+        "file-pdf-1790487060763",
+        "file-src-1790487060763"
+      ],
+      "chatId": "chat-wksp-1790487060763",
+      "feedbackId": null
+    },
+    {
+      "id": "REG-WKSP-2001",
+      "participantProfile": {
+        "name": "Rahul Joshi",
+        "email": "rahul.joshi@gmail.com",
+        "phone": "+91 88771 99221",
+        "role": "Registered Developer"
+      },
+      "workshopId": "wksp-reactor-ai",
+      "workshopTitle": "Microsoft Reactor Generative AI Masterclass",
+      "paymentStatus": "Successful",
+      "amountPaid": 1499,
+      "paymentMethod": "UPI (Google Pay)",
+      "paymentDate": "2026-06-24",
+      "transactionId": "TXN-90282",
+      "uniqueAccessKey": "BTD-WKSP-AI-73891-RAHUL",
+      "materialsFileIds": [
+        "FIL-WKSP-101-PDF",
+        "FIL-WKSP-101-SRC"
+      ],
+      "chatId": "CHT-WKSP-2001",
+      "feedbackId": "FDB-002"
+    }
+  ],
+  "db_payments": [
+    {
+      "id": "pay_rzp_ALXLUTDO",
+      "clientId": "attendee@scoders.com",
+      "clientName": "Attendee",
+      "clientEmail": "attendee@scoders.com",
+      "amount": 999,
+      "paymentMethod": "Razorpay Gateway (6363905989@ybl)",
+      "status": "Successful",
+      "timestamp": "2026-10-04T16:22:05.731Z",
+      "reference": "Workshop Pass: Full-Stack React Native Masterclass",
+      "interrupted": false,
+      "failureReason": null
+    },
+    {
+      "id": "pay_rzp_XUK1948D",
+      "clientId": "bhuvan@scoders.com",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "amount": 999,
+      "paymentMethod": "Razorpay Gateway (6363905989@ybl)",
+      "status": "Successful",
+      "timestamp": "2026-10-04T16:09:14.973Z",
+      "reference": "Workshop Pass: Full-Stack React Native Masterclass",
+      "interrupted": false,
+      "failureReason": null
+    },
+    {
+      "id": "TXN-193970",
+      "clientId": "bhuvan@scoders.com",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "amount": 10000,
+      "paymentMethod": "UPI (PhonePe)",
+      "status": "Successful",
+      "timestamp": "2026-09-28T09:25:34.714Z",
+      "reference": "Deposit payment for S-CODERS AI Agent Development",
+      "interrupted": false,
+      "failureReason": null
+    },
+    {
+      "id": "pay_TgwjOdIRcVpXci",
+      "clientId": "bhuvan@scoders.com",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "amount": 1,
+      "paymentMethod": "Razorpay Gateway (6363905989@ybl)",
+      "status": "Successful",
+      "timestamp": "2026-09-27T05:31:00.764Z",
+      "reference": "Workshop Pass: Building Real-world AI Agents with n8n & Gemini",
+      "interrupted": false,
+      "failureReason": null
+    },
+    {
+      "id": "pay_TgwjOdIRcVpXci",
+      "clientId": "bhuvan@scoders.com",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "amount": 1,
+      "currency": "INR",
+      "paymentMethod": "Razorpay Standard Gateway",
+      "status": "Successful",
+      "timestamp": "9/27/2026, 5:30:54 AM",
+      "reference": "Workshop Pass: Building Real-world AI Agents with n8n & Gemini",
+      "interrupted": false,
+      "failureReason": null,
+      "razorpayOrderId": "order_Tgwiv1ErENQaqh",
+      "razorpayPaymentId": "pay_TgwjOdIRcVpXci",
+      "razorpaySignature": "6f42f6308f8f8a50295a98eeee05dd2340e474e16920b97e669aff3ce999987f",
+      "paymentVerifiedAt": "2026-09-27T05:30:54.022Z"
+    }
+  ],
+  "db_chats": [
+    {
+      "id": "chat-wksp-1791130925724",
+      "clientName": "Attendee",
+      "clientEmail": "attendee@scoders.com",
+      "registrationId": "reg-wksp-1791130925724",
+      "reference": "Full-Stack React Native Masterclass",
+      "messages": [
+        {
+          "id": "msg-wksp-1",
+          "sender": "team",
+          "content": "Congratulations Attendee! You are officially registered for S-CODERS Workshop: 'Full-Stack React Native Masterclass'. Your learning materials, developer sandbox, and schedule access are unlocked.",
+          "timestamp": "2026-10-04T16:22:05.741Z"
+        }
+      ],
+      "lastUpdated": "2026-10-04T16:22:05.741Z"
+    },
+    {
+      "id": "chat-wksp-1791130154972",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "registrationId": "reg-wksp-1791130154972",
+      "reference": "Full-Stack React Native Masterclass",
+      "messages": [
+        {
+          "id": "msg-wksp-1",
+          "sender": "team",
+          "content": "Congratulations Bhuvan M! You are officially registered for S-CODERS Workshop: 'Full-Stack React Native Masterclass'. Your learning materials, developer sandbox, and schedule access are unlocked.",
+          "timestamp": "2026-10-04T16:09:14.974Z"
+        }
+      ],
+      "lastUpdated": "2026-10-04T16:09:14.974Z"
+    },
+    {
+      "id": "CHT-SVC-4712",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "registrationId": "REG-SVC-4712",
+      "reference": "AI Agent Development",
+      "messages": [
+        {
+          "id": "msg-init-1",
+          "sender": "team",
+          "content": "Welcome Bhuvan M to S-CODERS! We have created a separate database and conversation workspace for your project 'AI Agent Development'. Our team has reviewed your requirements: \"sdfghjk\". Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) will reach out shortly.",
+          "timestamp": "2026-09-28T09:25:34.714Z"
+        }
+      ],
+      "lastUpdated": "2026-09-28T09:25:34.714Z"
+    },
+    {
+      "id": "chat-wksp-1790487060763",
+      "clientName": "Bhuvan M",
+      "clientEmail": "bhuvan@scoders.com",
+      "registrationId": "reg-wksp-1790487060763",
+      "reference": "Building Real-world AI Agents with n8n & Gemini",
+      "messages": [
+        {
+          "id": "msg-wksp-1",
+          "sender": "team",
+          "content": "Congratulations Bhuvan M! You are officially registered for S-CODERS Workshop: 'Building Real-world AI Agents with n8n & Gemini'. Your learning materials, developer sandbox, and schedule access are unlocked.",
+          "timestamp": "2026-09-27T05:31:00.767Z"
+        }
+      ],
+      "lastUpdated": "2026-09-27T05:31:00.767Z"
+    },
+    {
+      "id": "CHT-SVC-1001",
+      "clientName": "AgroSmart Billing",
+      "clientEmail": "billing@agrosmart.in",
+      "registrationId": "REG-SVC-1001",
+      "reference": "AI Agent & LLM Orchestration",
+      "messages": [
+        {
+          "id": "m1",
+          "sender": "client",
+          "content": "Hi Team, did we start training the model on our custom crop dataset?",
+          "timestamp": "2026-07-11T10:00:00Z"
+        },
+        {
+          "id": "m2",
+          "sender": "team",
+          "content": "Hello! Yes, Bhuvan has configured the database pipeline, and Shreyas is refining the temperature parameters using Gemini 3.5 Flash. We are seeing 94% accuracy in crop diagnostic answers.",
+          "timestamp": "2026-07-11T10:15:00Z"
+        },
+        {
+          "id": "m3",
+          "sender": "client",
+          "content": "That sounds spectacular! Looking forward to the milestone 1 review.",
+          "timestamp": "2026-07-11T11:00:00Z"
+        }
+      ],
+      "lastUpdated": "2026-07-11T11:00:00Z"
+    },
+    {
+      "id": "CHT-WKSP-2001",
+      "clientName": "Rahul Joshi",
+      "clientEmail": "rahul.joshi@gmail.com",
+      "registrationId": "REG-WKSP-2001",
+      "reference": "Microsoft Reactor AI Masterclass",
+      "messages": [
+        {
+          "id": "w1",
+          "sender": "client",
+          "content": "Will I get a certificates of completion for this workshop?",
+          "timestamp": "2026-06-24T14:00:00Z"
+        },
+        {
+          "id": "w2",
+          "sender": "team",
+          "content": "Hi Rahul! Yes, absolutely. S-CODERS issues official digital certifications co-signed by NASSCOM ecosystem and S-CODERS founders.",
+          "timestamp": "2026-06-24T14:10:00Z"
+        }
+      ],
+      "lastUpdated": "2026-06-24T14:10:00Z"
+    }
+  ],
+  "db_files": [
+    {
+      "id": "file-pdf-1791130925724",
+      "name": "scoders_workshop_w-2_guide.pdf",
+      "type": "workshop_pdf",
+      "url": "#download-guide-pdf",
+      "size": "1.4 MB",
+      "clientId": "attendee@scoders.com",
+      "registrationId": "reg-wksp-1791130925724",
+      "uploadDate": "2026-10-04"
+    },
+    {
+      "id": "file-src-1791130925724",
+      "name": "scoders_workshop_w-2_boilerplate.zip",
+      "type": "workshop_source_code",
+      "url": "#download-boilerplate-zip",
+      "size": "890 KB",
+      "clientId": "attendee@scoders.com",
+      "registrationId": "reg-wksp-1791130925724",
+      "uploadDate": "2026-10-04"
+    },
+    {
+      "id": "file-pdf-1791130154972",
+      "name": "scoders_workshop_w-2_guide.pdf",
+      "type": "workshop_pdf",
+      "url": "#download-guide-pdf",
+      "size": "1.4 MB",
+      "clientId": "bhuvan@scoders.com",
+      "registrationId": "reg-wksp-1791130154972",
+      "uploadDate": "2026-10-04"
+    },
+    {
+      "id": "file-src-1791130154972",
+      "name": "scoders_workshop_w-2_boilerplate.zip",
+      "type": "workshop_source_code",
+      "url": "#download-boilerplate-zip",
+      "size": "890 KB",
+      "clientId": "bhuvan@scoders.com",
+      "registrationId": "reg-wksp-1791130154972",
+      "uploadDate": "2026-10-04"
+    },
+    {
+      "id": "FIL-SRC-4712",
+      "name": "ai_template_v1.zip",
+      "type": "project_source_code",
+      "url": "#download-source-zip",
+      "size": "2.5 MB",
+      "clientId": "bhuvan@scoders.com",
+      "registrationId": "REG-SVC-4712",
+      "uploadDate": "2026-09-28"
+    },
+    {
+      "id": "FIL-PDF-4712",
+      "name": "ai_specifications.pdf",
+      "type": "project_pdf",
+      "url": "#download-spec-pdf",
+      "size": "1.2 MB",
+      "clientId": "bhuvan@scoders.com",
+      "registrationId": "REG-SVC-4712",
+      "uploadDate": "2026-09-28"
+    },
+    {
+      "id": "file-pdf-1790487060763",
+      "name": "scoders_workshop_w-1_guide.pdf",
+      "type": "workshop_pdf",
+      "url": "#download-guide-pdf",
+      "size": "1.4 MB",
+      "clientId": "bhuvan@scoders.com",
+      "registrationId": "reg-wksp-1790487060763",
+      "uploadDate": "2026-09-27"
+    },
+    {
+      "id": "file-src-1790487060763",
+      "name": "scoders_workshop_w-1_boilerplate.zip",
+      "type": "workshop_source_code",
+      "url": "#download-boilerplate-zip",
+      "size": "890 KB",
+      "clientId": "bhuvan@scoders.com",
+      "registrationId": "reg-wksp-1790487060763",
+      "uploadDate": "2026-09-27"
+    },
+    {
+      "id": "FIL-SVC-001-SRC",
+      "name": "agrosmart_ai_agent_pipeline_v1.zip",
+      "type": "project_source_code",
+      "url": "#download-source-zip",
+      "size": "14.2 MB",
+      "clientId": "billing@agrosmart.in",
+      "registrationId": "REG-SVC-1001",
+      "uploadDate": "2026-07-12"
+    },
+    {
+      "id": "FIL-SVC-001-PDF",
+      "name": "AgroSmart_Architecture_Specification.pdf",
+      "type": "project_pdf",
+      "url": "#download-spec-pdf",
+      "size": "2.4 MB",
+      "clientId": "billing@agrosmart.in",
+      "registrationId": "REG-SVC-1001",
+      "uploadDate": "2026-07-10"
+    },
+    {
+      "id": "FIL-WKSP-101-PDF",
+      "name": "Gemini_Prompting_CheatSheet.pdf",
+      "type": "workshop_pdf",
+      "url": "#download-cheatsheet-pdf",
+      "size": "480 KB",
+      "clientId": "all_participants",
+      "registrationId": "REG-WKSP-2001",
+      "uploadDate": "2026-06-25"
+    },
+    {
+      "id": "FIL-WKSP-101-SRC",
+      "name": "n8n_scoders_automation_presets.json",
+      "type": "workshop_source_code",
+      "url": "#download-presets-json",
+      "size": "45 KB",
+      "clientId": "all_participants",
+      "registrationId": "REG-WKSP-2001",
+      "uploadDate": "2026-06-25"
+    }
+  ],
+  "db_candidate_applications": [
+    {
+      "fullName": "Priya Sharma",
+      "email": "priya.sharma@example.com",
+      "sector": "AI & Automation Engineering",
+      "roleTitle": "Generative AI & Prompt Engineer",
+      "employmentType": "Full-Time",
+      "expectedCompensation": "₹50,000 / month",
+      "phone": "+91 9876500000",
+      "whatsapp": "+91 9876500000",
+      "currentCity": "Bengaluru",
+      "portfolioUrl": "https://priyasharma.tech",
+      "status": "Submitted",
+      "id": "SCD-APP-MTRJN9NJ-4700",
+      "agreementReferenceId": "SCD-AGR-2026-MTRJN9NJ",
+      "submissionDate": "2026-09-07",
+      "createdAt": "2026-09-07T17:58:02.911Z"
+    },
+    {
+      "fullName": "Kavya Ramesh",
+      "email": "kavya.ramesh@example.com",
+      "sector": "AI & Automation Engineering",
+      "roleTitle": "AI Agent & LLM Workflow Engineer",
+      "employmentType": "Full-Time",
+      "expectedCompensation": "₹45,000 / month",
+      "phone": "+91 9876543210",
+      "whatsapp": "+91 9876543210",
+      "currentCity": "Bengaluru",
+      "portfolioUrl": "https://kavya.dev",
+      "status": "Submitted",
+      "id": "SCD-APP-MTRJBB1T-5169",
+      "agreementReferenceId": "SCD-AGR-2026-MTRJBB1T",
+      "submissionDate": "2026-09-07",
+      "createdAt": "2026-09-07T17:48:44.849Z"
+    },
+    {
+      "id": "SCD-APP-2026-001",
+      "submissionDate": "2026-08-15",
+      "status": "Shortlisted",
+      "sector": "AI & Automation Engineering",
+      "roleTitle": "Junior AI Workflow Engineer (n8n & LLM Orchestration)",
+      "employmentType": "Full-Time",
+      "fullName": "Ananya Sharma",
+      "email": "ananya.sharma.dev@gmail.com",
+      "phone": "+91 98450 11223",
+      "whatsapp": "+91 98450 11223",
+      "currentCity": "Bengaluru, Karnataka",
+      "portfolioUrl": "https://ananyasharma.dev",
+      "githubUrl": "https://github.com/ananya-ai",
+      "linkedinUrl": "https://linkedin.com/in/ananya-sharma-tech",
+      "highestQualification": "B.Tech in Computer Science & Engineering",
+      "institutionName": "PES University, Bengaluru",
+      "yearOfGraduation": "2025",
+      "experienceLevel": "0-1 Years",
+      "keySkills": "Python, Gemini SDK, n8n, LangChain, React, FastAPI, Docker, Vector Databases",
+      "previousProjects": "Built a WhatsApp autonomous customer support bot integrated with pgvector and Gemini Flash that reduced ticket triage time by 70%.",
+      "availabilityNotice": "Immediate",
+      "expectedCompensation": "₹45,000 / month",
+      "whyJoinScoders": "S-CODERS is driving genuine AI agent innovation right out of Bangalore. I want to build real-world workflows that impact startups directly.",
+      "impressiveAchievement": "Finalist at Smart India Hackathon 2024 for an automated agricultural disease detection agent.",
+      "resumeLink": "https://drive.google.com/file/d/sample-resume-ananya/view",
+      "agreementTitle": "S-CODERS Professional Talent Induction & Non-Disclosure Agreement",
+      "agreementReferenceId": "SCD-AGR-2026-ANANYA-01",
+      "agreementDate": "2026-08-15",
+      "effectiveDate": "2026-09-01",
+      "agreementDuration": "12 Months",
+      "agreementJurisdiction": "Bengaluru, Karnataka, India",
+      "agreementVersion": "v2.4 - 2026",
+      "companyLegalName": "S-CODERS (Bharath Tech Developers)",
+      "companyAddress": "Bengaluru, Karnataka, India - 560060",
+      "companyCin": "UDYAM-KR-03-018249",
+      "companyGstin": "29AABCXXXXX1Z5",
+      "companyPan": "AABCS8291M",
+      "companyEmail": "scoders82@gmail.com",
+      "companyPhone": "+91 6363905989 / +91 8867540445",
+      "companyAuthorizedRepresentative": "Shreyas M. / Bhuvan M.",
+      "companyRepresentativeDesignation": "Founder & CEO / Tech Lead",
+      "candidateLegalName": "Ananya Sharma",
+      "guardianName": "Ramesh Sharma",
+      "dateOfBirth": "2003-04-12",
+      "gender": "Female",
+      "permanentAddress": "#42, 3rd Cross, Indiranagar, Bengaluru - 560038",
+      "communicationAddress": "#42, 3rd Cross, Indiranagar, Bengaluru - 560038",
+      "panNumber": "ABCPS1234K",
+      "aadhaarNumber": "XXXX-XXXX-8921",
+      "officialEmail": "ananya.sharma.dev@gmail.com",
+      "emergencyContactName": "Ramesh Sharma (Father)",
+      "emergencyContactPhone": "+91 94480 22334",
+      "bankName": "HDFC Bank",
+      "accountHolderName": "Ananya Sharma",
+      "accountNumber": "50100492819201",
+      "ifscCode": "HDFC0001234",
+      "branchName": "Indiranagar Branch, Bengaluru",
+      "candidateDigitalSignature": "Ananya Sharma",
+      "agreedToNda": true,
+      "agreedToCodeOfConduct": true,
+      "agreedToIpAssignment": true,
+      "declarationConfirmed": true,
+      "adminNotes": "Impressed by her live demo of the Gemini agent. Scheduled for Technical Round with Suhas Gowda.",
+      "reviewedBy": "Bhuvan M."
+    }
+  ],
+  "scoders_dynamic_workshops": [
+    {
+      "id": "w-1",
+      "title": "Building Real-world AI Agents with n8n & Gemini",
+      "date": "June 18, 2026",
+      "startTime": "10:00 AM IST",
+      "location": "Microsoft Reactor, Bangalore",
+      "summary": "A fully hands-on developer session detailing how to map intricate multi-agent pipelines with n8n workflow systems, integrate Gemini API models, and trigger actions over Slack and Gmail.",
+      "achievements": [
+        "Over 150+ software developers and startup builders attended in person",
+        "Developed 3 custom production ready workflows live",
+        "Awarded \"Outstanding Tech Community Contribution\" badge"
+      ],
+      "photo": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500",
+      "category": "AI / Automation",
+      "attendees": 154,
+      "price": 1,
+      "duration": "2 Days (8 Hours Total)",
+      "toolsUsed": [
+        "n8n Orchestrator",
+        "Gemini 2.5 Flash API",
+        "React & TypeScript",
+        "Docker Containers",
+        "Webhooks & Slack Bots"
+      ],
+      "usefulness": [
+        "Master building multi-agent AI systems and autonomous workflows without recurring SaaS fees",
+        "Integrate LLM API calls directly into full-stack web and mobile applications",
+        "Automate lead triage, customer dispatch, and automated email/slack notifications",
+        "Receive the S-CODERS Certified AI Developer Badge and source code blueprints"
+      ],
+      "prerequisites": "Basic understanding of API concepts, JavaScript/TypeScript fundamentals, and a laptop with Node.js & Git installed."
+    },
+    {
+      "id": "w-2",
+      "title": "Full-Stack React Native Masterclass",
+      "date": "May 10, 2026",
+      "startTime": "09:30 AM IST",
+      "location": "RV College of Engineering, Bengaluru",
+      "summary": "A fast-paced masterclass covering local state optimization in React Native, building offline-first databases with SQLite, and deploying seamless animations using Reanimated.",
+      "achievements": [
+        "Trained 250+ aspiring engineering students on mobile architecture",
+        "30+ students launched active app prototypes on GitHub on the same day",
+        "Established the S-CODERS Student Developer Circle"
+      ],
+      "photo": "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&q=80&w=800&h=500",
+      "category": "Mobile Dev",
+      "attendees": 260,
+      "price": 999,
+      "duration": "3 Days (12 Hours Total)",
+      "toolsUsed": [
+        "React Native",
+        "Expo CLI",
+        "SQLite Mobile DB",
+        "Reanimated 3",
+        "Tailwind / NativeWind"
+      ],
+      "usefulness": [
+        "Build cross-platform iOS & Android mobile applications from scratch",
+        "Implement offline-first persistent database state management using local SQLite",
+        "Create silky-smooth 60fps animations and gesture handlers",
+        "Publish active mobile prototypes directly to GitHub and app store sandboxes"
+      ],
+      "prerequisites": "Familiarity with React components, state hooks, and standard JavaScript syntax."
+    },
+    {
+      "id": "w-3",
+      "title": "SaaS Hackathon: Idea to MVP in 48 Hours",
+      "date": "April 04, 2026",
+      "startTime": "10:00 AM IST",
+      "location": "eChai Ventures Hub, Bengaluru",
+      "summary": "A high-intensity, collaborative coding sprints bootcamp designed to assist founders in mapping out functional MVPs, configuring fast databases, and implementing standard payment processors.",
+      "achievements": [
+        "12 startup teams participated directly under S-CODERS mentorship",
+        "2 projects secured angel funding reviews within the same weekend",
+        "Direct panel discussion with 5 notable Bengaluru investors"
+      ],
+      "photo": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=800&h=500",
+      "category": "Startup / Scaling",
+      "attendees": 85,
+      "price": 1999,
+      "duration": "2 Days (16 Hours Sprint)",
+      "toolsUsed": [
+        "Vite + React",
+        "Node.js Express",
+        "PostgreSQL / Firestore",
+        "Razorpay & Stripe SDK",
+        "Tailwind CSS"
+      ],
+      "usefulness": [
+        "Transform rough product ideas into fully functional production MVPs in 48 hours",
+        "Implement secure authentication, user roles, and database persistence",
+        "Integrate payment gateways for immediate product monetisation and billing",
+        "Pitch live to Bengaluru angel investors, mentors, and technical advisors"
+      ],
+      "prerequisites": "Full-stack web development interest and willingness to collaborate in a high-speed sprint team."
+    }
+  ],
+  "scoders_registered_services": {
+    "ai": {
+      "key": "BTD-SERV-AI-1L46-ZVID",
+      "name": "Bhuvan M",
+      "email": "bhuvan@scoders.com",
+      "role": "Client Partner",
+      "budget": "fghjk",
+      "timeline": "yuj",
+      "timestamp": "2026-09-28"
+    },
+    "srv-ai-agents": {
+      "key": "BTD-SVC-AI-AG-82910",
+      "name": "AgroSmart Billing",
+      "email": "billing@agrosmart.in",
+      "role": "Client Partner",
+      "budget": "₹2,50,000",
+      "timeline": "4 Weeks",
+      "timestamp": "2026-07-10"
+    }
+  },
+  "scoders_registered_workshops": {
+    "w-1": {
+      "key": "BTD-WKSP-W-1-RLZU-H9TA",
+      "name": "Bhuvan M",
+      "email": "bhuvan@scoders.com",
+      "role": "Developer",
+      "tickets": 1,
+      "totalPaid": 1,
+      "timestamp": "2026-09-27"
+    },
+    "wksp-reactor-ai": {
+      "key": "BTD-WKSP-AI-73891-RAHUL",
+      "name": "Rahul Joshi",
+      "email": "rahul.joshi@gmail.com",
+      "role": "Registered Developer",
+      "tickets": 1,
+      "totalPaid": 1499,
+      "timestamp": "2026-06-24"
+    }
+  },
+  "db_razorpay_orders": [
+    {
+      "orderId": "order_TjtYtpLuGttiGG",
+      "applicationOrderKey": "attendee@scoders.com|Service & Workshop Payment|99900|INR",
+      "amount": 999,
+      "amountInPaise": 99900,
+      "currency": "INR",
+      "clientName": "Valued Client",
+      "email": "attendee@scoders.com",
+      "purpose": "Service & Workshop Payment",
+      "status": "FAILED",
+      "isLive": true,
+      "createdAt": "2026-10-04T16:21:25.504Z",
+      "createdAtMs": 1791130885504,
+      "lastError": "Signature verification failed",
+      "updatedAt": "2026-10-04T16:21:57.047Z"
+    },
+    {
+      "orderId": "order_TjtL2UfSDQ11o7",
+      "applicationOrderKey": "bhuvan@scoders.com|Service & Workshop Payment|99900|INR",
+      "amount": 999,
+      "amountInPaise": 99900,
+      "currency": "INR",
+      "clientName": "Valued Client",
+      "email": "bhuvan@scoders.com",
+      "purpose": "Service & Workshop Payment",
+      "status": "FAILED",
+      "isLive": true,
+      "createdAt": "2026-10-04T16:08:18.240Z",
+      "createdAtMs": 1791130098240,
+      "lastError": "Signature verification failed",
+      "updatedAt": "2026-10-04T16:09:06.261Z"
+    }
+  ]
+}

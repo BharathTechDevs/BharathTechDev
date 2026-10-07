@@ -82,7 +82,7 @@ export function buildUpiQueryString(params: UpiIntentParams): string {
  */
 export function generateUpiUrl(
   params: UpiIntentParams, 
-  scheme: 'universal' | 'phonepe' | 'gpay' | 'paytm' | 'bhim' = 'universal'
+  scheme: 'universal' | 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'bhim' | 'cred' | 'amazonpay' | 'whatsapp' = 'universal'
 ): string {
   return getAppropriateUpiLink(params, scheme);
 }
@@ -92,7 +92,7 @@ export function generateUpiUrl(
  */
 export function getAppropriateUpiLink(
   params: UpiIntentParams,
-  app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'universal' = 'universal'
+  app: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'bhim' | 'cred' | 'amazonpay' | 'whatsapp' | 'universal' = 'universal'
 ): string {
   const qs = buildUpiQueryString(params);
   const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
@@ -106,8 +106,16 @@ export function getAppropriateUpiLink(
         return `intent://pay?${qs}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
       case 'paytm':
         return `intent://pay?${qs}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
+      case 'fampay':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=com.fampay.in;action=android.intent.action.VIEW;end;`;
+      case 'cred':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=com.dreamplug.androidapp;action=android.intent.action.VIEW;end;`;
       case 'bhim':
         return `intent://pay?${qs}#Intent;scheme=upi;package=in.org.npci.upiapp;action=android.intent.action.VIEW;end;`;
+      case 'amazonpay':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=in.amazon.mShop.android.shopping;action=android.intent.action.VIEW;end;`;
+      case 'whatsapp':
+        return `intent://pay?${qs}#Intent;scheme=upi;package=com.whatsapp;action=android.intent.action.VIEW;end;`;
       default:
         return `upi://pay?${qs}`;
     }
@@ -121,8 +129,16 @@ export function getAppropriateUpiLink(
         return `tez://upi/pay?${qs}`;
       case 'paytm':
         return `paytmmp://pay?${qs}`;
+      case 'fampay':
+        return `fampay://upi/pay?${qs}`;
+      case 'cred':
+        return `cred://upi/pay?${qs}`;
       case 'bhim':
         return `bhim://pay?${qs}`;
+      case 'amazonpay':
+        return `amazonpay://upi/pay?${qs}`;
+      case 'whatsapp':
+        return `whatsapp://pay?${qs}`;
       default:
         return `upi://pay?${qs}`;
     }
@@ -134,7 +150,7 @@ export function getAppropriateUpiLink(
 /**
  * Generates Android Intent URIs specifically matching target package manager on Android devices
  */
-export function getAppSpecificIntent(params: UpiIntentParams, app: 'phonepe' | 'gpay' | 'paytm'): string {
+export function getAppSpecificIntent(params: UpiIntentParams, app: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'cred' | 'bhim'): string {
   const qs = buildUpiQueryString(params);
 
   if (app === 'phonepe') {
@@ -143,6 +159,12 @@ export function getAppSpecificIntent(params: UpiIntentParams, app: 'phonepe' | '
     return `intent://pay?${qs}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end;`;
   } else if (app === 'paytm') {
     return `intent://pay?${qs}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end;`;
+  } else if (app === 'fampay') {
+    return `intent://pay?${qs}#Intent;scheme=upi;package=com.fampay.in;action=android.intent.action.VIEW;end;`;
+  } else if (app === 'cred') {
+    return `intent://pay?${qs}#Intent;scheme=upi;package=com.dreamplug.androidapp;action=android.intent.action.VIEW;end;`;
+  } else if (app === 'bhim') {
+    return `intent://pay?${qs}#Intent;scheme=upi;package=in.org.npci.upiapp;action=android.intent.action.VIEW;end;`;
   }
   return `upi://pay?${qs}`;
 }
@@ -153,7 +175,7 @@ export function getAppSpecificIntent(params: UpiIntentParams, app: 'phonepe' | '
  */
 export function openUpiApp(
   params: UpiIntentParams, 
-  app: 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'universal' = 'universal'
+  app: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'bhim' | 'cred' | 'amazonpay' | 'whatsapp' | 'universal' = 'universal'
 ) {
   const targetVpa = params.pa || getActiveMerchantUpi();
   const targetPhone = getPhoneNumberForUpi(targetVpa);

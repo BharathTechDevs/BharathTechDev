@@ -4,7 +4,7 @@ import {
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
-  ExternalLink, Linkedin, Github, Phone, Mail
+  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -136,7 +136,14 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
       const savedUser = localStorage.getItem('scoders_user');
       setCurrentUser(savedUser ? JSON.parse(savedUser) : null);
     };
+    const handleSyncKeys = () => {
+      const saved = localStorage.getItem('scoders_registered_workshops');
+      setRegisteredKeys(saved ? JSON.parse(saved) : {});
+    };
     window.addEventListener('scoders_auth_change', handleSyncAuth);
+    window.addEventListener('scoders_registered_workshops_changed', handleSyncKeys);
+    window.addEventListener('scoders_pass_revoked', handleSyncKeys);
+    window.addEventListener('scoders_pass_restored', handleSyncKeys);
     window.addEventListener('focus', handleSyncAuth);
 
     // Check for direct key link from email button (?key=BTD-WKSP-XXXX)
@@ -151,6 +158,9 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
 
     return () => {
       window.removeEventListener('scoders_auth_change', handleSyncAuth);
+      window.removeEventListener('scoders_registered_workshops_changed', handleSyncKeys);
+      window.removeEventListener('scoders_pass_revoked', handleSyncKeys);
+      window.removeEventListener('scoders_pass_restored', handleSyncKeys);
       window.removeEventListener('focus', handleSyncAuth);
     };
   }, []);
@@ -216,9 +226,10 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     price: 1499
   };
 
-  // Check if active workshop is registered
-  const isRegistered = !!registeredKeys[activeWorkshop.id];
+  // Check if active workshop is registered and not revoked by admin
   const activeRegInfo = registeredKeys[activeWorkshop.id];
+  const isPassRevoked = activeRegInfo ? DatabaseEngine.isPassRevoked(activeRegInfo.key) : false;
+  const isRegistered = !!activeRegInfo && !isPassRevoked;
 
   // Load sandbox initial code template based on selected workshop
   useEffect(() => {
@@ -470,8 +481,8 @@ export default function TenantDashboard() {
     setIsProcessing(true);
     setPaymentError(null);
     const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
-    const participantName = (regName.trim() || currentUser?.name || 'Attendee').trim();
-    const participantEmail = (regEmail.trim() || currentUser?.email || 'attendee@scoders.com').trim();
+    const participantName = (regName.trim() || (currentUser?.name && currentUser.name !== 'Attendee' ? currentUser.name : '')).trim();
+    const participantEmail = (regEmail.trim() || (currentUser?.email && currentUser.email !== 'attendee@scoders.com' ? currentUser.email : '')).trim();
 
     try {
       const orderRes = await fetch('/api/razorpay/create-order', {
@@ -567,6 +578,13 @@ export default function TenantDashboard() {
     if (!manualKey.trim()) return;
 
     const trimmed = manualKey.trim().toUpperCase();
+
+    // Check if pass has been revoked by admin
+    if (DatabaseEngine.isPassRevoked(trimmed)) {
+      setManualKeyError(`⛔ Pass Revoked: Pass key ${trimmed} has been revoked by an administrator. Access is restricted. Please contact scoders82@gmail.com for assistance.`);
+      return;
+    }
+
     const code = activeWorkshop.id.toUpperCase();
     const expectedPrefix = `BTD-WKSP-${code}-`;
 
@@ -591,11 +609,22 @@ export default function TenantDashboard() {
     }
   };
 
-  const handleRemovePass = (id: string) => {
-    const updated = { ...registeredKeys };
-    delete updated[id];
-    setRegisteredKeys(updated);
-    localStorage.setItem('scoders_registered_workshops', JSON.stringify(updated));
+  // Revoke Pass is strictly controlled by Admin, not by client
+  const handleAdminRevokePass = (workshopId: string, passKey: string, attendeeName: string) => {
+    if (!isAdmin) {
+      alert("Unauthorized: Pass revocation can only be performed by administrators.");
+      return;
+    }
+    const reason = window.prompt(
+      `[ADMIN ACTION: REVOKE PASS]\n\nPass Key: ${passKey}\nAttendee: ${attendeeName}\nWorkshop: ${activeWorkshop.title}\n\nEnter reason for revoking pass:`,
+      "Administrative Revocation"
+    );
+    if (reason !== null) {
+      const res = DatabaseEngine.revokeWorkshopPass(workshopId, passKey, reason || 'Administrative Revocation', currentUser?.name || 'Admin');
+      alert(res.message);
+      const saved = localStorage.getItem('scoders_registered_workshops');
+      setRegisteredKeys(saved ? JSON.parse(saved) : {});
+    }
   };
 
   const handleCopyKey = (keyText: string) => {
@@ -1019,6 +1048,27 @@ export default function TenantDashboard() {
                     </div>
                   </div>
 
+                  {/* Notice if pass is revoked */}
+                  {isPassRevoked && (
+                    <div className="pt-8 mt-8 border-t border-white/5">
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 text-red-300 font-mono text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-red-500/20 text-red-400 rounded-xl">
+                            <AlertTriangle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-mono text-red-400 uppercase tracking-widest font-bold">Pass Status: Revoked</span>
+                            <h4 className="text-sm font-bold text-white font-sans">Session Pass Revoked by Administrator</h4>
+                            <p className="text-[11px] text-red-300/80 font-mono mt-0.5">Key: {activeRegInfo?.key} • Pass access was revoked by administrative policy.</p>
+                          </div>
+                        </div>
+                        <div className="text-[11px] text-gray-400">
+                          For questions regarding revocation, contact <span className="text-white font-bold">scoders82@gmail.com</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* GATE CONTROL: If registered, reveal interactive classroom. If not, show Register banner */}
                   {isRegistered ? (
                     <div id="workshop-classroom-section" className="pt-8 mt-8 border-t border-white/5 space-y-6">
@@ -1034,20 +1084,30 @@ export default function TenantDashboard() {
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleCopyKey(activeRegInfo.key)}
-                            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-all cursor-pointer border border-white/5"
-                            title="Copy Key"
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-300 hover:text-white transition-all cursor-pointer border border-white/5 flex items-center gap-1.5 text-xs font-mono"
+                            title="Copy Pass Key"
                           >
-                            {copiedKey ? <Check className="w-4 h-4 text-brand-teal" /> : <Copy className="w-4 h-4" />}
+                            {copiedKey ? <Check className="w-3.5 h-3.5 text-brand-teal" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedKey ? 'Copied' : 'Copy Key'}</span>
                           </button>
-                          <button
-                            onClick={() => handleRemovePass(activeWorkshop.id)}
-                            className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl font-mono text-[10px] uppercase font-bold transition-all cursor-pointer border border-red-500/15"
-                          >
-                            Revoke Pass
-                          </button>
+                          <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Pass Active
+                          </span>
+                          {/* Revoke Pass is strictly controlled by Admin, not by client */}
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleAdminRevokePass(activeWorkshop.id, activeRegInfo.key, activeRegInfo.name)}
+                              className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 hover:text-red-300 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                              title="Admin Control: Revoke this pass"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Admin: Revoke Pass</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1227,12 +1287,10 @@ export default function TenantDashboard() {
                         <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
                           <button
                             onClick={() => {
-                              setShowRegModal(true);
-                              setRegMode('register');
-                              setRegSuccessKey(null);
                               setPayTicketsCount(seatCount);
+                              handleInitiateRazorpayWorkshop();
                             }}
-                            className="px-6 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-teal/20"
+                            className="px-6 py-3 bg-[#521714] hover:bg-[#681e1a] active:bg-[#401210] text-[#ffded9] font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-black/40"
                           >
                             <Key className="w-4 h-4" />
                             Register & Pay ₹{(activeWorkshop.price ?? 1499).toLocaleString()}
@@ -1711,40 +1769,38 @@ export default function TenantDashboard() {
                         )}
 
                         <div>
-                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Full Name *</label>
+                          <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-1">Full Name *</label>
                           <input
                             type="text"
                             required
-                            disabled={!!currentUser}
                             value={regName}
                             onChange={(e) => setRegName(e.target.value)}
-                            placeholder="e.g. Rahul Sharma"
-                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
+                            placeholder="Enter your name"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Email Address *</label>
+                          <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-1">Email Address *</label>
                           <input
                             type="email"
                             required
-                            disabled={!!currentUser}
                             value={regEmail}
                             onChange={(e) => setRegEmail(e.target.value)}
-                            placeholder="e.g. student@college.edu"
-                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
+                            placeholder="Enter your email"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Your Technical Role / College (or Workplace) *</label>
+                          <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-1">Your Technical Role / College (or Workplace) *</label>
                           <input
                             type="text"
                             required
                             value={regRole}
                             onChange={(e) => setRegRole(e.target.value)}
-                            placeholder="e.g. Student, PESU / SDE-1, Swiggy"
-                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                            placeholder="Enter your role / college or organization"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all"
                           />
                         </div>
 

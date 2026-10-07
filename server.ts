@@ -1260,7 +1260,7 @@ async function startServer() {
 
       // Convert amount in INR to paise
       const amountInPaise = Math.round(numericAmount * 100);
-      const keyId = process.env.RAZORPAY_KEY_ID || "rzp_live_scoders_ybl";
+      const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder";
       const clientEmail = (customer?.email || notes?.email || "").trim().toLowerCase();
       const clientName = (customer?.name || notes?.clientName || "Valued Client").trim();
       const cleanPurpose = (purpose || notes?.purpose || "Service & Workshop Payment").trim();

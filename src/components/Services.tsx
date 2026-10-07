@@ -852,7 +852,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest">Access Keychain</p>
                           <p className="text-brand-teal font-extrabold truncate select-all">{registration.key}</p>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleCopyKey(registration.key)}
                             className="p-1.5 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-all cursor-pointer"
@@ -860,13 +860,20 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           >
                             {copiedKey ? <Check className="w-3.5 h-3.5 text-brand-teal" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
-                          <button
-                            onClick={() => handleRemoveKey(service.id)}
-                            className="p-1.5 hover:bg-red-500/10 rounded text-red-400 hover:text-red-300 transition-all cursor-pointer"
-                            title="Revoke Key"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
+                          {/* Revocation strictly controlled by Admin, not client */}
+                          {isAdmin && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`[ADMIN ONLY] Are you sure you want to revoke key for "${service.title}"? Clients will lose workspace access.`)) {
+                                  handleRemoveKey(service.id);
+                                }
+                              }}
+                              className="p-1.5 hover:bg-red-500/10 rounded text-red-400 hover:text-red-300 transition-all cursor-pointer"
+                              title="Admin Control: Revoke Key"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
 

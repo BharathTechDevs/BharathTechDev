@@ -5,7 +5,7 @@ import {
   X, RefreshCw, Sparkles, DollarSign, IndianRupee, Eye, ListFilter, Camera,
   Star, Database, BarChart as BarChartIcon, TrendingUp, Users as UsersIcon, Upload,
   Briefcase, FileText, CheckCircle2, AlertCircle, Building2, Landmark, User, Download, ExternalLink,
-  Users2
+  Users2, Ban, RotateCcw, ShieldAlert, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -23,7 +23,8 @@ import { Service, WorkshopEvent, ServiceEnquiry, GeneralMessage, NetworkingAchie
 import { 
   DatabaseEngine, ServiceRegistration, WorkshopRegistration, 
   PaymentTransaction, FeedbackItem, ChatConversation, 
-  FileRecord, EnquiryItem, TeamMemberRecord, GalleryMediaItem 
+  FileRecord, EnquiryItem, TeamMemberRecord, GalleryMediaItem,
+  RevokedPassRecord
 } from '../utils/dbEngine';
 import RecruitmentAdmin from './RecruitmentAdmin';
 import ApplicationFormsAdmin from './ApplicationFormsAdmin';
@@ -94,6 +95,9 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [registeredServices, setRegisteredServices] = useState<any>({});
   const [workshopComments, setWorkshopComments] = useState<any[]>([]);
   const [serviceFeedbacks, setServiceFeedbacks] = useState<any[]>([]);
+  const [revokedPasses, setRevokedPasses] = useState<Record<string, RevokedPassRecord>>(() => {
+    return DatabaseEngine.getRevokedPasses();
+  });
 
   // Form edit states
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -126,6 +130,8 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     const savedSvcFeedbacks = localStorage.getItem('scoders_feedbacks');
     setServiceFeedbacks(savedSvcFeedbacks ? JSON.parse(savedSvcFeedbacks) : []);
 
+    setRevokedPasses(DatabaseEngine.getRevokedPasses());
+
     // Load Database Engine structured tables
     setDbServiceRegs(DatabaseEngine.getServiceRegistrations());
     setDbWorkshopRegs(DatabaseEngine.getWorkshopRegistrations());
@@ -141,6 +147,29 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
       setDbCandidateApps(apps);
     }).catch(() => {});
     setDbAnalytics(DatabaseEngine.getAnalytics());
+  };
+
+  // Workshop Pass Revocation / Restoration (Admin Controlled)
+  const handleRevokePass = (workshopId: string, passKey: string, attendeeName: string, workshopTitle: string) => {
+    const reason = window.prompt(
+      `[ADMIN ACTION: REVOKE WORKSHOP PASS]\n\nPass Key: ${passKey}\nAttendee: ${attendeeName}\nWorkshop: ${workshopTitle}\n\nEnter reason for revoking pass:`,
+      "Administrative Revocation"
+    );
+    if (reason !== null) {
+      const res = DatabaseEngine.revokeWorkshopPass(workshopId, passKey, reason || 'Administrative Revocation', 'Administrator');
+      alert(res.message);
+      loadAllData();
+      if (onRefreshData) onRefreshData();
+    }
+  };
+
+  const handleRestorePass = (passKey: string) => {
+    if (confirm(`[ADMIN ACTION: RESTORE PASS]\n\nRestore workshop pass "${passKey}"?\nThe attendee will immediately regain access to their classroom sandbox.`)) {
+      const res = DatabaseEngine.restoreWorkshopPass(passKey);
+      alert(res.message);
+      loadAllData();
+      if (onRefreshData) onRefreshData();
+    }
   };
 
   const getRevenueTrend = () => {
@@ -1815,6 +1844,45 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                               )}
                             </div>
 
+                            {/* WORKSHOP PASS REVOCATION / RESTORE (Admin Control) */}
+                            {selectedDbTable === 'workshop_registrations' && selectedDbRecord.uniqueAccessKey && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const isRevoked = selectedDbRecord.paymentStatus === 'Revoked' || selectedDbRecord.isRevoked;
+                                  if (isRevoked) {
+                                    handleRestorePass(selectedDbRecord.uniqueAccessKey);
+                                    setSelectedDbRecord({ ...selectedDbRecord, paymentStatus: 'Successful', isRevoked: false });
+                                  } else {
+                                    handleRevokePass(
+                                      selectedDbRecord.workshopId,
+                                      selectedDbRecord.uniqueAccessKey,
+                                      selectedDbRecord.participantProfile?.name || 'Attendee',
+                                      selectedDbRecord.workshopTitle || 'Workshop'
+                                    );
+                                    setSelectedDbRecord({ ...selectedDbRecord, paymentStatus: 'Revoked', isRevoked: true });
+                                  }
+                                }}
+                                className={`w-full py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  selectedDbRecord.paymentStatus === 'Revoked' || selectedDbRecord.isRevoked
+                                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30'
+                                }`}
+                              >
+                                {selectedDbRecord.paymentStatus === 'Revoked' || selectedDbRecord.isRevoked ? (
+                                  <>
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    <span>Restore Workshop Pass</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Ban className="w-3.5 h-3.5" />
+                                    <span>Revoke Workshop Pass</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+
                             {/* DELETE ACTION */}
                             <button
                               onClick={() => {
@@ -2330,6 +2398,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                                   <th className="p-4 font-mono text-center">TICKETS</th>
                                   <th className="p-4 font-mono text-right">TOTAL PAID</th>
                                   <th className="p-4 font-mono text-center">REG DATE</th>
+                                  <th className="p-4 font-mono text-center text-red-400">ADMIN CONTROL</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-white/5 font-sans">
@@ -2350,6 +2419,16 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                                         ₹{(reg.totalPaid || 1499).toLocaleString()}
                                       </td>
                                       <td className="p-4 text-center font-mono text-gray-500">{reg.timestamp || 'TBD'}</td>
+                                      <td className="p-4 text-center">
+                                        <button
+                                          onClick={() => handleRevokePass(wId, reg.key, reg.name, wksp?.title || 'Workshop')}
+                                          className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/30 rounded-xl font-mono text-[10px] uppercase font-bold transition-all flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+                                          title="Admin Action: Revoke this pass (client cannot self-revoke)"
+                                        >
+                                          <Ban className="w-3.5 h-3.5" />
+                                          <span>Revoke Pass</span>
+                                        </button>
+                                      </td>
                                     </tr>
                                   );
                                 })}
@@ -2358,6 +2437,69 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                           </div>
                         )}
                       </div>
+
+                      {/* Revoked Workshop Passes Section (Controlled Exclusively by Admin) */}
+                      {Object.keys(revokedPasses).length > 0 && (
+                        <div className="space-y-3 pt-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-display font-bold text-sm text-red-400 flex items-center gap-2">
+                                <ShieldAlert className="w-4 h-4 text-red-400" />
+                                Revoked Workshop Passes Archive ({Object.keys(revokedPasses).length})
+                              </h4>
+                              <p className="text-gray-500 text-[11px] font-sans">
+                                Revoked passes cannot be accessed by clients. Only administrators can restore them.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="bg-brand-dark/40 border border-red-500/20 rounded-2xl overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left border-collapse text-xs">
+                                <thead>
+                                  <tr className="bg-brand-dark/80 border-b border-red-500/10 font-mono text-[9px] text-gray-500 uppercase tracking-widest">
+                                    <th className="p-3 pl-6">REVOKED KEY</th>
+                                    <th className="p-3">ATTENDEE</th>
+                                    <th className="p-3">WORKSHOP EVENT</th>
+                                    <th className="p-3">REVOCATION REASON</th>
+                                    <th className="p-3 text-center">REVOKED DATE</th>
+                                    <th className="p-3 font-mono text-center text-emerald-400">ADMIN RESTORE</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5 font-sans">
+                                  {Object.keys(revokedPasses).map((key) => {
+                                    const record = revokedPasses[key];
+                                    return (
+                                      <tr key={key} className="hover:bg-red-500/[2%] transition-colors">
+                                        <td className="p-3 pl-6 font-mono font-bold text-red-400 line-through select-all">{record.passKey}</td>
+                                        <td className="p-3">
+                                          <div className="font-semibold text-white">{record.participantName}</div>
+                                          <div className="text-[10px] text-gray-500 font-mono">{record.participantEmail}</div>
+                                        </td>
+                                        <td className="p-3 text-gray-300 truncate max-w-xs">{record.workshopTitle}</td>
+                                        <td className="p-3 text-red-300/80 font-mono text-[11px]">{record.reason || 'Administrative Revocation'}</td>
+                                        <td className="p-3 text-center font-mono text-[10px] text-gray-500">
+                                          {record.revokedAt ? new Date(record.revokedAt).toLocaleDateString() : 'N/A'}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                          <button
+                                            onClick={() => handleRestorePass(record.passKey)}
+                                            className="px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded-lg font-mono text-[10px] uppercase font-bold transition-all flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                                            title="Restore access for this workshop pass"
+                                          >
+                                            <RotateCcw className="w-3 h-3" />
+                                            <span>Restore Pass</span>
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Seminar Participant Feedbacks/Reviews */}

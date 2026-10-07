@@ -1258,7 +1258,7 @@ export default function Events() {
                             required
                             value={regName}
                             onChange={e => setRegName(e.target.value)}
-                            placeholder="e.g. Rahul Sharma"
+                            placeholder="Enter your name"
                             className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-xs font-mono focus:border-brand-teal focus:outline-none"
                           />
                         </div>
@@ -1272,7 +1272,7 @@ export default function Events() {
                             required
                             value={regEmail}
                             onChange={e => setRegEmail(e.target.value)}
-                            placeholder="e.g. suhas@example.com"
+                            placeholder="Enter your email"
                             className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-xs font-mono focus:border-brand-teal focus:outline-none"
                           />
                         </div>
@@ -1286,7 +1286,7 @@ export default function Events() {
                             required
                             value={regPhone}
                             onChange={e => setRegPhone(e.target.value)}
-                            placeholder="e.g. +91 8310463417"
+                            placeholder="Enter your phone number"
                             className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-xs font-mono focus:border-brand-teal focus:outline-none"
                           />
                         </div>
@@ -1299,7 +1299,7 @@ export default function Events() {
                             type="text"
                             value={regOrg}
                             onChange={e => setRegOrg(e.target.value)}
-                            placeholder="e.g. Tech Startup / College Name"
+                            placeholder="Enter your college / organization"
                             className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-xs font-mono focus:border-brand-teal focus:outline-none"
                           />
                         </div>

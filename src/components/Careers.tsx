@@ -2432,7 +2432,11 @@ export default function Careers({ onNavigate }: CareersProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveCareersTab('saved_forms');
+                    const activeId = submittedStage1App?.id || authorizedAppId;
+                    if (activeId) {
+                      setManualAccessInput(activeId);
+                    }
+                    setShowKeyModal(true);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-brand-teal text-brand-dark hover:bg-white font-mono text-xs uppercase tracking-wider font-bold transition-all cursor-pointer shadow-md"
