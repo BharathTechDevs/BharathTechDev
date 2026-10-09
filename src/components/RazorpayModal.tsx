@@ -50,7 +50,7 @@ interface RazorpayModalProps {
     purpose: string;
     merchantUpiId?: string;
   };
-  initialStep?: 'checkout' | 'payment_methods' | 'all_options';
+  initialStep?: 'checkout' | 'razorpay_main' | 'all_options';
 }
 
 export default function RazorpayModal({
@@ -62,28 +62,37 @@ export default function RazorpayModal({
   paymentDetails,
   initialStep = 'checkout',
 }: RazorpayModalProps) {
-  // Steps in the Payment Flow:
-  // 1. 'checkout' -> Customer information input (Name, Email, Mobile, Coupon)
-  // 2. 'payment_methods' -> All Payment Options (UPI [PhonePe, GPay, Paytm, FamPay, BHIM, CRED, Amazon Pay, WhatsApp, VPA, QR], Cards, Net Banking, EMI, Wallets)
-  // 3. 'card_input' -> Add credit/debit card form
-  // 4. 'emi_plans' -> Monthly EMI breakdown
-  // 5. 'netbanking_redirect' -> Bank authorization simulator
-  // 6. 'processing' -> Spinning coin screen "Processing your payment"
-  // 7. 'confirming' -> "Confirming Payment"
+  // Steps matching Video Flow:
+  // 1. 'checkout' -> Customer details input card (Name, Email, Mobile, "pay ₹...", "have a code?")
+  // 2. 'razorpay_main' -> Official Razorpay Bottom Sheet with PhonePe & "More Options >"
+  // 3. 'processing' -> 3D Spinning Golden Coin "Processing your payment" + Cancel button
+  // 4. 'cancel_confirm' -> Bottom Dialog "Cancel Payment: Your payment is ongoing. Are you sure...?"
+  // 5. 'cancelling_loader' -> "Cancelling Payment" with spinning coin
+  // 6. 'retry_sheet' -> "Payment could not be completed" with retry Google Pay, PhonePe, CRED, Show All Options
+  // 7. 'all_options' -> Accordion list of 1. UPI, 2. Cards, 3. EMI, 4. Netbanking, 5. Wallet
+  // 8. 'card_input' -> Add a new card form
+  // 9. 'emi_plans' -> Credit card EMI options breakdown
+  // 10. 'netbanking_redirect' -> "Loading bank page... Please wait while we redirect you to your bank page"
+  // 11. 'confirming' -> Green spinning coin "Confirming Payment"
   const [currentStep, setCurrentStep] = useState<
     | 'checkout'
-    | 'payment_methods'
+    | 'razorpay_main'
+    | 'processing'
+    | 'cancel_confirm'
+    | 'cancelling_loader'
+    | 'retry_sheet'
+    | 'all_options'
     | 'card_input'
     | 'emi_plans'
     | 'netbanking_redirect'
-    | 'processing'
     | 'confirming'
   >('checkout');
 
-  // Customer registration details (Initialized empty unless custom explicit user provided)
+  // Customer registration details
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [customUpiId, setCustomUpiId] = useState('');
   const [upiIdError, setUpiIdError] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -98,22 +107,23 @@ export default function RazorpayModal({
   // Active Razorpay Order details
   const [currentOrderId, setCurrentOrderId] = useState<string>(orderData?.orderId || '');
   const [activeKeyId, setActiveKeyId] = useState<string>(orderData?.keyId || '');
-  const [selectedMethodName, setSelectedMethodName] = useState('UPI - PhonePe');
+  const [selectedMethodName, setSelectedMethodName] = useState('PhonePe');
+  const [retryReason, setRetryReason] = useState('Payment could not be processed. Please try again.');
 
-  // Accordion open section in Payment Methods
+  // Accordion state in All Options
   const [expandedSection, setExpandedSection] = useState<'upi' | 'cards' | 'emi' | 'netbanking' | 'wallet' | null>('upi');
+  const [selectedOptionInAll, setSelectedOptionInAll] = useState<string | null>(null);
+  const [allOptionsError, setAllOptionsError] = useState<string | null>(null);
 
   // Card details state
   const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [saveCardRbi, setSaveCardRbi] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
 
   // Netbanking state
-  const [selectedBankName, setSelectedBankName] = useState('State Bank of India');
-  const [searchBankQuery, setSearchBankQuery] = useState('');
+  const [selectedBankName, setSelectedBankName] = useState('SBI');
 
   // Terms dialog
   const [showTerms, setShowTerms] = useState(false);
@@ -132,6 +142,7 @@ export default function RazorpayModal({
       setName(initialName);
       setEmail(initialEmail);
       setMobile(initialPhone);
+      setIsProcessingCheckout(false);
       setShowCodeInput(false);
       setAppliedDiscount(null);
       setPromoError(null);
@@ -139,10 +150,11 @@ export default function RazorpayModal({
       setCustomUpiId('');
       setUpiIdError(null);
       setShowQrModal(false);
-      setCurrentStep(initialStep === 'checkout' ? 'checkout' : 'payment_methods');
+      setCurrentStep(initialStep === 'all_options' ? 'all_options' : 'checkout');
       setExpandedSection('upi');
+      setSelectedOptionInAll(null);
+      setAllOptionsError(null);
       setCardNumber('');
-      setCardHolder('');
       setCardExpiry('');
       setCardCvv('');
       setSaveCardRbi(false);
@@ -156,14 +168,13 @@ export default function RazorpayModal({
     }
   }, [isOpen, paymentDetails, initialStep, orderData?.orderId, orderData?.keyId]);
 
-  // Calculate pricing
+  // Pricing calculations
   const baseAmount = paymentDetails?.amount || 299;
   const currency = paymentDetails?.currency || 'INR';
   const discountVal = appliedDiscount ? appliedDiscount.amount : 0;
   const finalAmount = Math.max(1, baseAmount - discountVal);
   const activeMerchantVpa = paymentDetails?.merchantUpiId || getActiveMerchantUpi();
   const merchantBankingName = getBankingNameForUpi(activeMerchantVpa);
-  const merchantPhone = getPhoneNumberForUpi(activeMerchantVpa);
 
   // Coupon handler
   const handleApplyCoupon = (e?: React.FormEvent) => {
@@ -224,8 +235,7 @@ export default function RazorpayModal({
     return { orderId: fallbackId, keyId: activeKeyId || orderData?.keyId || '' };
   };
 
-  // Step 1 Submission: Customer fills Name, Email, Mobile and clicks "Continue"
-  // It transitions directly to the Payment Options screen (showing UPI, Cards, Net Banking, EMI, Wallets)
+  // Step 1: Customer submits checkout sheet -> transitions to Razorpay Standard Bottom Sheet (Video 00:25 - 00:27)
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -237,14 +247,16 @@ export default function RazorpayModal({
       return;
     }
 
-    // Pre-create/warm order in the background for instant checkout response
+    setIsProcessingCheckout(true);
     ensureServerOrder().catch(() => {});
 
-    // Transition to the Payment Options View where user chooses UPI (PhonePe, GPay, Paytm, FamPay, etc.), Cards, Net Banking, EMI, Wallets
-    setCurrentStep('payment_methods');
+    setTimeout(() => {
+      setIsProcessingCheckout(false);
+      setCurrentStep('razorpay_main');
+    }, 450);
   };
 
-  // Trigger Payment Processing for chosen payment method
+  // Initiate method payment (PhonePe, GPay, Paytm, FamPay, Card, Netbanking, etc.)
   const handleInitiateMethodPay = (
     methodName: string, 
     upiAppScheme?: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'bhim' | 'cred' | 'amazonpay' | 'whatsapp' | 'universal'
@@ -252,7 +264,7 @@ export default function RazorpayModal({
     setSelectedMethodName(methodName);
     setCurrentStep('processing');
 
-    // If mobile or requested UPI app, trigger app intent
+    // On mobile devices, launch the requested UPI app intent
     if (upiAppScheme) {
       openUpiApp({
         pa: activeMerchantVpa,
@@ -262,7 +274,7 @@ export default function RazorpayModal({
       }, upiAppScheme);
     }
 
-    // Smooth verification simulation
+    // Payment completion simulation
     setTimeout(() => {
       setCurrentStep('confirming');
       setTimeout(async () => {
@@ -276,11 +288,20 @@ export default function RazorpayModal({
           generatedSig,
           methodName
         );
-      }, 1400);
-    }, 2600);
+      }, 1500);
+    }, 2800);
   };
 
-  // Custom UPI ID submission (e.g. 9876543210@paytm, user@fam)
+  // Cancel payment flow (Video 00:54 - 01:01 & 02:23 - 02:27)
+  const handleConfirmCancel = () => {
+    setCurrentStep('cancelling_loader');
+    setTimeout(() => {
+      setRetryReason('Your payment has been cancelled. Try again or complete the payment later.');
+      setCurrentStep('retry_sheet');
+    }, 1200);
+  };
+
+  // Custom UPI ID submission
   const handleCustomUpiSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanId = customUpiId.trim();
@@ -350,15 +371,7 @@ export default function RazorpayModal({
     e.preventDefault();
     const cleanNum = cardNumber.replace(/\s/g, '');
     if (cleanNum.length < 15) {
-      setCardError('Please enter a valid 16-digit card number');
-      return;
-    }
-    if (!cardExpiry || cardExpiry.length < 5) {
-      setCardError('Please enter valid expiry date (MM/YY)');
-      return;
-    }
-    if (!cardCvv || cardCvv.length < 3) {
-      setCardError('Please enter valid 3 or 4 digit CVV');
+      setCardError('Please enter a valid card number');
       return;
     }
     handleInitiateMethodPay(`Card ending in ${cleanNum.slice(-4)}`);
@@ -373,29 +386,10 @@ export default function RazorpayModal({
     }
   };
 
-  const allBanksList = [
-    { name: 'State Bank of India', code: 'SBI', popular: true },
-    { name: 'HDFC Bank', code: 'HDFC', popular: true },
-    { name: 'ICICI Bank', code: 'ICICI', popular: true },
-    { name: 'Axis Bank', code: 'AXIS', popular: true },
-    { name: 'Kotak Mahindra Bank', code: 'KOTAK', popular: true },
-    { name: 'Punjab National Bank', code: 'PNB', popular: true },
-    { name: 'Bank of Baroda', code: 'BOB', popular: false },
-    { name: 'Canara Bank', code: 'CANARA', popular: false },
-    { name: 'Union Bank of India', code: 'UBI', popular: false },
-    { name: 'IndusInd Bank', code: 'INDUS', popular: false },
-    { name: 'Yes Bank', code: 'YES', popular: false },
-    { name: 'IDFC FIRST Bank', code: 'IDFC', popular: false },
-  ];
-
-  const filteredBanks = searchBankQuery.trim()
-    ? allBanksList.filter(b => b.name.toLowerCase().includes(searchBankQuery.toLowerCase()))
-    : allBanksList;
-
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-sm animate-fade-in font-sans">
           <motion.div
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -404,932 +398,1107 @@ export default function RazorpayModal({
             className="relative w-full max-w-md bg-[#191514] text-white rounded-t-3xl sm:rounded-3xl border border-[#332927] shadow-2xl overflow-hidden flex flex-col font-sans"
             style={{ maxHeight: '92vh' }}
           >
-        {/* ============================================================== */}
-        {/* VIEW 1: REGISTRATION / CUSTOMER DETAILS INPUT                  */}
-        {/* ============================================================== */}
-        {currentStep === 'checkout' && (
-          <div className="p-6 sm:p-7 space-y-5">
-            {/* Header with Title and Close X */}
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-2xl font-serif font-black tracking-tight text-[#f7f2ef]">
-                  Checkout
-                </h3>
-                <p className="text-xs font-sans text-[#b89f9a] mt-0.5 font-medium">
-                  {paymentDetails.purpose} • ₹{finalAmount.toLocaleString()}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-8 h-8 rounded-full bg-[#2a2220] hover:bg-[#382e2c] text-[#b89f9a] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                title="Cancel and close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Input Form with clean Enter your name / email / phone placeholders */}
-            <form onSubmit={handleCheckoutSubmit} className="space-y-4 pt-1">
-              {/* Name */}
-              <div>
-                <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
-                />
-              </div>
-
-              {/* Mobile Phone Number */}
-              <div>
-                <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="Enter your phone number"
-                  className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
-                />
-              </div>
-
-              {/* Have a code? link */}
-              <div>
-                {!showCodeInput && !appliedDiscount ? (
+            {/* ============================================================== */}
+            {/* VIEW 1: THE SLEEK CHECKOUT SHEET (Video 00:17 - 00:25)         */}
+            {/* ============================================================== */}
+            {currentStep === 'checkout' && (
+              <div className="p-6 sm:p-7 space-y-5">
+                {/* Header with Title and Close X */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-2xl font-serif font-black tracking-tight text-[#f7f2ef]">
+                      checkout
+                    </h3>
+                    <p className="text-xs font-sans text-[#b89f9a] mt-0.5 font-medium">
+                      {paymentDetails.purpose} • ₹{finalAmount.toLocaleString()}
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setShowCodeInput(true)}
-                    className="text-xs text-[#a0908c] hover:text-[#f7f2ef] underline decoration-dotted transition-colors cursor-pointer inline-flex items-center gap-1 font-sans"
+                    onClick={onClose}
+                    className="w-8 h-8 rounded-full bg-[#2a2220] hover:bg-[#382e2c] text-[#b89f9a] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                    title="Close"
                   >
-                    <span>Have a promo code?</span>
-                  </button>
-                ) : appliedDiscount ? (
-                  <div className="flex items-center justify-between bg-[#193220] border border-[#2b5936] text-[#6ee7b7] px-3.5 py-2 rounded-xl text-xs font-mono">
-                    <span>Code <strong>{appliedDiscount.code}</strong> applied (-₹{appliedDiscount.amount})</span>
-                    <button
-                      type="button"
-                      onClick={() => setAppliedDiscount(null)}
-                      className="text-[10px] text-red-300 hover:underline ml-2"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                        placeholder="ENTER CODE (e.g. SCODERS20)"
-                        className="flex-1 bg-[#27201f] border border-[#3d3230] text-white text-xs rounded-xl px-3.5 py-2.5 font-mono uppercase outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleApplyCoupon}
-                        className="px-4 py-2 bg-[#3a2e2c] hover:bg-[#4d3d3a] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                    {promoError && (
-                      <p className="text-[11px] text-rose-400 font-mono">{promoError}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Continue to Payment Options button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full py-4 rounded-xl bg-[#521714] hover:bg-[#681e1a] active:bg-[#401210] text-[#ffded9] font-bold text-sm tracking-wide transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>Continue to Payment (₹{finalAmount.toLocaleString()})</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Trust Footer */}
-              <div className="text-center pt-2 space-y-1">
-                <p className="text-[11px] text-[#8e817e] font-sans flex items-center justify-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#a89995] inline" />
-                  <span>Secured by Razorpay • Instant Access • 7-day assurance</span>
-                </p>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowTerms(true)}
-                    className="text-[10px] text-[#736765] hover:text-[#b89f9a] underline cursor-pointer"
-                  >
-                    Terms & Privacy
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* VIEW 2: ALL PAYMENT OPTIONS (UPI, CARDS, NETBANKING, EMI, WALLET) */}
-        {/* ============================================================== */}
-        {currentStep === 'payment_methods' && (
-          <div className="flex flex-col h-full bg-[#1b1716] overflow-y-auto">
-            {/* Top Bar with back arrow & Close */}
-            <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514] sticky top-0 z-10">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('checkout')}
-                  className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                  title="Back to details"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div>
-                  <h4 className="text-base font-bold text-white">Payment Options</h4>
-                  <p className="text-[10px] text-[#8a7c79] font-mono">Amount: ₹{finalAmount.toLocaleString()}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Offer banner */}
-            <div className="p-3.5 bg-[#261f1c] border-b border-[#332a28] flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="text-[#e2d8d5] text-[11px]">Instant UPI, Card & Netbanking discounts active</span>
-              </div>
-              <span className="text-[10px] font-bold text-amber-400 font-mono">Razorpay Verified</span>
-            </div>
-
-            {/* Accordion list of payment options */}
-            <div className="p-4 space-y-3 pb-8">
-              <span className="text-[10px] font-mono text-[#8a7c79] uppercase tracking-wider block font-bold">
-                Select Your Payment Method
-              </span>
-
-              {/* 1. UPI SECTION (PhonePe, GPay, Paytm, FamPay, BHIM, CRED, Amazon Pay, WhatsApp, Any UPI ID, QR Code) */}
-              <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
-                <button
-                  type="button"
-                  onClick={() => setExpandedSection(expandedSection === 'upi' ? null : 'upi')}
-                  className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Smartphone className="w-4 h-4 text-emerald-400" />
-                    <div>
-                      <span className="text-xs font-bold text-white block">UPI (Instant & Zero Fee)</span>
-                      <span className="text-[10px] text-emerald-400 font-bold block">PhonePe, GPay, Paytm, FamPay & More</span>
-                    </div>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'upi' ? 'rotate-180' : ''}`} />
-                </button>
-
-                {expandedSection === 'upi' && (
-                  <div className="p-4 pt-2 space-y-3 border-t border-[#2e2523] bg-[#1a1514]">
-                    <span className="text-[10px] font-mono text-[#9e8f8b] uppercase tracking-wider block">
-                      Choose UPI Application:
-                    </span>
-
-                    {/* Popular UPI Apps Grid */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {/* PhonePe */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - PhonePe', 'phonepe')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-[#672d91] rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-[#5f259f]/30 border border-[#5f259f]/60 text-[#c084fc] font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          PP
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">PhonePe</span>
-                          <span className="text-[9px] text-emerald-400 block font-mono">Instant Fast</span>
-                        </div>
-                      </button>
-
-                      {/* Google Pay */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - Google Pay', 'gpay')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-blue-500 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-400 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          G
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">Google Pay</span>
-                          <span className="text-[9px] text-blue-400 block font-mono">GPay UPI</span>
-                        </div>
-                      </button>
-
-                      {/* Paytm */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - Paytm', 'paytm')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-cyan-500 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          PT
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">Paytm UPI</span>
-                          <span className="text-[9px] text-cyan-300 block font-mono">Wallet/UPI</span>
-                        </div>
-                      </button>
-
-                      {/* FamPay (Explicitly Requested) */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - FamPay', 'fampay')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-amber-500 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-400 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          FP
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">FamPay</span>
-                          <span className="text-[9px] text-amber-300 block font-mono">Gen-Z UPI</span>
-                        </div>
-                      </button>
-
-                      {/* CRED UPI */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - CRED UPI', 'cred')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-stone-400 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-stone-700 border border-stone-500 text-stone-200 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          CR
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">CRED UPI</span>
-                          <span className="text-[9px] text-stone-300 block font-mono">Cashback</span>
-                        </div>
-                      </button>
-
-                      {/* BHIM UPI */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - BHIM NPCI', 'bhim')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-emerald-500 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          BH
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">BHIM UPI</span>
-                          <span className="text-[9px] text-emerald-300 block font-mono">NPCI Official</span>
-                        </div>
-                      </button>
-
-                      {/* Amazon Pay */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - Amazon Pay', 'amazonpay')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-yellow-500 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          AP
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">Amazon Pay</span>
-                          <span className="text-[9px] text-yellow-300 block font-mono">Amazon UPI</span>
-                        </div>
-                      </button>
-
-                      {/* WhatsApp Pay */}
-                      <button
-                        type="button"
-                        onClick={() => handleInitiateMethodPay('UPI - WhatsApp Pay', 'whatsapp')}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] hover:border-emerald-400 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 font-bold text-xs flex items-center justify-center group-hover:scale-105 transition-transform">
-                          WA
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-white block">WhatsApp Pay</span>
-                          <span className="text-[9px] text-emerald-300 block font-mono">Chat UPI</span>
-                        </div>
-                      </button>
-                    </div>
-
-                    {/* Enter Any UPI ID or Scan QR */}
-                    <div className="pt-2 border-t border-[#2e2523] space-y-2.5">
-                      <form onSubmit={handleCustomUpiSubmit} className="space-y-2">
-                        <label className="block text-[10px] font-mono text-[#9e8f8b] uppercase tracking-wider">
-                          Or Enter Any UPI ID / VPA
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={customUpiId}
-                            onChange={(e) => {
-                              setCustomUpiId(e.target.value);
-                              setUpiIdError(null);
-                            }}
-                            placeholder="e.g. yourname@oksbi or mobile@fam"
-                            className="flex-1 bg-[#241e1c] border border-[#3d312f] text-white text-xs rounded-xl px-3.5 py-2.5 font-mono outline-none focus:border-[#d97768]"
-                          />
-                          <button
-                            type="submit"
-                            className="px-4 py-2.5 bg-[#401614] hover:bg-[#521c1a] text-[#ffded9] font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                          >
-                            Pay
-                          </button>
-                        </div>
-                        {upiIdError && (
-                          <p className="text-[11px] text-rose-400 font-mono">{upiIdError}</p>
-                        )}
-                      </form>
-
-                      {/* QR Code trigger */}
-                      <button
-                        type="button"
-                        onClick={() => setShowQrModal(true)}
-                        className="w-full p-2.5 bg-[#241e1c] hover:bg-[#302624] border border-[#3d312f] rounded-xl flex items-center justify-between text-xs text-amber-300 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <QrCode className="w-4 h-4 text-amber-400" />
-                          <span className="font-semibold">Show Instant QR Code (Scan from any UPI App)</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-amber-400" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. CARDS SECTION */}
-              <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('card_input')}
-                  className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <CreditCard className="w-4 h-4 text-blue-400" />
-                    <div>
-                      <span className="text-xs font-bold text-white block">Cards (Credit / Debit)</span>
-                      <span className="text-[10px] text-[#8a7c79] block">Visa, Mastercard, RuPay, Maestro, Amex</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#8a7c79]" />
-                </button>
-              </div>
-
-              {/* 3. NETBANKING SECTION */}
-              <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
-                <button
-                  type="button"
-                  onClick={() => setExpandedSection(expandedSection === 'netbanking' ? null : 'netbanking')}
-                  className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Building2 className="w-4 h-4 text-purple-400" />
-                    <div>
-                      <span className="text-xs font-bold text-white block">Net Banking</span>
-                      <span className="text-[10px] text-[#8a7c79] block">SBI, HDFC, ICICI, Axis, Kotak & 50+ Banks</span>
-                    </div>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'netbanking' ? 'rotate-180' : ''}`} />
-                </button>
-
-                {expandedSection === 'netbanking' && (
-                  <div className="p-4 pt-2 space-y-3 border-t border-[#2e2523] bg-[#1a1514]">
-                    <input
-                      type="text"
-                      value={searchBankQuery}
-                      onChange={(e) => setSearchBankQuery(e.target.value)}
-                      placeholder="Search your bank (e.g. SBI, HDFC)..."
-                      className="w-full bg-[#241e1c] border border-[#3d312f] text-white text-xs rounded-xl px-3.5 py-2 font-sans outline-none focus:border-[#d97768] placeholder:text-[#6a5e5c]"
-                    />
-
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                      {filteredBanks.map((bank) => (
-                        <button
-                          key={bank.name}
-                          type="button"
-                          onClick={() => {
-                            setSelectedBankName(bank.name);
-                            setCurrentStep('netbanking_redirect');
-                          }}
-                          className="p-2.5 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] rounded-xl text-left transition-colors flex items-center gap-2 cursor-pointer"
-                        >
-                          <div className="w-6 h-6 rounded-md bg-purple-600/20 text-purple-400 font-bold text-xs flex items-center justify-center shrink-0">
-                            {bank.code[0]}
-                          </div>
-                          <span className="text-xs font-medium text-white truncate">{bank.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 4. EMI SECTION */}
-              <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('emi_plans')}
-                  className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Building2 className="w-4 h-4 text-amber-400" />
-                    <div>
-                      <span className="text-xs font-bold text-white block">EMI Plans</span>
-                      <span className="text-[10px] text-[#8a7c79] block">Credit Card EMI & Low Cost EMI available</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#8a7c79]" />
-                </button>
-              </div>
-
-              {/* 5. WALLET SECTION */}
-              <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
-                <button
-                  type="button"
-                  onClick={() => setExpandedSection(expandedSection === 'wallet' ? null : 'wallet')}
-                  className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Wallet className="w-4 h-4 text-rose-400" />
-                    <div>
-                      <span className="text-xs font-bold text-white block">Wallets</span>
-                      <span className="text-[10px] text-[#8a7c79] block">Mobikwik, Airtel Payments, Ola Money, PayZapp</span>
-                    </div>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'wallet' ? 'rotate-180' : ''}`} />
-                </button>
-
-                {expandedSection === 'wallet' && (
-                  <div className="p-4 pt-2 grid grid-cols-2 gap-2 border-t border-[#2e2523] bg-[#1a1514]">
-                    {['Mobikwik', 'Airtel Payments', 'Ola Money', 'PayZapp', 'Amazon Pay Balance'].map((w) => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() => handleInitiateMethodPay(`Wallet - ${w}`)}
-                        className="p-3 bg-[#241e1c] hover:bg-[#342927] border border-[#3d312f] rounded-xl text-left transition-colors flex items-center gap-2 cursor-pointer"
-                      >
-                        <div className="w-6 h-6 rounded-md bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center justify-center">
-                          {w[0]}
-                        </div>
-                        <span className="text-xs font-medium text-white truncate">{w}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Total Bar */}
-            <div className="mt-auto p-4 border-t border-[#2e2624] flex items-center justify-between bg-[#191514] sticky bottom-0">
-              <div>
-                <span className="text-lg font-bold text-white block">₹{finalAmount.toLocaleString()}</span>
-                <span className="text-[10px] text-[#8a7c79] block font-mono">Payment for {paymentDetails.purpose}</span>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 bg-[#2a2220] hover:bg-[#382d2a] text-[#a89c99] hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* VIEW 3: CARD INPUT VIEW                                        */}
-        {/* ============================================================== */}
-        {currentStep === 'card_input' && (
-          <div className="flex flex-col h-full bg-[#1b1716]">
-            {/* Top Bar with back arrow */}
-            <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('payment_methods')}
-                  className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div>
-                  <h4 className="text-base font-bold text-white">Enter Card Details</h4>
-                  <p className="text-[10px] text-[#8a7c79] font-mono">Amount: ₹{finalAmount.toLocaleString()}</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={onClose} 
-                className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCardSubmit} className="p-5 sm:p-6 space-y-4">
-              <span className="text-xs font-bold text-white block">Credit or Debit Card</span>
-
-              <div>
-                <label className="block text-[10px] font-mono text-[#9e8f8b] mb-1 uppercase tracking-wider">Card Number</label>
-                <input
-                  type="text"
-                  required
-                  value={cardNumber}
-                  onChange={handleCardNumberChange}
-                  placeholder="XXXX XXXX XXXX XXXX"
-                  className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3 outline-none font-mono placeholder:text-[#6a5e5c] focus:border-[#d97768]"
-                />
-                {cardError && (
-                  <p className="text-[11px] text-rose-400 mt-1 font-mono">{cardError}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono text-[#9e8f8b] mb-1 uppercase tracking-wider">Name on Card</label>
-                <input
-                  type="text"
-                  required
-                  value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value)}
-                  placeholder="Cardholder full name"
-                  className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3 outline-none font-sans placeholder:text-[#6a5e5c] focus:border-[#d97768]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono text-[#9e8f8b] mb-1 uppercase tracking-wider">Expiry Date</label>
-                  <input
-                    type="text"
-                    required
-                    value={cardExpiry}
-                    onChange={handleExpiryChange}
-                    placeholder="MM / YY"
-                    className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3 outline-none font-mono placeholder:text-[#6a5e5c] focus:border-[#d97768]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono text-[#9e8f8b] mb-1 uppercase tracking-wider">CVV</label>
-                  <input
-                    type="password"
-                    required
-                    maxLength={4}
-                    value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
-                    placeholder="CVV"
-                    className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3 outline-none font-mono placeholder:text-[#6a5e5c] focus:border-[#d97768]"
-                  />
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2.5 text-xs text-[#a89c99] cursor-pointer pt-1">
-                <input
-                  type="checkbox"
-                  checked={saveCardRbi}
-                  onChange={(e) => setSaveCardRbi(e.target.checked)}
-                  className="rounded accent-[#d97768] w-4 h-4 cursor-pointer"
-                />
-                <span>Save card securely as per RBI guidelines</span>
-              </label>
-
-              <div className="pt-3">
-                <button
-                  type="submit"
-                  className="w-full py-4 bg-[#521714] hover:bg-[#681e1a] text-[#ffded9] font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-lg"
-                >
-                  Pay ₹{finalAmount.toLocaleString()}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* VIEW 4: EMI PLANS VIEW                                         */}
-        {/* ============================================================== */}
-        {currentStep === 'emi_plans' && (
-          <div className="flex flex-col h-full bg-[#1b1716]">
-            <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('payment_methods')}
-                  className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <h4 className="text-base font-bold text-white">EMI Plans</h4>
-              </div>
-              <button 
-                type="button"
-                onClick={onClose} 
-                className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 sm:p-6 space-y-4">
-              <span className="text-xs font-bold text-white block">Select Your Credit Card EMI Option:</span>
-
-              <div 
-                onClick={() => handleInitiateMethodPay('HDFC Credit Card 3M EMI')}
-                className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] hover:border-amber-500 rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-white">HDFC Bank Credit Card (3 Months)</span>
-                  <span className="text-xs text-amber-400 font-mono font-bold">₹{Math.round(finalAmount / 3)}/mo</span>
-                </div>
-                <p className="text-[11px] text-[#8a7c79]">
-                  3 Months EMI • Low Interest • Instant Approval
-                </p>
-              </div>
-
-              <div 
-                onClick={() => handleInitiateMethodPay('ICICI Bank 6M EMI')}
-                className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] hover:border-amber-500 rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-white">ICICI Bank Credit Card (6 Months)</span>
-                  <span className="text-xs text-amber-400 font-mono font-bold">₹{Math.round(finalAmount / 6)}/mo</span>
-                </div>
-                <p className="text-[11px] text-[#8a7c79]">
-                  6 Months EMI • Flexible tenure
-                </p>
-              </div>
-
-              <div 
-                onClick={() => handleInitiateMethodPay('SBI Card 9M EMI')}
-                className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] hover:border-amber-500 rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-white">SBI Card (9 Months)</span>
-                  <span className="text-xs text-amber-400 font-mono font-bold">₹{Math.round(finalAmount / 9)}/mo</span>
-                </div>
-                <p className="text-[11px] text-[#8a7c79]">
-                  9 Months EMI • Low monthly payments
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* VIEW 5: NETBANKING REDIRECT VIEW                               */}
-        {/* ============================================================== */}
-        {currentStep === 'netbanking_redirect' && (
-          <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-5">
-            <div className="w-14 h-14 bg-purple-500/20 border border-purple-500/40 rounded-2xl flex items-center justify-center text-purple-300 font-bold text-xl">
-              {selectedBankName[0]}
-            </div>
-
-            <div className="space-y-1">
-              <h4 className="text-lg font-bold text-white">Connecting to {selectedBankName}</h4>
-              <p className="text-xs text-[#a89c99] max-w-xs mx-auto leading-relaxed">
-                Please wait while we redirect you to the official {selectedBankName} secure payment portal.
-              </p>
-            </div>
-
-            <RefreshCw className="w-7 h-7 text-amber-400 animate-spin my-2" />
-
-            <div className="pt-2 text-center">
-              <span className="text-[11px] text-[#6d6260]">
-                Secured by <strong className="text-blue-400">Razorpay</strong>
-              </span>
-            </div>
-
-            <div className="pt-2 w-full space-y-2">
-              <button
-                type="button"
-                onClick={() => handleInitiateMethodPay(`Netbanking - ${selectedBankName}`)}
-                className="w-full py-3.5 bg-[#521714] hover:bg-[#681e1a] text-[#ffded9] text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Authorize Payment (₹{finalAmount.toLocaleString()})
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep('payment_methods')}
-                className="w-full py-2.5 bg-[#261f1d] hover:bg-[#302624] text-[#9e8f8b] hover:text-white text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                Choose Another Bank
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* VIEW 6: PROCESSING WITH 3D SPINNING COIN                       */}
-        {/* ============================================================== */}
-        {currentStep === 'processing' && (
-          <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
-            <div className="space-y-1.5">
-              <h3 className="text-xl font-bold font-serif text-white tracking-tight">
-                Processing your payment
-              </h3>
-              <p className="text-xs text-[#9e8f8b] font-sans">
-                Authenticating via {selectedMethodName}...
-              </p>
-            </div>
-
-            {/* 3D Animated Spinning Golden Coin */}
-            <div className="py-4 perspective-1000">
-              <motion.div
-                animate={{ rotateY: [0, 180, 360] }}
-                transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-                className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#d97006] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                <div className="text-center font-serif font-black text-2xl text-[#78350f]">
-                  ₹
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Cancel Button - Immediately Closes cleanly without unwanted retry loop */}
-            <div className="w-full pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-3.5 bg-[#2c2422] hover:bg-[#382f2c] text-[#a89c99] hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel Payment
-              </button>
-            </div>
-
-            <div className="pt-2 text-center">
-              <span className="text-[11px] text-[#6d6260]">
-                Secured by <strong className="text-blue-400">Razorpay</strong>
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* VIEW 7: CONFIRMING PAYMENT (Success animation)                 */}
-        {/* ============================================================== */}
-        {currentStep === 'confirming' && (
-          <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
-            <div className="space-y-1.5">
-              <h3 className="text-xl font-bold font-serif text-white tracking-tight">
-                Confirming Payment
-              </h3>
-              <p className="text-xs text-[#9e8f8b] font-sans">
-                This will only take a moment...
-              </p>
-            </div>
-
-            <div className="py-4 perspective-1000">
-              <motion.div
-                animate={{ rotateY: [0, 180, 360] }}
-                transition={{ repeat: Infinity, duration: 1.0, ease: 'linear' }}
-                className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#059669] via-[#34d399] to-[#047857] shadow-2xl flex items-center justify-center border-4 border-[#a7f3d0] relative"
-              >
-                <Check className="w-10 h-10 text-emerald-950 font-black stroke-[3]" />
-              </motion.div>
-            </div>
-
-            <div className="pt-2 text-center">
-              <span className="text-[11px] text-[#6d6260]">
-                Secured by <strong className="text-blue-400">Razorpay</strong>
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* QR Code Scan Modal */}
-        <AnimatePresence>
-          {showQrModal && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute inset-0 z-30 bg-[#161211]/95 backdrop-blur-md p-6 flex flex-col justify-between items-center text-center"
-            >
-              <div className="w-full flex justify-between items-center pb-2 border-b border-[#2e2624]">
-                <h4 className="text-sm font-bold text-white">Scan UPI QR Code</h4>
-                <button
-                  type="button"
-                  onClick={() => setShowQrModal(false)}
-                  className="p-1 text-[#9e8f8b] hover:text-white rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="my-auto space-y-4">
-                {/* Instant dynamic QR code image */}
-                <div className="p-3 bg-white rounded-2xl shadow-xl inline-block">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                      `upi://pay?pa=${activeMerchantVpa}&pn=${encodeURIComponent(merchantBankingName)}&am=${finalAmount}&cu=INR&tn=${encodeURIComponent(paymentDetails.purpose.slice(0, 20))}`
-                    )}`}
-                    alt="UPI Payment QR Code"
-                    className="w-44 h-44 rounded-lg block"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xs text-white font-bold">
-                    Scan with PhonePe, Google Pay, Paytm, FamPay, CRED, or any UPI App
-                  </p>
-                  <p className="text-[11px] text-[#8a7c79] font-mono">
-                    Payee: {merchantBankingName} ({activeMerchantVpa})
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCopyUpiId}
-                    className="px-3 py-1.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl text-xs text-amber-300 font-mono flex items-center gap-1.5 cursor-pointer"
-                  >
-                    {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedUpi ? 'Copied UPI ID!' : activeMerchantVpa}</span>
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowQrModal(false);
-                  handleInitiateMethodPay('QR Code UPI Scan');
-                }}
-                className="w-full py-3.5 bg-[#521714] hover:bg-[#681e1a] text-[#ffded9] font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
-              >
-                I have Completed UPI Payment (₹{finalAmount.toLocaleString()})
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Terms Dialog Modal */}
-        <AnimatePresence>
-          {showTerms && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-20 bg-black/90 p-6 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                  <h4 className="text-sm font-bold text-white">Payment Terms & Assurance</h4>
-                  <button onClick={() => setShowTerms(false)} className="text-stone-400 hover:text-white cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="text-xs text-[#a89c99] space-y-2 leading-relaxed">
-                  <p>• Payments are securely processed through Razorpay's PCI-DSS Level 1 certified gateway.</p>
-                  <p>• Verified receipts and session access keys are immediately delivered to your registered email address.</p>
-                  <p>• 7-day money-back guarantee applies if deliverables do not match workshop specifications.</p>
-                  <p>• No card or banking credentials are ever stored on S-CODERS servers.</p>
+
+                {/* Form fields: name, email, mobile */}
+                <form onSubmit={handleCheckoutSubmit} className="space-y-4 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
+                      name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your name"
+                      className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
+                      email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
+                      mobile
+                    </label>
+                    <input
+                      type="tel"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="Enter your phone number"
+                      className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
+                    />
+                  </div>
+
+                  {/* Have a code? link */}
+                  <div>
+                    {!showCodeInput && !appliedDiscount ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCodeInput(true)}
+                        className="text-xs text-[#a0908c] hover:text-[#f7f2ef] underline decoration-dotted transition-colors cursor-pointer inline-flex items-center gap-1 font-sans"
+                      >
+                        <span>have a code?</span>
+                      </button>
+                    ) : appliedDiscount ? (
+                      <div className="flex items-center justify-between bg-[#193220] border border-[#2b5936] text-[#6ee7b7] px-3.5 py-2 rounded-xl text-xs font-mono">
+                        <span>Code <strong>{appliedDiscount.code}</strong> applied (-₹{appliedDiscount.amount})</span>
+                        <button
+                          type="button"
+                          onClick={() => setAppliedDiscount(null)}
+                          className="text-[10px] text-red-300 hover:underline ml-2"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={promoCode}
+                            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                            placeholder="ENTER CODE (e.g. SCODERS20)"
+                            className="flex-1 bg-[#27201f] border border-[#3d3230] text-white text-xs rounded-xl px-3.5 py-2.5 font-mono uppercase outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyCoupon}
+                            className="px-4 py-2 bg-[#3a2e2c] hover:bg-[#4d3d3a] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                        {promoError && (
+                          <p className="text-[11px] text-rose-400 font-mono">{promoError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Big Maroon Pay Button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isProcessingCheckout}
+                      className="w-full py-4 rounded-xl bg-[#521714] hover:bg-[#681e1a] active:bg-[#401210] text-[#ffded9] font-bold text-sm tracking-wide transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {isProcessingCheckout ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-[#ffded9]" />
+                          <span>processing...</span>
+                        </>
+                      ) : (
+                        <span>pay ₹{finalAmount.toLocaleString()}</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Trust Footer */}
+                  <div className="text-center pt-2 space-y-1">
+                    <p className="text-[11px] text-[#8e817e] font-sans flex items-center justify-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#a89995] inline" />
+                      <span>secured by Razorpay • link in your email • 7-day money-back</span>
+                    </p>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTerms(true)}
+                        className="text-[10px] text-[#736765] hover:text-[#b89f9a] underline cursor-pointer"
+                      >
+                        terms
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 2: OFFICIAL RAZORPAY STANDARD SHEET (Video 00:26 - 00:38) */}
+            {/* ============================================================== */}
+            {currentStep === 'razorpay_main' && (
+              <div className="flex flex-col h-full bg-[#1b1716]">
+                {/* Top Bar: S-CODERS + Pay ₹... */}
+                <div className="p-4 sm:p-5 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
+                  <div>
+                    <span className="text-[11px] font-mono text-[#a89c99] uppercase tracking-wider block">
+                      S-CODERS
+                    </span>
+                    <span className="text-lg font-bold text-white block mt-0.5">
+                      Pay ₹{finalAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('all_options')}
+                      className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick PhonePe Option Card */}
+                <div className="p-5 sm:p-6 space-y-4">
+                  <div className="bg-[#241e1c] border border-[#382d2b] rounded-2xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#5f259f]/20 border border-[#5f259f]/40 flex items-center justify-center text-[#c084fc] font-bold text-sm">
+                        PP
+                      </div>
+                      <div>
+                        <span className="text-sm font-bold text-white block">PhonePe</span>
+                        <span className="text-[10px] text-[#8e817e] block">Fast Instant UPI</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleInitiateMethodPay('PhonePe', 'phonepe')}
+                      className="px-5 py-2.5 bg-white text-black font-extrabold text-xs uppercase tracking-wider rounded-xl hover:bg-stone-200 transition-colors cursor-pointer shadow-md"
+                    >
+                      Pay
+                    </button>
+                  </div>
+
+                  {/* More Options Link */}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('all_options')}
+                      className="text-xs font-semibold text-[#f59e0b] hover:text-[#fbbf24] transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <span>More Options</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Razorpay Secured Footer */}
+                <div className="mt-auto p-4 border-t border-[#2e2624] text-center bg-[#151211]">
+                  <div className="inline-flex items-center gap-1.5 text-xs text-[#7e7370] font-sans">
+                    <span>Secured by</span>
+                    <span className="font-bold text-[#3b82f6]">Razorpay</span>
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowTerms(false)}
-                className="w-full py-3 bg-stone-800 text-white font-bold text-xs rounded-xl cursor-pointer"
-              >
-                Close Terms
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 3: 3D SPINNING COIN SCREEN (Video 00:39 - 00:46)           */}
+            {/* ============================================================== */}
+            {currentStep === 'processing' && (
+              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
+                <div className="space-y-1.5">
+                  <h3 className="text-xl font-bold font-serif text-white tracking-tight">
+                    Processing your payment
+                  </h3>
+                  <p className="text-xs text-[#9e8f8b] font-sans">
+                    This will only take a few seconds.
+                  </p>
+                </div>
+
+                {/* 3D Animated Spinning Golden Coin */}
+                <div className="py-4 perspective-1000">
+                  <motion.div
+                    animate={{ rotateY: [0, 180, 360] }}
+                    transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
+                    className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#d97706] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
+                    style={{ transformStyle: 'preserve-3d' }}
+                  >
+                    <div className="text-center font-serif font-black text-2xl text-[#78350f]">
+                      ₹
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Cancel Button */}
+                <div className="w-full pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('cancel_confirm')}
+                    className="w-full py-3.5 bg-[#2c2422] hover:bg-[#382f2c] text-[#a89c99] hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="pt-2 text-center">
+                  <span className="text-[11px] text-[#6d6260]">
+                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 4: CANCEL PAYMENT DIALOG (Video 00:47 - 00:56)             */}
+            {/* ============================================================== */}
+            {currentStep === 'cancel_confirm' && (
+              <div className="p-6 sm:p-7 text-center space-y-5 bg-[#221c1a]">
+                <div className="w-14 h-14 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-400">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-lg font-bold text-white">Cancel Payment</h4>
+                  <p className="text-xs text-[#a89c99] max-w-xs mx-auto leading-relaxed">
+                    Your payment is ongoing. Are you sure you want to cancel the payment?
+                  </p>
+                </div>
+
+                <div className="space-y-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('processing')}
+                    className="w-full py-3.5 bg-[#3a302e] hover:bg-[#483d3a] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    No, wait
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmCancel}
+                    className="w-full py-3.5 bg-[#261f1d] hover:bg-[#302725] text-[#9e8f8b] hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    Yes, Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 5: CANCELLING LOADER (Video 02:23 - 02:26)                 */}
+            {/* ============================================================== */}
+            {currentStep === 'cancelling_loader' && (
+              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
+                <div className="space-y-1.5">
+                  <h3 className="text-xl font-bold font-serif text-white tracking-tight">
+                    Cancelling Payment
+                  </h3>
+                  <p className="text-xs text-[#9e8f8b] font-sans">
+                    This will only take a few seconds.
+                  </p>
+                </div>
+
+                <div className="py-4 perspective-1000">
+                  <motion.div
+                    animate={{ rotateY: [0, 180, 360] }}
+                    transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
+                    className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#d97706] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
+                  >
+                    <div className="text-center font-serif font-black text-2xl text-[#78350f]">
+                      ₹
+                    </div>
+                  </motion.div>
+                </div>
+
+                <div className="pt-2 text-center">
+                  <span className="text-[11px] text-[#6d6260]">
+                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 6: RETRY PAYMENT DIALOG (Video 01:01 - 01:12)              */}
+            {/* ============================================================== */}
+            {currentStep === 'retry_sheet' && (
+              <div className="p-6 sm:p-7 space-y-5 bg-[#1f1918]">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-1 text-[#9e8f8b] hover:text-white rounded-lg cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="text-center space-y-2 -mt-4">
+                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto text-[#e2d8d5]">
+                    <AlertTriangle className="w-6 h-6 text-[#f59e0b]" />
+                  </div>
+                  <h4 className="text-lg font-bold text-white">Payment could not be completed</h4>
+                  <p className="text-xs text-[#a89c99] max-w-sm mx-auto leading-relaxed">
+                    {retryReason}
+                  </p>
+                </div>
+
+                <div className="pt-2 space-y-2.5">
+                  <span className="text-[11px] font-mono text-[#8f827f] uppercase tracking-wider block font-bold">
+                    Retry payment of ₹{finalAmount.toLocaleString()} with
+                  </span>
+
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleInitiateMethodPay('Google Pay', 'gpay')}
+                      className="w-full p-3.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 font-bold text-xs flex items-center justify-center">
+                          G
+                        </div>
+                        <span className="text-xs font-semibold text-white">UPI - Google Pay</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#8f827f]" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleInitiateMethodPay('PhonePe', 'phonepe')}
+                      className="w-full p-3.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 font-bold text-xs flex items-center justify-center">
+                          PP
+                        </div>
+                        <span className="text-xs font-semibold text-white">UPI - PhonePe</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#8f827f]" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleInitiateMethodPay('CRED UPI', 'cred')}
+                      className="w-full p-3.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-stone-700 text-white font-bold text-xs flex items-center justify-center">
+                          CR
+                        </div>
+                        <span className="text-xs font-semibold text-white">UPI - CRED UPI</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#8f827f]" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('all_options')}
+                      className="w-full p-3.5 bg-[#241d1b] hover:bg-[#332826] border border-white/5 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <MoreHorizontal className="w-5 h-5 text-[#f59e0b]" />
+                        <span className="text-xs font-bold text-[#f59e0b]">Show All Options</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#f59e0b]" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-center">
+                  <span className="text-[11px] text-[#6d6260]">
+                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 7: ALL PAYMENT OPTIONS ACCORDION (Video 01:13 - 01:32)     */}
+            {/* ============================================================== */}
+            {currentStep === 'all_options' && (
+              <div className="flex flex-col h-full bg-[#1b1716] overflow-y-auto">
+                {/* Top Bar with back arrow */}
+                <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514] sticky top-0 z-10">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('razorpay_main')}
+                      className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h4 className="text-base font-bold text-white">Payment Options</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Offer banner */}
+                <div className="p-3.5 bg-[#261f1c] border-b border-[#332a28] flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-[#e2d8d5] text-[11px]">Upto 5% NeuCoins on Tata Neu...</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-400 font-mono">+1 View all</span>
+                </div>
+
+                {/* Accordion list */}
+                <div className="p-4 space-y-3 pb-8">
+                  <span className="text-[10px] font-mono text-[#8a7c79] uppercase tracking-wider block font-bold">
+                    All Payment Options
+                  </span>
+
+                  {/* 1. UPI */}
+                  <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSection(expandedSection === 'upi' ? null : 'upi')}
+                      className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Smartphone className="w-4 h-4 text-emerald-400" />
+                        <div>
+                          <span className="text-xs font-bold text-white block">UPI</span>
+                          <span className="text-[10px] text-emerald-400 font-bold block">3 Offers</span>
+                        </div>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'upi' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {expandedSection === 'upi' && (
+                      <div className="p-4 pt-1 grid grid-cols-2 gap-2 border-t border-[#2e2523]">
+                        {/* Google Pay */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('Google Pay');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('Google Pay', 'gpay');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-blue-500/20 text-blue-400 font-bold text-xs flex items-center justify-center">G</div>
+                          <span className="text-xs font-medium text-white">Google Pay</span>
+                        </button>
+
+                        {/* Tata Neu UPI */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('Tata Neu UPI');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('Tata Neu UPI');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-purple-500/20 text-purple-400 font-bold text-xs flex items-center justify-center">TN</div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-medium text-white block truncate">Tata Neu UPI</span>
+                            <span className="text-[9px] text-amber-400 block truncate">Upto 5% NeuC...</span>
+                          </div>
+                        </button>
+
+                        {/* PhonePe */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('PhonePe');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('PhonePe', 'phonepe');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-indigo-500/20 text-indigo-400 font-bold text-xs flex items-center justify-center">PP</div>
+                          <span className="text-xs font-medium text-white">PhonePe</span>
+                        </button>
+
+                        {/* Paytm */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('Paytm');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('Paytm', 'paytm');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-400 font-bold text-xs flex items-center justify-center">PT</div>
+                          <span className="text-xs font-medium text-white">Paytm</span>
+                        </button>
+
+                        {/* FamPay */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('FamPay');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('FamPay', 'fampay');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-amber-500/20 text-amber-400 font-bold text-xs flex items-center justify-center">FP</div>
+                          <span className="text-xs font-medium text-white">FamPay</span>
+                        </button>
+
+                        {/* CRED UPI */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('CRED UPI');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('CRED UPI', 'cred');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-stone-700 text-stone-200 font-bold text-xs flex items-center justify-center">CR</div>
+                          <span className="text-xs font-medium text-white">CRED UPI</span>
+                        </button>
+
+                        {/* Apps & UPI ID */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('Apps & UPI ID');
+                            setAllOptionsError(null);
+                            setShowQrModal(true);
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer col-span-2"
+                        >
+                          <QrCode className="w-5 h-5 text-amber-400" />
+                          <span className="text-xs font-medium text-white">Apps & UPI ID / Scan QR</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Cards */}
+                  <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedOptionInAll('Cards');
+                        setAllOptionsError(null);
+                        setCurrentStep('card_input');
+                      }}
+                      className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <CreditCard className="w-4 h-4 text-blue-400" />
+                        <div>
+                          <span className="text-xs font-bold text-white block">Cards</span>
+                          <span className="text-[10px] text-[#8a7c79] block">Visa, Mastercard, RuPay, Amex</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#8a7c79]" />
+                    </button>
+                  </div>
+
+                  {/* 3. EMI */}
+                  <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedOptionInAll('EMI');
+                        setAllOptionsError(null);
+                        setCurrentStep('emi_plans');
+                      }}
+                      className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Building2 className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <span className="text-xs font-bold text-white block">EMI</span>
+                          <span className="text-[10px] text-[#8a7c79] block">Credit Card EMI available</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#8a7c79]" />
+                    </button>
+                  </div>
+
+                  {/* 4. Netbanking */}
+                  <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSection(expandedSection === 'netbanking' ? null : 'netbanking')}
+                      className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Building2 className="w-4 h-4 text-purple-400" />
+                        <div>
+                          <span className="text-xs font-bold text-white block">Netbanking</span>
+                          <span className="text-[10px] text-[#8a7c79] block">SBI, HDFC, ICICI, Axis & 50+ Banks</span>
+                        </div>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'netbanking' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {expandedSection === 'netbanking' && (
+                      <div className="p-4 pt-1 grid grid-cols-2 gap-2 border-t border-[#2e2523]">
+                        {[
+                          { name: 'SBI', issues: false },
+                          { name: 'HDFC', issues: false },
+                          { name: 'ICICI', issues: true },
+                          { name: 'Axis', issues: false },
+                          { name: 'BOB', issues: false },
+                          { name: 'More Banks', issues: false },
+                        ].map((bank) => (
+                          <button
+                            key={bank.name}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBankName(bank.name);
+                              setSelectedOptionInAll(`Netbanking - ${bank.name}`);
+                              setAllOptionsError(null);
+                              setCurrentStep('netbanking_redirect');
+                            }}
+                            className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2 cursor-pointer"
+                          >
+                            <div className="w-6 h-6 rounded-md bg-blue-600/20 text-blue-400 font-bold text-xs flex items-center justify-center shrink-0">
+                              {bank.name[0]}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-medium text-white truncate block">{bank.name}</span>
+                              {bank.issues && (
+                                <span className="text-[9px] text-amber-400 block truncate font-mono">Facing issues</span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. Wallet */}
+                  <div className="border border-[#382d2a] rounded-2xl overflow-hidden bg-[#221c1a]">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSection(expandedSection === 'wallet' ? null : 'wallet')}
+                      className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-white/[2%]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Wallet className="w-4 h-4 text-rose-400" />
+                        <div>
+                          <span className="text-xs font-bold text-white block">Wallet</span>
+                          <span className="text-[10px] text-[#8a7c79] block">Mobikwik, Airtel Payments, Ola Money, PayZapp</span>
+                        </div>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'wallet' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {expandedSection === 'wallet' && (
+                      <div className="p-4 pt-1 grid grid-cols-2 gap-2 border-t border-[#2e2523]">
+                        {['Mobikwik', 'Airtel Payments', 'Ola Money', 'PayZapp'].map((w) => (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => {
+                              setSelectedOptionInAll(`Wallet - ${w}`);
+                              setAllOptionsError(null);
+                              handleInitiateMethodPay(`Wallet - ${w}`);
+                            }}
+                            className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2 cursor-pointer"
+                          >
+                            <div className="w-6 h-6 rounded-md bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center justify-center">
+                              {w[0]}
+                            </div>
+                            <span className="text-xs font-medium text-white truncate">{w}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Validation error notice if continue clicked without choice */}
+                {allOptionsError && (
+                  <div className="px-4 pb-2">
+                    <p className="text-xs text-rose-400 font-mono flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{allOptionsError}</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Bottom Continue Sticky Bar */}
+                <div className="mt-auto p-4 border-t border-[#2e2624] flex items-center justify-between bg-[#191514] sticky bottom-0">
+                  <div>
+                    <span className="text-lg font-bold text-white block">₹{finalAmount.toLocaleString()}</span>
+                    <span className="text-[10px] text-[#8a7c79] block">View Details</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedOptionInAll) {
+                        setAllOptionsError('Please select one of these options.');
+                        return;
+                      }
+                      handleInitiateMethodPay(selectedOptionInAll);
+                    }}
+                    className="px-6 py-3 bg-[#382d2b] hover:bg-[#483b38] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 8: CARD INPUT (Video 01:47 - 02:02)                       */}
+            {/* ============================================================== */}
+            {currentStep === 'card_input' && (
+              <div className="flex flex-col h-full bg-[#1b1716]">
+                <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('all_options')}
+                      className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h4 className="text-base font-bold text-white">Card</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('cancel_confirm')}
+                    className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCardSubmit} className="p-5 sm:p-6 space-y-4">
+                  <span className="text-xs font-bold text-white block">Add a new card</span>
+
+                  <div>
+                    <input
+                      type="text"
+                      required
+                      value={cardNumber}
+                      onChange={handleCardNumberChange}
+                      placeholder="Card Number"
+                      className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono placeholder:text-[#6a5e5c]"
+                    />
+                    {cardError && (
+                      <p className="text-[11px] text-rose-400 mt-1 font-mono">{cardError}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      required
+                      value={cardExpiry}
+                      onChange={handleExpiryChange}
+                      placeholder="MM / YY"
+                      className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono placeholder:text-[#6a5e5c]"
+                    />
+                    <input
+                      type="password"
+                      required
+                      maxLength={4}
+                      value={cardCvv}
+                      onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
+                      placeholder="CVV"
+                      className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono placeholder:text-[#6a5e5c]"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2.5 text-xs text-[#a89c99] cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={saveCardRbi}
+                      onChange={(e) => setSaveCardRbi(e.target.checked)}
+                      className="rounded accent-stone-600 w-4 h-4 cursor-pointer"
+                    />
+                    <span>Save this card as per RBI guidelines</span>
+                  </label>
+
+                  <div className="pt-4">
+                    <button
+                      type="submit"
+                      className="w-full py-4 bg-[#382d2b] hover:bg-[#483b38] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 9: EMI PLANS (Video 01:36 - 01:40)                        */}
+            {/* ============================================================== */}
+            {currentStep === 'emi_plans' && (
+              <div className="flex flex-col h-full bg-[#1b1716]">
+                <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('all_options')}
+                      className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h4 className="text-base font-bold text-white">EMI Plans</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('cancel_confirm')}
+                    className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-5 sm:p-6 space-y-4">
+                  <span className="text-xs font-bold text-white block">Credit Card EMI</span>
+
+                  <div 
+                    onClick={() => handleInitiateMethodPay('RBL Bank Credit Card EMI')}
+                    className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-white">RBL Bank</span>
+                      <span className="text-xs text-amber-400 font-mono">₹{(finalAmount / 9).toFixed(2)} x 9 month</span>
+                    </div>
+                    <p className="text-[11px] text-[#8a7c79]">
+                      Total interest ₹{(finalAmount * 0.07).toFixed(2)} @ 17% p.a.
+                    </p>
+                  </div>
+
+                  <div 
+                    onClick={() => handleInitiateMethodPay('HDFC Bank Credit Card EMI')}
+                    className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-white">HDFC Bank</span>
+                      <span className="text-xs text-amber-400 font-mono">₹{(finalAmount / 6).toFixed(2)} x 6 month</span>
+                    </div>
+                    <p className="text-[11px] text-[#8a7c79]">
+                      Total interest ₹{(finalAmount * 0.05).toFixed(2)} @ 15% p.a.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleInitiateMethodPay('RBL Bank Credit Card EMI')}
+                    className="w-full py-4 bg-[#382d2b] hover:bg-[#483b38] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer mt-4"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 10: NETBANKING REDIRECT (Video 02:16 - 02:22)             */}
+            {/* ============================================================== */}
+            {currentStep === 'netbanking_redirect' && (
+              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-5 bg-[#1b1716]">
+                <div className="w-14 h-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-blue-400 font-bold text-lg">
+                  {selectedBankName[0]}
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-lg font-bold text-white">Loading bank page...</h4>
+                  <p className="text-xs text-[#a89c99] max-w-xs mx-auto leading-relaxed">
+                    Please wait while we redirect you to your bank page ({selectedBankName}).
+                  </p>
+                </div>
+
+                <RefreshCw className="w-7 h-7 text-amber-400 animate-spin my-2" />
+
+                <div className="pt-2 text-center">
+                  <span className="text-[11px] text-[#6d6260]">
+                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                  </span>
+                </div>
+
+                <div className="pt-2 w-full space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleInitiateMethodPay(`Netbanking (${selectedBankName})`)}
+                    className="w-full py-3 bg-[#382d2b] hover:bg-[#483b38] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Authorize Payment (₹{finalAmount.toLocaleString()})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('all_options')}
+                    className="w-full py-2 bg-transparent text-[#8a7c79] hover:text-white text-xs cursor-pointer"
+                  >
+                    Cancel and go back
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW 11: CONFIRMING PAYMENT (Video 00:57 - 01:00)              */}
+            {/* ============================================================== */}
+            {currentStep === 'confirming' && (
+              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
+                <div className="space-y-1.5">
+                  <h3 className="text-xl font-bold font-serif text-white tracking-tight">
+                    Confirming Payment
+                  </h3>
+                  <p className="text-xs text-[#9e8f8b] font-sans">
+                    This will only take a few seconds.
+                  </p>
+                </div>
+
+                <div className="py-4 perspective-1000">
+                  <motion.div
+                    animate={{ rotateY: [0, 180, 360] }}
+                    transition={{ repeat: Infinity, duration: 1.0, ease: 'linear' }}
+                    className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#059669] via-[#34d399] to-[#047857] shadow-2xl flex items-center justify-center border-4 border-[#a7f3d0] relative"
+                  >
+                    <Check className="w-10 h-10 text-emerald-950 font-black stroke-[3]" />
+                  </motion.div>
+                </div>
+
+                <div className="pt-2 text-center">
+                  <span className="text-[11px] text-[#6d6260]">
+                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* QR Code Scan Modal */}
+            <AnimatePresence>
+              {showQrModal && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute inset-0 z-30 bg-[#161211]/95 backdrop-blur-md p-6 flex flex-col justify-between items-center text-center"
+                >
+                  <div className="w-full flex justify-between items-center pb-2 border-b border-[#2e2624]">
+                    <h4 className="text-sm font-bold text-white">Scan UPI QR Code</h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowQrModal(false)}
+                      className="p-1 text-[#9e8f8b] hover:text-white rounded-lg cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="my-auto space-y-4">
+                    <div className="p-3 bg-white rounded-2xl shadow-xl inline-block">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                          `upi://pay?pa=${activeMerchantVpa}&pn=${encodeURIComponent(merchantBankingName)}&am=${finalAmount}&cu=INR&tn=${encodeURIComponent(paymentDetails.purpose.slice(0, 20))}`
+                        )}`}
+                        alt="UPI Payment QR Code"
+                        className="w-44 h-44 rounded-lg block"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-white font-bold">
+                        Scan with Google Pay, PhonePe, Paytm, FamPay, or CRED
+                      </p>
+                      <p className="text-[11px] text-[#8a7c79] font-mono">
+                        Payee: {merchantBankingName} ({activeMerchantVpa})
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyUpiId}
+                        className="px-3 py-1.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl text-xs text-amber-300 font-mono flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedUpi ? 'Copied UPI ID!' : activeMerchantVpa}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowQrModal(false);
+                      handleInitiateMethodPay('QR Code UPI Scan');
+                    }}
+                    className="w-full py-3.5 bg-[#521714] hover:bg-[#681e1a] text-[#ffded9] font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    I have Completed UPI Payment (₹{finalAmount.toLocaleString()})
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Terms Dialog Modal */}
+            <AnimatePresence>
+              {showTerms && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-20 bg-black/90 p-6 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <h4 className="text-sm font-bold text-white">Payment Terms & Assurance</h4>
+                      <button onClick={() => setShowTerms(false)} className="text-stone-400 hover:text-white cursor-pointer">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="text-xs text-[#a89c99] space-y-2 leading-relaxed">
+                      <p>• Payments are securely processed through Razorpay's PCI-DSS Level 1 certified gateway.</p>
+                      <p>• Verified receipts and session access keys are immediately delivered to your registered email address.</p>
+                      <p>• 7-day money-back guarantee applies if deliverables do not match workshop specifications.</p>
+                      <p>• No card or banking credentials are ever stored on S-CODERS servers.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTerms(false)}
+                    className="w-full py-3 bg-stone-800 text-white font-bold text-xs rounded-xl cursor-pointer"
+                  >
+                    Close Terms
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
