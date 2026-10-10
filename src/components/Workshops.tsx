@@ -75,6 +75,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   // Registration Form States
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState('Developer');
   const [showRegModal, setShowRegModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -99,6 +100,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     currency: string;
     clientName: string;
     email: string;
+    phone?: string;
     purpose: string;
     merchantUpiId: string;
   } | null>(null);
@@ -517,6 +519,7 @@ export default function TenantDashboard() {
         currency: 'INR',
         clientName: participantName,
         email: participantEmail,
+        phone: regPhone.trim(),
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
         merchantUpiId: getActiveMerchantUpi()
       });
@@ -536,6 +539,7 @@ export default function TenantDashboard() {
         currency: 'INR',
         clientName: participantName,
         email: participantEmail,
+        phone: regPhone.trim(),
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
         merchantUpiId: getActiveMerchantUpi()
       });
@@ -1857,6 +1861,17 @@ export default function TenantDashboard() {
                         </div>
 
                         <div>
+                          <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-1">Mobile / WhatsApp Number</label>
+                          <input
+                            type="tel"
+                            value={regPhone}
+                            onChange={(e) => setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            placeholder="10-digit mobile number"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all font-mono"
+                          />
+                        </div>
+
+                        <div>
                           <label className="block text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-1">Your Technical Role / College (or Workplace) *</label>
                           <input
                             type="text"
@@ -1930,6 +1945,7 @@ export default function TenantDashboard() {
       {razorpayPaymentDetails && (
         <RazorpayModal
           isOpen={showRazorpayModal}
+          initialStep="all_options"
           onClose={() => {
             setShowRazorpayModal(false);
             setIsProcessing(false);

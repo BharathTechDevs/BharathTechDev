@@ -49,6 +49,7 @@ export default function Events() {
     currency: string;
     clientName: string;
     email: string;
+    phone?: string;
     purpose: string;
     merchantUpiId: string;
   } | null>(null);
@@ -460,6 +461,7 @@ export default function Events() {
           currency: 'INR',
           clientName: regName.trim(),
           email: regEmail.trim(),
+          phone: regPhone.trim(),
           purpose: `Event Pass: ${selectedEvent.name}`,
           merchantUpiId: getActiveMerchantUpi()
         });
@@ -479,6 +481,7 @@ export default function Events() {
           currency: 'INR',
           clientName: regName.trim(),
           email: regEmail.trim(),
+          phone: regPhone.trim(),
           purpose: `Event Pass: ${selectedEvent.name}`,
           merchantUpiId: getActiveMerchantUpi()
         });
@@ -2349,6 +2352,7 @@ export default function Events() {
       {razorpayPaymentDetails && (
         <RazorpayModal
           isOpen={showRazorpayModal}
+          initialStep="all_options"
           onClose={() => {
             setShowRazorpayModal(false);
             setPaymentStatusNotice({

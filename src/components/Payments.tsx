@@ -627,7 +627,7 @@ export default function Payments({
         {/* ============================================================== */}
         <RazorpayModal
           isOpen={isCheckoutOpen}
-          initialStep="checkout"
+          initialStep="all_options"
           onClose={() => setIsCheckoutOpen(false)}
           onSuccess={handlePaymentSuccess}
           paymentDetails={{

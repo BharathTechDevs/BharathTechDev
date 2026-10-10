@@ -62,7 +62,7 @@ export default function RazorpayModal({
   onFailure,
   orderData,
   paymentDetails,
-  initialStep = 'checkout',
+  initialStep = 'all_options',
 }: RazorpayModalProps) {
   // Steps matching Video Flow & Razorpay Standard:
   // 1. 'checkout' -> Customer details input card (Name, Email, Mobile, "pay ₹...", "have a code?")
@@ -139,13 +139,11 @@ export default function RazorpayModal({
   // Sync props when modal opens
   useEffect(() => {
     if (isOpen) {
-      const initialName = paymentDetails.clientName && paymentDetails.clientName !== 'Attendee' && !paymentDetails.clientName.includes('Manual')
-        ? paymentDetails.clientName
-        : '';
-      const initialEmail = paymentDetails.email && paymentDetails.email !== 'attendee@scoders.com' && paymentDetails.email !== 'attendee@scoders.dev'
-        ? paymentDetails.email
-        : '';
-      const initialPhone = paymentDetails.phone || '';
+      const rawName = paymentDetails.clientName?.trim() || '';
+      const initialName = rawName !== 'Attendee' && !rawName.startsWith('Manual User') ? rawName : '';
+      const rawEmail = paymentDetails.email?.trim() || '';
+      const initialEmail = rawEmail !== 'attendee@scoders.com' && rawEmail !== 'attendee@scoders.dev' ? rawEmail : '';
+      const initialPhone = paymentDetails.phone?.trim() || '';
 
       setName(initialName);
       setEmail(initialEmail);
@@ -158,7 +156,9 @@ export default function RazorpayModal({
       setCustomUpiId('');
       setUpiIdError(null);
       setShowQrModal(false);
-      setCurrentStep(initialStep === 'all_options' ? 'all_options' : 'checkout');
+
+      // Automatically read pre-filled registration details and open UPI & payment options directly
+      setCurrentStep('all_options');
       setExpandedSection('upi');
       setSelectedOptionInAll(null);
       setAllOptionsError(null);
@@ -370,6 +370,7 @@ export default function RazorpayModal({
 
   // Main "Pay ₹..." button on Checkout Step:
   // Initiates official Razorpay Standard Checkout SDK popup with full method support
+  // Handle Pay Click: Automatically reads details, creates server order, and opens UPI options immediately
   const handlePayViaRazorpaySDK = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!name.trim()) {
@@ -382,9 +383,23 @@ export default function RazorpayModal({
     }
 
     setIsProcessingCheckout(true);
+
+    // Initialize/ensure server order in the background
+    ensureServerOrder().catch((err) => {
+      console.warn('Pre-creating Razorpay order in background:', err);
+    });
+
+    // Automatically transition to the payment options sheet with UPI section already expanded
+    setExpandedSection('upi');
+    setIsProcessingCheckout(false);
+    setCurrentStep('all_options');
+  };
+
+  // Launch official Razorpay standard checkout popup when explicitly requested
+  const handleLaunchRazorpayStandardPopup = async () => {
+    setIsProcessingCheckout(true);
     const order = await ensureServerOrder();
 
-    // Check if official Razorpay Checkout SDK is ready
     const sdkReady = await loadRazorpaySDK();
     if (sdkReady && (window as any).Razorpay && order.orderId && order.orderId.startsWith('order_')) {
       try {
@@ -465,8 +480,8 @@ export default function RazorpayModal({
       }
     }
 
-    // Fallback if SDK popup fails to open: Route cleanly to payment methods sheet
     setIsProcessingCheckout(false);
+    setExpandedSection('upi');
     setCurrentStep('all_options');
   };
 
@@ -621,7 +636,7 @@ export default function RazorpayModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-sm animate-fade-in font-sans">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-sm animate-fade-in font-sans">
           <motion.div
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -765,15 +780,8 @@ export default function RazorpayModal({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!name.trim()) {
-                          alert('Please enter your name');
-                          return;
-                        }
-                        if (!email.trim()) {
-                          alert('Please enter your email address');
-                          return;
-                        }
                         ensureServerOrder().catch(() => {});
+                        setExpandedSection('upi');
                         setCurrentStep('all_options');
                       }}
                       className="w-full py-2.5 text-xs text-[#b89f9a] hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
@@ -1171,20 +1179,52 @@ export default function RazorpayModal({
                     <button
                       type="button"
                       onClick={() => setCurrentStep('checkout')}
-                      className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                      className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                      title="Edit contact info"
                     >
                       <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <h4 className="text-base font-bold text-white">Payment Options</h4>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded bg-[#0c2340] border border-[#0d5392] flex items-center justify-center">
+                          <span className="text-[10px] font-black text-[#528ff0]">R</span>
+                        </div>
+                        <h4 className="text-base font-bold text-white tracking-tight">Razorpay Gateway</h4>
+                        <span className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-mono rounded-full font-bold">
+                          UPI & Cards
+                        </span>
+                      </div>
+                      <span className="text-xs text-[#b89f9a] font-medium block">
+                        Pay ₹{finalAmount.toLocaleString()} • {paymentDetails.purpose}
+                      </span>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={onClose}
-                    className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
+                    className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
+
+                {/* Pre-filled Payer Details Bar */}
+                {(name || email) && (
+                  <div className="px-4 py-2 bg-[#221a18] border-b border-[#302422] flex items-center justify-between text-[11px] font-sans text-[#b89f9a]">
+                    <div className="truncate">
+                      <span>Paying as </span>
+                      <strong className="text-white font-medium">{name || 'Attendee'}</strong>
+                      {email && <span className="text-[#8e7e7b]"> ({email})</span>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('checkout')}
+                      className="text-[#d97768] hover:text-[#ff9b8c] underline font-mono text-[10px] shrink-0 ml-2 cursor-pointer"
+                    >
+                      edit
+                    </button>
+                  </div>
+                )}
 
                 {/* Offer banner */}
                 <div className="p-3.5 bg-[#261f1c] border-b border-[#332a28] flex items-center justify-between text-xs">
@@ -1302,6 +1342,54 @@ export default function RazorpayModal({
                         >
                           <div className="w-6 h-6 rounded-md bg-purple-500/20 text-purple-400 font-bold text-xs flex items-center justify-center">TN</div>
                           <span className="text-xs font-medium text-white truncate">Tata Neu UPI</span>
+                        </button>
+
+                        {/* WhatsApp Pay */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('WhatsApp Pay');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('WhatsApp Pay', 'whatsapp');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center">WA</div>
+                          <span className="text-xs font-medium text-white truncate">WhatsApp Pay</span>
+                        </button>
+
+                        {/* BHIM UPI */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('BHIM UPI');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('BHIM UPI', 'bhim');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-orange-500/20 text-orange-400 font-bold text-xs flex items-center justify-center">BH</div>
+                          <span className="text-xs font-medium text-white truncate">BHIM UPI</span>
+                        </button>
+
+                        {/* 1-Tap Auto-Launch Any Installed UPI App */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('Any UPI App');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('Any UPI App', 'universal');
+                          }}
+                          className="p-3.5 bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/40 rounded-xl text-left transition-colors flex items-center justify-between cursor-pointer col-span-2 shadow-md shadow-emerald-950/40"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center">⚡</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">Auto-Redirect to Any UPI App</span>
+                              <span className="text-[10px] text-emerald-300/90 block">Auto-opens installed Google Pay, PhonePe, Paytm or default UPI app</span>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
                         </button>
 
                         {/* Apps & UPI ID / Scan QR */}
@@ -1434,6 +1522,31 @@ export default function RazorpayModal({
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Option: Standard Razorpay Popup */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleLaunchRazorpayStandardPopup}
+                      className="w-full py-3 px-4 bg-[#261f1c] hover:bg-[#332826] border border-[#3d2f2c] rounded-2xl text-xs text-[#d97768] hover:text-[#ff9b8c] font-semibold transition-all flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-[#d97768]" />
+                        <span>Open Razorpay Standard Popup</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-[#a89c99]" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Razorpay Secured Footer */}
+                <div className="mt-auto p-3.5 border-t border-[#2e2624] text-center bg-[#151211]">
+                  <div className="inline-flex items-center gap-1.5 text-xs text-[#7e7370] font-sans">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" />
+                    <span>Secured by</span>
+                    <span className="font-bold text-[#3b82f6]">Razorpay</span>
+                    <span>• 100% Encrypted Payment</span>
                   </div>
                 </div>
               </div>
