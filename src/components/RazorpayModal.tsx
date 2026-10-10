@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, ArrowLeft, ArrowRight, ShieldCheck, Check, CreditCard, Building2, 
   Wallet, RefreshCw, Smartphone, QrCode, Tag, Sparkles, ChevronRight, 
   ChevronDown, Lock, AlertTriangle, CheckCircle2, MoreHorizontal, ExternalLink,
-  Copy
+  Copy, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   createRazorpayOrder,
   verifyRazorpayPayment,
+  loadRazorpaySDK,
+  checkRazorpayOrderStatus
 } from '../services/razorpay';
 import { 
   getActiveMerchantUpi, 
@@ -62,10 +64,10 @@ export default function RazorpayModal({
   paymentDetails,
   initialStep = 'checkout',
 }: RazorpayModalProps) {
-  // Steps matching Video Flow:
+  // Steps matching Video Flow & Razorpay Standard:
   // 1. 'checkout' -> Customer details input card (Name, Email, Mobile, "pay ₹...", "have a code?")
   // 2. 'razorpay_main' -> Official Razorpay Bottom Sheet with PhonePe & "More Options >"
-  // 3. 'processing' -> 3D Spinning Golden Coin "Processing your payment" + Cancel button
+  // 3. 'processing' -> 3D Spinning Golden Coin "Waiting for payment confirmation" + active countdown timer
   // 4. 'cancel_confirm' -> Bottom Dialog "Cancel Payment: Your payment is ongoing. Are you sure...?"
   // 5. 'cancelling_loader' -> "Cancelling Payment" with spinning coin
   // 6. 'retry_sheet' -> "Payment could not be completed" with retry Google Pay, PhonePe, CRED, Show All Options
@@ -109,6 +111,12 @@ export default function RazorpayModal({
   const [activeKeyId, setActiveKeyId] = useState<string>(orderData?.keyId || '');
   const [selectedMethodName, setSelectedMethodName] = useState('PhonePe');
   const [retryReason, setRetryReason] = useState('Payment could not be processed. Please try again.');
+
+  // Timing & Waiting state (Active 10-minute timer for UPI / App payments)
+  const [waitingSeconds, setWaitingSeconds] = useState(600); // 10 minutes (600s)
+  const [isCheckingManualStatus, setIsCheckingManualStatus] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Accordion state in All Options
   const [expandedSection, setExpandedSection] = useState<'upi' | 'cards' | 'emi' | 'netbanking' | 'wallet' | null>('upi');
@@ -159,6 +167,9 @@ export default function RazorpayModal({
       setCardCvv('');
       setSaveCardRbi(false);
       setCardError(null);
+      setWaitingSeconds(600);
+      setStatusMessage(null);
+      setIsCheckingManualStatus(false);
       if (orderData?.orderId) {
         setCurrentOrderId(orderData.orderId);
       }
@@ -175,6 +186,128 @@ export default function RazorpayModal({
   const finalAmount = Math.max(1, baseAmount - discountVal);
   const activeMerchantVpa = paymentDetails?.merchantUpiId || getActiveMerchantUpi();
   const merchantBankingName = getBankingNameForUpi(activeMerchantVpa);
+
+  // Helper to dispatch email notification on payment failure / cancellation
+  const dispatchPaymentFailureEmail = async (reasonText: string) => {
+    const targetEmail = email.trim();
+    if (!targetEmail || !targetEmail.includes('@')) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+    try {
+      if (paymentDetails.purpose.toLowerCase().includes('workshop')) {
+        await fetch('/api/email/workshop-payment-failed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: targetEmail,
+            clientName: name.trim() || 'Valued Participant',
+            workshopTitle: paymentDetails.purpose,
+            amount: finalAmount,
+            currency,
+            reason: reasonText,
+            actionUrl: `${origin}/?view=workshops`,
+          }),
+        });
+      } else if (paymentDetails.purpose.toLowerCase().includes('event') || paymentDetails.purpose.toLowerCase().includes('summit')) {
+        await fetch('/api/email/event-payment-failed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: targetEmail,
+            clientName: name.trim() || 'Valued Attendee',
+            eventTitle: paymentDetails.purpose,
+            amount: finalAmount,
+            currency,
+            reason: reasonText,
+            actionUrl: `${origin}/?view=events`,
+          }),
+        });
+      } else {
+        await fetch('/api/razorpay/payment-failed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: targetEmail,
+            clientName: name.trim() || 'Valued Client',
+            purpose: paymentDetails.purpose,
+            amount: finalAmount,
+            currency,
+            errorReason: reasonText,
+            orderId: currentOrderId,
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn('Could not dispatch failure email:', err);
+    }
+  };
+
+  // Active Timer & Background Polling Effect
+  useEffect(() => {
+    if (!isOpen || currentStep !== 'processing') {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    // 1. Decrement countdown timer every 1s
+    const timerInterval = setInterval(() => {
+      setWaitingSeconds((prev) => {
+        if (prev <= 1) {
+          // Timer expired -> Mark failed, dispatch email, transition to retry_sheet
+          const timeoutReason = 'Payment session timed out. No payment was completed within the 10-minute window.';
+          setRetryReason(timeoutReason);
+          dispatchPaymentFailureEmail(timeoutReason);
+          setCurrentStep('retry_sheet');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // 2. Poll backend order status every 3.5s to see if payment was completed in UPI/Bank
+    const pollStatus = async () => {
+      if (!currentOrderId) return;
+      try {
+        const check = await checkRazorpayOrderStatus(currentOrderId);
+        if (check.status === 'PAID' && check.verified) {
+          // Payment captured!
+          clearInterval(timerInterval);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          setCurrentStep('confirming');
+          setTimeout(async () => {
+            await handlePaymentSuccess(
+              check.paymentId || `pay_rzp_${Date.now()}`,
+              currentOrderId,
+              'verified_by_gateway',
+              selectedMethodName
+            );
+          }, 1200);
+        }
+      } catch (e) {
+        // Continue polling
+      }
+    };
+
+    pollingRef.current = setInterval(pollStatus, 3500);
+
+    return () => {
+      clearInterval(timerInterval);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [isOpen, currentStep, currentOrderId, selectedMethodName]);
+
+  // Format seconds into MM:SS
+  const formatTimer = (totalSec: number) => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Coupon handler
   const handleApplyCoupon = (e?: React.FormEvent) => {
@@ -235,9 +368,10 @@ export default function RazorpayModal({
     return { orderId: fallbackId, keyId: activeKeyId || orderData?.keyId || '' };
   };
 
-  // Step 1: Customer submits checkout sheet -> transitions to Razorpay Standard Bottom Sheet (Video 00:25 - 00:27)
-  const handleCheckoutSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Main "Pay ₹..." button on Checkout Step:
+  // Initiates official Razorpay Standard Checkout SDK popup with full method support
+  const handlePayViaRazorpaySDK = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!name.trim()) {
       alert('Please enter your name');
       return;
@@ -248,20 +382,102 @@ export default function RazorpayModal({
     }
 
     setIsProcessingCheckout(true);
-    ensureServerOrder().catch(() => {});
+    const order = await ensureServerOrder();
 
-    setTimeout(() => {
-      setIsProcessingCheckout(false);
-      setCurrentStep('razorpay_main');
-    }, 450);
+    // Check if official Razorpay Checkout SDK is ready
+    const sdkReady = await loadRazorpaySDK();
+    if (sdkReady && (window as any).Razorpay && order.orderId && order.orderId.startsWith('order_')) {
+      try {
+        let paymentConfirmed = false;
+
+        const rzp = new (window as any).Razorpay({
+          key: order.keyId || 'rzp_live_scoders_ybl',
+          amount: Math.round(finalAmount * 100),
+          currency,
+          name: 'S-CODERS (Bharat Tech Developers)',
+          description: paymentDetails.purpose,
+          image: '/favicon.ico',
+          order_id: order.orderId,
+          prefill: {
+            name: name.trim(),
+            email: email.trim(),
+            contact: mobile.trim(),
+          },
+          theme: {
+            color: '#521714',
+            backdrop_color: '#0B0F17',
+          },
+          modal: {
+            confirm_close: true,
+            backdropclose: false,
+            ondismiss: async () => {
+              if (paymentConfirmed) return;
+              setIsProcessingCheckout(false);
+
+              // Check backend if payment was captured before dismissing
+              const check = await checkRazorpayOrderStatus(order.orderId);
+              if (check.status === 'PAID' && check.verified) {
+                paymentConfirmed = true;
+                setCurrentStep('confirming');
+                await handlePaymentSuccess(
+                  check.paymentId || `pay_rzp_${Date.now()}`,
+                  order.orderId,
+                  'verified',
+                  'Razorpay Standard Checkout'
+                );
+                return;
+              }
+
+              // Intercept dismissal: User cancelled or backed out
+              setSelectedMethodName('Razorpay Gateway');
+              const cancelMsg = 'Your payment was cancelled before completion.';
+              setRetryReason(cancelMsg);
+              dispatchPaymentFailureEmail(cancelMsg);
+              setCurrentStep('retry_sheet');
+            },
+          },
+          handler: async (response: any) => {
+            paymentConfirmed = true;
+            setIsProcessingCheckout(false);
+            setCurrentStep('confirming');
+            await handlePaymentSuccess(
+              response.razorpay_payment_id,
+              response.razorpay_order_id || order.orderId,
+              response.razorpay_signature,
+              'Razorpay Standard Checkout'
+            );
+          },
+        });
+
+        rzp.on('payment.failed', (failResp: any) => {
+          setIsProcessingCheckout(false);
+          const failMsg = failResp?.error?.description || 'Payment was declined by bank or cancelled.';
+          setRetryReason(failMsg);
+          dispatchPaymentFailureEmail(failMsg);
+          setCurrentStep('retry_sheet');
+        });
+
+        rzp.open();
+        setIsProcessingCheckout(false);
+        return;
+      } catch (sdkErr) {
+        console.warn('Razorpay SDK popup invocation warning, routing to payment options:', sdkErr);
+      }
+    }
+
+    // Fallback if SDK popup fails to open: Route cleanly to payment methods sheet
+    setIsProcessingCheckout(false);
+    setCurrentStep('all_options');
   };
 
-  // Initiate method payment (PhonePe, GPay, Paytm, FamPay, Card, Netbanking, etc.)
+  // Initiate direct method payment (PhonePe, GPay, Paytm, FamPay, Card, Netbanking, etc.)
   const handleInitiateMethodPay = (
     methodName: string, 
     upiAppScheme?: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'bhim' | 'cred' | 'amazonpay' | 'whatsapp' | 'universal'
   ) => {
     setSelectedMethodName(methodName);
+    setWaitingSeconds(600); // 10 minutes session
+    setStatusMessage(null);
     setCurrentStep('processing');
 
     // On mobile devices, launch the requested UPI app intent
@@ -273,32 +489,48 @@ export default function RazorpayModal({
         tn: paymentDetails.purpose.slice(0, 25),
       }, upiAppScheme);
     }
-
-    // Payment completion simulation
-    setTimeout(() => {
-      setCurrentStep('confirming');
-      setTimeout(async () => {
-        const generatedPaymentId = `pay_rzp_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-        const generatedOrderId = currentOrderId || `order_${Date.now()}`;
-        const generatedSig = `sig_verified_${Date.now()}`;
-
-        await handlePaymentSuccess(
-          generatedPaymentId,
-          generatedOrderId,
-          generatedSig,
-          methodName
-        );
-      }, 1500);
-    }, 2800);
   };
 
-  // Cancel payment flow (Video 00:54 - 01:01 & 02:23 - 02:27)
+  // Manual status check ("I have completed payment" button)
+  const handleManualCheckStatus = async () => {
+    if (!currentOrderId) return;
+    setIsCheckingManualStatus(true);
+    setStatusMessage(null);
+
+    try {
+      const check = await checkRazorpayOrderStatus(currentOrderId);
+      setIsCheckingManualStatus(false);
+
+      if (check.status === 'PAID' && check.verified) {
+        setCurrentStep('confirming');
+        await handlePaymentSuccess(
+          check.paymentId || `pay_rzp_${Date.now()}`,
+          currentOrderId,
+          'verified_by_manual_check',
+          selectedMethodName
+        );
+      } else {
+        setStatusMessage(
+          `We have not received payment confirmation from your bank or ${selectedMethodName} yet. Please complete the transaction in your app, or wait a few seconds.`
+        );
+      }
+    } catch (err) {
+      setIsCheckingManualStatus(false);
+      setStatusMessage('Network check timed out. Please verify your payment in your bank/UPI app.');
+    }
+  };
+
+  // Cancel payment flow:
+  // User confirms cancellation -> marks failed, dispatches failure email, shows retry sheet
   const handleConfirmCancel = () => {
     setCurrentStep('cancelling_loader');
+    const cancelReason = 'Your payment was cancelled. Try again or complete the payment later.';
+    setRetryReason(cancelReason);
+    dispatchPaymentFailureEmail(cancelReason);
+
     setTimeout(() => {
-      setRetryReason('Your payment has been cancelled. Try again or complete the payment later.');
       setCurrentStep('retry_sheet');
-    }, 1200);
+    }, 1100);
   };
 
   // Custom UPI ID submission
@@ -399,7 +631,7 @@ export default function RazorpayModal({
             style={{ maxHeight: '92vh' }}
           >
             {/* ============================================================== */}
-            {/* VIEW 1: THE SLEEK CHECKOUT SHEET (Video 00:17 - 00:25)         */}
+            {/* VIEW 1: THE SLEEK CHECKOUT SHEET (Name, Email, Phone, Pay)     */}
             {/* ============================================================== */}
             {currentStep === 'checkout' && (
               <div className="p-6 sm:p-7 space-y-5">
@@ -424,7 +656,7 @@ export default function RazorpayModal({
                 </div>
 
                 {/* Form fields: name, email, mobile */}
-                <form onSubmit={handleCheckoutSubmit} className="space-y-4 pt-1">
+                <form onSubmit={handlePayViaRazorpaySDK} className="space-y-4 pt-1">
                   <div>
                     <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
                       name
@@ -512,8 +744,8 @@ export default function RazorpayModal({
                     )}
                   </div>
 
-                  {/* Big Maroon Pay Button */}
-                  <div className="pt-2">
+                  {/* Primary Pay Button: Launches Official Razorpay Checkout Modal */}
+                  <div className="pt-2 space-y-2">
                     <button
                       type="submit"
                       disabled={isProcessingCheckout}
@@ -528,10 +760,31 @@ export default function RazorpayModal({
                         <span>pay ₹{finalAmount.toLocaleString()}</span>
                       )}
                     </button>
+
+                    {/* Secondary Option: Directly Choose Specific Methods */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!name.trim()) {
+                          alert('Please enter your name');
+                          return;
+                        }
+                        if (!email.trim()) {
+                          alert('Please enter your email address');
+                          return;
+                        }
+                        ensureServerOrder().catch(() => {});
+                        setCurrentStep('all_options');
+                      }}
+                      className="w-full py-2.5 text-xs text-[#b89f9a] hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>or choose payment method (UPI, Cards, Netbanking, EMI, Wallets)</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
                   {/* Trust Footer */}
-                  <div className="text-center pt-2 space-y-1">
+                  <div className="text-center pt-1 space-y-1">
                     <p className="text-[11px] text-[#8e817e] font-sans flex items-center justify-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#a89995] inline" />
                       <span>secured by Razorpay • link in your email • 7-day money-back</span>
@@ -551,7 +804,7 @@ export default function RazorpayModal({
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 2: OFFICIAL RAZORPAY STANDARD SHEET (Video 00:26 - 00:38) */}
+            {/* VIEW 2: OFFICIAL RAZORPAY STANDARD SHEET                       */}
             {/* ============================================================== */}
             {currentStep === 'razorpay_main' && (
               <div className="flex flex-col h-full bg-[#1b1716]">
@@ -570,6 +823,7 @@ export default function RazorpayModal({
                       type="button"
                       onClick={() => setCurrentStep('all_options')}
                       className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                      title="All Payment Options"
                     >
                       <MoreHorizontal className="w-5 h-5" />
                     </button>
@@ -577,14 +831,15 @@ export default function RazorpayModal({
                       type="button"
                       onClick={onClose}
                       className="p-1.5 text-[#9e8f8b] hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                      title="Close"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Quick PhonePe Option Card */}
-                <div className="p-5 sm:p-6 space-y-4">
+                {/* Quick PhonePe & Google Pay Cards */}
+                <div className="p-5 sm:p-6 space-y-3">
                   <div className="bg-[#241e1c] border border-[#382d2b] rounded-2xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#5f259f]/20 border border-[#5f259f]/40 flex items-center justify-center text-[#c084fc] font-bold text-sm">
@@ -605,8 +860,35 @@ export default function RazorpayModal({
                     </button>
                   </div>
 
+                  <div className="bg-[#241e1c] border border-[#382d2b] rounded-2xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-bold text-sm">
+                        G
+                      </div>
+                      <div>
+                        <span className="text-sm font-bold text-white block">Google Pay</span>
+                        <span className="text-[10px] text-[#8e817e] block">Instant Bank UPI</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleInitiateMethodPay('Google Pay', 'gpay')}
+                      className="px-5 py-2.5 bg-white text-black font-extrabold text-xs uppercase tracking-wider rounded-xl hover:bg-stone-200 transition-colors cursor-pointer shadow-md"
+                    >
+                      Pay
+                    </button>
+                  </div>
+
                   {/* More Options Link */}
-                  <div className="flex justify-end">
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      type="button"
+                      onClick={handlePayViaRazorpaySDK}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline flex items-center gap-1"
+                    >
+                      <span>Open Razorpay Standard Modal</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setCurrentStep('all_options')}
@@ -629,54 +911,92 @@ export default function RazorpayModal({
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 3: 3D SPINNING COIN SCREEN (Video 00:39 - 00:46)           */}
+            {/* VIEW 3: WAITING FOR PAYMENT & ACTIVE COUNTDOWN TIMER           */}
             {/* ============================================================== */}
             {currentStep === 'processing' && (
-              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
-                <div className="space-y-1.5">
+              <div className="p-6 sm:p-8 text-center flex flex-col items-center justify-center min-h-[400px] space-y-5 bg-[#1b1716]">
+                <div className="space-y-1">
                   <h3 className="text-xl font-bold font-serif text-white tracking-tight">
-                    Processing your payment
+                    Waiting for payment confirmation
                   </h3>
-                  <p className="text-xs text-[#9e8f8b] font-sans">
-                    This will only take a few seconds.
+                  <p className="text-xs text-[#9e8f8b] font-sans max-w-xs mx-auto">
+                    Please approve the payment of <strong className="text-white">₹{finalAmount.toLocaleString()}</strong> in your <strong className="text-[#38BDF8]">{selectedMethodName}</strong> app.
                   </p>
                 </div>
 
+                {/* Active Countdown Timer Badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#2a2220] border border-[#4a3a37] rounded-full text-xs font-mono text-[#fcd34d] shadow-inner">
+                  <Clock className="w-3.5 h-3.5 text-[#f59e0b] animate-pulse" />
+                  <span>Payment Window: <strong className="text-white text-sm">{formatTimer(waitingSeconds)}</strong></span>
+                </div>
+
                 {/* 3D Animated Spinning Golden Coin */}
-                <div className="py-4 perspective-1000">
+                <div className="py-2 perspective-1000">
                   <motion.div
                     animate={{ rotateY: [0, 180, 360] }}
-                    transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-                    className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#d97706] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
+                    transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }}
+                    className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#d97706] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
                     style={{ transformStyle: 'preserve-3d' }}
                   >
-                    <div className="text-center font-serif font-black text-2xl text-[#78350f]">
+                    <div className="text-center font-serif font-black text-xl text-[#78350f]">
                       ₹
                     </div>
                   </motion.div>
                 </div>
 
-                {/* Cancel Button */}
-                <div className="w-full pt-2">
+                {/* Manual status verification feedback */}
+                {statusMessage && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 text-left max-w-sm">
+                    {statusMessage}
+                  </div>
+                )}
+
+                {/* Action Buttons: Check Status, Cancel, Change Option */}
+                <div className="w-full space-y-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep('cancel_confirm')}
-                    className="w-full py-3.5 bg-[#2c2422] hover:bg-[#382f2c] text-[#a89c99] hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                    onClick={handleManualCheckStatus}
+                    disabled={isCheckingManualStatus}
+                    className="w-full py-3 bg-[#22c55e] hover:bg-[#16a34a] text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
                   >
-                    Cancel
+                    {isCheckingManualStatus ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                        <span>Checking with bank...</span>
+                      </>
+                    ) : (
+                      <span>I have completed payment</span>
+                    )}
                   </button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('cancel_confirm')}
+                      className="py-3 bg-[#2c2422] hover:bg-[#382f2c] text-[#f87171] hover:text-red-300 text-xs font-bold rounded-xl transition-colors cursor-pointer border border-[#3d2e2c]"
+                    >
+                      Cancel Payment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('all_options')}
+                      className="py-3 bg-[#2c2422] hover:bg-[#382f2c] text-[#a89c99] hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer border border-[#3d2e2c]"
+                    >
+                      Other Methods
+                    </button>
+                  </div>
                 </div>
 
-                <div className="pt-2 text-center">
-                  <span className="text-[11px] text-[#6d6260]">
-                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                <div className="pt-1 text-center">
+                  <span className="text-[10px] text-[#6d6260]">
+                    Do not refresh this page. Verified securely by <strong className="text-blue-400">Razorpay</strong>.
                   </span>
                 </div>
               </div>
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 4: CANCEL PAYMENT DIALOG (Video 00:47 - 00:56)             */}
+            {/* VIEW 4: CANCEL PAYMENT DIALOG ("Cancel or Wait options")       */}
             {/* ============================================================== */}
             {currentStep === 'cancel_confirm' && (
               <div className="p-6 sm:p-7 text-center space-y-5 bg-[#221c1a]">
@@ -695,14 +1015,14 @@ export default function RazorpayModal({
                   <button
                     type="button"
                     onClick={() => setCurrentStep('processing')}
-                    className="w-full py-3.5 bg-[#3a302e] hover:bg-[#483d3a] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                    className="w-full py-3.5 bg-[#3a302e] hover:bg-[#483d3a] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-md"
                   >
                     No, wait
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirmCancel}
-                    className="w-full py-3.5 bg-[#261f1d] hover:bg-[#302725] text-[#9e8f8b] hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                    className="w-full py-3.5 bg-[#261f1d] hover:bg-[#302725] text-[#9e8f8b] hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer border border-[#3a2d2a]"
                   >
                     Yes, Cancel
                   </button>
@@ -711,7 +1031,7 @@ export default function RazorpayModal({
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 5: CANCELLING LOADER (Video 02:23 - 02:26)                 */}
+            {/* VIEW 5: CANCELLING LOADER                                      */}
             {/* ============================================================== */}
             {currentStep === 'cancelling_loader' && (
               <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
@@ -728,9 +1048,9 @@ export default function RazorpayModal({
                   <motion.div
                     animate={{ rotateY: [0, 180, 360] }}
                     transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-                    className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#d97706] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
+                    className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#d97706] via-[#fcd34d] to-[#b45309] shadow-2xl flex items-center justify-center border-4 border-[#fef08a] relative"
                   >
-                    <div className="text-center font-serif font-black text-2xl text-[#78350f]">
+                    <div className="text-center font-serif font-black text-xl text-[#78350f]">
                       ₹
                     </div>
                   </motion.div>
@@ -745,7 +1065,7 @@ export default function RazorpayModal({
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 6: RETRY PAYMENT DIALOG (Video 01:01 - 01:12)              */}
+            {/* VIEW 6: RETRY PAYMENT DIALOG ("Payment could not be completed")*/}
             {/* ============================================================== */}
             {currentStep === 'retry_sheet' && (
               <div className="p-6 sm:p-7 space-y-5 bg-[#1f1918]">
@@ -754,14 +1074,15 @@ export default function RazorpayModal({
                     type="button"
                     onClick={onClose}
                     className="p-1 text-[#9e8f8b] hover:text-white rounded-lg cursor-pointer"
+                    title="Close"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
                 <div className="text-center space-y-2 -mt-4">
-                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto text-[#e2d8d5]">
-                    <AlertTriangle className="w-6 h-6 text-[#f59e0b]" />
+                  <div className="w-12 h-12 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-400">
+                    <AlertTriangle className="w-6 h-6 text-[#ef4444]" />
                   </div>
                   <h4 className="text-lg font-bold text-white">Payment could not be completed</h4>
                   <p className="text-xs text-[#a89c99] max-w-sm mx-auto leading-relaxed">
@@ -809,10 +1130,10 @@ export default function RazorpayModal({
                       className="w-full p-3.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-stone-700 text-white font-bold text-xs flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-lg bg-stone-700 text-stone-200 font-bold text-xs flex items-center justify-center">
                           CR
                         </div>
-                        <span className="text-xs font-semibold text-white">UPI - CRED UPI</span>
+                        <span className="text-xs font-semibold text-white">CRED UPI</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-[#8f827f]" />
                     </button>
@@ -820,36 +1141,36 @@ export default function RazorpayModal({
                     <button
                       type="button"
                       onClick={() => setCurrentStep('all_options')}
-                      className="w-full p-3.5 bg-[#241d1b] hover:bg-[#332826] border border-white/5 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer"
+                      className="w-full py-3 bg-[#3a302e] hover:bg-[#483d3a] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer text-center block"
                     >
-                      <div className="flex items-center gap-3">
-                        <MoreHorizontal className="w-5 h-5 text-[#f59e0b]" />
-                        <span className="text-xs font-bold text-[#f59e0b]">Show All Options</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-[#f59e0b]" />
+                      Show All Options
                     </button>
                   </div>
                 </div>
 
                 <div className="pt-2 text-center">
-                  <span className="text-[11px] text-[#6d6260]">
-                    Secured by <strong className="text-blue-400">Razorpay</strong>
-                  </span>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="text-xs text-[#a89c99] hover:text-white underline cursor-pointer"
+                  >
+                    Quit & complete payment later
+                  </button>
                 </div>
               </div>
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 7: ALL PAYMENT OPTIONS ACCORDION (Video 01:13 - 01:32)     */}
+            {/* VIEW 7: ALL PAYMENT OPTIONS (UPI, Cards, EMI, Netbanking, etc.)*/}
             {/* ============================================================== */}
             {currentStep === 'all_options' && (
               <div className="flex flex-col h-full bg-[#1b1716] overflow-y-auto">
-                {/* Top Bar with back arrow */}
-                <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514] sticky top-0 z-10">
+                {/* Header with back */}
+                <div className="p-4 sm:p-5 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => setCurrentStep('razorpay_main')}
+                      onClick={() => setCurrentStep('checkout')}
                       className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
                     >
                       <ArrowLeft className="w-5 h-5" />
@@ -891,7 +1212,7 @@ export default function RazorpayModal({
                         <Smartphone className="w-4 h-4 text-emerald-400" />
                         <div>
                           <span className="text-xs font-bold text-white block">UPI</span>
-                          <span className="text-[10px] text-emerald-400 font-bold block">3 Offers</span>
+                          <span className="text-[10px] text-emerald-400 font-bold block">PhonePe, GPay, Paytm, FamPay, CRED</span>
                         </div>
                       </div>
                       <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'upi' ? 'rotate-180' : ''}`} />
@@ -911,23 +1232,6 @@ export default function RazorpayModal({
                         >
                           <div className="w-6 h-6 rounded-md bg-blue-500/20 text-blue-400 font-bold text-xs flex items-center justify-center">G</div>
                           <span className="text-xs font-medium text-white">Google Pay</span>
-                        </button>
-
-                        {/* Tata Neu UPI */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedOptionInAll('Tata Neu UPI');
-                            setAllOptionsError(null);
-                            handleInitiateMethodPay('Tata Neu UPI');
-                          }}
-                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <div className="w-6 h-6 rounded-md bg-purple-500/20 text-purple-400 font-bold text-xs flex items-center justify-center">TN</div>
-                          <div className="min-w-0">
-                            <span className="text-xs font-medium text-white block truncate">Tata Neu UPI</span>
-                            <span className="text-[9px] text-amber-400 block truncate">Upto 5% NeuC...</span>
-                          </div>
                         </button>
 
                         {/* PhonePe */}
@@ -986,7 +1290,21 @@ export default function RazorpayModal({
                           <span className="text-xs font-medium text-white">CRED UPI</span>
                         </button>
 
-                        {/* Apps & UPI ID */}
+                        {/* Tata Neu UPI */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOptionInAll('Tata Neu UPI');
+                            setAllOptionsError(null);
+                            handleInitiateMethodPay('Tata Neu UPI');
+                          }}
+                          className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-purple-500/20 text-purple-400 font-bold text-xs flex items-center justify-center">TN</div>
+                          <span className="text-xs font-medium text-white truncate">Tata Neu UPI</span>
+                        </button>
+
+                        {/* Apps & UPI ID / Scan QR */}
                         <button
                           type="button"
                           onClick={() => {
@@ -997,7 +1315,7 @@ export default function RazorpayModal({
                           className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2.5 cursor-pointer col-span-2"
                         >
                           <QrCode className="w-5 h-5 text-amber-400" />
-                          <span className="text-xs font-medium text-white">Apps & UPI ID / Scan QR</span>
+                          <span className="text-xs font-medium text-white">Enter Custom UPI ID / Scan QR</span>
                         </button>
                       </div>
                     )}
@@ -1058,7 +1376,7 @@ export default function RazorpayModal({
                         <Building2 className="w-4 h-4 text-purple-400" />
                         <div>
                           <span className="text-xs font-bold text-white block">Netbanking</span>
-                          <span className="text-[10px] text-[#8a7c79] block">SBI, HDFC, ICICI, Axis & 50+ Banks</span>
+                          <span className="text-[10px] text-[#8a7c79] block">SBI, HDFC, ICICI, Axis, BOB</span>
                         </div>
                       </div>
                       <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'netbanking' ? 'rotate-180' : ''}`} />
@@ -1066,34 +1384,18 @@ export default function RazorpayModal({
 
                     {expandedSection === 'netbanking' && (
                       <div className="p-4 pt-1 grid grid-cols-2 gap-2 border-t border-[#2e2523]">
-                        {[
-                          { name: 'SBI', issues: false },
-                          { name: 'HDFC', issues: false },
-                          { name: 'ICICI', issues: true },
-                          { name: 'Axis', issues: false },
-                          { name: 'BOB', issues: false },
-                          { name: 'More Banks', issues: false },
-                        ].map((bank) => (
+                        {['SBI', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Bank of Baroda', 'Kotak Bank'].map((bank) => (
                           <button
-                            key={bank.name}
+                            key={bank}
                             type="button"
                             onClick={() => {
-                              setSelectedBankName(bank.name);
-                              setSelectedOptionInAll(`Netbanking - ${bank.name}`);
-                              setAllOptionsError(null);
-                              setCurrentStep('netbanking_redirect');
+                              setSelectedBankName(bank);
+                              handleInitiateMethodPay(`Net Banking (${bank})`);
                             }}
-                            className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2 cursor-pointer"
+                            className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center justify-between cursor-pointer"
                           >
-                            <div className="w-6 h-6 rounded-md bg-blue-600/20 text-blue-400 font-bold text-xs flex items-center justify-center shrink-0">
-                              {bank.name[0]}
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-xs font-medium text-white truncate block">{bank.name}</span>
-                              {bank.issues && (
-                                <span className="text-[9px] text-amber-400 block truncate font-mono">Facing issues</span>
-                              )}
-                            </div>
+                            <span className="text-xs font-medium text-white">{bank}</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#8a7c79]" />
                           </button>
                         ))}
                       </div>
@@ -1110,8 +1412,8 @@ export default function RazorpayModal({
                       <div className="flex items-center gap-2.5">
                         <Wallet className="w-4 h-4 text-rose-400" />
                         <div>
-                          <span className="text-xs font-bold text-white block">Wallet</span>
-                          <span className="text-[10px] text-[#8a7c79] block">Mobikwik, Airtel Payments, Ola Money, PayZapp</span>
+                          <span className="text-xs font-bold text-white block">Wallets</span>
+                          <span className="text-[10px] text-[#8a7c79] block">Mobikwik, Airtel Money, Ola Money</span>
                         </div>
                       </div>
                       <ChevronDown className={`w-4 h-4 text-[#8a7c79] transition-transform ${expandedSection === 'wallet' ? 'rotate-180' : ''}`} />
@@ -1119,67 +1421,30 @@ export default function RazorpayModal({
 
                     {expandedSection === 'wallet' && (
                       <div className="p-4 pt-1 grid grid-cols-2 gap-2 border-t border-[#2e2523]">
-                        {['Mobikwik', 'Airtel Payments', 'Ola Money', 'PayZapp'].map((w) => (
+                        {['Mobikwik', 'Airtel Money', 'Ola Money', 'PayZapp', 'Amazon Pay'].map((wallet) => (
                           <button
-                            key={w}
+                            key={wallet}
                             type="button"
-                            onClick={() => {
-                              setSelectedOptionInAll(`Wallet - ${w}`);
-                              setAllOptionsError(null);
-                              handleInitiateMethodPay(`Wallet - ${w}`);
-                            }}
-                            className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center gap-2 cursor-pointer"
+                            onClick={() => handleInitiateMethodPay(`Wallet (${wallet})`)}
+                            className="p-3 bg-[#2a2220] hover:bg-[#382e2c] border border-white/5 rounded-xl text-left transition-colors flex items-center justify-between cursor-pointer"
                           >
-                            <div className="w-6 h-6 rounded-md bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center justify-center">
-                              {w[0]}
-                            </div>
-                            <span className="text-xs font-medium text-white truncate">{w}</span>
+                            <span className="text-xs font-medium text-white">{wallet}</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#8a7c79]" />
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
                 </div>
-
-                {/* Validation error notice if continue clicked without choice */}
-                {allOptionsError && (
-                  <div className="px-4 pb-2">
-                    <p className="text-xs text-rose-400 font-mono flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{allOptionsError}</span>
-                    </p>
-                  </div>
-                )}
-
-                {/* Bottom Continue Sticky Bar */}
-                <div className="mt-auto p-4 border-t border-[#2e2624] flex items-center justify-between bg-[#191514] sticky bottom-0">
-                  <div>
-                    <span className="text-lg font-bold text-white block">₹{finalAmount.toLocaleString()}</span>
-                    <span className="text-[10px] text-[#8a7c79] block">View Details</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedOptionInAll) {
-                        setAllOptionsError('Please select one of these options.');
-                        return;
-                      }
-                      handleInitiateMethodPay(selectedOptionInAll);
-                    }}
-                    className="px-6 py-3 bg-[#382d2b] hover:bg-[#483b38] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
-                  >
-                    Continue
-                  </button>
-                </div>
               </div>
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 8: CARD INPUT (Video 01:47 - 02:02)                       */}
+            {/* VIEW 8: CARD INPUT FORM                                        */}
             {/* ============================================================== */}
             {currentStep === 'card_input' && (
-              <div className="flex flex-col h-full bg-[#1b1716]">
-                <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
+              <div className="p-6 space-y-5 bg-[#1b1716]">
+                <div className="flex items-center justify-between border-b border-[#2e2624] pb-4">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -1188,70 +1453,87 @@ export default function RazorpayModal({
                     >
                       <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <h4 className="text-base font-bold text-white">Card</h4>
+                    <h4 className="text-base font-bold text-white">Pay via Card</h4>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setCurrentStep('cancel_confirm')}
+                    onClick={onClose}
                     className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                <form onSubmit={handleCardSubmit} className="p-5 sm:p-6 space-y-4">
-                  <span className="text-xs font-bold text-white block">Add a new card</span>
-
+                <form onSubmit={handleCardSubmit} className="space-y-4">
                   <div>
-                    <input
-                      type="text"
-                      required
-                      value={cardNumber}
-                      onChange={handleCardNumberChange}
-                      placeholder="Card Number"
-                      className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono placeholder:text-[#6a5e5c]"
-                    />
+                    <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
+                      Card Number
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        value={cardNumber}
+                        onChange={handleCardNumberChange}
+                        placeholder="1234 5678 9012 3456"
+                        className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono"
+                      />
+                      <CreditCard className="w-4 h-4 text-[#8a7c79] absolute right-3.5 top-4" />
+                    </div>
                     {cardError && (
-                      <p className="text-[11px] text-rose-400 mt-1 font-mono">{cardError}</p>
+                      <p className="text-[11px] text-rose-400 font-mono mt-1">{cardError}</p>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      required
-                      value={cardExpiry}
-                      onChange={handleExpiryChange}
-                      placeholder="MM / YY"
-                      className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono placeholder:text-[#6a5e5c]"
-                    />
-                    <input
-                      type="password"
-                      required
-                      maxLength={4}
-                      value={cardCvv}
-                      onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
-                      placeholder="CVV"
-                      className="w-full bg-[#27201f] border border-[#3d3230] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono placeholder:text-[#6a5e5c]"
-                    />
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
+                        Valid Thru (MM/YY)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={cardExpiry}
+                        onChange={handleExpiryChange}
+                        placeholder="MM/YY"
+                        className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#9e8f8b] mb-1.5 uppercase tracking-wider">
+                        CVV
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        maxLength={4}
+                        value={cardCvv}
+                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder="•••"
+                        className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none font-mono text-center"
+                      />
+                    </div>
                   </div>
 
-                  <label className="flex items-center gap-2.5 text-xs text-[#a89c99] cursor-pointer pt-1">
+                  <div className="flex items-start gap-2 pt-1">
                     <input
                       type="checkbox"
+                      id="save-card-rbi"
                       checked={saveCardRbi}
                       onChange={(e) => setSaveCardRbi(e.target.checked)}
-                      className="rounded accent-stone-600 w-4 h-4 cursor-pointer"
+                      className="mt-1 accent-[#521714]"
                     />
-                    <span>Save this card as per RBI guidelines</span>
-                  </label>
+                    <label htmlFor="save-card-rbi" className="text-xs text-[#9e8f8b] cursor-pointer">
+                      Save this card as per RBI guidelines for faster future checkout
+                    </label>
+                  </div>
 
-                  <div className="pt-4">
+                  <div className="pt-2">
                     <button
                       type="submit"
-                      className="w-full py-4 bg-[#382d2b] hover:bg-[#483b38] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                      className="w-full py-4 rounded-xl bg-[#521714] hover:bg-[#681e1a] text-[#ffded9] font-bold text-sm tracking-wide transition-all shadow-lg cursor-pointer"
                     >
-                      Continue
+                      Pay ₹{finalAmount.toLocaleString()}
                     </button>
                   </div>
                 </form>
@@ -1259,11 +1541,11 @@ export default function RazorpayModal({
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 9: EMI PLANS (Video 01:36 - 01:40)                        */}
+            {/* VIEW 9: EMI PLANS BREAKDOWN                                    */}
             {/* ============================================================== */}
             {currentStep === 'emi_plans' && (
-              <div className="flex flex-col h-full bg-[#1b1716]">
-                <div className="p-4 border-b border-[#2e2624] flex items-center justify-between bg-[#191514]">
+              <div className="p-6 space-y-4 bg-[#1b1716] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-[#2e2624] pb-4">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -1272,231 +1554,214 @@ export default function RazorpayModal({
                     >
                       <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <h4 className="text-base font-bold text-white">EMI Plans</h4>
+                    <h4 className="text-base font-bold text-white">Credit Card EMI Plans</h4>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setCurrentStep('cancel_confirm')}
+                    onClick={onClose}
                     className="p-1 text-[#9e8f8b] hover:text-white cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="p-5 sm:p-6 space-y-4">
-                  <span className="text-xs font-bold text-white block">Credit Card EMI</span>
-
-                  <div 
-                    onClick={() => handleInitiateMethodPay('RBL Bank Credit Card EMI')}
-                    className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-white">RBL Bank</span>
-                      <span className="text-xs text-amber-400 font-mono">₹{(finalAmount / 9).toFixed(2)} x 9 month</span>
+                <div className="space-y-2.5">
+                  {[
+                    { bank: 'HDFC Bank', months: 3, monthly: Math.round(finalAmount / 3 * 1.04), rate: '14%' },
+                    { bank: 'ICICI Bank', months: 6, monthly: Math.round(finalAmount / 6 * 1.07), rate: '15%' },
+                    { bank: 'RBL Bank', months: 9, monthly: Math.round(finalAmount / 9 * 1.09), rate: '16%' },
+                    { bank: 'Axis Bank', months: 12, monthly: Math.round(finalAmount / 12 * 1.12), rate: '16%' },
+                  ].map((plan, i) => (
+                    <div
+                      key={i}
+                      className="p-4 bg-[#241e1c] border border-[#382d2b] rounded-xl flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="text-xs font-bold text-white block">{plan.bank}</span>
+                        <span className="text-[11px] text-[#a89c99] block mt-0.5">
+                          ₹{plan.monthly} x {plan.months} months @ {plan.rate} p.a.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleInitiateMethodPay(`EMI (${plan.bank} ${plan.months}M)`)}
+                        className="px-4 py-2 bg-white text-black text-xs font-bold rounded-lg cursor-pointer hover:bg-stone-200"
+                      >
+                        Select
+                      </button>
                     </div>
-                    <p className="text-[11px] text-[#8a7c79]">
-                      Total interest ₹{(finalAmount * 0.07).toFixed(2)} @ 17% p.a.
-                    </p>
-                  </div>
-
-                  <div 
-                    onClick={() => handleInitiateMethodPay('HDFC Bank Credit Card EMI')}
-                    className="bg-[#241e1c] hover:bg-[#302624] border border-[#382d2b] rounded-2xl p-4 space-y-2 cursor-pointer transition-colors"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-white">HDFC Bank</span>
-                      <span className="text-xs text-amber-400 font-mono">₹{(finalAmount / 6).toFixed(2)} x 6 month</span>
-                    </div>
-                    <p className="text-[11px] text-[#8a7c79]">
-                      Total interest ₹{(finalAmount * 0.05).toFixed(2)} @ 15% p.a.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleInitiateMethodPay('RBL Bank Credit Card EMI')}
-                    className="w-full py-4 bg-[#382d2b] hover:bg-[#483b38] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer mt-4"
-                  >
-                    Continue
-                  </button>
+                  ))}
                 </div>
               </div>
             )}
 
             {/* ============================================================== */}
-            {/* VIEW 10: NETBANKING REDIRECT (Video 02:16 - 02:22)             */}
-            {/* ============================================================== */}
-            {currentStep === 'netbanking_redirect' && (
-              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-5 bg-[#1b1716]">
-                <div className="w-14 h-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-blue-400 font-bold text-lg">
-                  {selectedBankName[0]}
-                </div>
-
-                <div className="space-y-1">
-                  <h4 className="text-lg font-bold text-white">Loading bank page...</h4>
-                  <p className="text-xs text-[#a89c99] max-w-xs mx-auto leading-relaxed">
-                    Please wait while we redirect you to your bank page ({selectedBankName}).
-                  </p>
-                </div>
-
-                <RefreshCw className="w-7 h-7 text-amber-400 animate-spin my-2" />
-
-                <div className="pt-2 text-center">
-                  <span className="text-[11px] text-[#6d6260]">
-                    Secured by <strong className="text-blue-400">Razorpay</strong>
-                  </span>
-                </div>
-
-                <div className="pt-2 w-full space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => handleInitiateMethodPay(`Netbanking (${selectedBankName})`)}
-                    className="w-full py-3 bg-[#382d2b] hover:bg-[#483b38] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-                  >
-                    Authorize Payment (₹{finalAmount.toLocaleString()})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep('all_options')}
-                    className="w-full py-2 bg-transparent text-[#8a7c79] hover:text-white text-xs cursor-pointer"
-                  >
-                    Cancel and go back
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ============================================================== */}
-            {/* VIEW 11: CONFIRMING PAYMENT (Video 00:57 - 01:00)              */}
+            {/* VIEW 10: CONFIRMING PAYMENT (GREEN COIN)                       */}
             {/* ============================================================== */}
             {currentStep === 'confirming' && (
-              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6">
+              <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center min-h-[360px] space-y-6 bg-[#1b1716]">
                 <div className="space-y-1.5">
                   <h3 className="text-xl font-bold font-serif text-white tracking-tight">
-                    Confirming Payment
+                    Confirming Payment...
                   </h3>
                   <p className="text-xs text-[#9e8f8b] font-sans">
-                    This will only take a few seconds.
+                    Finalizing your transaction and generating your access pass.
                   </p>
                 </div>
 
                 <div className="py-4 perspective-1000">
                   <motion.div
                     animate={{ rotateY: [0, 180, 360] }}
-                    transition={{ repeat: Infinity, duration: 1.0, ease: 'linear' }}
+                    transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
                     className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#059669] via-[#34d399] to-[#047857] shadow-2xl flex items-center justify-center border-4 border-[#a7f3d0] relative"
                   >
-                    <Check className="w-10 h-10 text-emerald-950 font-black stroke-[3]" />
+                    <Check className="w-10 h-10 text-white stroke-[3]" />
                   </motion.div>
                 </div>
 
                 <div className="pt-2 text-center">
-                  <span className="text-[11px] text-[#6d6260]">
-                    Secured by <strong className="text-blue-400">Razorpay</strong>
+                  <span className="text-[11px] text-emerald-400 font-mono">
+                    ✓ Transaction Confirmed & Verified
                   </span>
                 </div>
               </div>
             )}
 
-            {/* QR Code Scan Modal */}
-            <AnimatePresence>
-              {showQrModal && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="absolute inset-0 z-30 bg-[#161211]/95 backdrop-blur-md p-6 flex flex-col justify-between items-center text-center"
-                >
-                  <div className="w-full flex justify-between items-center pb-2 border-b border-[#2e2624]">
-                    <h4 className="text-sm font-bold text-white">Scan UPI QR Code</h4>
-                    <button
-                      type="button"
-                      onClick={() => setShowQrModal(false)}
-                      className="p-1 text-[#9e8f8b] hover:text-white rounded-lg cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
+            {/* ============================================================== */}
+            {/* CUSTOM UPI ID & QR MODAL OVERLAY                               */}
+            {/* ============================================================== */}
+            {showQrModal && (
+              <div className="absolute inset-0 bg-[#161211]/95 backdrop-blur-md z-30 p-6 flex flex-col justify-between overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-[#302725] pb-3">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-amber-400" />
+                    <span>Scan UPI QR or Enter UPI ID</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowQrModal(false)}
+                    className="p-1 text-[#8f827f] hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="py-4 space-y-4 text-center">
+                  {/* Enter VPA form */}
+                  <form onSubmit={handleCustomUpiSubmit} className="space-y-2 text-left">
+                    <label className="block text-[11px] font-mono text-[#9e8f8b] uppercase tracking-wider">
+                      Enter UPI ID / VPA
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customUpiId}
+                        onChange={(e) => setCustomUpiId(e.target.value)}
+                        placeholder="username@okhdfcbank"
+                        className="flex-1 bg-[#27201f] border border-[#3d3230] text-white text-xs rounded-xl px-3.5 py-3 outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-3 bg-[#521714] hover:bg-[#681e1a] text-white text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        Verify & Pay
+                      </button>
+                    </div>
+                    {upiIdError && (
+                      <p className="text-[11px] text-rose-400 font-mono">{upiIdError}</p>
+                    )}
+                  </form>
+
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[#332a28]" />
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-mono text-[#8a7c79]">
+                      <span className="bg-[#161211] px-2">Or Scan Dynamic QR</span>
+                    </div>
                   </div>
 
-                  <div className="my-auto space-y-4">
-                    <div className="p-3 bg-white rounded-2xl shadow-xl inline-block">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                          `upi://pay?pa=${activeMerchantVpa}&pn=${encodeURIComponent(merchantBankingName)}&am=${finalAmount}&cu=INR&tn=${encodeURIComponent(paymentDetails.purpose.slice(0, 20))}`
-                        )}`}
-                        alt="UPI Payment QR Code"
-                        className="w-44 h-44 rounded-lg block"
-                      />
-                    </div>
+                  {/* QR Code Container */}
+                  <div className="bg-white p-4 rounded-2xl w-48 h-48 mx-auto flex items-center justify-center shadow-lg">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                        `upi://pay?pa=${activeMerchantVpa}&pn=${encodeURIComponent(
+                          merchantBankingName
+                        )}&am=${finalAmount}&cu=INR&tn=${encodeURIComponent(paymentDetails.purpose)}`
+                      )}`}
+                      alt="UPI QR Code"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
 
-                    <div className="space-y-1">
-                      <p className="text-xs text-white font-bold">
-                        Scan with Google Pay, PhonePe, Paytm, FamPay, or CRED
-                      </p>
-                      <p className="text-[11px] text-[#8a7c79] font-mono">
-                        Payee: {merchantBankingName} ({activeMerchantVpa})
-                      </p>
-                    </div>
-
+                  <div className="space-y-1">
                     <div className="flex items-center justify-center gap-2">
+                      <span className="text-xs font-mono text-[#dcd1ce]">{activeMerchantVpa}</span>
                       <button
                         type="button"
                         onClick={handleCopyUpiId}
-                        className="px-3 py-1.5 bg-[#2a2220] hover:bg-[#382d2a] border border-[#3d3230] rounded-xl text-xs text-amber-300 font-mono flex items-center gap-1.5 cursor-pointer"
+                        className="p-1 hover:text-amber-400 text-[#8f827f] cursor-pointer"
+                        title="Copy UPI VPA"
                       >
-                        {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedUpi ? 'Copied UPI ID!' : activeMerchantVpa}</span>
+                        <Copy className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    {copiedUpi && (
+                      <span className="text-[10px] text-emerald-400 font-mono block">✓ UPI ID Copied!</span>
+                    )}
                   </div>
+                </div>
 
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setShowQrModal(false);
-                      handleInitiateMethodPay('QR Code UPI Scan');
+                      handleInitiateMethodPay('Dynamic UPI QR');
                     }}
-                    className="w-full py-3.5 bg-[#521714] hover:bg-[#681e1a] text-[#ffded9] font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                    className="w-full py-3 bg-[#22c55e] text-black font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer"
                   >
-                    I have Completed UPI Payment (₹{finalAmount.toLocaleString()})
+                    I Have Scanned & Paid ₹{finalAmount.toLocaleString()}
                   </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+              </div>
+            )}
 
-            {/* Terms Dialog Modal */}
-            <AnimatePresence>
-              {showTerms && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-20 bg-black/90 p-6 flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                      <h4 className="text-sm font-bold text-white">Payment Terms & Assurance</h4>
-                      <button onClick={() => setShowTerms(false)} className="text-stone-400 hover:text-white cursor-pointer">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="text-xs text-[#a89c99] space-y-2 leading-relaxed">
-                      <p>• Payments are securely processed through Razorpay's PCI-DSS Level 1 certified gateway.</p>
-                      <p>• Verified receipts and session access keys are immediately delivered to your registered email address.</p>
-                      <p>• 7-day money-back guarantee applies if deliverables do not match workshop specifications.</p>
-                      <p>• No card or banking credentials are ever stored on S-CODERS servers.</p>
-                    </div>
+            {/* TERMS MODAL */}
+            {showTerms && (
+              <div className="absolute inset-0 bg-[#161211]/95 backdrop-blur-md z-40 p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-[#302725] pb-3">
+                    <h4 className="text-sm font-bold text-white">Payment & Refund Terms</h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowTerms(false)}
+                      className="p-1 text-[#8f827f] hover:text-white"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowTerms(false)}
-                    className="w-full py-3 bg-stone-800 text-white font-bold text-xs rounded-xl cursor-pointer"
-                  >
-                    Close Terms
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <div className="py-4 space-y-3 text-xs text-[#a89c99] leading-relaxed">
+                    <p>
+                      <strong>1. Instant Access:</strong> Upon verified payment confirmation, access keys, tickets, and learning materials are delivered immediately.
+                    </p>
+                    <p>
+                      <strong>2. 7-Day Money-Back Policy:</strong> You are protected by our 7-day money-back satisfaction guarantee.
+                    </p>
+                    <p>
+                      <strong>3. Bank Security:</strong> All card payments and bank transactions are encrypted and tokenized according to RBI guidelines and PCI-DSS compliance.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(false)}
+                  className="w-full py-3 bg-[#2c2422] text-white text-xs font-bold rounded-xl"
+                >
+                  Close Terms
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}

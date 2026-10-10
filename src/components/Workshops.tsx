@@ -176,6 +176,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   // Leader photos state
   const [leaderPhotos, setLeaderPhotos] = useState<Record<string, string>>({
     shreyas: getLeaderPhoto('shreyas'),
+    lokesh: getLeaderPhoto('lokesh'),
     bhuvan: getLeaderPhoto('bhuvan')
   });
 
@@ -187,6 +188,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     const updatePhotos = () => {
       setLeaderPhotos({
         shreyas: getLeaderPhoto('shreyas'),
+        lokesh: getLeaderPhoto('lokesh'),
         bhuvan: getLeaderPhoto('bhuvan')
       });
     };
@@ -1325,7 +1327,7 @@ export default function TenantDashboard() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Host 1: Shreyas.M (Founder & CEO) */}
                       <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
                         <div className="space-y-3.5">
@@ -1334,8 +1336,12 @@ export default function TenantDashboard() {
                               <img 
                                 src={getLeaderPhoto('shreyas')} 
                                 alt="Shreyas.M" 
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
                                 referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const t = e.currentTarget as HTMLImageElement;
+                                  if (!t.src.endsWith('/founder.jpg')) t.src = '/founder.jpg';
+                                }}
                               />
                             </div>
                             <div>
@@ -1356,7 +1362,7 @@ export default function TenantDashboard() {
                         {/* Social Profiles: GitHub & LinkedIn */}
                         <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
                           <a
-                            href="https://github.com/shreyasshreyas40858-max/Chaturya"
+                            href="https://github.com/Shreyas-73"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -1376,7 +1382,61 @@ export default function TenantDashboard() {
                         </div>
                       </div>
 
-                      {/* Host 2: Bhuvan M (Tech Lead) */}
+                      {/* Host 2: Lokesh A. (Co-Founder) */}
+                      <div className="bg-[#181924]/90 border border-white/10 hover:border-purple-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
+                        <div className="space-y-3.5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-purple-500/60 shrink-0 bg-purple-500/10 shadow-lg shadow-purple-500/20">
+                              <img 
+                                src={getLeaderPhoto('lokesh')} 
+                                alt="Lokesh A." 
+                                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const t = e.currentTarget as HTMLImageElement;
+                                  if (!t.src.endsWith('/cofounder.jpg')) t.src = '/cofounder.jpg';
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-purple-400 transition-colors leading-tight">
+                                lokesh a.
+                              </h4>
+                              <span className="text-[11px] font-mono text-purple-400 uppercase font-bold tracking-wider block mt-0.5">
+                                CO-FOUNDER • VIBE CODING • AI LABS
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                            co-founder, s-coders (bharat tech developers). conducts interactive sessions on vibe coding, rapid full-stack prototyping, and creative AI prompt architectures.
+                          </p>
+                        </div>
+
+                        {/* Social Profiles: GitHub & LinkedIn */}
+                        <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+                          <a
+                            href="https://github.com/Lokesh132005"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                          >
+                            <Github className="w-3.5 h-3.5 text-white" />
+                            <span>GitHub</span>
+                          </a>
+                          <a
+                            href="https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                          >
+                            <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                            <span>LinkedIn</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Host 3: Bhuvan M (Tech Lead) */}
                       <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
                         <div className="space-y-3.5">
                           <div className="flex items-center gap-4">
@@ -1384,8 +1444,12 @@ export default function TenantDashboard() {
                               <img 
                                 src={getLeaderPhoto('bhuvan')} 
                                 alt="Bhuvan M" 
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
                                 referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const t = e.currentTarget as HTMLImageElement;
+                                  if (!t.src.endsWith('/techlead.jpg') && !t.src.endsWith('/bhuvan.jpg')) t.src = '/techlead.jpg';
+                                }}
                               />
                             </div>
                             <div>
@@ -1874,6 +1938,7 @@ export default function TenantDashboard() {
             setShowRazorpayModal(false);
             setIsProcessing(false);
             setPaymentError(reason || 'Payment incomplete or cancelled. No workshop pass was issued.');
+            handleSimulatePaymentFailure(reason || 'Payment cancelled or declined by user');
           }}
           onSuccess={handleRazorpayWorkshopSuccess}
           orderData={razorpayOrderData}

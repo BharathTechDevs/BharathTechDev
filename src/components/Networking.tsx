@@ -611,6 +611,10 @@ export default function Networking() {
                       alt={moment.title} 
                       className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700 ease-out" 
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800&h=500';
+                      }}
                     />
                     
                     {/* Floating Badges */}

@@ -102,6 +102,7 @@ export default function Team() {
           ...m,
           name: dbMatch.name || m.name,
           role: dbMatch.role || m.role,
+          photoUrl: dbMatch.photoUrl || m.photoUrl,
           bio: dbMatch.bio || m.bio,
           expertise: dbMatch.expertise || m.expertise,
           githubUrl: dbMatch.githubUrl || m.githubUrl,
@@ -282,16 +283,23 @@ export default function Team() {
               <div className="relative z-10">
                 {/* Photo & Interactive Hover Quick-Action Overlay */}
                 <div className="relative mb-6 group/photo">
-                  <div className="w-full aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-lg relative bg-black/40">
+                  <div className="w-full aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-lg relative bg-[#0d0e15] flex items-center justify-center">
                     <img
                       src={photos[member.id] || (photos as any)[member.id.toLowerCase()] || getLeaderPhoto(member.id as any) || member.photoUrl}
                       alt={member.name}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
+                      loading="eager"
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700 ease-out"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
-                        if (target.src !== member.photoUrl) {
-                          target.src = member.photoUrl;
+                        const fallbackMap: Record<string, string> = {
+                          shreyas: '/founder.jpg',
+                          lokesh: '/cofounder.jpg',
+                          bhuvan: '/techlead.jpg'
+                        };
+                        const standardFallback = fallbackMap[member.id.toLowerCase()] || member.photoUrl;
+                        if (!target.src.endsWith(standardFallback) && target.src !== standardFallback) {
+                          target.src = standardFallback;
                         }
                       }}
                     />

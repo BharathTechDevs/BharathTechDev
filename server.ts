@@ -1921,12 +1921,37 @@ async function startServer() {
     }
   });
 
+  // Helper to dynamically resolve the accurate live website URL for email links
+  const resolveAppUrl = (req: express.Request, fallbackPath: string = ""): string => {
+    const envUrl = process.env.APP_URL?.trim();
+    if (envUrl && envUrl.startsWith("http")) {
+      const base = envUrl.replace(/\/$/, "");
+      return `${base}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+    }
+    const origin = req.headers.origin;
+    if (origin && typeof origin === "string" && origin.startsWith("http")) {
+      const base = origin.replace(/\/$/, "");
+      return `${base}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+    }
+    const fwdHost = req.headers["x-forwarded-host"];
+    if (fwdHost && typeof fwdHost === "string") {
+      const proto = req.headers["x-forwarded-proto"] || "https";
+      return `${proto}://${fwdHost}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+    }
+    const host = req.headers.host;
+    if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+      return `https://${host}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+    }
+    return `http://${host || "localhost:3000"}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+  };
+
   // 1. Service Registration Accepted Email Endpoint
   app.post("/api/email/service-accepted", async (req, res) => {
     try {
       const { email, clientName, serviceTitle, uniqueKey, actionUrl } = req.body;
-      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
-      const targetUrl = actionUrl || `${origin}/?view=services&key=${uniqueKey || ''}`;
+      const targetUrl = actionUrl && actionUrl.startsWith("http")
+        ? actionUrl
+        : resolveAppUrl(req, `/?view=services&key=${uniqueKey || ""}`);
 
       const result = await sendEmailNotification({
         to: email || "client@example.com",
@@ -1954,8 +1979,9 @@ async function startServer() {
   app.post("/api/email/workshop-payment-verified", async (req, res) => {
     try {
       const { email, clientName, workshopTitle, amount, currency = "INR", uniqueKey, paymentId, actionUrl } = req.body;
-      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
-      const targetUrl = actionUrl || `${origin}/?view=workshops&key=${uniqueKey || ''}`;
+      const targetUrl = actionUrl && actionUrl.startsWith("http")
+        ? actionUrl
+        : resolveAppUrl(req, `/?view=workshops&key=${uniqueKey || ""}`);
 
       const result = await sendEmailNotification({
         to: email || "client@example.com",
@@ -1987,8 +2013,9 @@ async function startServer() {
   app.post("/api/email/workshop-payment-failed", async (req, res) => {
     try {
       const { email, clientName, workshopTitle, amount, currency = "INR", reason, actionUrl } = req.body;
-      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
-      const targetUrl = actionUrl || `${origin}/?view=workshops`;
+      const targetUrl = actionUrl && actionUrl.startsWith("http")
+        ? actionUrl
+        : resolveAppUrl(req, `/?view=workshops`);
 
       const result = await sendEmailNotification({
         to: email || "client@example.com",
@@ -2019,8 +2046,9 @@ async function startServer() {
   app.post("/api/email/event-payment-verified", async (req, res) => {
     try {
       const { email, clientName, eventTitle, amount, currency = "INR", ticketCode, paymentId, actionUrl } = req.body;
-      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
-      const targetUrl = actionUrl || `${origin}/?view=events&ticket=${ticketCode || ''}`;
+      const targetUrl = actionUrl && actionUrl.startsWith("http")
+        ? actionUrl
+        : resolveAppUrl(req, `/?view=events&ticket=${ticketCode || ""}`);
 
       const result = await sendEmailNotification({
         to: email || "client@example.com",
@@ -2052,8 +2080,9 @@ async function startServer() {
   app.post("/api/email/event-payment-failed", async (req, res) => {
     try {
       const { email, clientName, eventTitle, amount, currency = "INR", reason, actionUrl } = req.body;
-      const origin = req.headers.origin || `http://${req.headers.host || 'localhost:3000'}`;
-      const targetUrl = actionUrl || `${origin}/?view=events`;
+      const targetUrl = actionUrl && actionUrl.startsWith("http")
+        ? actionUrl
+        : resolveAppUrl(req, `/?view=events`);
 
       const result = await sendEmailNotification({
         to: email || "client@example.com",

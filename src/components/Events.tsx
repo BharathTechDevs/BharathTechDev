@@ -2362,6 +2362,19 @@ export default function Events() {
               type: 'FAILED',
               message: reason || 'Payment incomplete or cancelled. No ticket pass generated.'
             });
+            fetch('/api/email/event-payment-failed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: regEmail || 'attendee@scoders.com',
+                clientName: regName || 'Valued Attendee',
+                eventTitle: selectedEvent?.name || razorpayPaymentDetails?.purpose || 'S-CODERS Tech Summit',
+                amount: razorpayPaymentDetails?.amount || selectedEvent?.ticketPrice || 999,
+                currency: 'INR',
+                reason: reason || 'Payment was declined, interrupted, or cancelled by user.',
+                actionUrl: `${window.location.origin}/?view=events`
+              })
+            }).catch(e => console.warn('Event failure email dispatch error:', e));
           }}
           onSuccess={handleRazorpayEventSuccess}
           orderData={razorpayOrderData}
