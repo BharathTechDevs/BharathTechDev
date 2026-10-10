@@ -1795,11 +1795,13 @@ async function startServer() {
     }
   };
 
-  // Razorpay Create Order Endpoints (Standard & Legacy)
+  // Razorpay Create Order Endpoints (Standard & Direct Aliases)
+  app.post("/api/create-order", handleCreateOrder);
   app.post("/api/payments/create-order", handleCreateOrder);
   app.post("/api/razorpay/create-order", handleCreateOrder);
 
-  // Razorpay Verify Payment Endpoints (Standard & Legacy)
+  // Razorpay Verify Payment Endpoints (Standard & Direct Aliases)
+  app.post("/api/verify-payment", handleVerifyPayment);
   app.post("/api/payments/verify", handleVerifyPayment);
   app.post("/api/razorpay/verify-payment", handleVerifyPayment);
 
