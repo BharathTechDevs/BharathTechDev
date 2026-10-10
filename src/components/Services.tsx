@@ -3036,45 +3036,58 @@ export function ServiceProjectSpaceDashboard({
         </div>
         
         {/* Developer Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Shreyas.M */}
-          <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
-            <div className="space-y-3.5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
-                  <img 
-                    src={getLeaderPhoto('shreyas')} 
-                    alt="Shreyas.M" 
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const t = e.currentTarget as HTMLImageElement;
-                      if (!t.src.endsWith('/founder.jpg')) t.src = '/founder.jpg';
-                    }}
-                  />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Card 1: Shreyas M. */}
+          <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-[#f87171]/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-[#f87171]/10 flex flex-col justify-between overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#f87171] to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
+
+            <div className="space-y-4">
+              {/* Identity Header */}
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 border-[#f87171]/60 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
+                    <img 
+                      src={getLeaderPhoto('shreyas')} 
+                      alt="Shreyas M." 
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const t = e.currentTarget as HTMLImageElement;
+                        if (!t.src.endsWith('/founder.jpg')) t.src = '/founder.jpg';
+                      }}
+                    />
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0e1017]" title="Active" />
                 </div>
-                <div>
-                  <h4 className="font-display font-bold text-white text-2xl sm:text-3xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
-                    shreyas.m
+
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-display font-bold text-white text-xl sm:text-2xl tracking-tight group-hover:text-[#f87171] transition-colors truncate">
+                    Shreyas M.
                   </h4>
-                  <span className="text-[11px] sm:text-xs font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
-                    FOUNDER • CEO • ARCHITECTURE
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-[#f87171]/15 text-[#f87171] border border-[#f87171]/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                      Founder & CEO
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-mono text-gray-400 mt-1 truncate">
+                    Architecture · Production AI
+                  </p>
                 </div>
               </div>
 
+              {/* Bio Description */}
               <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                founder, s-coders (bharat tech developers). shipped multiple production systems and ai agents. direct 1-on-1 architecture alignment, project coordination, and custom development.
+                Founder of S-CODERS (Bharat Tech Developers). Shipped multiple production systems and AI agents. Direct 1-on-1 architecture alignment, project coordination, and custom software delivery.
               </p>
             </div>
 
-            {/* Social & Contact Pill buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+            {/* Social & Contact Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
               <a
                 href="https://github.com/Shreyas-73"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Github className="w-3.5 h-3.5 text-white" />
                 <span>GitHub</span>
@@ -3083,66 +3096,79 @@ export function ServiceProjectSpaceDashboard({
                 href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>LinkedIn</span>
               </a>
               <a
                 href="tel:+918310463417"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5 text-[#f87171]" />
                 <span>+91 8310463417</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Mail className="w-3.5 h-3.5 text-[#f87171]" />
-                <span>scoders82@gmail.com</span>
+                <span>Email</span>
               </a>
             </div>
           </div>
 
           {/* Card 2: Lokesh A. */}
-          <div className="bg-[#181924]/90 border border-white/10 hover:border-purple-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
-            <div className="space-y-3.5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-purple-500/60 shrink-0 bg-purple-500/10 shadow-lg shadow-purple-500/20">
-                  <img 
-                    src={getLeaderPhoto('lokesh')} 
-                    alt="Lokesh A." 
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const t = e.currentTarget as HTMLImageElement;
-                      if (!t.src.endsWith('/cofounder.jpg')) t.src = '/cofounder.jpg';
-                    }}
-                  />
+          <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-purple-500/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-purple-500/10 flex flex-col justify-between overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
+
+            <div className="space-y-4">
+              {/* Identity Header */}
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 border-purple-500/60 bg-purple-500/10 shadow-lg shadow-purple-500/20">
+                    <img 
+                      src={getLeaderPhoto('lokesh')} 
+                      alt="Lokesh A." 
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const t = e.currentTarget as HTMLImageElement;
+                        if (!t.src.endsWith('/cofounder.jpg')) t.src = '/cofounder.jpg';
+                      }}
+                    />
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0e1017]" title="Active" />
                 </div>
-                <div>
-                  <h4 className="font-display font-bold text-white text-2xl sm:text-3xl lowercase group-hover:text-purple-400 transition-colors leading-tight">
-                    lokesh a.
+
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-display font-bold text-white text-xl sm:text-2xl tracking-tight group-hover:text-purple-400 transition-colors truncate">
+                    Lokesh A.
                   </h4>
-                  <span className="text-[11px] sm:text-xs font-mono text-purple-400 uppercase font-bold tracking-wider block mt-0.5">
-                    CO-FOUNDER • VIBE CODER • PROTOTYPING
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                      Co-Founder
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-mono text-gray-400 mt-1 truncate">
+                    Vibe Coding · AI Labs · Prototyping
+                  </p>
                 </div>
               </div>
 
+              {/* Bio Description */}
               <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                co-founder, s-coders (bharat tech developers). specializes in rapid prototyping, prompt engineering, smart workflow automations, and practical product innovation.
+                Co-Founder, S-CODERS (Bharat Tech Developers). Specializes in rapid prototyping, prompt engineering, smart workflow automations, and practical product innovation.
               </p>
             </div>
 
-            {/* Social & Contact Pill buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+            {/* Social & Contact Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
               <a
                 href="https://github.com/Lokesh132005"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Github className="w-3.5 h-3.5 text-white" />
                 <span>GitHub</span>
@@ -3151,59 +3177,72 @@ export function ServiceProjectSpaceDashboard({
                 href="https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>LinkedIn</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Mail className="w-3.5 h-3.5 text-purple-400" />
-                <span>scoders82@gmail.com</span>
+                <span>Email</span>
               </a>
             </div>
           </div>
 
-          {/* Card 3: Bhuvan */}
-          <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
-            <div className="space-y-3.5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-brand-teal/60 shrink-0 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
-                  <img 
-                    src={getLeaderPhoto('bhuvan')} 
-                    alt="Bhuvan M" 
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const t = e.currentTarget as HTMLImageElement;
-                      if (!t.src.endsWith('/techlead.jpg') && !t.src.endsWith('/bhuvan.jpg')) t.src = '/techlead.jpg';
-                    }}
-                  />
+          {/* Card 3: Bhuvan M. */}
+          <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-brand-teal/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-brand-teal/10 flex flex-col justify-between overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-brand-teal to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
+
+            <div className="space-y-4">
+              {/* Identity Header */}
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 border-brand-teal/60 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
+                    <img 
+                      src={getLeaderPhoto('bhuvan')} 
+                      alt="Bhuvan M." 
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const t = e.currentTarget as HTMLImageElement;
+                        if (!t.src.endsWith('/techlead.jpg') && !t.src.endsWith('/bhuvan.jpg')) t.src = '/techlead.jpg';
+                      }}
+                    />
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0e1017]" title="Active" />
                 </div>
-                <div>
-                  <h4 className="font-display font-bold text-white text-2xl sm:text-3xl lowercase group-hover:text-brand-teal transition-colors leading-tight">
-                    bhuvan
+
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-display font-bold text-white text-xl sm:text-2xl tracking-tight group-hover:text-brand-teal transition-colors truncate">
+                    Bhuvan M.
                   </h4>
-                  <span className="text-[11px] sm:text-xs font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
-                    TECH LEAD • FULL-STACK • UI/UX
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-brand-teal/15 text-brand-teal border border-brand-teal/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                      Tech Lead
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-mono text-gray-400 mt-1 truncate">
+                    Full-Stack · UI/UX · Platform
+                  </p>
                 </div>
               </div>
 
+              {/* Bio Description */}
               <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
                 Tech Lead at S-CODERS. Full-Stack Developer & UI/UX enthusiast. Architected and developed the complete S-CODERS digital platform, responsive web applications, and interactive user experiences.
               </p>
             </div>
 
-            {/* Contact Pill buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
+            {/* Contact Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
               <a
                 href="https://github.com/Gowda487"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Github className="w-3.5 h-3.5 text-white" />
                 <span>GitHub</span>
@@ -3212,14 +3251,14 @@ export function ServiceProjectSpaceDashboard({
                 href="https://www.linkedin.com/in/bhuvan-m-102835326/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>LinkedIn</span>
               </a>
               <a
                 href="tel:+916363905989"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5 text-brand-teal" />
                 <span>+91 6363905989</span>
@@ -3228,17 +3267,17 @@ export function ServiceProjectSpaceDashboard({
                 href="https://wa.me/916363905989"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-xl text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                <span>whatsapp</span>
+                <span>WhatsApp</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Mail className="w-3.5 h-3.5 text-brand-teal" />
-                <span>scoders82@gmail.com</span>
+                <span>Email</span>
               </a>
             </div>
           </div>

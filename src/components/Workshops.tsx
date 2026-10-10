@@ -1317,195 +1317,240 @@ export default function TenantDashboard() {
                     </div>
                   )}
 
-                  {/* WHO'S RUNNING IT / your hosts Section (Matches Page 3) */}
-                  <div className="pt-10 mt-10 border-t border-white/10 space-y-6">
-                    <div>
-                      <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold block mb-1">
-                        WHO'S RUNNING IT
-                      </span>
-                      <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-white lowercase">
-                        your hosts
-                      </h3>
-                      <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1">
-                        live with the people who built the product, not a slideshow host reading slides.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {/* Host 1: Shreyas.M (Founder & CEO) */}
-                      <div className="bg-[#181924]/90 border border-white/10 hover:border-[#f87171]/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
-                        <div className="space-y-3.5">
-                          <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#f87171]/60 shrink-0 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
-                              <img 
-                                src={getLeaderPhoto('shreyas')} 
-                                alt="Shreyas.M" 
-                                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  const t = e.currentTarget as HTMLImageElement;
-                                  if (!t.src.endsWith('/founder.jpg')) t.src = '/founder.jpg';
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-[#f87171] transition-colors leading-tight">
-                                shreyas.m
-                              </h4>
-                              <span className="text-[11px] font-mono text-[#f87171] uppercase font-bold tracking-wider block mt-0.5">
-                                FOUNDER • WORKSHOPS • 1:1 SESSIONS
-                              </span>
-                            </div>
-                          </div>
-
-                          <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                            founder, s-coders (bharat tech developers). shipped multiple production systems and ai agents. teaches practical architecture, workflows, and high-impact developer tooling.
-                          </p>
-                        </div>
-
-                        {/* Social Profiles: GitHub & LinkedIn */}
-                        <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
-                          <a
-                            href="https://github.com/Shreyas-73"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Github className="w-3.5 h-3.5 text-white" />
-                            <span>GitHub</span>
-                          </a>
-                          <a
-                            href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
-                            <span>LinkedIn</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Host 2: Lokesh A. (Co-Founder) */}
-                      <div className="bg-[#181924]/90 border border-white/10 hover:border-purple-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
-                        <div className="space-y-3.5">
-                          <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-purple-500/60 shrink-0 bg-purple-500/10 shadow-lg shadow-purple-500/20">
-                              <img 
-                                src={getLeaderPhoto('lokesh')} 
-                                alt="Lokesh A." 
-                                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  const t = e.currentTarget as HTMLImageElement;
-                                  if (!t.src.endsWith('/cofounder.jpg')) t.src = '/cofounder.jpg';
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-purple-400 transition-colors leading-tight">
-                                lokesh a.
-                              </h4>
-                              <span className="text-[11px] font-mono text-purple-400 uppercase font-bold tracking-wider block mt-0.5">
-                                CO-FOUNDER • VIBE CODING • AI LABS
-                              </span>
-                            </div>
-                          </div>
-
-                          <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                            co-founder, s-coders (bharat tech developers). conducts interactive sessions on vibe coding, rapid full-stack prototyping, and creative AI prompt architectures.
-                          </p>
-                        </div>
-
-                        {/* Social Profiles: GitHub & LinkedIn */}
-                        <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
-                          <a
-                            href="https://github.com/Lokesh132005"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Github className="w-3.5 h-3.5 text-white" />
-                            <span>GitHub</span>
-                          </a>
-                          <a
-                            href="https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-full text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
-                            <span>LinkedIn</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Host 3: Bhuvan M (Tech Lead) */}
-                      <div className="bg-[#181924]/90 border border-white/10 hover:border-brand-teal/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all shadow-xl group flex flex-col justify-between">
-                        <div className="space-y-3.5">
-                          <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-brand-teal/60 shrink-0 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
-                              <img 
-                                src={getLeaderPhoto('bhuvan')} 
-                                alt="Bhuvan M" 
-                                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  const t = e.currentTarget as HTMLImageElement;
-                                  if (!t.src.endsWith('/techlead.jpg') && !t.src.endsWith('/bhuvan.jpg')) t.src = '/techlead.jpg';
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="font-display font-bold text-white text-2xl lowercase group-hover:text-brand-teal transition-colors leading-tight">
-                                bhuvan
-                              </h4>
-                              <span className="text-[11px] font-mono text-brand-teal uppercase font-bold tracking-wider block mt-0.5">
-                                TECH LEAD • FULL-STACK • UI/UX
-                              </span>
-                            </div>
-                          </div>
-
-                          <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                            Tech Lead at S-CODERS. Full-Stack Developer & UI/UX enthusiast. Architected and developed the complete S-CODERS digital platform, responsive applications, and interactive experiences.
-                          </p>
-                        </div>
-
-                        {/* Contact & Connect Links */}
-                        <div className="flex flex-wrap items-center gap-2 pt-3.5 border-t border-white/10">
-                          <a
-                            href="tel:+916363905989"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                            <span>+91 6363905989</span>
-                          </a>
-                          <a
-                            href="https://wa.me/916363905989"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-full text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
-                            <span>WhatsApp</span>
-                          </a>
-                          <a
-                            href="mailto:scoders82@gmail.com"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-full text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-brand-teal" />
-                            <span>Email</span>
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                 </div>
               </motion.div>
             </AnimatePresence>
           </div>
 
+        </div>
+
+        {/* WHO'S RUNNING IT / your hosts Section - Full-Width Showcase */}
+        <div className="glass-panel p-6 sm:p-8 md:p-10 rounded-3xl border border-white/10 relative overflow-hidden space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <span className="text-xs font-mono text-brand-teal uppercase tracking-widest font-bold block mb-1">
+                WHO'S RUNNING IT
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-white">
+                Your Workshop Mentors & Hosts
+              </h3>
+              <p className="text-gray-400 text-xs sm:text-sm font-sans mt-1">
+                Live with the engineering leads who architected the platforms, not a slideshow reader.
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-gray-300 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>3 Verified Mentors Live</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Host 1: Shreyas M. (Founder & CEO) */}
+            <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-[#f87171]/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-[#f87171]/10 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#f87171] to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
+
+              <div className="space-y-4">
+                {/* Identity Header */}
+                <div className="flex items-start gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 border-[#f87171]/60 bg-[#f87171]/10 shadow-lg shadow-[#f87171]/20">
+                      <img 
+                        src={getLeaderPhoto('shreyas')} 
+                        alt="Shreyas M." 
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const t = e.currentTarget as HTMLImageElement;
+                          if (!t.src.endsWith('/founder.jpg')) t.src = '/founder.jpg';
+                        }}
+                      />
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0e1017]" title="Active" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-display font-bold text-white text-xl sm:text-2xl tracking-tight group-hover:text-[#f87171] transition-colors truncate">
+                      Shreyas M.
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className="px-2 py-0.5 rounded-md bg-[#f87171]/15 text-[#f87171] border border-[#f87171]/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                        Founder & CEO
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-gray-400 mt-1 truncate">
+                      Architecture · Workshops · 1:1
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bio Description */}
+                <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                  Founder of S-CODERS (Bharat Tech Developers). Shipped multiple production systems and AI agents. Teaches practical software architecture, scalable workflows, and high-impact developer tooling.
+                </p>
+              </div>
+
+              {/* Social Profiles & Contact */}
+              <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
+                <a
+                  href="https://github.com/Shreyas-73"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <Github className="w-3.5 h-3.5 text-white" />
+                  <span>GitHub</span>
+                </a>
+                <a
+                  href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                  <span>LinkedIn</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Host 2: Lokesh A. (Co-Founder) */}
+            <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-purple-500/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-purple-500/10 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
+
+              <div className="space-y-4">
+                {/* Identity Header */}
+                <div className="flex items-start gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 border-purple-500/60 bg-purple-500/10 shadow-lg shadow-purple-500/20">
+                      <img 
+                        src={getLeaderPhoto('lokesh')} 
+                        alt="Lokesh A." 
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const t = e.currentTarget as HTMLImageElement;
+                          if (!t.src.endsWith('/cofounder.jpg')) t.src = '/cofounder.jpg';
+                        }}
+                      />
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0e1017]" title="Active" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-display font-bold text-white text-xl sm:text-2xl tracking-tight group-hover:text-purple-400 transition-colors truncate">
+                      Lokesh A.
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className="px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                        Co-Founder
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-gray-400 mt-1 truncate">
+                      Vibe Coding · AI Labs · Prototyping
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bio Description */}
+                <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                  Co-Founder, S-CODERS (Bharat Tech Developers). Conducts interactive sessions on vibe coding, rapid full-stack prototyping, and creative AI prompt architectures for high-speed software delivery.
+                </p>
+              </div>
+
+              {/* Social Profiles & Contact */}
+              <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
+                <a
+                  href="https://github.com/Lokesh132005"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <Github className="w-3.5 h-3.5 text-white" />
+                  <span>GitHub</span>
+                </a>
+                <a
+                  href="https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
+                  <span>LinkedIn</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Host 3: Bhuvan M. (Tech Lead) */}
+            <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-brand-teal/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-brand-teal/10 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-brand-teal to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
+
+              <div className="space-y-4">
+                {/* Identity Header */}
+                <div className="flex items-start gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 border-brand-teal/60 bg-brand-teal/10 shadow-lg shadow-brand-teal/20">
+                      <img 
+                        src={getLeaderPhoto('bhuvan')} 
+                        alt="Bhuvan M." 
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const t = e.currentTarget as HTMLImageElement;
+                          if (!t.src.endsWith('/techlead.jpg') && !t.src.endsWith('/bhuvan.jpg')) t.src = '/techlead.jpg';
+                        }}
+                      />
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0e1017]" title="Active" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-display font-bold text-white text-xl sm:text-2xl tracking-tight group-hover:text-brand-teal transition-colors truncate">
+                      Bhuvan M.
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className="px-2 py-0.5 rounded-md bg-brand-teal/15 text-brand-teal border border-brand-teal/30 text-[10px] font-mono font-bold uppercase tracking-wider">
+                        Tech Lead
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-gray-400 mt-1 truncate">
+                      Full-Stack · UI/UX · Architecture
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bio Description */}
+                <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
+                  Tech Lead at S-CODERS. Full-Stack Developer & UI/UX enthusiast. Architected and developed the complete S-CODERS digital platform, responsive applications, and interactive experiences.
+                </p>
+              </div>
+
+              {/* Contact & Connect Links */}
+              <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
+                <a
+                  href="tel:+916363905989"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                  <span>+91 6363905989</span>
+                </a>
+                <a
+                  href="https://wa.me/916363905989"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-xl text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                  <span>WhatsApp</span>
+                </a>
+                <a
+                  href="mailto:scoders82@gmail.com"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <Mail className="w-3.5 h-3.5 text-brand-teal" />
+                  <span>Email</span>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* SOCIAL PROOF: Dynamic comments section below the active workshop detail billboard */}

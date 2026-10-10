@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, ArrowLeft, ArrowRight, ShieldCheck, Check, CreditCard, Building2, 
   Wallet, RefreshCw, Smartphone, QrCode, Tag, Sparkles, ChevronRight, 
-  ChevronDown, Lock, AlertTriangle, CheckCircle2, MoreHorizontal, ExternalLink,
+  ChevronDown, Lock, AlertTriangle, AlertCircle, CheckCircle2, MoreHorizontal, ExternalLink,
   Copy, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -62,7 +62,7 @@ export default function RazorpayModal({
   onFailure,
   orderData,
   paymentDetails,
-  initialStep = 'all_options',
+  initialStep,
 }: RazorpayModalProps) {
   // Steps matching Video Flow & Razorpay Standard:
   // 1. 'checkout' -> Customer details input card (Name, Email, Mobile, "pay ₹...", "have a code?")
@@ -105,6 +105,7 @@ export default function RazorpayModal({
   const [promoCode, setPromoCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; percent: number; amount: number } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   // Active Razorpay Order details
   const [currentOrderId, setCurrentOrderId] = useState<string>(orderData?.orderId || '');
@@ -156,10 +157,24 @@ export default function RazorpayModal({
       setCustomUpiId('');
       setUpiIdError(null);
       setShowQrModal(false);
+      setCheckoutError(null);
 
-      // Automatically read pre-filled registration details and open UPI & payment options directly
-      setCurrentStep('all_options');
-      setExpandedSection('upi');
+      // Check whether user has already filled registration details
+      const hasRegistrationDetails = Boolean(
+        initialName && initialName.trim() &&
+        initialEmail && initialEmail.trim()
+      );
+
+      // If user has already registered / filled details:
+      // Automatically read details and open UPI & other payment options directly.
+      // If user has NOT yet registered (e.g. clicking on registration without details):
+      // Open the registration form first so they get registered, then auto-open UPI upon submitting!
+      if (initialStep === 'checkout' || !hasRegistrationDetails) {
+        setCurrentStep('checkout');
+      } else {
+        setCurrentStep('all_options');
+        setExpandedSection('upi');
+      }
       setSelectedOptionInAll(null);
       setAllOptionsError(null);
       setCardNumber('');
@@ -374,14 +389,15 @@ export default function RazorpayModal({
   const handlePayViaRazorpaySDK = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!name.trim()) {
-      alert('Please enter your name');
+      setCheckoutError('Please enter your full name to complete registration');
       return;
     }
-    if (!email.trim()) {
-      alert('Please enter your email address');
+    if (!email.trim() || !email.includes('@')) {
+      setCheckoutError('Please enter a valid email address to receive pass confirmation');
       return;
     }
 
+    setCheckoutError(null);
     setIsProcessingCheckout(true);
 
     // Initialize/ensure server order in the background
@@ -680,7 +696,10 @@ export default function RazorpayModal({
                       type="text"
                       required
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (checkoutError) setCheckoutError(null);
+                      }}
                       placeholder="Enter your name"
                       className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
                     />
@@ -694,7 +713,10 @@ export default function RazorpayModal({
                       type="email"
                       required
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (checkoutError) setCheckoutError(null);
+                      }}
                       placeholder="Enter your email"
                       className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
                     />
@@ -707,7 +729,10 @@ export default function RazorpayModal({
                     <input
                       type="tel"
                       value={mobile}
-                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onChange={(e) => {
+                        setMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                        if (checkoutError) setCheckoutError(null);
+                      }}
                       placeholder="Enter your phone number"
                       className="w-full bg-[#27201f] border border-[#3d3230] focus:border-[#d97768] text-white text-sm rounded-xl px-4 py-3.5 outline-none transition-colors placeholder:text-[#6a5e5c]"
                     />
@@ -761,6 +786,13 @@ export default function RazorpayModal({
 
                   {/* Primary Pay Button: Launches Official Razorpay Checkout Modal */}
                   <div className="pt-2 space-y-2">
+                    {checkoutError && (
+                      <div className="p-2.5 bg-rose-500/15 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-300 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                        <span>{checkoutError}</span>
+                      </div>
+                    )}
+
                     <button
                       type="submit"
                       disabled={isProcessingCheckout}
