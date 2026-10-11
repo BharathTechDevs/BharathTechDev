@@ -57,11 +57,8 @@ export default function Contact() {
   };
 
   const socialLinks = [
-    { name: 'Service WhatsApp Group', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Customer Care Support', icon: <MessageCircle className="w-5 h-5" />, href: 'https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4', color: 'hover:text-[#25d366] hover:border-[#25d366] text-[#25d366]' },
     { name: 'Email Support', icon: <Mail className="w-5 h-5" />, href: 'mailto:scoders82@gmail.com', color: 'hover:text-brand-teal hover:border-brand-teal' },
-    { name: 'WhatsApp (Bhuvan)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/916363905989', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
-    { name: 'WhatsApp (Shreyas)', icon: <MessageCircle className="w-5 h-5" />, href: 'https://wa.me/918310463417', color: 'hover:text-[#25d366] hover:border-[#25d366]' },
     { name: 'Instagram', icon: <Instagram className="w-5 h-5" />, href: 'https://www.instagram.com/scoders2025?igsh=Ym1jcG01czR1MHdj', color: 'hover:text-[#e4405f] hover:border-[#e4405f]' },
     { name: 'YouTube', icon: <Youtube className="w-5 h-5" />, href: 'https://www.youtube.com/@S-CODERS', color: 'hover:text-[#ff0000] hover:border-[#ff0000]' },
     { name: 'Twitter / X', icon: <Twitter className="w-5 h-5" />, href: 'https://x.com/SCODERSozws', color: 'hover:text-[#1da1f2] hover:border-[#1da1f2]' },
@@ -120,67 +117,21 @@ export default function Contact() {
                   <span>Bengaluru, Karnataka, India</span>
                 </div>
                 
-                {/* Bhuvan M - Tech Lead */}
-                <div className="flex gap-3 text-sm font-sans text-gray-300">
-                  <Phone className="w-5 h-5 text-brand-teal shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[11px] font-mono uppercase text-brand-teal font-bold block">Bhuvan M • Tech Lead (+91 6363905989)</span>
-                    <div className="flex flex-wrap items-center gap-3 mt-1">
-                      <a href="tel:+916363905989" className="hover:text-brand-teal font-bold font-mono transition-colors">+91 6363905989</a>
-                      <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="text-[#25D366] text-xs font-mono hover:underline flex items-center gap-1">
-                        <MessageCircle className="w-3 h-3" />
-                        <span>Chat on WhatsApp</span>
-                      </a>
-                      <a href="https://github.com/Gowda487" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white text-xs font-mono hover:underline flex items-center gap-1">
-                        <Github className="w-3 h-3 text-white" />
-                        <span>GitHub</span>
-                      </a>
-                      <a href="https://www.linkedin.com/in/bhuvan-m-102835326/" target="_blank" rel="noopener noreferrer" className="text-[#38bdf8] text-xs font-mono hover:underline flex items-center gap-1">
-                        <Linkedin className="w-3 h-3" />
-                        <span>LinkedIn</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Shreyas M - Founder & CEO */}
-                <div className="flex gap-3 text-sm font-sans text-gray-300">
-                  <Phone className="w-5 h-5 text-brand-teal shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[11px] font-mono uppercase text-gray-400 font-bold block">Shreyas M • Founder & CEO (+91 8310463417)</span>
-                    <div className="flex flex-wrap items-center gap-3 mt-1">
-                      <a href="tel:+918310463417" className="hover:text-brand-teal font-mono transition-colors">+91 8310463417</a>
-                      <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="text-[#25D366] text-xs font-mono hover:underline flex items-center gap-1">
-                        <MessageCircle className="w-3 h-3" />
-                        <span>Chat on WhatsApp</span>
-                      </a>
-                      <a href="https://github.com/shreyasshreyas40858-max/Chaturya" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white text-xs font-mono hover:underline flex items-center gap-1">
-                        <Github className="w-3 h-3 text-white" />
-                        <span>GitHub</span>
-                      </a>
-                      <a href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" rel="noopener noreferrer" className="text-[#38bdf8] text-xs font-mono hover:underline flex items-center gap-1">
-                        <Linkedin className="w-3 h-3" />
-                        <span>LinkedIn</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="flex gap-3 text-sm font-sans font-light text-gray-300">
                   <Mail className="w-5 h-5 text-brand-coral shrink-0 mt-0.5" />
                   <a href="mailto:scoders82@gmail.com" className="hover:text-brand-teal transition-colors">scoders82@gmail.com</a>
                 </div>
 
-                {/* Instant Service WhatsApp Group & Support Card */}
+                {/* Customer Care Support WhatsApp Card */}
                 <div className="pt-2">
                   <a
-                    href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
+                    href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3 px-4 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4 text-black" />
-                    <span>Service WhatsApp Group</span>
+                    <span>Customer Care Support WhatsApp</span>
                   </a>
                 </div>
               </div>

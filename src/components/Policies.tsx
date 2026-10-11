@@ -697,14 +697,6 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                           <span className="text-white">Within 24 business hours</span>
                         </p>
                         <p>
-                          <span className="text-gray-500 uppercase block">Bhuvan M (Tech Lead - WhatsApp & Call):</span>
-                          <a href="https://wa.me/916363905989" target="_blank" rel="noopener noreferrer" className="text-[#25D366] font-bold hover:underline">+91 6363905989 (Direct WhatsApp)</a>
-                        </p>
-                        <p>
-                          <span className="text-gray-500 uppercase block">Shreyas M (Founder & CEO - WhatsApp & Call):</span>
-                          <a href="https://wa.me/918310463417" target="_blank" rel="noopener noreferrer" className="text-brand-teal font-bold hover:underline">+91 8310463417 (Direct WhatsApp)</a>
-                        </p>
-                        <p>
                           <span className="text-gray-500 uppercase block">YouTube Channel:</span>
                           <a href="https://www.youtube.com/@S-CODERS" target="_blank" rel="noopener noreferrer" className="text-white hover:text-brand-teal">@S-CODERS</a>
                         </p>
@@ -765,24 +757,6 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                       >
                         <Phone className="w-4 h-4 text-[#25D366]" />
                         <span>Customer Care Support WhatsApp Group</span>
-                      </a>
-                      <a 
-                        href="https://wa.me/916363905989" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-[#25D366]/20 hover:text-[#25D366] border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
-                      >
-                        <Phone className="w-4 h-4 text-[#25D366]" />
-                        <span>Bhuvan M (6363905989)</span>
-                      </a>
-                      <a 
-                        href="https://wa.me/918310463417" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-brand-teal/10 hover:text-brand-teal border border-white/5 rounded-xl text-xs font-mono transition-all duration-300"
-                      >
-                        <Phone className="w-4 h-4 text-brand-teal" />
-                        <span>Shreyas M (8310463417)</span>
                       </a>
                       <a 
                         href="mailto:scoders82@gmail.com" 

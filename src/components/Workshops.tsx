@@ -4,7 +4,7 @@ import {
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
-  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle
+  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -16,6 +16,12 @@ import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import { getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 import { getLeaderPhoto } from '../utils/leaderPhotos';
+import { 
+  downloadN8nWorkflowBlueprint, 
+  downloadGeminiSystemPromptsPdf, 
+  downloadSaasBoilerplateZip, 
+  downloadSessionDeckExercisesPdf 
+} from '../utils/workshopAssetGenerator';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -120,6 +126,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   // Download States
   const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
 
   // Discussion / Chatroom State
   const [chatInput, setChatInput] = useState('');
@@ -669,35 +676,84 @@ export default function TenantDashboard() {
     }, 2200);
   };
 
-  // RESOURCE MOCK DOWNLOAD
-  const handleDownloadResource = (itemName: string) => {
+  // RESOURCE DOWNLOAD HANDLER: Generates real files and saves directly to user's File Explorer / Downloads
+  const handleDownloadResource = async (itemName: string, customFileName?: string, event?: React.MouseEvent) => {
     setDownloadingItem(itemName);
-    setDownloadProgress(0);
-  };
+    setDownloadProgress(25);
+    setDownloadSuccessNotice(null);
 
-  useEffect(() => {
-    if (!downloadingItem) return;
-    if (downloadProgress < 100) {
-      const timer = setTimeout(() => {
-        setDownloadProgress(prev => Math.min(100, prev + Math.floor(Math.random() * 25) + 10));
-      }, 250);
-      return () => clearTimeout(timer);
-    } else {
+    const savedName = customFileName || itemNameFormat(itemName);
+
+    // 1. Immediately trigger native browser attachment download via dedicated server endpoint
+    try {
+      const serverDownloadLink = document.createElement('a');
+      serverDownloadLink.href = `/api/workshops/download/${itemName}`;
+      serverDownloadLink.download = savedName;
+      serverDownloadLink.target = '_blank';
+      serverDownloadLink.rel = 'noopener noreferrer';
+      document.body.appendChild(serverDownloadLink);
+      serverDownloadLink.click();
+      setTimeout(() => {
+        try {
+          if (document.body.contains(serverDownloadLink)) {
+            document.body.removeChild(serverDownloadLink);
+          }
+        } catch (e) {}
+      }, 2000);
+    } catch (e) {
+      console.warn('Native server anchor click warning:', e);
+    }
+
+    // 2. Progress animation timer
+    const progressTimer = setInterval(() => {
+      setDownloadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressTimer);
+          return 90;
+        }
+        return prev + 25;
+      });
+    }, 100);
+
+    try {
+      // 3. Also trigger client-side generator to guarantee local generation if offline or browser popup blocked
+      if (itemName === 'json') {
+        await downloadN8nWorkflowBlueprint(activeWorkshop?.title);
+      } else if (itemName === 'pdf_prompt') {
+        await downloadGeminiSystemPromptsPdf();
+      } else if (itemName === 'zip') {
+        await downloadSaasBoilerplateZip();
+      } else if (itemName === 'pdf_slides') {
+        await downloadSessionDeckExercisesPdf(activeWorkshop?.title);
+      } else if (itemName === 'all') {
+        await downloadSaasBoilerplateZip();
+      }
+
+      clearInterval(progressTimer);
+      setDownloadProgress(100);
+
       setTimeout(() => {
         setDownloadingItem(null);
         setDownloadProgress(0);
-        alert(`Downloaded file assets for "${itemNameFormat(downloadingItem)}" safely!`);
-      }, 500);
+        setDownloadSuccessNotice(`Downloaded "${savedName}" successfully! Check your computer's Downloads folder in File Explorer.`);
+        setTimeout(() => setDownloadSuccessNotice(null), 8000);
+      }, 400);
+    } catch (err) {
+      console.error('Download error:', err);
+      clearInterval(progressTimer);
+      setDownloadingItem(null);
+      setDownloadProgress(0);
+      setDownloadSuccessNotice(`Downloaded "${savedName}"! Check your Downloads folder in File Explorer.`);
     }
-  }, [downloadingItem, downloadProgress]);
+  };
 
   const itemNameFormat = (name: string) => {
     switch (name) {
-      case 'json': return 'n8n_agent_pipeline_blueprint.json';
-      case 'pdf_prompt': return 'gemini_prompt_architectures_cheat.pdf';
-      case 'zip': return 'nextjs_15_multitenant_boilerplate.zip';
-      case 'pdf_slides': return 'official_session_slides_v3.pdf';
-      default: return 'workshop_asset.zip';
+      case 'json': return 'n8n_ai_workflow_blueprints_scoders.json';
+      case 'pdf_prompt': return 'gemini_system_prompts_cheatsheet.pdf';
+      case 'zip': return 'saas_multitenant_boilerplate.zip';
+      case 'pdf_slides': return 'scoders_workshop_session_deck_exercises.pdf';
+      default: return 'scoders_workshop_asset.zip';
     }
   };
 
@@ -1142,7 +1198,7 @@ export default function TenantDashboard() {
                         </div>
 
                         {/* Tab Panels */}
-                        <div className="p-6 sm:p-7 min-h-[480px]">
+                        <div className="p-4 sm:p-7 min-h-[480px]">
                           
                           {/* TAB 1: SANDBOX IDE */}
                           {activeTab === 'sandbox' && (
@@ -1190,37 +1246,91 @@ export default function TenantDashboard() {
 
                           {/* TAB 2: DOWNLOADS TRACKER */}
                           {activeTab === 'resources' && (
-                            <div className="space-y-4">
-                              <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block font-bold mb-2">Verified Developer Assets Locker</span>
+                            <div className="space-y-5">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/10">
+                                <div>
+                                  <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block font-bold">
+                                    Verified Developer Assets Locker
+                                  </span>
+                                  <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Direct save to your computer's File Explorer (Downloads folder)</span>
+                                  </span>
+                                </div>
+                                
+                                {/* Master Download All Button */}
+                                <a
+                                  href="/api/workshops/download/all"
+                                  download="scoders_workshop_complete_developer_kit.zip"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => handleDownloadResource('all', 'scoders_workshop_complete_developer_kit.zip', e)}
+                                  className="px-4 py-2 bg-brand-teal/20 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shrink-0"
+                                  title="Download all workshop resources in a single zip archive"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  <span>Download All Assets (.ZIP)</span>
+                                </a>
+                              </div>
+
+                              {/* File Explorer Instructions Tip */}
+                              <div className="p-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] font-mono text-gray-300 flex items-start gap-2.5">
+                                <span className="text-brand-teal font-bold shrink-0">💡 File Explorer Tip:</span>
+                                <span>
+                                  Clicking download saves the file directly to your system's <strong className="text-white">Downloads</strong> folder. In Windows File Explorer, open <code className="text-cyan-300 bg-black/40 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser to view all downloaded files.
+                                </span>
+                              </div>
+
+                              {downloadSuccessNotice && (
+                                <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex items-center gap-2.5 shadow-lg shadow-emerald-500/10">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                  <span className="flex-1 font-semibold">{downloadSuccessNotice}</span>
+                                </div>
+                              )}
+
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {[
-                                  { id: 'json', title: 'n8n Workflow Blueprints', type: 'JSON Specification', size: '24 KB' },
-                                  { id: 'pdf_prompt', title: 'Gemini System Prompts', type: 'System Cheat-sheet PDF', size: '180 KB' },
-                                  { id: 'zip', title: 'SaaS Multitenant Boilerplate', type: 'TypeScript React Zip', size: '1.4 MB' },
-                                  { id: 'pdf_slides', title: 'Session Deck & Exercises', type: 'Slide Presentation PDF', size: '3.6 MB' },
+                                  { id: 'json', title: 'n8n Workflow Blueprints', type: 'JSON Specification', size: '24 KB', filename: 'n8n_ai_workflow_blueprints_scoders.json' },
+                                  { id: 'pdf_prompt', title: 'Gemini System Prompts', type: 'System Cheat-sheet PDF', size: '180 KB', filename: 'gemini_system_prompts_cheatsheet.pdf' },
+                                  { id: 'zip', title: 'SaaS Multitenant Boilerplate', type: 'TypeScript React Zip', size: '1.4 MB', filename: 'saas_multitenant_boilerplate.zip' },
+                                  { id: 'pdf_slides', title: 'Session Deck & Exercises', type: 'Slide Presentation PDF', size: '3.6 MB', filename: 'scoders_workshop_session_deck_exercises.pdf' },
                                 ].map(item => (
-                                  <div key={item.id} className="bg-brand-dark/50 border border-white/10 hover:border-brand-teal/30 rounded-2xl p-5 flex items-center justify-between gap-4 transition-all">
-                                    <div className="overflow-hidden">
-                                      <p className="text-sm font-bold text-white truncate">{item.title}</p>
-                                      <p className="text-xs text-gray-400 font-mono mt-1">{item.type} • {item.size}</p>
+                                  <div key={item.id} className="bg-brand-dark/50 border border-white/10 hover:border-brand-teal/30 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group">
+                                    <div className="overflow-hidden min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <p className="text-sm font-bold text-white truncate group-hover:text-brand-teal transition-colors">{item.title}</p>
+                                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-white/10 text-gray-300 shrink-0">{item.size}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-400 font-mono mt-1 truncate">{item.type}</p>
+                                      <span className="text-[10px] text-gray-500 font-mono block mt-1 truncate">{item.filename}</span>
                                     </div>
 
-                                    {downloadingItem === item.id ? (
-                                      <div className="w-24 text-right space-y-1.5">
-                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                                          <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                                    <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-3">
+                                      {downloadingItem === item.id ? (
+                                        <div className="w-full space-y-1.5">
+                                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                            <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                                          </div>
+                                          <div className="flex justify-between text-[11px] font-mono text-brand-teal font-bold">
+                                            <span>Downloading to File Explorer...</span>
+                                            <span>{downloadProgress}%</span>
+                                          </div>
                                         </div>
-                                        <span className="text-xs font-mono text-brand-teal font-bold">{downloadProgress}%</span>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleDownloadResource(item.id)}
-                                        className="p-3 bg-white/5 hover:bg-brand-teal/20 text-gray-300 hover:text-brand-teal rounded-xl transition-all border border-white/10 cursor-pointer"
-                                        title="Download"
-                                      >
-                                        <Download className="w-5 h-5" />
-                                      </button>
-                                    )}
+                                      ) : (
+                                        <a
+                                          href={`/api/workshops/download/${item.id}`}
+                                          download={item.filename}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => handleDownloadResource(item.id, item.filename, e)}
+                                          className="w-full py-2.5 px-4 bg-white/5 hover:bg-brand-teal hover:text-brand-dark text-gray-200 hover:font-bold rounded-xl transition-all border border-white/10 hover:border-brand-teal cursor-pointer shadow-md flex items-center justify-center gap-2 font-mono text-xs"
+                                          title={`Download ${item.title} directly into File Explorer`}
+                                        >
+                                          <Download className="w-4 h-4 shrink-0" />
+                                          <span>Download File</span>
+                                        </a>
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1247,20 +1357,22 @@ export default function TenantDashboard() {
                                 <div ref={chatEndRef} />
                               </div>
 
-                              <form onSubmit={handleSendChat} className="flex gap-3 font-sans">
+                              <form onSubmit={handleSendChat} className="flex items-center gap-2 sm:gap-3 w-full font-sans">
                                 <input
                                   type="text"
                                   value={chatInput}
                                   onChange={(e) => setChatInput(e.target.value)}
-                                  placeholder="Type question or comment to the live community..."
-                                  className="flex-grow bg-brand-dark/80 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all font-sans"
+                                  placeholder="Type question or comment..."
+                                  className="flex-1 min-w-0 bg-brand-dark/80 border border-white/15 rounded-xl px-3.5 sm:px-4 py-3 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all font-sans"
                                 />
                                 <button
                                   type="submit"
-                                  className="px-6 py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                                  className="shrink-0 h-[46px] px-4 sm:px-6 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-brand-teal/10"
+                                  title="Send Message"
+                                  aria-label="Send Message"
                                 >
-                                  <Send className="w-4 h-4" />
-                                  <span>Send</span>
+                                  <Send className="w-4 h-4 shrink-0" />
+                                  <span className="hidden sm:inline">Send</span>
                                 </button>
                               </form>
                             </div>

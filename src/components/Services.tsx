@@ -17,6 +17,7 @@ import { DatabaseEngine, ServiceRegistration, EnquiryItem, PaymentTransaction, C
 import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp, generateUpiUrl, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 import { getLeaderPhoto } from '../utils/leaderPhotos';
+import { downloadServiceSpecPdf } from '../utils/workshopAssetGenerator';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -73,7 +74,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   const [regTimeline, setRegTimeline] = useState('');
   const [regSuccessKey, setRegSuccessKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
-  const [modalMode, setModalMode] = useState<'register' | 'enterKey' | 'qrPay'>('register');
+  const [modalMode, setModalMode] = useState<'register' | 'enterKey'>('register');
   const [inputtedKey, setInputtedKey] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
 
@@ -1360,7 +1361,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                   // FORM STATE
                   <div>
                     {/* Toggle Modes */}
-                    <div className="grid grid-cols-3 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20">
+                    <div className="grid grid-cols-2 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20">
                       <button
                         type="button"
                         onClick={() => { setModalMode('register'); setKeyError(null); setInputtedKey(''); }}
@@ -1378,16 +1379,6 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                         }`}
                       >
                         Enter Key
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setModalMode('qrPay'); setQrPayError(null); setQrPayUtr(''); }}
-                        className={`py-2 text-[11px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 flex items-center justify-center gap-1 ${
-                          modalMode === 'qrPay' ? 'bg-[#5f259f] text-white font-bold shadow' : 'text-gray-400 hover:text-white'
-                        }`}
-                      >
-                        <QrCode className="w-3.5 h-3.5" />
-                        <span>QR Code Pay</span>
                       </button>
                     </div>
 
@@ -1485,7 +1476,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           </button>
                         </div>
                       </form>
-                    ) : modalMode === 'enterKey' ? (
+                    ) : (
                       <form onSubmit={handleVerifyKey} className="space-y-4 font-sans">
                         <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Enter Dispatch Key *</label>
@@ -1513,187 +1504,6 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           >
                             <Key className="w-3.5 h-3.5" />
                             Verify & Sync Keychain
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      /* QR CODE PAYMENT FORM */
-                      <form onSubmit={handleVerifyQrServicePay} className="space-y-4 font-sans">
-                        {/* Payer Info */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">Your Name</label>
-                            <input
-                              type="text"
-                              value={regName}
-                              onChange={(e) => setRegName(e.target.value)}
-                              placeholder="e.g. Rahul Sharma"
-                              className="w-full bg-brand-dark/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">Your Email</label>
-                            <input
-                              type="email"
-                              value={regEmail}
-                              onChange={(e) => setRegEmail(e.target.value)}
-                              placeholder="e.g. scoders82@gmail.com"
-                              className="w-full bg-brand-dark/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Amount Selection */}
-                        <div>
-                          <label className="block text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1.5">Select Advance / Token Amount</label>
-                          <div className="grid grid-cols-3 gap-2 font-mono text-xs">
-                            {[2500, 5000, 10000].map((amt) => (
-                              <button
-                                key={amt}
-                                type="button"
-                                onClick={() => setQrPayAmount(amt)}
-                                className={`py-2 px-3 rounded-xl border font-bold transition-all text-center cursor-pointer ${
-                                  qrPayAmount === amt
-                                    ? 'bg-brand-teal text-brand-dark border-brand-teal shadow-md'
-                                    : 'bg-white/5 border-white/10 text-gray-300 hover:text-white'
-                                }`}
-                              >
-                                ₹{amt.toLocaleString()}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Direct Mobile UPI App Instant Triggers */}
-                        <div className="space-y-2 pt-1">
-                          <label className="block text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">
-                            ⚡ Pay Directly via UPI App (Instant Launch)
-                          </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {/* PhonePe Direct Trigger */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openUpiApp({
-                                  pa: getActiveMerchantUpi(),
-                                  pn: 'S-CODERS Technologies',
-                                  am: qrPayAmount,
-                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
-                                  tr: `SRV${Date.now()}`
-                                }, 'phonepe');
-                              }}
-                              className="py-2.5 px-2 bg-[#5f259f]/20 hover:bg-[#5f259f]/40 active:scale-95 text-white border border-[#5f259f]/50 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-[#5f259f]/10"
-                            >
-                              <div className="w-6 h-6 rounded-full bg-[#5f259f] flex items-center justify-center text-white text-[10px] font-bold">
-                                पे
-                              </div>
-                              <span className="text-[11px] font-bold font-mono">PhonePe</span>
-                              <span className="text-[8px] text-purple-300 font-mono">Tap to Open</span>
-                            </button>
-
-                            {/* Google Pay Direct Trigger */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openUpiApp({
-                                  pa: getActiveMerchantUpi(),
-                                  pn: 'S-CODERS Technologies',
-                                  am: qrPayAmount,
-                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
-                                  tr: `SRV${Date.now()}`
-                                }, 'gpay');
-                              }}
-                              className="py-2.5 px-2 bg-blue-600/20 hover:bg-blue-600/40 active:scale-95 text-white border border-blue-500/50 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-blue-600/10"
-                            >
-                              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
-                                G
-                              </div>
-                              <span className="text-[11px] font-bold font-mono">Google Pay</span>
-                              <span className="text-[8px] text-blue-300 font-mono">Tap to Open</span>
-                            </button>
-
-                            {/* Paytm / Any UPI Direct Trigger */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openUpiApp({
-                                  pa: getActiveMerchantUpi(),
-                                  pn: 'S-CODERS Technologies',
-                                  am: qrPayAmount,
-                                  tn: `Advance: ${registeringService.title.slice(0, 20)}`,
-                                  tr: `SRV${Date.now()}`
-                                }, 'universal');
-                              }}
-                              className="py-2.5 px-2 bg-cyan-600/20 hover:bg-cyan-600/40 active:scale-95 text-white border border-cyan-500/50 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md shadow-cyan-600/10"
-                            >
-                              <div className="w-6 h-6 rounded-full bg-cyan-600 flex items-center justify-center text-white text-[10px] font-bold">
-                                UPI
-                              </div>
-                              <span className="text-[11px] font-bold font-mono">Any UPI App</span>
-                              <span className="text-[8px] text-cyan-300 font-mono">Paytm / BHIM</span>
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-gray-400 font-mono text-center">
-                            Tap above to launch your installed payment app with prefilled amount ₹{qrPayAmount.toLocaleString()}
-                          </p>
-                        </div>
-
-                        {/* PhonePe UPI Scanner Card */}
-                        <div className="py-2 flex flex-col items-center">
-                          <PhonePeScannerCard
-                            upiString={generateUpiUrl({
-                              pa: getActiveMerchantUpi(),
-                              pn: 'S-CODERS Technologies',
-                              am: qrPayAmount,
-                              tn: `Advance: ${registeringService.title.slice(0, 20)}`,
-                              tr: `SRV${Date.now()}`
-                            }, 'universal')}
-                            merchantName="S-CODERS Technologies"
-                            merchantVpa={getActiveMerchantUpi()}
-                            amount={qrPayAmount}
-                          />
-                        </div>
-
-                        {/* UTR Input */}
-                        <div>
-                          <label className="block text-[10px] font-mono text-brand-teal uppercase tracking-widest mb-1 font-bold">
-                            Enter 12-Digit UPI Ref / UTR Number *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={16}
-                            value={qrPayUtr}
-                            onChange={(e) => {
-                              setQrPayUtr(e.target.value.replace(/\D/g, ''));
-                              setQrPayError(null);
-                            }}
-                            placeholder="e.g. 423589123456"
-                            className="w-full bg-brand-dark/70 border border-brand-teal/40 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal font-mono tracking-wider"
-                          />
-                        </div>
-
-                        {qrPayError && (
-                          <p className="text-red-400 text-xs font-mono">{qrPayError}</p>
-                        )}
-
-                        <div className="pt-2">
-                          <button
-                            type="submit"
-                            disabled={qrPayVerifying || !qrPayUtr}
-                            className="w-full py-3 bg-[#5f259f] hover:bg-[#722ebd] text-white font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#5f259f]/30 disabled:opacity-50"
-                          >
-                            {qrPayVerifying ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                <span>Verifying with Bank of Baroda...</span>
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck className="w-4 h-4" />
-                                <span>Verify UPI Payment & Generate Key</span>
-                              </>
-                            )}
                           </button>
                         </div>
                       </form>
@@ -2949,19 +2759,47 @@ export function ServiceProjectSpaceDashboard({
     }, 1500);
   };
 
-  const handleDownload = (fileName: string) => {
+  const handleDownload = async (fileName: string) => {
     setDownloadingFile(fileName);
-    setDownloadProgress(0);
+    setDownloadProgress(20);
+
+    // 1. Native server download trigger
+    try {
+      const link = document.createElement('a');
+      link.href = `/api/services/download/${encodeURIComponent(fileName)}`;
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        try {
+          if (document.body.contains(link)) document.body.removeChild(link);
+        } catch (e) {}
+      }, 2000);
+    } catch (e) {
+      console.warn('Server download link warning:', e);
+    }
+
     const interval = setInterval(() => {
       setDownloadProgress(p => {
-        if (p >= 100) {
+        if (p >= 90) {
           clearInterval(interval);
-          setTimeout(() => setDownloadingFile(null), 1000);
-          return 100;
+          return 90;
         }
-        return p + 20;
+        return p + 25;
       });
-    }, 150);
+    }, 100);
+
+    try {
+      await downloadServiceSpecPdf(fileName, 'Verified Service Architecture Blueprint');
+    } catch (e) {
+      console.warn('Client PDF generation warning:', e);
+    }
+
+    clearInterval(interval);
+    setDownloadProgress(100);
+    setTimeout(() => setDownloadingFile(null), 1000);
   };
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
@@ -3313,14 +3151,17 @@ export function ServiceProjectSpaceDashboard({
                   </div>
                   <div className="shrink-0 flex items-center gap-3">
                     <span className="text-xs font-mono text-gray-400">{file.size}</span>
-                    <button
+                    <a
+                      href={`/api/services/download/${encodeURIComponent(file.name)}`}
+                      download={file.name}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => handleDownload(file.name)}
-                      disabled={downloadingFile !== null}
-                      className="p-2.5 bg-white/5 hover:bg-brand-teal/20 hover:text-brand-teal text-gray-300 rounded-xl transition-all cursor-pointer border border-white/10"
-                      title="Download Spec PDF"
+                      className="p-2.5 bg-white/5 hover:bg-brand-teal hover:text-brand-dark text-gray-300 rounded-xl transition-all cursor-pointer border border-white/10 flex items-center justify-center"
+                      title="Download Spec PDF to File Explorer"
                     >
                       <Download className="w-4 h-4" />
-                    </button>
+                    </a>
                   </div>
                 </div>
               ))}

@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import JSZip from "jszip";
+import { jsPDF } from "jspdf";
 
 dotenv.config();
 
@@ -1077,6 +1079,524 @@ async function startServer() {
   // API endpoints
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", startup: "S-CODERS", razorpay: true, merchantUpiId: "scoders@ybl" });
+  });
+
+  // ==============================================================
+  // OFFICIAL WORKSHOP & SERVICE ASSET DOWNLOAD SERVERS (FILE EXPLORER NATIVE)
+  // ==============================================================
+  function generateN8nJson(): string {
+    const workflowData = {
+      name: "S-CODERS • AI Agents with n8n & Gemini • Production Workflow",
+      version: "1.4.0",
+      createdAt: new Date().toISOString(),
+      author: "S-CODERS (Bharat Tech Developers) - Bengaluru",
+      license: "MIT",
+      meta: {
+        templateCredsSetupCompleted: true,
+        instanceId: "scoders_enterprise_cluster_01"
+      },
+      nodes: [
+        {
+          parameters: {
+            httpMethod: "POST",
+            path: "webhook/v1/ai-agent-trigger",
+            responseMode: "responseNode",
+            options: {}
+          },
+          name: "Incoming Webhook Trigger",
+          type: "n8n-nodes-base.webhook",
+          typeVersion: 1.1,
+          position: [240, 300],
+          id: "node-webhook-01"
+        },
+        {
+          parameters: {
+            model: "models/gemini-2.5-flash",
+            options: {
+              temperature: 0.2,
+              maxOutputTokens: 2048
+            }
+          },
+          name: "Google Gemini 2.5 Flash Model",
+          type: "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+          typeVersion: 1,
+          position: [460, 480],
+          id: "node-gemini-lm-02"
+        },
+        {
+          parameters: {
+            promptType: "define",
+            text: "=Analyze the client request payload: {{ $json.body.query }}\\nIdentify intent and extract entities into JSON schema.",
+            hasOutputParser: true
+          },
+          name: "AI Agent Reasoning Engine",
+          type: "@n8n/n8n-nodes-langchain.agent",
+          typeVersion: 1.6,
+          position: [500, 300],
+          id: "node-agent-core-03"
+        },
+        {
+          parameters: {
+            tableName: "developer_knowledge_base",
+            similarityMetric: "cosine"
+          },
+          name: "Supabase Vector Memory RAG",
+          type: "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+          typeVersion: 1,
+          position: [700, 480],
+          id: "node-vector-rag-04"
+        },
+        {
+          parameters: {
+            options: {
+              responseCode: 200
+            }
+          },
+          name: "Respond to Webhook",
+          type: "n8n-nodes-base.respondToWebhook",
+          typeVersion: 1.1,
+          position: [780, 300],
+          id: "node-respond-05"
+        }
+      ],
+      connections: {
+        "Incoming Webhook Trigger": {
+          main: [[{ node: "AI Agent Reasoning Engine", type: "main", index: 0 }]]
+        },
+        "Google Gemini 2.5 Flash Model": {
+          ai_languageModel: [[{ node: "AI Agent Reasoning Engine", type: "ai_languageModel", index: 0 }]]
+        },
+        "Supabase Vector Memory RAG": {
+          ai_tool: [[{ node: "AI Agent Reasoning Engine", type: "ai_tool", index: 0 }]]
+        },
+        "AI Agent Reasoning Engine": {
+          main: [[{ node: "Respond to Webhook", type: "main", index: 0 }]]
+        }
+      },
+      settings: { executionOrder: "v1" }
+    };
+    return JSON.stringify(workflowData, null, 2);
+  }
+
+  function generateGeminiPromptsPdfBuffer(): Buffer {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 50;
+
+    doc.setFillColor(11, 15, 23);
+    doc.rect(0, 0, pageWidth, 90, "F");
+
+    doc.setTextColor(34, 211, 238);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.text("S-CODERS • BHARAT TECH DEVELOPERS", margin, 42);
+
+    doc.setTextColor(248, 250, 252);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("Official Gemini 2.5 & AI Agent System Prompt Engineering Guide", margin, 65);
+
+    y = 120;
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("1. Core Principles of Autonomous AI System Prompts", margin, y);
+    y += 20;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
+    const introText =
+      "When building production multi-agent systems with Google Gemini 2.5 Flash and Pro models, " +
+      "system instructions must enforce identity, operational boundaries, tool availability, and structured output formatting. " +
+      "Below are the exact production templates used by S-CODERS engineering leads in Bengaluru.";
+    const introLines = doc.splitTextToSize(introText, contentWidth);
+    doc.text(introLines, margin, y);
+    y += introLines.length * 14 + 15;
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(margin, y, contentWidth, 140, 6, 6, "F");
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(margin, y, contentWidth, 140, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("TEMPLATE A: Senior Autonomous Software Engineer (TypeScript & React)", margin + 12, y + 20);
+
+    doc.setFont("courier", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(30, 41, 59);
+    const promptCode1 = [
+      "You are a senior full-stack software engineer at Bharat Tech Developers.",
+      "Your goal is to build robust, bug-free, and high-performance TypeScript components.",
+      "- Adhere strictly to Tailwind CSS utility conventions. Never use inline styles.",
+      "- When generating APIs, return clean JSON without markdown conversational filler.",
+      "- Always handle edge cases: network timeout, null pointer, and token expiry.",
+      "- Temperature: 0.15 | TopP: 0.95 | Model: gemini-2.5-flash"
+    ];
+    doc.text(promptCode1, margin + 12, y + 40);
+    y += 160;
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(margin, y, contentWidth, 140, 6, 6, "F");
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(margin, y, contentWidth, 140, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("TEMPLATE B: Multi-Step Tool Calling & ReAct Execution Loop", margin + 12, y + 20);
+
+    doc.setFont("courier", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(30, 41, 59);
+    const promptCode2 = [
+      "You are an orchestrator agent that has access to tools: [search_db, run_code, send_webhook].",
+      "Follow this strict loop for every user query:",
+      "1. THOUGHT: State internal reasoning clearly before acting.",
+      "2. ACTION: Call the appropriate function with required arguments schema.",
+      "3. OBSERVATION: Inspect function return value.",
+      "4. FINAL ANSWER: Formulate output response to the user with references."
+    ];
+    doc.text(promptCode2, margin + 12, y + 40);
+    y += 160;
+
+    doc.setFillColor(240, 253, 250);
+    doc.roundedRect(margin, y, contentWidth, 120, 6, 6, "F");
+    doc.setDrawColor(45, 212, 191);
+    doc.roundedRect(margin, y, contentWidth, 120, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(13, 148, 136);
+    doc.text("KEY BEST PRACTICES FROM SHREYAS M. & LOKESH A.", margin + 12, y + 20);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    const tips = [
+      "1. Never prompt the model to 'be smart' — instead define precise role boundaries.",
+      "2. Use systemInstruction in GoogleGenAI SDK instead of injecting into user history.",
+      "3. Enable responseSchema with Type.OBJECT to guarantee zero syntax parse errors.",
+      "4. Store conversation session history in Redis or PostgreSQL with user token keys."
+    ];
+    doc.text(tips, margin + 12, y + 42);
+
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Verified Asset • S-CODERS Tech Conference & Workshop Series • scoders82@gmail.com", margin, 800);
+
+    return Buffer.from(doc.output("arraybuffer"));
+  }
+
+  async function generateSaasZipBuffer(): Promise<Buffer> {
+    const zip = new JSZip();
+    zip.file("README.md", `# S-CODERS SaaS Multitenant Production Boilerplate\\nDeveloped by S-CODERS (Bharat Tech Developers) • Bengaluru, India\\n\\n## Overview\\nThis production starter template implements complete multi-tenant tenant isolation with:\\n- Tenant-specific subdomain / path resolution\\n- PostgreSQL Row Level Security (RLS) policies\\n- Role-Based Access Control (Admin, Member, Viewer)\\n- React 19 + TypeScript frontend with Tailwind CSS\\n- Express.js API backend with JWT tenant session verification\\n\\n## Getting Started\\n\\\`\\\`\\\`bash\\nnpm install\\nnpm run dev\\n\\\`\\\`\\\`\\n\\n## Support\\nContact: scoders82@gmail.com | Phone: +91 6363905989\\n`);
+    zip.file("package.json", JSON.stringify({
+      name: "scoders-saas-multitenant-starter",
+      version: "1.0.0",
+      private: true,
+      scripts: { dev: "vite", build: "vite build", serve: "node server.js" },
+      dependencies: { react: "^19.0.0", "react-dom": "^19.0.0", "lucide-react": "^0.546.0", clsx: "^2.1.1", "tailwind-merge": "^3.0.0" },
+      devDependencies: { vite: "^6.2.0", typescript: "^5.8.0", tailwindcss: "^4.0.0" }
+    }, null, 2));
+    zip.file("tsconfig.json", JSON.stringify({
+      compilerOptions: { target: "ESNext", lib: ["DOM", "DOM.Iterable", "ESNext"], module: "ESNext", moduleResolution: "Node", jsx: "react-jsx", strict: true },
+      include: ["src"]
+    }, null, 2));
+    
+    const src = zip.folder("src");
+    if (src) {
+      src.file("main.tsx", "import React from 'react';\\nimport ReactDOM from 'react-dom/client';\\nimport App from './App';\\nimport './index.css';\\n\\nReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);");
+      src.file("App.tsx", "import React, { useState } from 'react';\\nimport { TenantDashboard } from './components/TenantDashboard';\\nimport { OrgSwitcher } from './components/OrgSwitcher';\\n\\nexport default function App() {\\n  const [currentTenant, setCurrentTenant] = useState({ id: 'org_scoders_01', name: 'Bharat Tech Innovators', plan: 'Enterprise', membersCount: 14 });\\n  return (\\n    <div className=\"min-h-screen bg-slate-950 text-slate-100 p-8 font-sans\">\\n      <header className=\"max-w-6xl mx-auto flex justify-between items-center pb-6 border-b border-slate-800\">\\n        <h1 className=\"text-2xl font-black text-cyan-400\">S-CODERS SaaS Engine</h1>\\n        <OrgSwitcher currentTenant={currentTenant} onSelectTenant={setCurrentTenant} />\\n      </header>\\n      <main className=\"max-w-6xl mx-auto pt-8\">\\n        <TenantDashboard tenant={currentTenant} />\\n      </main>\\n    </div>\\n  );\\n}");
+      src.file("index.css", "@import \"tailwindcss\";\\nbody { margin: 0; background-color: #030712; color: #f9fafb; }");
+
+      const components = src.folder("components");
+      if (components) {
+        components.file("TenantDashboard.tsx", "import React from 'react';\\nexport function TenantDashboard({ tenant }: { tenant: any }) {\\n  return (\\n    <div className=\"bg-slate-900 border border-slate-800 rounded-2xl p-6\">\\n      <h2 className=\"text-lg font-bold text-white mb-2\">Tenant Workspace: {tenant.name}</h2>\\n      <p className=\"text-xs text-slate-400\">Tenant ID: <code className=\"text-cyan-400\">{tenant.id}</code></p>\\n    </div>\\n  );\\n}");
+        components.file("OrgSwitcher.tsx", "import React from 'react';\\nexport function OrgSwitcher({ currentTenant, onSelectTenant }: any) {\\n  return (<select value={currentTenant.id} onChange={(e) => onSelectTenant({ id: e.target.value, name: 'Active Org', plan: 'Enterprise' })} className=\"bg-slate-900 text-slate-200 border border-slate-700 rounded-xl px-4 py-2 text-xs font-mono\"><option value=\"org_scoders_01\">🏢 Bharat Tech Innovators</option></select>);\\n}");
+      }
+
+      const serverFolder = src.folder("server");
+      if (serverFolder) {
+        serverFolder.file("tenantIsolation.ts", "import { Request, Response, NextFunction } from 'express';\\nexport function tenantIsolationMiddleware(req: any, res: Response, next: NextFunction) {\\n  const tenantId = req.headers['x-tenant-id'] || 'default_tenant';\\n  req.tenantId = tenantId;\\n  next();\\n}");
+        serverFolder.file("rlsPolicies.sql", "-- PostgreSQL / Supabase Row-Level Security\\nALTER TABLE projects ENABLE ROW LEVEL SECURITY;\\nCREATE POLICY tenant_isolation_projects ON projects FOR ALL USING (tenant_id = current_setting('app.current_tenant_id', true));");
+      }
+    }
+
+    return await zip.generateAsync({ type: "nodebuffer" });
+  }
+
+  function generateSessionDeckPdfBuffer(workshopTitle = "AI Agents with n8n & Gemini"): Buffer {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 50;
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 90, "F");
+
+    doc.setTextColor(34, 211, 238);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.text("S-CODERS • WORKSHOP SESSION DECK", margin, 42);
+
+    doc.setTextColor(248, 250, 252);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Official Curriculum, Architecture Slides & Lab Exercises • ${workshopTitle}`, margin, 65);
+
+    y = 120;
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, contentWidth, 120, 6, 6, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, contentWidth, 120, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text("SLIDE 1: Modern AI Agent Architecture Overview", margin + 14, y + 24);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const slide1Lines = [
+      "• Foundation Models vs. Autonomous Agent Loops: Understanding the ReAct loop.",
+      "• Tool Definitions: Schemas, function parameters, and deterministic execution boundaries.",
+      "• Memory Layers: Ephemeral session context vs. persistent vector embeddings (Supabase/PostgreSQL).",
+      "• Latency Optimizations: Streaming token deltas directly to client UI via Server-Sent Events (SSE)."
+    ];
+    doc.text(slide1Lines, margin + 14, y + 46);
+    y += 140;
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, contentWidth, 160, 6, 6, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, contentWidth, 160, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text("HANDS-ON LAB EXERCISES (Required for Certificate Eligibility)", margin + 14, y + 24);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const labLines = [
+      "Exercise 1: Create an n8n webhook listener that ingests incoming JSON payloads and logs to terminal.",
+      "Exercise 2: Connect the Google Gemini 2.5 Flash model with system instructions to classify sentiment.",
+      "Exercise 3: Implement tool routing: if query asks for database data, trigger query_sql; else reply directly.",
+      "Exercise 4: Store conversation memory in localStorage and sync with the S-CODERS Sandbox environment.",
+      "Exercise 5: Deploy the complete agent to Google Cloud Run or Render with environment secrets."
+    ];
+    doc.text(labLines, margin + 14, y + 46);
+    y += 180;
+
+    doc.setFillColor(240, 253, 250);
+    doc.roundedRect(margin, y, contentWidth, 110, 6, 6, "F");
+    doc.setDrawColor(45, 212, 191);
+    doc.roundedRect(margin, y, contentWidth, 110, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(13, 148, 136);
+    doc.text("OFFICIAL MENTOR VERIFICATION & CREDENTIAL MINTING", margin + 14, y + 24);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    const certLines = [
+      "Upon completing the exercises, submit your pass key and repository link to your instructor.",
+      "Verification Mentors: Shreyas M. (Founder), Lokesh A. (Co-Founder), Bhuvan M. (Tech Lead).",
+      "Official S-CODERS Digital Developer Credentials are dispatched via scoders82@gmail.com."
+    ];
+    doc.text(certLines, margin + 14, y + 44);
+
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("© 2026 S-CODERS (Bharat Tech Developers) • Bengaluru, India • All Rights Reserved", margin, 800);
+
+    return Buffer.from(doc.output("arraybuffer"));
+  }
+
+  async function generateWorkshopKitBundle(): Promise<Buffer> {
+    const zip = new JSZip();
+    zip.file("README_FIRST.txt", `S-CODERS • BHARAT TECH DEVELOPERS\\nOfficial Workshop Developer Kit\\n=========================================\\nIncluded in this package:\\n1. n8n_ai_workflow_blueprints_scoders.json (Production n8n + Gemini agent workflow)\\n2. gemini_system_prompts_cheatsheet.pdf (Gemini 2.5 prompt engineering guide)\\n3. saas_multitenant_boilerplate.zip (Complete React 19 + Express multitenant SaaS starter)\\n4. scoders_workshop_session_deck_exercises.pdf (Curriculum slides & lab exercises)\\n\\nSupport & Verification: scoders82@gmail.com | +91 6363905989\\n`);
+    zip.file("n8n_ai_workflow_blueprints_scoders.json", generateN8nJson());
+    zip.file("gemini_system_prompts_cheatsheet.pdf", generateGeminiPromptsPdfBuffer());
+    zip.file("saas_multitenant_boilerplate.zip", await generateSaasZipBuffer());
+    zip.file("scoders_workshop_session_deck_exercises.pdf", generateSessionDeckPdfBuffer());
+    return await zip.generateAsync({ type: "nodebuffer" });
+  }
+
+  function generateServiceSpecPdfBuffer(filename: string, desc = "Official Architecture Specification"): Buffer {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 50;
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 90, "F");
+
+    doc.setTextColor(34, 211, 238);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("S-CODERS • SPECIFICATION DOCUMENT", margin, 42);
+
+    doc.setTextColor(248, 250, 252);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Official Technical Deliverable: ${filename.replace(".pdf", "")}`, margin, 65);
+
+    y = 120;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text("Document Overview & Scope", margin, y);
+    y += 20;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
+    const p1 = `This document contains the verified architectural specifications, implementation plans, and engineering parameters prepared by S-CODERS (Bharat Tech Developers) for your project: "${desc}".`;
+    const p1Lines = doc.splitTextToSize(p1, contentWidth);
+    doc.text(p1Lines, margin, y);
+    y += p1Lines.length * 14 + 20;
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, contentWidth, 130, 6, 6, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, contentWidth, 130, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text("1. Architectural & Technology Highlights", margin + 12, y + 20);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const items = [
+      "• Frontend Stack: React 19, TypeScript 5.8, Tailwind CSS v4, Motion engine.",
+      "• Backend & Proxy: Express.js server, Node.js v20+ runtime, encrypted payload transport.",
+      "• AI Core: Google Gemini 2.5 Flash / Pro API with structured output schemas.",
+      "• Database & State: PostgreSQL / SQLite with Row-Level Security and strict tenant boundary isolation.",
+      "• Deployment Target: Google Cloud Run containerized deployment with custom domain routing."
+    ];
+    doc.text(items, margin + 12, y + 40);
+    y += 150;
+
+    doc.setFillColor(240, 253, 250);
+    doc.roundedRect(margin, y, contentWidth, 120, 6, 6, "F");
+    doc.setDrawColor(45, 212, 191);
+    doc.roundedRect(margin, y, contentWidth, 120, 6, 6, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(13, 148, 136);
+    doc.text("2. Engineering Team Assignment & Coordination", margin + 12, y + 20);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    const teamItems = [
+      "• Shreyas M. (Founder & CEO): Lead Architecture, System Design & Model Routing.",
+      "• Lokesh A. (Co-Founder): Vibe Coding Prototyping, Prompt Engineering & Workflow Automations.",
+      "• Bhuvan M. (Tech Lead): UI/UX Platform Development & Full-Stack Implementation.",
+      "• Direct Support: scoders82@gmail.com | WhatsApp: +91 6363905989"
+    ];
+    doc.text(teamItems, margin + 12, y + 40);
+
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("S-CODERS (Bharat Tech Developers) • Confidential Technical Asset • Bengaluru, India", margin, 800);
+
+    return Buffer.from(doc.output("arraybuffer"));
+  }
+
+  // WORKSHOP ASSET DOWNLOAD ENDPOINTS (Guaranteed File Explorer Native Save)
+  app.get(["/api/workshops/download/:assetId", "/api/workshops/download"], async (req, res) => {
+    try {
+      const assetId = (req.params.assetId || (req.query.item as string) || (req.query.id as string) || (req.query.file as string) || "").toLowerCase();
+
+      if (assetId.includes("json") || assetId.includes("blueprint") || assetId.includes("n8n")) {
+        const jsonContent = generateN8nJson();
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("Content-Disposition", 'attachment; filename="n8n_ai_workflow_blueprints_scoders.json"');
+        res.setHeader("Cache-Control", "no-cache");
+        return res.send(jsonContent);
+      }
+
+      if (assetId.includes("pdf_prompt") || assetId.includes("prompt") || assetId.includes("cheatsheet")) {
+        const pdfBuf = generateGeminiPromptsPdfBuffer();
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", 'attachment; filename="gemini_system_prompts_cheatsheet.pdf"');
+        res.setHeader("Content-Length", pdfBuf.length);
+        res.setHeader("Cache-Control", "no-cache");
+        return res.end(pdfBuf);
+      }
+
+      if (assetId.includes("zip") || assetId.includes("boilerplate") || assetId.includes("saas")) {
+        const zipBuf = await generateSaasZipBuffer();
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", 'attachment; filename="saas_multitenant_boilerplate.zip"');
+        res.setHeader("Content-Length", zipBuf.length);
+        res.setHeader("Cache-Control", "no-cache");
+        return res.end(zipBuf);
+      }
+
+      if (assetId.includes("pdf_slides") || assetId.includes("slides") || assetId.includes("deck") || assetId.includes("exercise")) {
+        const pdfBuf = generateSessionDeckPdfBuffer();
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", 'attachment; filename="scoders_workshop_session_deck_exercises.pdf"');
+        res.setHeader("Content-Length", pdfBuf.length);
+        res.setHeader("Cache-Control", "no-cache");
+        return res.end(pdfBuf);
+      }
+
+      if (assetId.includes("all") || assetId.includes("kit") || assetId.includes("bundle")) {
+        const bundleBuf = await generateWorkshopKitBundle();
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", 'attachment; filename="scoders_workshop_complete_developer_kit.zip"');
+        res.setHeader("Content-Length", bundleBuf.length);
+        res.setHeader("Cache-Control", "no-cache");
+        return res.end(bundleBuf);
+      }
+
+      // Default fallback
+      const defaultBuf = await generateSaasZipBuffer();
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", 'attachment; filename="saas_multitenant_boilerplate.zip"');
+      return res.end(defaultBuf);
+    } catch (err) {
+      console.error("Error serving workshop download:", err);
+      res.status(500).json({ error: "Failed to generate asset download" });
+    }
+  });
+
+  // SERVICE SPEC DOWNLOAD ENDPOINT
+  app.get("/api/services/download/:filename", (req, res) => {
+    try {
+      const rawName = req.params.filename || "Project_Architecture_Spec.pdf";
+      const filename = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
+      const pdfBuf = generateServiceSpecPdfBuffer(filename, "Verified Service Architecture Blueprint");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", pdfBuf.length);
+      res.setHeader("Cache-Control", "no-cache");
+      return res.end(pdfBuf);
+    } catch (err) {
+      console.error("Error serving service download:", err);
+      res.status(500).json({ error: "Failed to generate spec PDF" });
+    }
   });
 
   // Shared Data Storage Helpers
