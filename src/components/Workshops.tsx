@@ -20,7 +20,9 @@ import {
   downloadN8nWorkflowBlueprint, 
   downloadGeminiSystemPromptsPdf, 
   downloadSaasBoilerplateZip, 
-  downloadSessionDeckExercisesPdf 
+  downloadSessionDeckExercisesPdf,
+  downloadWorkshopKitBundle,
+  triggerFileDownload
 } from '../utils/workshopAssetGenerator';
 
 interface WorkshopsProps {
@@ -127,6 +129,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
+  const [lastDownloadedItem, setLastDownloadedItem] = useState<{ id: string; filename: string } | null>(null);
 
   // Discussion / Chatroom State
   const [chatInput, setChatInput] = useState('');
@@ -676,74 +679,80 @@ export default function TenantDashboard() {
     }, 2200);
   };
 
-  // RESOURCE DOWNLOAD HANDLER: Generates real files and saves directly to user's File Explorer / Downloads
+  // RESOURCE DOWNLOAD HANDLER: Generates real, verified files and saves directly to user's File Explorer / Downloads
   const handleDownloadResource = async (itemName: string, customFileName?: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    if (downloadingItem) return; // Prevent concurrent multiple downloads
+
     setDownloadingItem(itemName);
-    setDownloadProgress(25);
+    setDownloadProgress(20);
     setDownloadSuccessNotice(null);
 
     const savedName = customFileName || itemNameFormat(itemName);
 
-    // 1. Immediately trigger native browser attachment download via dedicated server endpoint
-    try {
-      const serverDownloadLink = document.createElement('a');
-      serverDownloadLink.href = `/api/workshops/download/${itemName}`;
-      serverDownloadLink.download = savedName;
-      serverDownloadLink.target = '_blank';
-      serverDownloadLink.rel = 'noopener noreferrer';
-      document.body.appendChild(serverDownloadLink);
-      serverDownloadLink.click();
-      setTimeout(() => {
-        try {
-          if (document.body.contains(serverDownloadLink)) {
-            document.body.removeChild(serverDownloadLink);
-          }
-        } catch (e) {}
-      }, 2000);
-    } catch (e) {
-      console.warn('Native server anchor click warning:', e);
-    }
-
-    // 2. Progress animation timer
+    // Progress tick animation
     const progressTimer = setInterval(() => {
-      setDownloadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressTimer);
-          return 90;
-        }
-        return prev + 25;
-      });
-    }, 100);
+      setDownloadProgress((prev) => (prev >= 85 ? 85 : prev + 15));
+    }, 120);
 
     try {
-      // 3. Also trigger client-side generator to guarantee local generation if offline or browser popup blocked
-      if (itemName === 'json') {
-        await downloadN8nWorkflowBlueprint(activeWorkshop?.title);
-      } else if (itemName === 'pdf_prompt') {
-        await downloadGeminiSystemPromptsPdf();
-      } else if (itemName === 'zip') {
-        await downloadSaasBoilerplateZip();
-      } else if (itemName === 'pdf_slides') {
-        await downloadSessionDeckExercisesPdf(activeWorkshop?.title);
-      } else if (itemName === 'all') {
-        await downloadSaasBoilerplateZip();
+      // 1. Fetch exact binary from backend endpoint
+      const response = await fetch(`/api/workshops/download/${encodeURIComponent(itemName)}`);
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error('Received empty download buffer');
       }
 
       clearInterval(progressTimer);
-      setDownloadProgress(100);
+      setDownloadProgress(95);
 
+      // 2. Save the single, validated binary blob into File Explorer
+      triggerFileDownload(blob, savedName);
+
+      setDownloadProgress(100);
+      setLastDownloadedItem({ id: itemName, filename: savedName });
+      setDownloadSuccessNotice(`"${savedName}" saved directly to your Downloads folder in File Explorer!`);
+      setTimeout(() => setDownloadSuccessNotice(null), 10000);
+    } catch (networkErr) {
+      console.warn('Backend download endpoint fetch failed, falling back to local asset generator:', networkErr);
+      try {
+        // High-fidelity client-side fallback if offline or server unreachable
+        if (itemName === 'json') {
+          await downloadN8nWorkflowBlueprint(activeWorkshop?.title);
+        } else if (itemName === 'pdf_prompt') {
+          await downloadGeminiSystemPromptsPdf();
+        } else if (itemName === 'zip') {
+          await downloadSaasBoilerplateZip();
+        } else if (itemName === 'pdf_slides') {
+          await downloadSessionDeckExercisesPdf(activeWorkshop?.title);
+        } else if (itemName === 'all') {
+          await downloadWorkshopKitBundle(activeWorkshop?.title);
+        }
+
+        clearInterval(progressTimer);
+        setDownloadProgress(100);
+        setLastDownloadedItem({ id: itemName, filename: savedName });
+        setDownloadSuccessNotice(`"${savedName}" saved directly to your Downloads folder in File Explorer!`);
+        setTimeout(() => setDownloadSuccessNotice(null), 10000);
+      } catch (genErr) {
+        console.error('All download methods failed:', genErr);
+        clearInterval(progressTimer);
+        setDownloadSuccessNotice(`Failed to generate "${savedName}". Please check your internet connection and try again.`);
+      }
+    } finally {
+      clearInterval(progressTimer);
       setTimeout(() => {
         setDownloadingItem(null);
         setDownloadProgress(0);
-        setDownloadSuccessNotice(`Downloaded "${savedName}" successfully! Check your computer's Downloads folder in File Explorer.`);
-        setTimeout(() => setDownloadSuccessNotice(null), 8000);
-      }, 400);
-    } catch (err) {
-      console.error('Download error:', err);
-      clearInterval(progressTimer);
-      setDownloadingItem(null);
-      setDownloadProgress(0);
-      setDownloadSuccessNotice(`Downloaded "${savedName}"! Check your Downloads folder in File Explorer.`);
+      }, 800);
     }
   };
 
@@ -1259,32 +1268,56 @@ export default function TenantDashboard() {
                                 </div>
                                 
                                 {/* Master Download All Button */}
-                                <a
-                                  href="/api/workshops/download/all"
-                                  download="scoders_workshop_complete_developer_kit.zip"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
                                   onClick={(e) => handleDownloadResource('all', 'scoders_workshop_complete_developer_kit.zip', e)}
-                                  className="px-4 py-2 bg-brand-teal/20 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shrink-0"
+                                  disabled={downloadingItem !== null}
+                                  className="px-4 py-2 bg-brand-teal/20 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shrink-0 disabled:opacity-50"
                                   title="Download all workshop resources in a single zip archive"
                                 >
                                   <Download className="w-4 h-4" />
-                                  <span>Download All Assets (.ZIP)</span>
-                                </a>
+                                  <span>{downloadingItem === 'all' ? 'Downloading Kit...' : 'Download All Assets (.ZIP)'}</span>
+                                </button>
                               </div>
 
                               {/* File Explorer Instructions Tip */}
-                              <div className="p-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] font-mono text-gray-300 flex items-start gap-2.5">
-                                <span className="text-brand-teal font-bold shrink-0">💡 File Explorer Tip:</span>
-                                <span>
-                                  Clicking download saves the file directly to your system's <strong className="text-white">Downloads</strong> folder. In Windows File Explorer, open <code className="text-cyan-300 bg-black/40 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser to view all downloaded files.
-                                </span>
+                              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono text-gray-300 space-y-2.5">
+                                <div className="flex items-center gap-2 text-brand-teal font-bold text-xs uppercase tracking-wider">
+                                  <span>💡 File Explorer Guide</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] pt-1">
+                                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                                    <span className="text-brand-teal font-bold shrink-0">1.</span>
+                                    <span>Click <strong className="text-white">Download</strong> to save the verified file directly to your system's <strong className="text-white">Downloads</strong> folder.</span>
+                                  </div>
+                                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                                    <span className="text-brand-teal font-bold shrink-0">2.</span>
+                                    <span>In File Explorer, open <code className="text-cyan-300 bg-white/10 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser.</span>
+                                  </div>
+                                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                                    <span className="text-brand-teal font-bold shrink-0">3.</span>
+                                    <span>Click <strong className="text-brand-teal">Open</strong> to preview documents immediately in your browser tab.</span>
+                                  </div>
+                                </div>
                               </div>
 
                               {downloadSuccessNotice && (
-                                <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex items-center gap-2.5 shadow-lg shadow-emerald-500/10">
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                                  <span className="flex-1 font-semibold">{downloadSuccessNotice}</span>
+                                <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-emerald-500/10">
+                                  <div className="flex items-center gap-2.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <span className="font-semibold">{downloadSuccessNotice}</span>
+                                  </div>
+                                  {lastDownloadedItem && (lastDownloadedItem.id === 'pdf_prompt' || lastDownloadedItem.id === 'pdf_slides' || lastDownloadedItem.id === 'json') && (
+                                    <a
+                                      href={`/api/workshops/view/${lastDownloadedItem.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1.5 bg-emerald-400 text-black hover:bg-emerald-300 font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Open / View in Browser</span>
+                                    </a>
+                                  )}
                                 </div>
                               )}
 
@@ -1305,30 +1338,43 @@ export default function TenantDashboard() {
                                       <span className="text-[10px] text-gray-500 font-mono block mt-1 truncate">{item.filename}</span>
                                     </div>
 
-                                    <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-3">
+                                    <div className="pt-2 border-t border-white/5 flex items-center gap-2">
                                       {downloadingItem === item.id ? (
-                                        <div className="w-full space-y-1.5">
+                                        <div className="w-full space-y-1.5 py-1">
                                           <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                                             <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
                                           </div>
                                           <div className="flex justify-between text-[11px] font-mono text-brand-teal font-bold">
-                                            <span>Downloading to File Explorer...</span>
+                                            <span>Saving to File Explorer...</span>
                                             <span>{downloadProgress}%</span>
                                           </div>
                                         </div>
                                       ) : (
-                                        <a
-                                          href={`/api/workshops/download/${item.id}`}
-                                          download={item.filename}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onClick={(e) => handleDownloadResource(item.id, item.filename, e)}
-                                          className="w-full py-2.5 px-4 bg-white/5 hover:bg-brand-teal hover:text-brand-dark text-gray-200 hover:font-bold rounded-xl transition-all border border-white/10 hover:border-brand-teal cursor-pointer shadow-md flex items-center justify-center gap-2 font-mono text-xs"
-                                          title={`Download ${item.title} directly into File Explorer`}
-                                        >
-                                          <Download className="w-4 h-4 shrink-0" />
-                                          <span>Download File</span>
-                                        </a>
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleDownloadResource(item.id, item.filename, e)}
+                                            disabled={downloadingItem !== null}
+                                            className="flex-1 py-2 px-3 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal hover:font-bold rounded-xl transition-all border border-brand-teal/30 hover:border-brand-teal cursor-pointer shadow-sm flex items-center justify-center gap-1.5 font-mono text-xs disabled:opacity-50"
+                                            title={`Download ${item.title} directly into File Explorer`}
+                                          >
+                                            <Download className="w-3.5 h-3.5 shrink-0" />
+                                            <span>Download</span>
+                                          </button>
+
+                                          {item.id !== 'zip' ? (
+                                            <a
+                                              href={`/api/workshops/view/${item.id}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="py-2 px-3 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white rounded-xl transition-all border border-white/10 cursor-pointer shadow-sm flex items-center justify-center gap-1.5 font-mono text-xs shrink-0"
+                                              title={`Open and view ${item.title} directly in browser`}
+                                            >
+                                              <Eye className="w-3.5 h-3.5 text-brand-teal" />
+                                              <span>Open</span>
+                                            </a>
+                                          ) : null}
+                                        </>
                                       )}
                                     </div>
                                   </div>

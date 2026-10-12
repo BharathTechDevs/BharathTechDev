@@ -1295,7 +1295,7 @@ async function startServer() {
 
   async function generateSaasZipBuffer(): Promise<Buffer> {
     const zip = new JSZip();
-    zip.file("README.md", `# S-CODERS SaaS Multitenant Production Boilerplate\\nDeveloped by S-CODERS (Bharat Tech Developers) • Bengaluru, India\\n\\n## Overview\\nThis production starter template implements complete multi-tenant tenant isolation with:\\n- Tenant-specific subdomain / path resolution\\n- PostgreSQL Row Level Security (RLS) policies\\n- Role-Based Access Control (Admin, Member, Viewer)\\n- React 19 + TypeScript frontend with Tailwind CSS\\n- Express.js API backend with JWT tenant session verification\\n\\n## Getting Started\\n\\\`\\\`\\\`bash\\nnpm install\\nnpm run dev\\n\\\`\\\`\\\`\\n\\n## Support\\nContact: scoders82@gmail.com | Phone: +91 6363905989\\n`);
+    zip.file("README.md", `# S-CODERS SaaS Multitenant Production Boilerplate\\nDeveloped by S-CODERS (Bharat Tech Developers) • Bengaluru, India\\n\\n## Overview\\nThis production starter template implements complete multi-tenant tenant isolation with:\\n- Tenant-specific subdomain / path resolution\\n- PostgreSQL Row Level Security (RLS) policies\\n- Role-Based Access Control (Admin, Member, Viewer)\\n- React 19 + TypeScript frontend with Tailwind CSS\\n- Express.js API backend with JWT tenant session verification\\n\\n## Getting Started\\n\\\`\\\`\\\`bash\\nnpm install\\nnpm run dev\\n\\\`\\\`\\\`\\n\\n## Support\\nContact: scoders82@gmail.com\\n`);
     zip.file("package.json", JSON.stringify({
       name: "scoders-saas-multitenant-starter",
       version: "1.0.0",
@@ -1427,7 +1427,7 @@ async function startServer() {
 
   async function generateWorkshopKitBundle(): Promise<Buffer> {
     const zip = new JSZip();
-    zip.file("README_FIRST.txt", `S-CODERS • BHARAT TECH DEVELOPERS\\nOfficial Workshop Developer Kit\\n=========================================\\nIncluded in this package:\\n1. n8n_ai_workflow_blueprints_scoders.json (Production n8n + Gemini agent workflow)\\n2. gemini_system_prompts_cheatsheet.pdf (Gemini 2.5 prompt engineering guide)\\n3. saas_multitenant_boilerplate.zip (Complete React 19 + Express multitenant SaaS starter)\\n4. scoders_workshop_session_deck_exercises.pdf (Curriculum slides & lab exercises)\\n\\nSupport & Verification: scoders82@gmail.com | +91 6363905989\\n`);
+    zip.file("README_FIRST.txt", `S-CODERS • BHARAT TECH DEVELOPERS\\nOfficial Workshop Developer Kit\\n=========================================\\nIncluded in this package:\\n1. n8n_ai_workflow_blueprints_scoders.json (Production n8n + Gemini agent workflow)\\n2. gemini_system_prompts_cheatsheet.pdf (Gemini 2.5 prompt engineering guide)\\n3. saas_multitenant_boilerplate.zip (Complete React 19 + Express multitenant SaaS starter)\\n4. scoders_workshop_session_deck_exercises.pdf (Curriculum slides & lab exercises)\\n\\nSupport & Verification: scoders82@gmail.com\\n`);
     zip.file("n8n_ai_workflow_blueprints_scoders.json", generateN8nJson());
     zip.file("gemini_system_prompts_cheatsheet.pdf", generateGeminiPromptsPdfBuffer());
     zip.file("saas_multitenant_boilerplate.zip", await generateSaasZipBuffer());
@@ -1522,23 +1522,27 @@ async function startServer() {
     return Buffer.from(doc.output("arraybuffer"));
   }
 
-  // WORKSHOP ASSET DOWNLOAD ENDPOINTS (Guaranteed File Explorer Native Save)
-  app.get(["/api/workshops/download/:assetId", "/api/workshops/download"], async (req, res) => {
+  // WORKSHOP ASSET DOWNLOAD & INLINE VIEW ENDPOINTS (Guaranteed File Explorer Native Save & In-Browser Preview)
+  app.get(["/api/workshops/download/:assetId", "/api/workshops/download", "/api/workshops/view/:assetId", "/api/workshops/view"], async (req, res) => {
     try {
+      const isInlineView = req.path.includes("/view") || req.query.view === "inline";
+      const dispositionType = isInlineView ? "inline" : "attachment";
       const assetId = (req.params.assetId || (req.query.item as string) || (req.query.id as string) || (req.query.file as string) || "").toLowerCase();
 
       if (assetId.includes("json") || assetId.includes("blueprint") || assetId.includes("n8n")) {
         const jsonContent = generateN8nJson();
+        const jsonBuf = Buffer.from(jsonContent, "utf-8");
         res.setHeader("Content-Type", "application/json; charset=utf-8");
-        res.setHeader("Content-Disposition", 'attachment; filename="n8n_ai_workflow_blueprints_scoders.json"');
+        res.setHeader("Content-Disposition", `${dispositionType}; filename="n8n_ai_workflow_blueprints_scoders.json"`);
+        res.setHeader("Content-Length", jsonBuf.length);
         res.setHeader("Cache-Control", "no-cache");
-        return res.send(jsonContent);
+        return res.end(jsonBuf);
       }
 
       if (assetId.includes("pdf_prompt") || assetId.includes("prompt") || assetId.includes("cheatsheet")) {
         const pdfBuf = generateGeminiPromptsPdfBuffer();
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", 'attachment; filename="gemini_system_prompts_cheatsheet.pdf"');
+        res.setHeader("Content-Disposition", `${dispositionType}; filename="gemini_system_prompts_cheatsheet.pdf"`);
         res.setHeader("Content-Length", pdfBuf.length);
         res.setHeader("Cache-Control", "no-cache");
         return res.end(pdfBuf);
@@ -1556,7 +1560,7 @@ async function startServer() {
       if (assetId.includes("pdf_slides") || assetId.includes("slides") || assetId.includes("deck") || assetId.includes("exercise")) {
         const pdfBuf = generateSessionDeckPdfBuffer();
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", 'attachment; filename="scoders_workshop_session_deck_exercises.pdf"');
+        res.setHeader("Content-Disposition", `${dispositionType}; filename="scoders_workshop_session_deck_exercises.pdf"`);
         res.setHeader("Content-Length", pdfBuf.length);
         res.setHeader("Cache-Control", "no-cache");
         return res.end(pdfBuf);

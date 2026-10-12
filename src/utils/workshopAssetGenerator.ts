@@ -6,14 +6,23 @@ import { jsPDF } from 'jspdf';
  * File Explorer (Downloads folder).
  */
 export function triggerFileDownload(blob: Blob, filename: string) {
+  // Ensure accurate MIME type on blob
+  let mimeType = blob.type;
+  if (!mimeType || mimeType === 'application/octet-stream') {
+    if (filename.endsWith('.pdf')) mimeType = 'application/pdf';
+    else if (filename.endsWith('.zip')) mimeType = 'application/zip';
+    else if (filename.endsWith('.json')) mimeType = 'application/json';
+  }
+  const typedBlob = blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
+
   // 1. IE / Legacy Edge support
   if (typeof (window.navigator as any).msSaveOrOpenBlob === 'function') {
-    (window.navigator as any).msSaveOrOpenBlob(blob, filename);
+    (window.navigator as any).msSaveOrOpenBlob(typedBlob, filename);
     return;
   }
 
   // 2. Standard HTML5 blob download
-  const url = window.URL.createObjectURL(blob);
+  const url = window.URL.createObjectURL(typedBlob);
   const anchor = document.createElement('a');
   anchor.style.position = 'fixed';
   anchor.style.top = '-9999px';
@@ -29,7 +38,6 @@ export function triggerFileDownload(blob: Blob, filename: string) {
   try {
     anchor.click();
   } catch (err) {
-    // Synthetic event dispatch fallback
     const clickEvt = new MouseEvent('click', {
       view: window,
       bubbles: true,
@@ -48,7 +56,7 @@ export function triggerFileDownload(blob: Blob, filename: string) {
     } catch (e) {
       // Ignored cleanup errors
     }
-  }, 10000);
+  }, 30000);
 }
 
 /**
@@ -349,7 +357,7 @@ npm run dev
 - \`/src/types/index.ts\`: Common TypeScript interfaces
 
 ## Support
-Contact: scoders82@gmail.com | Phone: +91 6363905989
+Contact: scoders82@gmail.com
 `
   );
 
@@ -797,7 +805,7 @@ export async function downloadServiceSpecPdf(filename: string, desc: string) {
     '• Shreyas M. (Founder & CEO): Lead Architecture, System Design & Model Routing.',
     '• Lokesh A. (Co-Founder): Vibe Coding Prototyping, Prompt Engineering & Workflow Automations.',
     '• Bhuvan M. (Tech Lead): UI/UX Platform Development & Full-Stack Implementation.',
-    '• Direct Support: scoders82@gmail.com | WhatsApp: +91 6363905989'
+    '• Direct Support: scoders82@gmail.com'
   ];
   doc.text(teamItems, margin + 12, y + 40);
 
@@ -809,4 +817,74 @@ export async function downloadServiceSpecPdf(filename: string, desc: string) {
 
   const pdfBlob = doc.output('blob');
   triggerFileDownload(pdfBlob, filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
+}
+
+/**
+ * 6. Generates and downloads the complete Master Kit (.ZIP bundle) client-side fallback.
+ */
+export async function downloadWorkshopKitBundle(workshopTitle = 'AI Agents with n8n & Gemini') {
+  const zip = new JSZip();
+  zip.file(
+    'README_FIRST.txt',
+    `S-CODERS • BHARAT TECH DEVELOPERS\nOfficial Workshop Developer Kit\n=========================================\nIncluded in this package:\n1. n8n_ai_workflow_blueprints_scoders.json (Production n8n + Gemini agent workflow)\n2. gemini_system_prompts_cheatsheet.pdf (Gemini 2.5 prompt engineering guide)\n3. saas_multitenant_boilerplate.zip (Complete React 19 + Express multitenant SaaS starter)\n4. scoders_workshop_session_deck_exercises.pdf (Curriculum slides & lab exercises)\n\nSupport: scoders82@gmail.com\n`
+  );
+
+  // 1. JSON
+  const workflowData = {
+    name: `S-CODERS • ${workshopTitle} • Production Workflow`,
+    version: '1.4.0',
+    createdAt: new Date().toISOString(),
+    author: 'S-CODERS (Bharat Tech Developers) - Bengaluru',
+    license: 'MIT',
+    meta: { templateCredsSetupCompleted: true, instanceId: 'scoders_enterprise_cluster_01' },
+    nodes: [
+      { parameters: { httpMethod: 'POST', path: 'webhook/v1/ai-agent-trigger' }, name: 'Incoming Webhook Trigger', type: 'n8n-nodes-base.webhook', position: [240, 300] },
+      { parameters: { model: 'models/gemini-2.5-flash' }, name: 'Google Gemini 2.5 Flash Model', type: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini', position: [460, 480] }
+    ]
+  };
+  zip.file('n8n_ai_workflow_blueprints_scoders.json', JSON.stringify(workflowData, null, 2));
+
+  // 2. Prompt PDF
+  const docPrompts = new jsPDF({ unit: 'pt', format: 'a4' });
+  docPrompts.setFillColor(11, 15, 23);
+  docPrompts.rect(0, 0, docPrompts.internal.pageSize.getWidth(), 80, 'F');
+  docPrompts.setTextColor(34, 211, 238);
+  docPrompts.setFont('helvetica', 'bold');
+  docPrompts.setFontSize(20);
+  docPrompts.text('S-CODERS • GEMINI SYSTEM PROMPTS GUIDE', 40, 40);
+  docPrompts.setTextColor(248, 250, 252);
+  docPrompts.setFontSize(11);
+  docPrompts.setFont('helvetica', 'normal');
+  docPrompts.text('Official Gemini 2.5 System Prompt Engineering Specifications', 40, 60);
+  docPrompts.setTextColor(15, 23, 42);
+  docPrompts.text('Production system instructions and operational boundaries for multi-agent autonomous loops.', 40, 110);
+  docPrompts.text('Support & Inquiries: scoders82@gmail.com', 40, 780);
+  zip.file('gemini_system_prompts_cheatsheet.pdf', docPrompts.output('arraybuffer'));
+
+  // 3. Slides PDF
+  const docSlides = new jsPDF({ unit: 'pt', format: 'a4' });
+  docSlides.setFillColor(11, 15, 23);
+  docSlides.rect(0, 0, docSlides.internal.pageSize.getWidth(), 80, 'F');
+  docSlides.setTextColor(34, 211, 238);
+  docSlides.setFont('helvetica', 'bold');
+  docSlides.setFontSize(20);
+  docSlides.text('S-CODERS • WORKSHOP SLIDES & LABS', 40, 40);
+  docSlides.setTextColor(248, 250, 252);
+  docSlides.setFontSize(11);
+  docSlides.setFont('helvetica', 'normal');
+  docSlides.text(`Curriculum Deck & Exercises • ${workshopTitle}`, 40, 60);
+  docSlides.setTextColor(15, 23, 42);
+  docSlides.text('Hands-on exercises and architecture deck for building production AI applications.', 40, 110);
+  docSlides.text('Support & Mentor Verification: scoders82@gmail.com', 40, 780);
+  zip.file('scoders_workshop_session_deck_exercises.pdf', docSlides.output('arraybuffer'));
+
+  // 4. Boilerplate nested zip
+  const saasZip = new JSZip();
+  saasZip.file('README.md', '# S-CODERS SaaS Multitenant Boilerplate\nCreated by S-CODERS • Bengaluru\nSupport: scoders82@gmail.com\n');
+  saasZip.file('package.json', JSON.stringify({ name: 'scoders-saas-starter', version: '1.0.0', private: true }, null, 2));
+  const saasBuf = await saasZip.generateAsync({ type: 'arraybuffer' });
+  zip.file('saas_multitenant_boilerplate.zip', saasBuf);
+
+  const bundleBlob = await zip.generateAsync({ type: 'blob' });
+  triggerFileDownload(bundleBlob, 'scoders_workshop_complete_developer_kit.zip');
 }
