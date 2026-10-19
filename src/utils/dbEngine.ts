@@ -91,18 +91,27 @@ export interface FeedbackItem {
   submissionDate: string;
 }
 
+export interface ChatMessageItem {
+  id: string;
+  sender: 'client' | 'team';
+  senderName?: string;
+  senderRole?: string;
+  content: string;
+  timestamp: string;
+  edited?: boolean;
+  editedAt?: string;
+}
+
 export interface ChatConversation {
-  id: string; // e.g. "CHT-5819"
+  id: string; // e.g. "CHT-5819" or "chat-wksp-..."
   clientName: string;
   clientEmail: string;
   registrationId: string; // Service / Workshop registration ID
   reference: string; // Selected service title or workshop title
-  messages: Array<{
-    id: string;
-    sender: 'client' | 'team';
-    content: string;
-    timestamp: string;
-  }>;
+  workshopId?: string;
+  serviceId?: string;
+  uniqueAccessKey?: string;
+  messages: ChatMessageItem[];
   lastUpdated: string;
 }
 

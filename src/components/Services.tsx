@@ -6,7 +6,7 @@ import {
   Settings, Database, AppWindow, Eye, Check, ChevronRight, Layout,
   Laptop, Server, Clock, Calendar, Shield, HelpCircle, Star, Download,
   Phone, Mail, MessageSquare, FileText, QrCode, MessageCircle, ExternalLink, ShieldCheck,
-  Github, Linkedin
+  Github, Linkedin, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -17,7 +17,8 @@ import { DatabaseEngine, ServiceRegistration, EnquiryItem, PaymentTransaction, C
 import PhonePeScannerCard from './PhonePeScannerCard';
 import { openUpiApp, generateUpiUrl, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } from '../utils/paymentLinks';
 import { getLeaderPhoto } from '../utils/leaderPhotos';
-import { downloadServiceSpecPdf } from '../utils/workshopAssetGenerator';
+import { downloadServiceSpecPdf, triggerFileDownload } from '../utils/workshopAssetGenerator';
+import ServiceChatRoom from './ServiceChatRoom';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -608,6 +609,30 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         };
         const currentPayments = DatabaseEngine.getPayments();
         DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
+
+        // Save Chat Conversation for QR Registration
+        const dbChat: ChatConversation = {
+          id: mockChatId,
+          clientName: payerName,
+          clientEmail: payerEmail,
+          registrationId: regId,
+          reference: registeringService.title,
+          serviceId: registeringService.id,
+          uniqueAccessKey: generatedKey,
+          messages: [
+            { 
+              id: 'msg-init-1', 
+              sender: 'team', 
+              senderName: 'S-CODERS Lead Team',
+              senderRole: 'S-CODERS Founder & CEO',
+              content: `Welcome ${payerName} to S-CODERS! We have initialized your dedicated WhatsApp-style workspace for '${registeringService.title}'. Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) are directly assigned to coordinate your deliverables.`, 
+              timestamp: new Date().toISOString() 
+            }
+          ],
+          lastUpdated: new Date().toISOString()
+        };
+        const currentChats = DatabaseEngine.getChats();
+        DatabaseEngine.saveChats([dbChat, ...currentChats]);
       } catch (e) {}
 
       // Trigger Email Notification
@@ -1580,6 +1605,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                   <ServiceProjectSpaceDashboard 
                     service={activeWorkspaceService} 
                     regInfo={regInfo} 
+                    isAdmin={isAdmin}
+                    currentUser={currentUser}
                     onClose={() => setActiveWorkspaceService(null)} 
                   />
                 </div>
@@ -2709,22 +2736,16 @@ function ConsultancyAdvisorPlayground() {
 export function ServiceProjectSpaceDashboard({ 
   service, 
   regInfo, 
+  isAdmin = false,
+  currentUser = null,
   onClose 
 }: { 
   service: any; 
   regInfo: any; 
+  isAdmin?: boolean;
+  currentUser?: AppUser | null;
   onClose: () => void; 
 }) {
-  // Live Chat state
-  const [messages, setMessages] = useState<Array<{ sender: 'client' | 'scoders'; text: string; time: string }>>([
-    {
-      sender: 'scoders',
-      text: `Hello ${regInfo.name}! Welcome to your S-CODERS custom project space. We've initialized analysis for your ${service.title} project based on your registered budget of ${regInfo.budget || 'TBD'} and timeline of ${regInfo.timeline || 'TBD'}. Our expert team is reviewing the requirements.`,
-      time: 'Just Now'
-    }
-  ]);
-  const [inputText, setInputText] = useState('');
-  
   // Feedback Form State
   const [feedName, setFeedName] = useState(regInfo.name || '');
   const [feedEmail, setFeedEmail] = useState(regInfo.email || '');
@@ -2733,73 +2754,72 @@ export function ServiceProjectSpaceDashboard({
   const [feedExperience, setFeedExperience] = useState('');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
-  // File download simulation
-  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  // File download states (Identical to Workshop high-fidelity download system)
+  const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
+  const [lastDownloadedItem, setLastDownloadedItem] = useState<{ id: string; filename: string } | null>(null);
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
+  const handleDownloadResource = async (fileName: string, customTitle?: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
-    const userMsg = inputText.trim();
-    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setMessages(prev => [...prev, { sender: 'client', text: userMsg, time: nowStr }]);
-    setInputText('');
+    if (downloadingItem) return;
 
-    // Simulate smart team response after 1.5 seconds
-    setTimeout(() => {
-      const responses = [
-        "That sounds like an excellent design consideration! I've added this detail directly to our technical spec sheet. Shreyas will address this in our next Zoom meet.",
-        "Understood. We are aligning the UI layouts accordingly. I'll ask Bhuvan to update the progress designs so you can review the change shortly.",
-        "Perfect. Regarding the timeline, we can expedite the database schema creation to match your requirements. I will WhatsApp you with a draft link.",
-        "Received. Shreyas is currently writing the core AI routing graph. We will showcase the functional prototype during our next milestone demo!"
-      ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      setMessages(prev => [...prev, { sender: 'scoders', text: randomResponse, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-    }, 1500);
-  };
-
-  const handleDownload = async (fileName: string) => {
-    setDownloadingFile(fileName);
+    setDownloadingItem(fileName);
     setDownloadProgress(20);
+    setDownloadSuccessNotice(null);
 
-    // 1. Native server download trigger
+    const progressTimer = setInterval(() => {
+      setDownloadProgress((prev) => (prev >= 85 ? 85 : prev + 15));
+    }, 120);
+
     try {
-      const link = document.createElement('a');
-      link.href = `/api/services/download/${encodeURIComponent(fileName)}`;
-      link.download = fileName;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
+      // 1. Fetch exact binary from backend endpoint
+      const response = await fetch(`/api/services/download/${encodeURIComponent(fileName)}`);
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error('Received empty download buffer');
+      }
+
+      clearInterval(progressTimer);
+      setDownloadProgress(95);
+
+      // 2. Save binary blob into File Explorer
+      triggerFileDownload(blob, fileName);
+
+      setDownloadProgress(100);
+      setLastDownloadedItem({ id: fileName, filename: fileName });
+      setDownloadSuccessNotice(`"${fileName}" saved directly to your Downloads folder in File Explorer!`);
+      setTimeout(() => setDownloadSuccessNotice(null), 10000);
+    } catch (networkErr) {
+      console.warn('Backend download endpoint fetch failed, falling back to local asset generator:', networkErr);
+      try {
+        await downloadServiceSpecPdf(fileName, customTitle || 'Verified Service Architecture Blueprint');
+
+        clearInterval(progressTimer);
+        setDownloadProgress(100);
+        setLastDownloadedItem({ id: fileName, filename: fileName });
+        setDownloadSuccessNotice(`"${fileName}" saved directly to your Downloads folder in File Explorer!`);
+        setTimeout(() => setDownloadSuccessNotice(null), 10000);
+      } catch (genErr) {
+        console.error('All download methods failed:', genErr);
+        clearInterval(progressTimer);
+        setDownloadSuccessNotice(`Failed to generate "${fileName}". Please check your internet connection and try again.`);
+      }
+    } finally {
+      clearInterval(progressTimer);
       setTimeout(() => {
-        try {
-          if (document.body.contains(link)) document.body.removeChild(link);
-        } catch (e) {}
-      }, 2000);
-    } catch (e) {
-      console.warn('Server download link warning:', e);
+        setDownloadingItem(null);
+        setDownloadProgress(0);
+      }, 800);
     }
-
-    const interval = setInterval(() => {
-      setDownloadProgress(p => {
-        if (p >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return p + 25;
-      });
-    }, 100);
-
-    try {
-      await downloadServiceSpecPdf(fileName, 'Verified Service Architecture Blueprint');
-    } catch (e) {
-      console.warn('Client PDF generation warning:', e);
-    }
-
-    clearInterval(interval);
-    setDownloadProgress(100);
-    setTimeout(() => setDownloadingFile(null), 1000);
   };
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
@@ -3122,108 +3142,156 @@ export function ServiceProjectSpaceDashboard({
         </div>
       </div>
 
-      {/* 3. MIDDLE SECTION: PROGRESS FILES & LIVE CHAT (SPACIOUS 2-COLUMN GRID) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+      {/* 3. MIDDLE SECTION: PROGRESS FILES & WHATSAPP-STYLE LIVE CHAT (SPACIOUS 2-COLUMN GRID) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-start">
         
-        {/* PROGRESS FILES / PDF SECTION */}
-        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-xl min-h-[480px]">
+        {/* PROGRESS FILES / PDF SECTION - IDENTICAL TO WORKSHOP FILE DOWNLOADING */}
+        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-xl min-h-[520px] space-y-5">
           <div>
-            <div className="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
-              <FileText className="w-5 h-5 text-brand-teal" />
-              <h4 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Progress Files & Spec PDFs</h4>
+            <div className="flex items-center justify-between gap-3 mb-4 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-brand-teal" />
+                <h4 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Progress Files & Spec PDFs</h4>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-teal/15 text-brand-teal border border-brand-teal/30 font-bold">
+                ENGINEERING DELIVERABLES
+              </span>
             </div>
             
-            <p className="text-xs sm:text-sm text-gray-300 mb-5 leading-relaxed">
-              Whenever you log in with your key, the latest blueprints, wireframes, and spec files uploaded by S-CODERS will appear here for download.
+            <p className="text-xs sm:text-sm text-gray-300 mb-4 leading-relaxed">
+              Whenever you log in with your key, the verified architecture blueprints, UI wireframes, and database specifications generated by S-CODERS are available for direct download into your system's File Explorer.
             </p>
 
+            {/* File Explorer Instructions Tip - Clean structured card layout matching Workshop */}
+            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono text-gray-300 space-y-2.5 mb-4">
+              <div className="flex items-center gap-2 text-brand-teal font-bold text-xs uppercase tracking-wider">
+                <FileText className="w-4 h-4 shrink-0" />
+                <span>File Explorer & Downloads Guide</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] leading-relaxed">
+                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                  <span className="text-brand-teal font-bold shrink-0">1.</span>
+                  <span>Your file downloads directly into your operating system's <code className="text-brand-teal bg-white/10 px-1 py-0.5 rounded">Downloads</code> folder in File Explorer / Finder.</span>
+                </div>
+                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                  <span className="text-brand-teal font-bold shrink-0">2.</span>
+                  <span>In File Explorer, open <code className="text-cyan-300 bg-white/10 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser.</span>
+                </div>
+                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                  <span className="text-brand-teal font-bold shrink-0">3.</span>
+                  <span>Click <strong className="text-brand-teal">Open</strong> to preview documents immediately in your browser tab.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Download Success Banner */}
+            {downloadSuccessNotice && (
+              <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-emerald-500/10 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-semibold">{downloadSuccessNotice}</span>
+                </div>
+                {lastDownloadedItem && (
+                  <a
+                    href={`/api/services/view/${encodeURIComponent(lastDownloadedItem.id)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-emerald-400 text-black hover:bg-emerald-300 font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Open / View in Browser</span>
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* 4 Specification Files Grid */}
             <div className="space-y-3 flex-grow">
               {[
-                { name: 'Project_Architecture_Spec.pdf', desc: 'Tech stack flow, system diagram & parameters', size: '1.8 MB' },
-                { name: 'Interactive_UI_Mockups_v1.pdf', desc: 'High fidelity wireframes & layout templates', size: '4.5 MB' },
-                { name: 'Database_Schema_Spec.pdf', desc: 'PostgreSQL structures, attributes & indices', size: '1.2 MB' },
-                { name: 'AI_Agent_Logic_Flowchart.pdf', desc: 'Structured chain-of-thought routing blueprint', size: '2.4 MB' }
+                { id: 'Project_Architecture_Spec.pdf', title: 'Project Architecture Blueprint', desc: 'Tech stack flow, system diagram & parameters', size: '1.8 MB', filename: 'Project_Architecture_Spec.pdf' },
+                { id: 'Interactive_UI_Mockups_v1.pdf', title: 'Interactive UI Mockups & Flows', desc: 'High fidelity wireframes & layout templates', size: '4.5 MB', filename: 'Interactive_UI_Mockups_v1.pdf' },
+                { id: 'Database_Schema_Spec.pdf', title: 'Relational Database Schema Spec', desc: 'PostgreSQL structures, attributes & indices', size: '1.2 MB', filename: 'Database_Schema_Spec.pdf' },
+                { id: 'AI_Agent_Logic_Flowchart.pdf', title: 'AI Agent & Routing Logic Flowchart', desc: 'Structured chain-of-thought routing blueprint', size: '2.4 MB', filename: 'AI_Agent_Logic_Flowchart.pdf' }
               ].map((file) => (
-                <div key={file.name} className="p-3.5 sm:p-4 bg-brand-dark/70 border border-white/10 hover:border-brand-teal/30 rounded-2xl flex items-center justify-between gap-3 text-left transition-all">
+                <div key={file.id} className="p-3.5 sm:p-4 bg-brand-dark/70 border border-white/10 hover:border-brand-teal/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left transition-all group">
                   <div className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-white truncate">{file.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="block text-sm font-bold text-white group-hover:text-brand-teal transition-colors truncate">{file.title}</span>
+                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-white/10 text-gray-300 shrink-0">{file.size}</span>
+                    </div>
                     <span className="block text-xs text-gray-400 truncate mt-0.5">{file.desc}</span>
+                    <span className="block text-[10px] text-gray-500 font-mono mt-0.5 truncate">{file.filename}</span>
                   </div>
-                  <div className="shrink-0 flex items-center gap-3">
-                    <span className="text-xs font-mono text-gray-400">{file.size}</span>
-                    <a
-                      href={`/api/services/download/${encodeURIComponent(file.name)}`}
-                      download={file.name}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => handleDownload(file.name)}
-                      className="p-2.5 bg-white/5 hover:bg-brand-teal hover:text-brand-dark text-gray-300 rounded-xl transition-all cursor-pointer border border-white/10 flex items-center justify-center"
-                      title="Download Spec PDF to File Explorer"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
+
+                  <div className="shrink-0 flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                    {downloadingItem === file.id ? (
+                      <div className="w-36 space-y-1 font-mono text-left">
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand-teal transition-all duration-200" style={{ width: `${downloadProgress}%` }} />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-brand-teal font-bold">
+                          <span>Saving...</span>
+                          <span>{downloadProgress}%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadResource(file.id, file.title, e)}
+                          disabled={downloadingItem !== null}
+                          className="px-3 py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all cursor-pointer border border-brand-teal/30 hover:border-brand-teal flex items-center gap-1.5 font-mono text-xs font-bold disabled:opacity-50 shadow-sm"
+                          title={`Download ${file.title} directly into File Explorer`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download</span>
+                        </button>
+
+                        <a
+                          href={`/api/services/view/${encodeURIComponent(file.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white rounded-xl transition-all cursor-pointer border border-white/10 flex items-center gap-1.5 font-mono text-xs shadow-sm"
+                          title={`Open ${file.title} directly in new tab`}
+                        >
+                          <Eye className="w-3.5 h-3.5 text-brand-teal" />
+                          <span>Open</span>
+                        </a>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {downloadingFile && (
-            <div className="mt-5 p-4 bg-brand-teal/10 border border-brand-teal/30 rounded-2xl space-y-2 font-mono">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-300 truncate">Downloading: {downloadingFile}</span>
-                <span className="text-brand-teal font-bold">{downloadProgress}%</span>
-              </div>
-              <div className="w-full bg-brand-dark h-2 rounded-full overflow-hidden">
-                <div className="bg-brand-teal h-full transition-all duration-150" style={{ width: `${downloadProgress}%` }} />
-              </div>
-            </div>
-          )}
+          {/* Master Download All ZIP Bundle Button */}
+          <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-xs font-mono text-gray-400">
+              Need all specifications at once?
+            </span>
+            <button
+              type="button"
+              onClick={(e) => handleDownloadResource('scoders_service_project_specs_bundle.zip', 'Service Specs Complete Bundle', e)}
+              disabled={downloadingItem !== null}
+              className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/20 shadow-sm"
+              title="Download entire specification bundle in ZIP format"
+            >
+              <Download className="w-4 h-4 text-brand-teal" />
+              <span>Download All Specs (ZIP Bundle)</span>
+            </button>
+          </div>
         </div>
 
-        {/* CHATBOX SECTION */}
-        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-xl min-h-[480px]">
-          <div>
-            <div className="flex items-center gap-3 mb-4 border-b border-white/10 pb-3">
-              <MessageSquare className="w-5 h-5 text-brand-teal" />
-              <h4 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Collaborative Live Chat</h4>
-            </div>
-          </div>
-
-          {/* Messages scrollable area */}
-          <div className="flex-grow overflow-y-auto space-y-3.5 pr-2 py-2 scrollbar-thin scrollbar-thumb-white/10 max-h-[300px] min-h-[220px]">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex flex-col ${msg.sender === 'client' ? 'items-end' : 'items-start'}`}>
-                <span className="text-[10px] sm:text-xs font-mono text-gray-400 mb-1">
-                  {msg.sender === 'client' ? 'You' : 'S-CODERS Lead'} • {msg.time}
-                </span>
-                <div className={`px-4 py-3 rounded-2xl text-xs sm:text-sm max-w-[85%] leading-relaxed ${
-                  msg.sender === 'client' 
-                    ? 'bg-brand-teal text-brand-dark font-medium rounded-tr-none shadow-md' 
-                    : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10'
-                }`}>
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Chat Form Input */}
-          <form onSubmit={handleSendMessage} className="flex gap-2.5 border-t border-white/10 pt-4 mt-3">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Drop developer feedback or questions..."
-              className="flex-grow bg-brand-dark/70 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-teal font-sans placeholder-gray-500"
-            />
-            <button
-              type="submit"
-              className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 font-bold"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+        {/* CHATBOX SECTION - WHATSAPP-STYLE INDIVIDUAL CHAT SYSTEM */}
+        <div className="min-h-[520px]">
+          <ServiceChatRoom
+            activeService={service}
+            activeRegInfo={regInfo}
+            isRegistered={true}
+            isAdmin={isAdmin}
+            currentUser={currentUser}
+          />
         </div>
 
       </div>

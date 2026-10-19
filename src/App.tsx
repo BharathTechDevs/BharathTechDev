@@ -788,30 +788,30 @@ export default function App() {
       </footer>
 
       {/* Floating Interactive Trigger Widgets */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
+      <div className="fixed bottom-4 right-3 sm:bottom-6 sm:right-6 z-40 flex flex-col gap-2.5 sm:gap-3">
         {/* Instant WhatsApp Customer Care Support trigger */}
         <a
           href="https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-4 bg-[#25d366] hover:bg-[#20ba5a] text-white rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center cursor-pointer group relative"
+          className="w-11 h-11 sm:w-14 sm:h-14 bg-[#25d366] hover:bg-[#20ba5a] text-white rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center cursor-pointer group relative"
           title="Customer Care Support WhatsApp Group"
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
           <span className="sr-only">Customer Care Support WhatsApp Group</span>
         </a>
 
         {/* Floating AI Consultant trigger */}
         <button
           onClick={() => setIsAssistantOpen(!isAssistantOpen)}
-          className="p-4 bg-brand-teal hover:bg-white text-brand-dark rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center relative group cursor-pointer"
+          className="w-11 h-11 sm:w-14 sm:h-14 bg-brand-teal hover:bg-white text-brand-dark rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center relative group cursor-pointer"
           title="S-CODERS AI Consultant"
         >
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+          <span className="absolute -top-1 -right-1 flex h-3 sm:h-3.5 w-3 sm:w-3.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-coral opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-brand-coral"></span>
+            <span className="relative inline-flex rounded-full h-3 sm:h-3.5 w-3 sm:w-3.5 bg-brand-coral"></span>
           </span>
-          {isAssistantOpen ? <X className="w-6 h-6 animate-spin-slow" /> : <MessageSquare className="w-6 h-6" />}
+          {isAssistantOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" /> : <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />}
         </button>
       </div>
 

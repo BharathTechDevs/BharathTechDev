@@ -24,18 +24,10 @@ import {
   downloadWorkshopKitBundle,
   triggerFileDownload
 } from '../utils/workshopAssetGenerator';
+import WorkshopChatRoom from './WorkshopChatRoom';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
-}
-
-interface ChatMessage {
-  id: string;
-  sender: string;
-  role: string;
-  text: string;
-  time: string;
-  isSelf?: boolean;
 }
 
 export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
@@ -131,10 +123,6 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
   const [lastDownloadedItem, setLastDownloadedItem] = useState<{ id: string; filename: string } | null>(null);
 
-  // Discussion / Chatroom State
-  const [chatInput, setChatInput] = useState('');
-  const [chatroomMessages, setChatroomMessages] = useState<ChatMessage[]>([]);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Sync current user state
   const [currentUser, setCurrentUser] = useState(() => {
@@ -411,8 +399,17 @@ export default function TenantDashboard() {
         clientEmail: safeEmail,
         registrationId: regId,
         reference: activeWorkshop.title,
+        workshopId: activeWorkshop.id,
+        uniqueAccessKey: generatedKey,
         messages: [
-          { id: 'msg-wksp-1', sender: 'team', content: `Congratulations ${safeName}! You are officially registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your learning materials, developer sandbox, and schedule access are unlocked.`, timestamp: new Date().toISOString() }
+          { 
+            id: `msg-wksp-1-${Date.now()}`, 
+            sender: 'team', 
+            senderName: 'S-CODERS Mentor Team',
+            senderRole: 'S-CODERS Founder & CEO',
+            content: `Congratulations ${safeName}! You are officially registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your learning materials, developer sandbox, and schedule access are unlocked. This is your private, individual chat with our mentors—feel free to ask questions or share links!`, 
+            timestamp: new Date().toISOString() 
+          }
         ],
         lastUpdated: new Date().toISOString()
       };
@@ -617,6 +614,36 @@ export default function TenantDashboard() {
       };
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
+
+      // Ensure individual chat is initialized for manual pass holder
+      try {
+        const manualChatId = `chat-wksp-${activeWorkshop.id}-${trimmed}`;
+        const existingChats = DatabaseEngine.getChats();
+        if (!existingChats.some(c => c.id === manualChatId || c.uniqueAccessKey === trimmed)) {
+          const manualChat: ChatConversation = {
+            id: manualChatId,
+            clientName: currentUser?.name || 'Registered Attendee',
+            clientEmail: currentUser?.email || 'manual@wksp-pass.in',
+            registrationId: trimmed,
+            workshopId: activeWorkshop.id,
+            reference: activeWorkshop.title,
+            uniqueAccessKey: trimmed,
+            messages: [
+              {
+                id: `msg-wksp-${Date.now()}`,
+                sender: 'team',
+                senderName: 'S-CODERS Mentor Team',
+                senderRole: 'S-CODERS Founder & CEO',
+                content: `Welcome to the private discussion channel for '${activeWorkshop.title}'! You can clear your technical doubts and share URLs directly with our engineering mentors here.`,
+                timestamp: new Date().toISOString()
+              }
+            ],
+            lastUpdated: new Date().toISOString()
+          };
+          DatabaseEngine.saveChats([manualChat, ...existingChats]);
+        }
+      } catch (e) {}
+
       setShowRegModal(false);
       setManualKey('');
       setManualKeyError(null);
@@ -766,67 +793,6 @@ export default function TenantDashboard() {
     }
   };
 
-  // VERIFIED COMMUNITY CHATROOM FEED SIMULATOR
-  useEffect(() => {
-    // Initial messages set
-    const mockMessages: ChatMessage[] = [
-      { id: '1', sender: 'Aravind K', role: 'SDE-2, Swiggy', text: 'Wait, does the Gemini Node SDK support streaming responses out of the box?', time: '10:41 AM' },
-      { id: '2', sender: 'Instructor Shreyas', role: 'S-CODERS Founder & CEO', text: 'Yes, absolutely! Use `ai.models.generateContentStream` instead of `generateContent` for real-time output streams.', time: '10:42 AM' },
-      { id: '3', sender: 'Nisha Hegde', role: 'Student, RVCE', text: 'The n8n custom WhatsApp webhook nodes worked perfectly on the sandbox. This is super fast.', time: '10:43 AM' },
-      { id: '4', sender: 'Meghana R', role: 'Intern, Dell', text: 'Do we get a certification record of attendance once we finish the final sandbox test?', time: '10:44 AM' }
-    ];
-    setChatroomMessages(mockMessages);
-  }, [selectedWorkshopId]);
-
-  // Periodic incoming mock chats
-  useEffect(() => {
-    if (!isRegistered) return;
-
-    const interval = setInterval(() => {
-      const randomChats = [
-        { sender: 'Bhuvan M', role: 'Tech Lead, S-CODERS', text: 'Is anyone deploying sub-agents? What is your prompt strategy for avoiding loops?' },
-        { sender: 'Instructor Shreyas', role: 'S-CODERS Founder & CEO', text: 'Make sure your agent has a clear exit node or a system constraint specifying: Maximum 5 loop turns.' },
-        { sender: 'Nithin Rao', role: 'Backend Dev, Zerodha', text: 'Just finished compiling the Postgres pool configurations. Working nicely!' },
-        { sender: 'Lokesh A', role: 'Co-Founder, S-CODERS', text: 'Amazing work everyone. Keep experimenting with the n8n webhook nodes!' }
-      ];
-
-      const chosen = randomChats[Math.floor(Math.random() * randomChats.length)];
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        sender: chosen.sender,
-        role: chosen.role,
-        text: chosen.text,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setChatroomMessages(prev => [...prev, newMessage]);
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [isRegistered]);
-
-  // Send message
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      sender: currentUser?.name || 'You (Developer)',
-      role: currentUser?.role === 'admin' ? 'System Administrator' : 'Attendee Builder',
-      text: chatInput.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isSelf: true
-    };
-
-    setChatroomMessages(prev => [...prev, newMessage]);
-    setChatInput('');
-  };
-
-  // Scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatroomMessages]);
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1383,45 +1349,15 @@ export default function TenantDashboard() {
                             </div>
                           )}
 
-                          {/* TAB 3: DISCUSSION LIVE CHATROOM */}
+                          {/* TAB 3: DISCUSSION LIVE CHATROOM - WhatsApp-Style Individual Persistent Private Chat & S-CODERS Team Portal */}
                           {activeTab === 'discussion' && (
-                            <div className="flex flex-col h-[460px] justify-between space-y-4">
-                              <div className="flex-grow bg-[#010309] border border-white/10 rounded-2xl p-5 overflow-y-auto space-y-4 max-h-80 shadow-inner">
-                                {chatroomMessages.map((msg, idx) => (
-                                  <div key={msg.id || idx} className={`flex flex-col max-w-[85%] ${msg.isSelf ? 'ml-auto items-end' : 'items-start'}`}>
-                                    <div className="flex items-center gap-2 text-xs font-mono text-gray-400 mb-1">
-                                      <span className={msg.isSelf ? 'text-brand-teal font-bold' : 'text-gray-200 font-semibold'}>{msg.sender}</span>
-                                      <span>•</span>
-                                      <span>{msg.role}</span>
-                                    </div>
-                                    <div className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${msg.isSelf ? 'bg-brand-teal text-brand-dark rounded-tr-none font-medium shadow-md' : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10'}`}>
-                                      {msg.text}
-                                    </div>
-                                    <span className="text-[10px] font-mono text-gray-500 mt-1">{msg.time}</span>
-                                  </div>
-                                ))}
-                                <div ref={chatEndRef} />
-                              </div>
-
-                              <form onSubmit={handleSendChat} className="flex items-center gap-2 sm:gap-3 w-full font-sans">
-                                <input
-                                  type="text"
-                                  value={chatInput}
-                                  onChange={(e) => setChatInput(e.target.value)}
-                                  placeholder="Type question or comment..."
-                                  className="flex-1 min-w-0 bg-brand-dark/80 border border-white/15 rounded-xl px-3.5 sm:px-4 py-3 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all font-sans"
-                                />
-                                <button
-                                  type="submit"
-                                  className="shrink-0 h-[46px] px-4 sm:px-6 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-brand-teal/10"
-                                  title="Send Message"
-                                  aria-label="Send Message"
-                                >
-                                  <Send className="w-4 h-4 shrink-0" />
-                                  <span className="hidden sm:inline">Send</span>
-                                </button>
-                              </form>
-                            </div>
+                            <WorkshopChatRoom
+                              activeWorkshop={activeWorkshop}
+                              activeRegInfo={activeRegInfo}
+                              isRegistered={isRegistered}
+                              isAdmin={isAdmin}
+                              currentUser={currentUser}
+                            />
                           )}
 
                         </div>

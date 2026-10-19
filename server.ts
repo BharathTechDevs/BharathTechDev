@@ -1510,7 +1510,7 @@ async function startServer() {
       "• Shreyas M. (Founder & CEO): Lead Architecture, System Design & Model Routing.",
       "• Lokesh A. (Co-Founder): Vibe Coding Prototyping, Prompt Engineering & Workflow Automations.",
       "• Bhuvan M. (Tech Lead): UI/UX Platform Development & Full-Stack Implementation.",
-      "• Direct Support: scoders82@gmail.com | WhatsApp: +91 6363905989"
+      "• Direct Support: scoders82@gmail.com | Official Service Community Desk"
     ];
     doc.text(teamItems, margin + 12, y + 40);
 
@@ -1586,14 +1586,38 @@ async function startServer() {
     }
   });
 
-  // SERVICE SPEC DOWNLOAD ENDPOINT
-  app.get("/api/services/download/:filename", (req, res) => {
+  // SERVICE SPEC DOWNLOAD & IN-BROWSER VIEW ENDPOINTS (Guaranteed Native Save & In-Browser Preview)
+  app.get(["/api/services/download/:filename", "/api/services/download", "/api/services/view/:filename", "/api/services/view"], async (req, res) => {
     try {
-      const rawName = req.params.filename || "Project_Architecture_Spec.pdf";
+      const isInlineView = req.path.includes("/view") || req.query.view === "inline";
+      const dispositionType = isInlineView ? "inline" : "attachment";
+      const rawName = (req.params.filename || (req.query.file as string) || (req.query.item as string) || "Project_Architecture_Spec.pdf").trim();
+
+      if (rawName.includes("all") || rawName.includes("bundle") || rawName.includes("zip")) {
+        const zip = new JSZip();
+        zip.file("README_SERVICE_SPECS.txt", `S-CODERS • BHARAT TECH DEVELOPERS\nOfficial Service Project Specification Bundle\n==============================================\nIncluded Specifications:\n1. Project_Architecture_Spec.pdf (System diagram, parameters & tech stack)\n2. Interactive_UI_Mockups_v1.pdf (High fidelity wireframes & component layouts)\n3. Database_Schema_Spec.pdf (PostgreSQL entities, indices & schema definitions)\n4. AI_Agent_Logic_Flowchart.pdf (Chain-of-thought routing & API orchestration)\n\nDirect Engineering Support: scoders82@gmail.com\n`);
+        
+        const files = [
+          "Project_Architecture_Spec.pdf",
+          "Interactive_UI_Mockups_v1.pdf",
+          "Database_Schema_Spec.pdf",
+          "AI_Agent_Logic_Flowchart.pdf"
+        ];
+        for (const f of files) {
+          zip.file(f, generateServiceSpecPdfBuffer(f, f.replace(/_/g, " ").replace(".pdf", "")));
+        }
+        const zipBuf = await zip.generateAsync({ type: "nodebuffer" });
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", 'attachment; filename="scoders_service_project_specs_bundle.zip"');
+        res.setHeader("Content-Length", zipBuf.length);
+        res.setHeader("Cache-Control", "no-cache");
+        return res.end(zipBuf);
+      }
+
       const filename = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
-      const pdfBuf = generateServiceSpecPdfBuffer(filename, "Verified Service Architecture Blueprint");
+      const pdfBuf = generateServiceSpecPdfBuffer(filename, filename.replace(/_/g, " ").replace(".pdf", ""));
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Disposition", `${dispositionType}; filename="${filename}"`);
       res.setHeader("Content-Length", pdfBuf.length);
       res.setHeader("Cache-Control", "no-cache");
       return res.end(pdfBuf);
@@ -1740,6 +1764,309 @@ async function startServer() {
       res.json({ success: true, count: Object.keys(current).length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // UNIFIED 1-ON-1 CLIENT CHAT API (Workshop & Services WhatsApp-Style Endpoints)
+  // ==========================================
+
+  // 1. List client chats (for authorized S-CODERS team management)
+  app.get(["/api/workshops/chats", "/api/services/chats", "/api/chats"], (req, res) => {
+    try {
+      const isServices = req.path.includes("/services");
+      const appState = getStoredAppState();
+      const chatsList: any[] = Array.isArray(appState["db_chats"]) ? appState["db_chats"] : [];
+      let updated = false;
+
+      if (isServices) {
+        // Sync & auto-initialize service registrations into chats
+        const serviceRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+        const serviceId = req.query.serviceId as string;
+
+        for (const reg of serviceRegs) {
+          const clientEmail = (reg.clientProfile?.email || "client@scoders.dev").trim().toLowerCase();
+          const clientName = reg.clientProfile?.name || "Client";
+          const regChatId = reg.chatId || `chat-svc-${reg.id || reg.uniqueKey}`;
+
+          let existing = chatsList.find(c => c.id === regChatId || (c.registrationId === reg.id && c.clientEmail?.toLowerCase() === clientEmail) || c.uniqueAccessKey === reg.uniqueKey);
+          if (!existing) {
+            const newChat = {
+              id: regChatId,
+              clientName,
+              clientEmail,
+              registrationId: reg.id,
+              serviceId: reg.serviceId,
+              reference: reg.selectedServiceTitle || "Custom Engineering Project",
+              uniqueAccessKey: reg.uniqueKey,
+              messages: [
+                {
+                  id: `msg-svc-init-${Date.now()}`,
+                  sender: "team",
+                  senderName: "S-CODERS Lead Team",
+                  senderRole: "S-CODERS Founder & CEO",
+                  content: `Welcome ${clientName}! Your project '${reg.selectedServiceTitle || "Custom Service"}' is officially registered. This is your private WhatsApp-style channel with our developers. Feel free to share links, ask questions, or review deliverables.`,
+                  timestamp: reg.registrationDate ? new Date(reg.registrationDate).toISOString() : new Date().toISOString()
+                }
+              ],
+              lastUpdated: new Date().toISOString()
+            };
+            chatsList.unshift(newChat);
+            updated = true;
+          }
+        }
+
+        if (updated) {
+          appState["db_chats"] = chatsList;
+          saveStoredAppState(appState);
+        }
+
+        const result = chatsList.filter(c => {
+          const isSvc = c.id?.toLowerCase().includes("svc") || 
+                        c.registrationId?.toLowerCase().includes("svc") ||
+                        c.id?.startsWith("CHT-SVC") ||
+                        c.serviceId ||
+                        (!c.id?.toLowerCase().includes("wksp") && !c.reference?.toLowerCase().includes("workshop"));
+          if (!isSvc) return false;
+          if (serviceId && c.serviceId && c.serviceId !== serviceId) return false;
+          return true;
+        });
+
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        return res.json({ success: true, count: result.length, chats: result });
+      }
+
+      // Default: Workshop chats
+      const workshopRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+      const workshopId = req.query.workshopId as string;
+
+      for (const reg of workshopRegs) {
+        if (!reg.participantProfile) continue;
+        const regEmail = (reg.participantProfile.email || "").trim().toLowerCase();
+        const regChatId = reg.chatId || `chat-wksp-${reg.id || reg.uniqueAccessKey}`;
+
+        let existing = chatsList.find(c => c.id === regChatId || (c.registrationId === reg.id && c.clientEmail?.toLowerCase() === regEmail));
+        if (!existing) {
+          const newChat = {
+            id: regChatId,
+            clientName: reg.participantProfile.name || "Workshop Attendee",
+            clientEmail: reg.participantProfile.email || "attendee@scoders.com",
+            registrationId: reg.id,
+            workshopId: reg.workshopId,
+            reference: reg.workshopTitle || "S-CODERS Workshop",
+            uniqueAccessKey: reg.uniqueAccessKey,
+            messages: [
+              {
+                id: `msg-init-${Date.now()}`,
+                sender: "team",
+                senderName: "S-CODERS Mentor Team",
+                senderRole: "S-CODERS Founder & CEO",
+                content: `Welcome ${reg.participantProfile.name || "Developer"}! You are officially registered for '${reg.workshopTitle || "Workshop"}'. This is your private, individual chat with the S-CODERS team. You can ask questions, share links, or clear any doubts directly with our mentors.`,
+                timestamp: reg.paymentDate ? new Date(reg.paymentDate).toISOString() : new Date().toISOString()
+              }
+            ],
+            lastUpdated: new Date().toISOString()
+          };
+          chatsList.unshift(newChat);
+          updated = true;
+        }
+      }
+
+      if (updated) {
+        appState["db_chats"] = chatsList;
+        saveStoredAppState(appState);
+      }
+
+      const result = chatsList.filter(c => {
+        const isWorkshop = c.id?.toLowerCase().includes("wksp") || 
+                           c.registrationId?.toLowerCase().includes("wksp") ||
+                           c.reference?.toLowerCase().includes("workshop") ||
+                           c.reference?.toLowerCase().includes("react native") ||
+                           c.reference?.toLowerCase().includes("ai agent") ||
+                           c.reference?.toLowerCase().includes("masterclass") ||
+                           c.workshopId;
+        if (!isWorkshop) return false;
+        if (workshopId && c.workshopId && c.workshopId !== workshopId) return false;
+        return true;
+      });
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({ success: true, count: result.length, chats: result });
+    } catch (err: any) {
+      console.error("Error fetching chats:", err);
+      res.status(500).json({ error: "Failed to fetch conversations: " + err.message });
+    }
+  });
+
+  // 2. Get specific client chat by ID (or auto-initialize if not existing)
+  app.get(["/api/workshops/chats/:chatId", "/api/services/chats/:chatId", "/api/chats/:chatId"], (req, res) => {
+    try {
+      const chatId = req.params.chatId;
+      const appState = getStoredAppState();
+      const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
+
+      let conversation = chatsList.find(c => c.id === chatId);
+
+      // Also allow lookup by registrationId or uniqueAccessKey
+      if (!conversation) {
+        conversation = chatsList.find(c => c.registrationId === chatId || c.uniqueAccessKey === chatId);
+      }
+
+      // If still not found, check if client query params provided to auto-create
+      if (!conversation) {
+        const clientName = (req.query.clientName as string) || "Valued Client";
+        const clientEmail = (req.query.clientEmail as string) || "client@scoders.dev";
+        const registrationId = (req.query.registrationId as string) || chatId;
+        const reference = (req.query.reference as string) || "Custom Project / Workshop";
+        const isService = req.path.includes("services") || chatId.includes("svc") || chatId.includes("SERV");
+
+        conversation = {
+          id: chatId,
+          clientName,
+          clientEmail,
+          registrationId,
+          reference,
+          messages: [
+            {
+              id: `msg-welcome-${Date.now()}`,
+              sender: "team",
+              senderName: isService ? "S-CODERS Lead Team" : "S-CODERS Mentor Team",
+              senderRole: "S-CODERS Founder & CEO",
+              content: `Welcome ${clientName}! This is your private, 1-on-1 discussion room with the S-CODERS engineering mentors for '${reference}'. You can post questions, share code or GitHub links, and clear doubts in real-time.`,
+              timestamp: new Date().toISOString()
+            }
+          ],
+          lastUpdated: new Date().toISOString()
+        };
+
+        chatsList.unshift(conversation);
+        appState["db_chats"] = chatsList;
+        saveStoredAppState(appState);
+      }
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, conversation });
+    } catch (err: any) {
+      console.error("Error retrieving chat:", err);
+      res.status(500).json({ error: "Failed to load chat: " + err.message });
+    }
+  });
+
+  // 3. Post a message to an individual client chat
+  app.post(["/api/workshops/chats/:chatId/messages", "/api/services/chats/:chatId/messages", "/api/chats/:chatId/messages"], (req, res) => {
+    try {
+      const chatId = req.params.chatId;
+      const { content, sender, senderName, senderRole, clientEmail, clientName, reference } = req.body;
+
+      if (!content || !content.trim()) {
+        return res.status(400).json({ error: "Message content cannot be empty." });
+      }
+
+      const appState = getStoredAppState();
+      const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
+
+      let conversation = chatsList.find(c => c.id === chatId || c.registrationId === chatId || c.uniqueAccessKey === chatId);
+
+      if (!conversation) {
+        conversation = {
+          id: chatId,
+          clientName: clientName || "Valued Client",
+          clientEmail: clientEmail || "client@scoders.dev",
+          registrationId: chatId,
+          reference: reference || "S-CODERS Workspace",
+          messages: [],
+          lastUpdated: new Date().toISOString()
+        };
+        chatsList.unshift(conversation);
+      }
+
+      const newMessage = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        sender: sender === 'team' ? 'team' : 'client',
+        senderName: senderName || (sender === 'team' ? 'S-CODERS Team' : conversation.clientName || 'You'),
+        senderRole: senderRole || (sender === 'team' ? 'Official Lead' : 'Client'),
+        content: content.trim(),
+        timestamp: new Date().toISOString()
+      };
+
+      conversation.messages = conversation.messages || [];
+      conversation.messages.push(newMessage);
+      conversation.lastUpdated = new Date().toISOString();
+
+      appState["db_chats"] = chatsList;
+      saveStoredAppState(appState);
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.status(201).json({ success: true, message: newMessage, conversation });
+    } catch (err: any) {
+      console.error("Error sending message:", err);
+      res.status(500).json({ error: "Failed to save message: " + err.message });
+    }
+  });
+
+  // 4. Edit message in individual chat
+  app.put(["/api/workshops/chats/:chatId/messages/:messageId", "/api/services/chats/:chatId/messages/:messageId", "/api/chats/:chatId/messages/:messageId"], (req, res) => {
+    try {
+      const { chatId, messageId } = req.params;
+      const { content } = req.body;
+
+      if (!content || !content.trim()) {
+        return res.status(400).json({ error: "Updated content cannot be empty." });
+      }
+
+      const appState = getStoredAppState();
+      const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
+
+      const conversation = chatsList.find(c => c.id === chatId || c.registrationId === chatId || c.uniqueAccessKey === chatId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found." });
+      }
+
+      const message = (conversation.messages || []).find((m: any) => m.id === messageId);
+      if (!message) {
+        return res.status(404).json({ error: "Message not found." });
+      }
+
+      message.content = content.trim();
+      message.edited = true;
+      message.editedAt = new Date().toISOString();
+      conversation.lastUpdated = new Date().toISOString();
+
+      appState["db_chats"] = chatsList;
+      saveStoredAppState(appState);
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, message, conversation });
+    } catch (err: any) {
+      console.error("Error editing message:", err);
+      res.status(500).json({ error: "Failed to edit message: " + err.message });
+    }
+  });
+
+  // 5. Delete message in individual chat
+  app.delete(["/api/workshops/chats/:chatId/messages/:messageId", "/api/services/chats/:chatId/messages/:messageId", "/api/chats/:chatId/messages/:messageId"], (req, res) => {
+    try {
+      const { chatId, messageId } = req.params;
+
+      const appState = getStoredAppState();
+      const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
+
+      const conversation = chatsList.find(c => c.id === chatId || c.registrationId === chatId || c.uniqueAccessKey === chatId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found." });
+      }
+
+      conversation.messages = (conversation.messages || []).filter((m: any) => m.id !== messageId);
+      conversation.lastUpdated = new Date().toISOString();
+
+      appState["db_chats"] = chatsList;
+      saveStoredAppState(appState);
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, deletedId: messageId, remaining: conversation.messages.length });
+    } catch (err: any) {
+      console.error("Error deleting message:", err);
+      res.status(500).json({ error: "Failed to delete message: " + err.message });
     }
   });
 
