@@ -35,19 +35,27 @@ export default function WorkshopChatRoom({
 
   // Determine stable individual chat ID for this client + workshop
   const clientChatId = useMemo(() => {
-    // Check if there is an existing registration in DatabaseEngine
     try {
       const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
       const match = workshopRegs.find(r => 
         (r.workshopId === activeWorkshop.id || r.workshopTitle === activeWorkshop.title) &&
-        (r.uniqueAccessKey === clientKey || r.participantProfile?.email?.toLowerCase() === clientEmail)
+        (
+          (activeRegInfo?.key && r.uniqueAccessKey === activeRegInfo.key) ||
+          (clientEmail && r.participantProfile?.email?.toLowerCase() === clientEmail) ||
+          (currentUser?.email && r.participantProfile?.email?.toLowerCase() === currentUser.email.toLowerCase())
+        )
       );
       if (match?.chatId) return match.chatId;
+      if (match?.id) return `chat-wksp-${match.id}`;
     } catch (e) {}
+
+    if (activeRegInfo?.key) {
+      return `chat-wksp-${activeWorkshop.id}-${activeRegInfo.key}`;
+    }
 
     const sanitizedEmail = clientEmail.replace(/[^a-zA-Z0-9]/g, '_');
     return `chat-wksp-${activeWorkshop.id}-${sanitizedEmail}`;
-  }, [activeWorkshop.id, activeWorkshop.title, clientEmail, clientKey]);
+  }, [activeWorkshop.id, activeWorkshop.title, clientEmail, clientKey, activeRegInfo, currentUser]);
 
   // Mode: 'client' (their own private WhatsApp chat) vs 'team' (S-CODERS team management portal)
   const [activeMode, setActiveMode] = useState<'client' | 'team'>('client');
@@ -107,7 +115,7 @@ export default function WorkshopChatRoom({
     }
   };
 
-  // Fetch or initialize active conversation
+  // Fetch or initialize active conversation with permanent message merging
   const loadConversation = async (chatId: string) => {
     try {
       const queryParams = new URLSearchParams({
@@ -122,6 +130,15 @@ export default function WorkshopChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.conversation) {
+          // Also merge local DB messages if any exist
+          try {
+            const allChats = DatabaseEngine.getChats();
+            const localMatch = allChats.find(c => c.id === chatId || c.clientEmail?.toLowerCase() === clientEmail);
+            if (localMatch && localMatch.messages && localMatch.messages.length > data.conversation.messages.length) {
+              data.conversation.messages = localMatch.messages;
+            }
+          } catch (e) {}
+
           setCurrentConversation(data.conversation);
           setMessages(data.conversation.messages || []);
           return;
@@ -131,12 +148,29 @@ export default function WorkshopChatRoom({
       console.warn('Network chat fetch failed, checking local database:', err);
     }
 
-    // Fallback to DatabaseEngine
+    // Fallback and permanent merging to DatabaseEngine
     try {
       const allChats = DatabaseEngine.getChats();
-      let match = allChats.find(c => c.id === chatId);
+      // Find matching chat by ID or email
+      let match = allChats.find(c => c.id === chatId || (c.clientEmail && c.clientEmail.toLowerCase() === clientEmail));
+      
+      // If there are other fallback chats for this email/workshop, merge their messages
+      const altMatches = allChats.filter(c => c.id !== chatId && c.clientEmail && c.clientEmail.toLowerCase() === clientEmail);
+      let mergedMessages: ChatMessageItem[] = match?.messages || [];
+      for (const alt of altMatches) {
+        if (alt.messages && Array.isArray(alt.messages)) {
+          for (const m of alt.messages) {
+            if (!mergedMessages.some(existing => existing.id === m.id || (existing.content === m.content && existing.timestamp === m.timestamp))) {
+              mergedMessages.push(m);
+            }
+          }
+        }
+      }
+
+      // Sort messages chronologically by timestamp
+      mergedMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
       if (!match) {
-        // Initialize fallback chat
         match = {
           id: chatId,
           clientName,
@@ -145,20 +179,25 @@ export default function WorkshopChatRoom({
           reference: activeWorkshop.title,
           workshopId: activeWorkshop.id,
           uniqueAccessKey: clientKey,
-          messages: [
+          messages: mergedMessages.length > 0 ? mergedMessages : [
             {
               id: `msg-init-${Date.now()}`,
               sender: 'team',
               senderName: 'S-CODERS Mentor Team',
               senderRole: 'S-CODERS Founder & CEO',
-              content: `Welcome ${clientName}! This is your private, individual chat with the S-CODERS team for '${activeWorkshop.title}'. Feel free to ask questions, share GitHub links, or clear any doubts directly with our mentors.`,
+              content: `Welcome ${clientName}! This is your private, permanent chat with the S-CODERS team for '${activeWorkshop.title}'. All messages and doubts are securely stored and will remain available whenever you return.`,
               timestamp: new Date().toISOString()
             }
           ],
           lastUpdated: new Date().toISOString()
         };
-        DatabaseEngine.saveChats([match, ...allChats]);
+        DatabaseEngine.saveChats([match, ...allChats.filter(c => c.id !== chatId)]);
+      } else {
+        match.messages = mergedMessages;
+        match.lastUpdated = new Date().toISOString();
+        DatabaseEngine.saveChats(allChats);
       }
+
       setCurrentConversation(match);
       setMessages(match.messages || []);
     } catch (dbErr) {
@@ -490,29 +529,13 @@ export default function WorkshopChatRoom({
           </div>
         </div>
 
-        {/* Right side controls: Switch to Team Portal or Return to Client Mode */}
+        {/* Right side status badge */}
         <div className="flex items-center gap-2 shrink-0">
-          {activeMode === 'team' ? (
-            <button
-              type="button"
-              onClick={() => setActiveMode('client')}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-white/15"
-              title="Return to your private client chat"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">My Client Chat</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleOpenTeamPortal}
-              className="px-3 py-1.5 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              title="Authorized S-CODERS Team: Access all client conversations"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>S-CODERS Team Portal</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-mono text-gray-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="hidden sm:inline">Direct Mentor Channel</span>
+            <span className="sm:hidden">Online</span>
+          </div>
         </div>
       </div>
 
@@ -898,70 +921,6 @@ export default function WorkshopChatRoom({
                 Insert Link
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================
-          MODAL: S-CODERS Team Access Passcode Verification
-          ======================================================== */}
-      {showTeamAuthModal && (
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-md z-40 flex items-center justify-center p-4">
-          <div className="bg-[#0e1626] border border-brand-teal/40 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-brand-teal font-display font-bold text-sm">
-                <ShieldCheck className="w-5 h-5 text-brand-teal" />
-                <span>S-CODERS Team Authorization</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTeamAuthModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-300 leading-relaxed font-sans">
-              Enter your authorized S-CODERS Team Passcode to access the centralized client chat management desk and reply to registered clients.
-            </p>
-
-            <form onSubmit={handleVerifyTeamPasscode} className="space-y-3 font-sans">
-              <div>
-                <label className="text-[11px] font-mono text-gray-400 block mb-1">Team Passcode / Admin Key:</label>
-                <input
-                  type="password"
-                  value={teamPasscodeInput}
-                  onChange={(e) => setTeamPasscodeInput(e.target.value)}
-                  placeholder="Enter passcode..."
-                  className="w-full px-3 py-2 bg-black/60 border border-white/15 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal font-mono"
-                  autoFocus
-                />
-              </div>
-
-              {teamAuthError && (
-                <div className="p-2 bg-red-500/15 border border-red-500/30 rounded-lg text-[11px] font-mono text-red-300">
-                  {teamAuthError}
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTeamAuthModal(false)}
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg text-xs font-mono"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!teamPasscodeInput.trim()}
-                  className="px-4 py-1.5 bg-brand-teal hover:bg-emerald-400 text-brand-dark font-bold rounded-lg text-xs font-mono disabled:opacity-50 cursor-pointer"
-                >
-                  Verify & Enter
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

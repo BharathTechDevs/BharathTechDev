@@ -42,14 +42,23 @@ export default function ServiceChatRoom({
       const serviceRegs = DatabaseEngine.getServiceRegistrations();
       const match = serviceRegs.find(r => 
         (r.serviceId === activeService.id || r.selectedServiceTitle === activeService.title) &&
-        (r.uniqueKey === clientKey || r.clientProfile?.email?.toLowerCase() === clientEmail)
+        (
+          (activeRegInfo?.key && r.uniqueKey === activeRegInfo.key) ||
+          (clientEmail && r.clientProfile?.email?.toLowerCase() === clientEmail) ||
+          (currentUser?.email && r.clientProfile?.email?.toLowerCase() === currentUser.email.toLowerCase())
+        )
       );
       if (match?.chatId) return match.chatId;
+      if (match?.id) return `chat-svc-${match.id}`;
     } catch (e) {}
+
+    if (activeRegInfo?.key) {
+      return `chat-svc-${activeService.id}-${activeRegInfo.key}`;
+    }
 
     const sanitizedEmail = clientEmail.replace(/[^a-zA-Z0-9]/g, '_');
     return `chat-svc-${activeService.id}-${sanitizedEmail}`;
-  }, [activeService.id, activeService.title, clientEmail, clientKey]);
+  }, [activeService.id, activeService.title, clientEmail, clientKey, activeRegInfo, currentUser]);
 
   // Mode: 'client' (their own private WhatsApp chat) vs 'team' (S-CODERS team management portal)
   const [activeMode, setActiveMode] = useState<'client' | 'team'>('client');
@@ -109,7 +118,7 @@ export default function ServiceChatRoom({
     }
   };
 
-  // Fetch or initialize active conversation
+  // Fetch or initialize active conversation with permanent message merging
   const loadConversation = async (chatId: string) => {
     try {
       const queryParams = new URLSearchParams({
@@ -124,6 +133,15 @@ export default function ServiceChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.conversation) {
+          // Merge local DB messages if any exist
+          try {
+            const allChats = DatabaseEngine.getChats();
+            const localMatch = allChats.find(c => c.id === chatId || c.clientEmail?.toLowerCase() === clientEmail);
+            if (localMatch && localMatch.messages && localMatch.messages.length > data.conversation.messages.length) {
+              data.conversation.messages = localMatch.messages;
+            }
+          } catch (e) {}
+
           setCurrentConversation(data.conversation);
           setMessages(data.conversation.messages || []);
           return;
@@ -133,12 +151,26 @@ export default function ServiceChatRoom({
       console.warn('Network chat fetch failed, checking local database:', err);
     }
 
-    // Fallback to DatabaseEngine
+    // Fallback and permanent merging to DatabaseEngine
     try {
       const allChats = DatabaseEngine.getChats();
-      let match = allChats.find(c => c.id === chatId);
+      let match = allChats.find(c => c.id === chatId || (c.clientEmail && c.clientEmail.toLowerCase() === clientEmail));
+      
+      const altMatches = allChats.filter(c => c.id !== chatId && c.clientEmail && c.clientEmail.toLowerCase() === clientEmail);
+      let mergedMessages: ChatMessageItem[] = match?.messages || [];
+      for (const alt of altMatches) {
+        if (alt.messages && Array.isArray(alt.messages)) {
+          for (const m of alt.messages) {
+            if (!mergedMessages.some(existing => existing.id === m.id || (existing.content === m.content && existing.timestamp === m.timestamp))) {
+              mergedMessages.push(m);
+            }
+          }
+        }
+      }
+
+      mergedMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
       if (!match) {
-        // Initialize fallback chat
         match = {
           id: chatId,
           clientName,
@@ -147,20 +179,25 @@ export default function ServiceChatRoom({
           reference: activeService.title,
           serviceId: activeService.id,
           uniqueAccessKey: clientKey,
-          messages: [
+          messages: mergedMessages.length > 0 ? mergedMessages : [
             {
               id: `msg-svc-init-${Date.now()}`,
               sender: 'team',
               senderName: 'S-CODERS Lead Team',
               senderRole: 'S-CODERS Founder & CEO',
-              content: `Welcome ${clientName}! This is your private, individual WhatsApp-style workspace for '${activeService.title}'. Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) are directly assigned to your project. Feel free to share links, review deliverables, or ask questions!`,
+              content: `Welcome ${clientName}! This is your private, permanent WhatsApp-style workspace for '${activeService.title}'. All messages, files, and doubts are securely stored and will remain available whenever you return.`,
               timestamp: new Date().toISOString()
             }
           ],
           lastUpdated: new Date().toISOString()
         };
-        DatabaseEngine.saveChats([match, ...allChats]);
+        DatabaseEngine.saveChats([match, ...allChats.filter(c => c.id !== chatId)]);
+      } else {
+        match.messages = mergedMessages;
+        match.lastUpdated = new Date().toISOString();
+        DatabaseEngine.saveChats(allChats);
       }
+
       setCurrentConversation(match);
       setMessages(match.messages || []);
     } catch (dbErr) {
@@ -488,29 +525,13 @@ export default function ServiceChatRoom({
           </div>
         </div>
 
-        {/* Right side controls: Switch to Team Portal or Return to Client Mode */}
+        {/* Right side status badge */}
         <div className="flex items-center gap-2 shrink-0">
-          {activeMode === 'team' ? (
-            <button
-              type="button"
-              onClick={() => setActiveMode('client')}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-white/15"
-              title="Return to your private client chat"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">My Client Chat</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleOpenTeamPortal}
-              className="px-3 py-1.5 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              title="Authorized S-CODERS Team: Access all client service conversations"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>S-CODERS Team Portal</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-mono text-gray-300">
+            <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" />
+            <span className="hidden sm:inline">Direct Developer Channel</span>
+            <span className="sm:hidden">Online</span>
+          </div>
         </div>
       </div>
 
@@ -895,63 +916,6 @@ export default function ServiceChatRoom({
                 Add Link to Chat
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================
-          S-CODERS TEAM PORTAL AUTH MODAL
-          ======================================================== */}
-      {showTeamAuthModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="bg-[#0b101d] border border-brand-teal/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl font-sans text-center">
-            <div className="w-12 h-12 rounded-2xl bg-brand-teal/15 border border-brand-teal/30 flex items-center justify-center text-brand-teal mx-auto">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-
-            <div>
-              <h4 className="font-display font-bold text-base text-white">S-CODERS Team Portal</h4>
-              <p className="text-xs text-gray-400 mt-1">
-                Authorized access for S-CODERS mentors (Shreyas, Bhuvan, Mentors) to manage and respond to individual client chats.
-              </p>
-            </div>
-
-            <form onSubmit={handleVerifyTeamPasscode} className="space-y-3 text-left">
-              <div>
-                <label className="block text-[11px] font-mono text-gray-300 mb-1">Enter Team Passcode or Admin Email</label>
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  value={teamPasscodeInput}
-                  onChange={(e) => setTeamPasscodeInput(e.target.value)}
-                  placeholder="e.g. SCODERS2026"
-                  className="w-full p-2.5 bg-black/60 border border-white/15 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal font-mono text-xs"
-                />
-              </div>
-
-              {teamAuthError && (
-                <p className="text-[11px] font-mono text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
-                  {teamAuthError}
-                </p>
-              )}
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTeamAuthModal(false)}
-                  className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl text-xs font-mono cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-brand-teal hover:bg-white text-brand-dark font-bold rounded-xl text-xs font-mono cursor-pointer transition-all shadow-md"
-                >
-                  Verify Access
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

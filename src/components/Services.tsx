@@ -908,7 +908,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                         className="w-full py-2.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 group cursor-pointer shadow-md shadow-brand-teal/10"
                       >
                         <Play className="w-3.5 h-3.5 fill-current" />
-                        Launch Active Workspace
+                        Launch Active Services
                         <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                       </button>
                     </div>

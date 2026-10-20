@@ -821,6 +821,55 @@ export default function TenantDashboard() {
     setTimeout(() => setSubmitSuccess(false), 3000);
   };
 
+  // Permanent Profile & Registration Persistence on Mount
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem('scoders_user');
+      if (savedUser && !regName) {
+        const parsedUser = JSON.parse(savedUser);
+        if (parsedUser?.name && parsedUser.name !== 'Attendee') {
+          setRegName(parsedUser.name);
+          setRegEmail(parsedUser.email || '');
+        }
+      }
+
+      // Check if any workshop registration exists in DatabaseEngine or localStorage for current user
+      const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
+      if (workshopRegs.length > 0) {
+        const currentKeys = { ...registeredKeys };
+        let updated = false;
+        for (const reg of workshopRegs) {
+          if (reg.participantProfile && reg.workshopId && !currentKeys[reg.workshopId]) {
+            const email = (reg.participantProfile.email || '').toLowerCase().trim();
+            if (!currentUser || email === currentUser.email?.toLowerCase()) {
+              currentKeys[reg.workshopId] = {
+                key: reg.uniqueAccessKey || 'BTD-WKSP-RESTORED',
+                name: reg.participantProfile.name || 'Verified Attendee',
+                email: reg.participantProfile.email || 'attendee@scoders.com',
+                role: reg.participantProfile.role || 'Developer',
+                timestamp: reg.paymentDate || new Date().toLocaleDateString()
+              };
+              updated = true;
+            }
+          }
+        }
+        if (updated) {
+          setRegisteredKeys(currentKeys);
+          localStorage.setItem('scoders_registered_workshops', JSON.stringify(currentKeys));
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Determine currently active registered client name for badge
+  const activeRegisteredAttendeeName = useMemo(() => {
+    if (activeRegInfo?.name) return activeRegInfo.name;
+    const allRegs = Object.values(registeredKeys);
+    if (allRegs.length > 0 && allRegs[0].name) return allRegs[0].name;
+    if (currentUser?.name && currentUser.name !== 'Attendee') return currentUser.name;
+    return null;
+  }, [activeRegInfo, registeredKeys, currentUser]);
+
   return (
     <section id="workshops" className="py-24 bg-brand-dark relative overflow-hidden">
       {/* Ambient background glow */}
@@ -828,8 +877,19 @@ export default function TenantDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        {/* Section Header with Persistent Registered Name Badge */}
+        <div className="text-center max-w-3xl mx-auto mb-16 relative">
+          {activeRegisteredAttendeeName && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold mb-4 shadow-lg shadow-emerald-500/10"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Active Account Profile: <strong className="text-white underline decoration-emerald-400">{activeRegisteredAttendeeName}</strong> (Permanently Saved)</span>
+            </motion.div>
+          )}
+
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/20 text-brand-teal text-xs font-mono mb-4">
             <Calendar className="w-3.5 h-3.5" />
             <span>COMMUNITY BUILDING</span>
