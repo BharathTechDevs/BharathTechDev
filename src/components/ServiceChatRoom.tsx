@@ -38,13 +38,23 @@ export default function ServiceChatRoom({
 
   // Determine stable individual chat ID for this client + service
   const clientChatId = useMemo(() => {
+    const activeKey = activeRegInfo?.key || clientKey;
     try {
+      const allChats = DatabaseEngine.getChats();
+      if (activeKey && activeKey !== 'PASS-SVC-KEY' && activeKey !== 'ENTER-KEY-TO-VERIFY') {
+        const keyMatch = allChats.find(c => 
+          c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase() || 
+          c.id.toUpperCase().includes(activeKey.toUpperCase())
+        );
+        if (keyMatch?.id) return keyMatch.id;
+      }
+
       const serviceRegs = DatabaseEngine.getServiceRegistrations();
       const match = serviceRegs.find(r => 
         (r.serviceId === activeService.id || r.selectedServiceTitle === activeService.title) &&
         (
-          (activeRegInfo?.key && r.uniqueKey === activeRegInfo.key) ||
-          (clientEmail && r.clientProfile?.email?.toLowerCase() === clientEmail) ||
+          (activeKey && r.uniqueKey?.toUpperCase() === activeKey.toUpperCase()) ||
+          (clientEmail && !clientEmail.includes('manual') && r.clientProfile?.email?.toLowerCase() === clientEmail) ||
           (currentUser?.email && r.clientProfile?.email?.toLowerCase() === currentUser.email.toLowerCase())
         )
       );
@@ -52,8 +62,8 @@ export default function ServiceChatRoom({
       if (match?.id) return `chat-svc-${match.id}`;
     } catch (e) {}
 
-    if (activeRegInfo?.key) {
-      return `chat-svc-${activeService.id}-${activeRegInfo.key}`;
+    if (activeKey && activeKey !== 'PASS-SVC-KEY' && activeKey !== 'ENTER-KEY-TO-VERIFY') {
+      return `chat-svc-${activeKey}`;
     }
 
     const sanitizedEmail = clientEmail.replace(/[^a-zA-Z0-9]/g, '_');
@@ -120,13 +130,15 @@ export default function ServiceChatRoom({
 
   // Fetch or initialize active conversation with permanent message merging
   const loadConversation = async (chatId: string) => {
+    const activeKey = activeRegInfo?.key || clientKey || '';
     try {
       const queryParams = new URLSearchParams({
         clientName,
         clientEmail,
         registrationId: chatId,
         serviceId: activeService.id,
-        reference: activeService.title
+        reference: activeService.title,
+        key: activeKey
       });
 
       const res = await fetch(`/api/services/chats/${encodeURIComponent(chatId)}?${queryParams.toString()}`);
@@ -136,7 +148,11 @@ export default function ServiceChatRoom({
           // Merge local DB messages if any exist
           try {
             const allChats = DatabaseEngine.getChats();
-            const localMatch = allChats.find(c => c.id === chatId || c.clientEmail?.toLowerCase() === clientEmail);
+            const localMatch = allChats.find(c => 
+              c.id === chatId || 
+              (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+              (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail)
+            );
             if (localMatch && localMatch.messages && localMatch.messages.length > data.conversation.messages.length) {
               data.conversation.messages = localMatch.messages;
             }
@@ -154,9 +170,17 @@ export default function ServiceChatRoom({
     // Fallback and permanent merging to DatabaseEngine
     try {
       const allChats = DatabaseEngine.getChats();
-      let match = allChats.find(c => c.id === chatId || (c.clientEmail && c.clientEmail.toLowerCase() === clientEmail));
+      let match = allChats.find(c => 
+        c.id === chatId || 
+        (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+        (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail)
+      );
       
-      const altMatches = allChats.filter(c => c.id !== chatId && c.clientEmail && c.clientEmail.toLowerCase() === clientEmail);
+      const altMatches = allChats.filter(c => 
+        c.id !== chatId && 
+        ((activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) || 
+         (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail))
+      );
       let mergedMessages: ChatMessageItem[] = match?.messages || [];
       for (const alt of altMatches) {
         if (alt.messages && Array.isArray(alt.messages)) {
@@ -178,7 +202,7 @@ export default function ServiceChatRoom({
           registrationId: chatId,
           reference: activeService.title,
           serviceId: activeService.id,
-          uniqueAccessKey: clientKey,
+          uniqueAccessKey: activeKey || clientKey,
           messages: mergedMessages.length > 0 ? mergedMessages : [
             {
               id: `msg-svc-init-${Date.now()}`,
@@ -194,6 +218,7 @@ export default function ServiceChatRoom({
         DatabaseEngine.saveChats([match, ...allChats.filter(c => c.id !== chatId)]);
       } else {
         match.messages = mergedMessages;
+        match.uniqueAccessKey = match.uniqueAccessKey || activeKey || clientKey;
         match.lastUpdated = new Date().toISOString();
         DatabaseEngine.saveChats(allChats);
       }
@@ -290,6 +315,7 @@ export default function ServiceChatRoom({
       }
     }
 
+    const activeKey = activeRegInfo?.key || clientKey || '';
     const payload = {
       content: cleanContent,
       sender: isTeam ? 'team' : 'client',
@@ -297,7 +323,10 @@ export default function ServiceChatRoom({
       senderRole,
       clientName: currentConversation?.clientName || clientName,
       clientEmail: currentConversation?.clientEmail || clientEmail,
-      reference: activeService.title
+      reference: activeService.title,
+      serviceId: activeService.id,
+      uniqueAccessKey: activeKey,
+      key: activeKey
     };
 
     try {
@@ -310,8 +339,29 @@ export default function ServiceChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.message) {
-          setMessages(prev => [...prev, data.message]);
+          const updatedMessages = [...messages, data.message];
+          setMessages(updatedMessages);
           setMessageInput('');
+
+          try {
+            const allChats = DatabaseEngine.getChats();
+            const exists = allChats.some(c => c.id === currentChatId);
+            const updated = exists 
+              ? allChats.map(c => c.id === currentChatId ? { ...c, messages: updatedMessages, uniqueAccessKey: activeKey || c.uniqueAccessKey, lastUpdated: new Date().toISOString() } : c)
+              : [{
+                  id: currentChatId,
+                  clientName: currentConversation?.clientName || clientName,
+                  clientEmail: currentConversation?.clientEmail || clientEmail,
+                  registrationId: currentChatId,
+                  reference: activeService.title,
+                  serviceId: activeService.id,
+                  uniqueAccessKey: activeKey || undefined,
+                  messages: updatedMessages,
+                  lastUpdated: new Date().toISOString()
+                }, ...allChats];
+            DatabaseEngine.saveChats(updated);
+          } catch (e) {}
+
           isUserScrolledUpRef.current = false;
           setTimeout(() => scrollToBottomSafely(true), 50);
           setIsSending(false);
@@ -338,12 +388,20 @@ export default function ServiceChatRoom({
 
     try {
       const allChats = DatabaseEngine.getChats();
-      const updated = allChats.map(c => {
-        if (c.id === currentChatId) {
-          return { ...c, messages: updatedMessages, lastUpdated: new Date().toISOString() };
-        }
-        return c;
-      });
+      const exists = allChats.some(c => c.id === currentChatId);
+      const updated = exists 
+        ? allChats.map(c => c.id === currentChatId ? { ...c, messages: updatedMessages, uniqueAccessKey: activeKey || c.uniqueAccessKey, lastUpdated: new Date().toISOString() } : c)
+        : [{
+            id: currentChatId,
+            clientName: currentConversation?.clientName || clientName,
+            clientEmail: currentConversation?.clientEmail || clientEmail,
+            registrationId: currentChatId,
+            reference: activeService.title,
+            serviceId: activeService.id,
+            uniqueAccessKey: activeKey || undefined,
+            messages: updatedMessages,
+            lastUpdated: new Date().toISOString()
+          }, ...allChats];
       DatabaseEngine.saveChats(updated);
     } catch (e) {}
 
@@ -367,18 +425,28 @@ export default function ServiceChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m));
+          const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
+          setMessages(updated);
           setEditingMessageId(null);
           setEditContent('');
+          try {
+            const allChats = DatabaseEngine.getChats();
+            DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: updated } : c));
+          } catch (e) {}
           return;
         }
       }
     } catch (e) {}
 
     // Local fallback
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m));
+    const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
+    setMessages(updated);
     setEditingMessageId(null);
     setEditContent('');
+    try {
+      const allChats = DatabaseEngine.getChats();
+      DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: updated } : c));
+    } catch (e) {}
   };
 
   // Delete Message Handler
@@ -391,13 +459,23 @@ export default function ServiceChatRoom({
       });
 
       if (res.ok) {
-        setMessages(prev => prev.filter(m => m.id !== messageId));
+        const filtered = messages.filter(m => m.id !== messageId);
+        setMessages(filtered);
+        try {
+          const allChats = DatabaseEngine.getChats();
+          DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: filtered } : c));
+        } catch (e) {}
         return;
       }
     } catch (e) {}
 
     // Local fallback
-    setMessages(prev => prev.filter(m => m.id !== messageId));
+    const filtered = messages.filter(m => m.id !== messageId);
+    setMessages(filtered);
+    try {
+      const allChats = DatabaseEngine.getChats();
+      DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: filtered } : c));
+    } catch (e) {}
   };
 
   // Insert Link Helper
@@ -483,7 +561,7 @@ export default function ServiceChatRoom({
   }, [teamConversations, teamSearchQuery]);
 
   return (
-    <div className="flex flex-col h-[520px] bg-[#070B12] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative font-sans">
+    <div className="flex flex-col h-[540px] sm:h-[680px] max-h-[85dvh] min-h-[260px] sm:min-h-[420px] bg-[#070B12] border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl relative font-sans">
       
       {/* ========================================================
           TOP HEADER: WhatsApp-Style Status Bar
@@ -812,42 +890,57 @@ export default function ServiceChatRoom({
             </div>
           )}
 
-          {/* INPUT BAR */}
+          {/* INPUT BAR - WhatsApp Style Spacious & Comfortable */}
           <form
             onSubmit={handleSendMessage}
-            className="p-3 bg-[#0a101d] border-t border-white/10 flex items-center gap-2 shrink-0"
+            className="p-2 sm:p-3.5 bg-[#0a101d]/98 backdrop-blur-md border-t border-white/10 flex items-end gap-2 sm:gap-3 shrink-0 sticky bottom-0 z-20"
           >
             {/* Share Link Button */}
             <button
               type="button"
               onClick={() => setShowLinkModal(true)}
-              className="p-2.5 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white rounded-xl transition-colors cursor-pointer border border-white/10"
+              className="p-2.5 sm:p-3 bg-white/5 hover:bg-brand-teal/15 text-gray-300 hover:text-brand-teal rounded-xl sm:rounded-2xl transition-all cursor-pointer border border-white/10 shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center hover:border-brand-teal/40"
               title="Share a clickable link (Website, Figma, GitHub, etc.)"
             >
-              <Link2 className="w-4 h-4 text-brand-teal" />
+              <Link2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-teal" />
             </button>
 
-            {/* Main Message Input */}
-            <input
-              type="text"
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              placeholder={
-                activeMode === 'team'
-                  ? `Message ${currentConversation?.clientName || 'Client'} directly...`
-                  : "Type a message or paste any link (https://...)"
-              }
-              className="flex-1 bg-black/50 border border-white/15 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal font-sans"
-            />
+            {/* Main Message Input: Multi-line Comfortable Textarea */}
+            <div className="flex-1 relative min-w-0">
+              <textarea
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                onFocus={() => {
+                  setTimeout(() => scrollToBottomSafely(true), 150);
+                }}
+                rows={1}
+                placeholder={
+                  activeMode === 'team'
+                    ? `Message ${currentConversation?.clientName || 'Client'} directly (Press Enter to send)...`
+                    : "Type a message or paste any link (Enter to send, Shift+Enter for new line)..."
+                }
+                className="w-full bg-black/70 border border-white/10 focus:border-brand-teal/60 focus:ring-1 focus:ring-brand-teal/30 rounded-xl sm:rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-[15px] sm:text-base text-white placeholder-gray-400 focus:outline-none font-sans resize-none min-h-[48px] sm:min-h-[52px] max-h-32 transition-all leading-relaxed"
+                style={{
+                  height: 'auto',
+                  overflowY: messageInput.split('\n').length > 3 ? 'auto' : 'hidden'
+                }}
+              />
+            </div>
 
             {/* Send Button */}
             <button
               type="submit"
               disabled={isSending || !messageInput.trim()}
-              className="p-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black rounded-xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-emerald-500/20"
+              className="p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black rounded-xl sm:rounded-2xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
               title="Send Message"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
             </button>
           </form>
 

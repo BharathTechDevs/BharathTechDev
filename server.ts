@@ -1902,14 +1902,90 @@ async function startServer() {
   app.get(["/api/workshops/chats/:chatId", "/api/services/chats/:chatId", "/api/chats/:chatId"], (req, res) => {
     try {
       const chatId = req.params.chatId;
+      const keyQuery = (req.query.key as string || "").trim().toUpperCase();
+      const clientEmailQuery = (req.query.clientEmail as string || "").trim().toLowerCase();
+      const serviceIdQuery = (req.query.serviceId as string || "").trim();
+      const workshopIdQuery = (req.query.workshopId as string || "").trim();
+
       const appState = getStoredAppState();
       const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
 
+      // 1. Direct ID match
       let conversation = chatsList.find(c => c.id === chatId);
 
-      // Also allow lookup by registrationId or uniqueAccessKey
-      if (!conversation) {
-        conversation = chatsList.find(c => c.registrationId === chatId || c.uniqueAccessKey === chatId);
+      // 2. Key or Registration ID match
+      if (!conversation && (keyQuery || chatId)) {
+        const searchKey = keyQuery || chatId.replace(/^chat-(svc|wksp)-[^-]+-/, '');
+        conversation = chatsList.find(c => 
+          c.uniqueAccessKey?.toUpperCase() === searchKey ||
+          c.registrationId?.toUpperCase() === searchKey ||
+          c.id?.toUpperCase() === searchKey ||
+          (searchKey.length > 5 && c.id?.toUpperCase().includes(searchKey))
+        );
+      }
+
+      // 3. Match against service/workshop registrations in appState
+      if (!conversation && keyQuery) {
+        const serviceRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+        const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+        
+        const matchedSvcReg = serviceRegs.find(r => r.uniqueKey?.toUpperCase() === keyQuery);
+        if (matchedSvcReg) {
+          conversation = chatsList.find(c => 
+            c.id === matchedSvcReg.chatId || 
+            c.uniqueAccessKey?.toUpperCase() === keyQuery ||
+            c.registrationId === matchedSvcReg.id ||
+            c.clientEmail?.toLowerCase() === matchedSvcReg.clientProfile?.email?.toLowerCase()
+          );
+        }
+
+        if (!conversation) {
+          const matchedWkspReg = wkspRegs.find(r => r.uniqueAccessKey?.toUpperCase() === keyQuery);
+          if (matchedWkspReg) {
+            conversation = chatsList.find(c => 
+              c.id === matchedWkspReg.chatId || 
+              c.uniqueAccessKey?.toUpperCase() === keyQuery ||
+              c.registrationId === matchedWkspReg.id ||
+              c.clientEmail?.toLowerCase() === matchedWkspReg.participantProfile?.email?.toLowerCase()
+            );
+          }
+        }
+      }
+
+      // 4. Match by email + service/workshop if still not found
+      if (!conversation && clientEmailQuery && !clientEmailQuery.includes('manual') && (serviceIdQuery || workshopIdQuery)) {
+        conversation = chatsList.find(c => 
+          c.clientEmail?.toLowerCase() === clientEmailQuery &&
+          ((serviceIdQuery && (c.serviceId === serviceIdQuery || c.reference?.toLowerCase().includes(serviceIdQuery.toLowerCase()))) ||
+           (workshopIdQuery && (c.workshopId === workshopIdQuery || c.reference?.toLowerCase().includes(workshopIdQuery.toLowerCase()))))
+        );
+      }
+
+      // If existing conversation found, update metadata if available
+      if (conversation) {
+        let changed = false;
+        if (keyQuery && !conversation.uniqueAccessKey) {
+          conversation.uniqueAccessKey = keyQuery;
+          changed = true;
+        }
+        const incomingName = req.query.clientName as string;
+        if (incomingName && incomingName !== 'Manual Access' && incomingName !== 'Manual Attendee' && incomingName !== 'Valued Client') {
+          if (conversation.clientName === 'Manual Access' || conversation.clientName === 'Manual Attendee' || conversation.clientName === 'Valued Client') {
+            conversation.clientName = incomingName;
+            changed = true;
+          }
+        }
+        const incomingEmail = req.query.clientEmail as string;
+        if (incomingEmail && !incomingEmail.includes('manual') && incomingEmail !== 'client@scoders.dev') {
+          if (conversation.clientEmail?.includes('manual') || conversation.clientEmail === 'client@scoders.dev') {
+            conversation.clientEmail = incomingEmail;
+            changed = true;
+          }
+        }
+        if (changed) {
+          appState["db_chats"] = chatsList;
+          saveStoredAppState(appState);
+        }
       }
 
       // If still not found, check if client query params provided to auto-create
@@ -1926,13 +2002,16 @@ async function startServer() {
           clientEmail,
           registrationId,
           reference,
+          uniqueAccessKey: keyQuery || undefined,
+          serviceId: serviceIdQuery || undefined,
+          workshopId: workshopIdQuery || undefined,
           messages: [
             {
               id: `msg-welcome-${Date.now()}`,
               sender: "team",
               senderName: isService ? "S-CODERS Lead Team" : "S-CODERS Mentor Team",
               senderRole: "S-CODERS Founder & CEO",
-              content: `Welcome ${clientName}! This is your private, 1-on-1 discussion room with the S-CODERS engineering mentors for '${reference}'. You can post questions, share code or GitHub links, and clear doubts in real-time.`,
+              content: `Welcome ${clientName}! This is your private, permanent WhatsApp-style discussion room with S-CODERS engineering leads for '${reference}'. You can post questions, share code or GitHub links, and clear doubts anytime.`,
               timestamp: new Date().toISOString()
             }
           ],
@@ -1956,16 +2035,21 @@ async function startServer() {
   app.post(["/api/workshops/chats/:chatId/messages", "/api/services/chats/:chatId/messages", "/api/chats/:chatId/messages"], (req, res) => {
     try {
       const chatId = req.params.chatId;
-      const { content, sender, senderName, senderRole, clientEmail, clientName, reference } = req.body;
+      const { content, sender, senderName, senderRole, clientEmail, clientName, reference, uniqueAccessKey, key } = req.body;
 
       if (!content || !content.trim()) {
         return res.status(400).json({ error: "Message content cannot be empty." });
       }
 
+      const activeKey = (uniqueAccessKey || key || "").trim().toUpperCase();
       const appState = getStoredAppState();
       const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
 
-      let conversation = chatsList.find(c => c.id === chatId || c.registrationId === chatId || c.uniqueAccessKey === chatId);
+      let conversation = chatsList.find(c => 
+        c.id === chatId || 
+        (activeKey && (c.uniqueAccessKey?.toUpperCase() === activeKey || c.id.includes(activeKey))) ||
+        c.registrationId === chatId
+      );
 
       if (!conversation) {
         conversation = {
@@ -1974,10 +2058,15 @@ async function startServer() {
           clientEmail: clientEmail || "client@scoders.dev",
           registrationId: chatId,
           reference: reference || "S-CODERS Workspace",
+          uniqueAccessKey: activeKey || undefined,
           messages: [],
           lastUpdated: new Date().toISOString()
         };
         chatsList.unshift(conversation);
+      }
+
+      if (activeKey && !conversation.uniqueAccessKey) {
+        conversation.uniqueAccessKey = activeKey;
       }
 
       const newMessage = {

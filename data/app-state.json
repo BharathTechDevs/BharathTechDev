@@ -215,6 +215,25 @@
   ],
   "db_chats": [
     {
+      "id": "chat-wksp-test",
+      "clientName": "Shreyas.M",
+      "clientEmail": "client@scoders.dev",
+      "registrationId": "chat-wksp-test",
+      "reference": "Custom Project / Workshop",
+      "uniqueAccessKey": "BTD-TEST-KEY",
+      "messages": [
+        {
+          "id": "msg-welcome-1792773033257",
+          "sender": "team",
+          "senderName": "S-CODERS Mentor Team",
+          "senderRole": "S-CODERS Founder & CEO",
+          "content": "Welcome Shreyas.M! This is your private, permanent WhatsApp-style discussion room with S-CODERS engineering leads for 'Custom Project / Workshop'. You can post questions, share code or GitHub links, and clear doubts anytime.",
+          "timestamp": "2026-10-23T16:30:33.257Z"
+        }
+      ],
+      "lastUpdated": "2026-10-23T16:30:33.257Z"
+    },
+    {
       "id": "chat-wksp-1791130925724",
       "clientName": "Attendee",
       "clientEmail": "attendee@scoders.com",

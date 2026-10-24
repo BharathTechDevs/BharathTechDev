@@ -35,13 +35,23 @@ export default function WorkshopChatRoom({
 
   // Determine stable individual chat ID for this client + workshop
   const clientChatId = useMemo(() => {
+    const activeKey = activeRegInfo?.key || clientKey;
     try {
+      const allChats = DatabaseEngine.getChats();
+      if (activeKey && activeKey !== 'PASS-KEY' && activeKey !== 'ENTER-KEY-TO-VERIFY') {
+        const keyMatch = allChats.find(c => 
+          c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase() || 
+          c.id.toUpperCase().includes(activeKey.toUpperCase())
+        );
+        if (keyMatch?.id) return keyMatch.id;
+      }
+
       const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
       const match = workshopRegs.find(r => 
         (r.workshopId === activeWorkshop.id || r.workshopTitle === activeWorkshop.title) &&
         (
-          (activeRegInfo?.key && r.uniqueAccessKey === activeRegInfo.key) ||
-          (clientEmail && r.participantProfile?.email?.toLowerCase() === clientEmail) ||
+          (activeKey && r.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+          (clientEmail && !clientEmail.includes('manual') && r.participantProfile?.email?.toLowerCase() === clientEmail) ||
           (currentUser?.email && r.participantProfile?.email?.toLowerCase() === currentUser.email.toLowerCase())
         )
       );
@@ -49,8 +59,8 @@ export default function WorkshopChatRoom({
       if (match?.id) return `chat-wksp-${match.id}`;
     } catch (e) {}
 
-    if (activeRegInfo?.key) {
-      return `chat-wksp-${activeWorkshop.id}-${activeRegInfo.key}`;
+    if (activeKey && activeKey !== 'PASS-KEY' && activeKey !== 'ENTER-KEY-TO-VERIFY') {
+      return `chat-wksp-${activeKey}`;
     }
 
     const sanitizedEmail = clientEmail.replace(/[^a-zA-Z0-9]/g, '_');
@@ -117,13 +127,15 @@ export default function WorkshopChatRoom({
 
   // Fetch or initialize active conversation with permanent message merging
   const loadConversation = async (chatId: string) => {
+    const activeKey = activeRegInfo?.key || clientKey || '';
     try {
       const queryParams = new URLSearchParams({
         clientName,
         clientEmail,
         registrationId: chatId,
         workshopId: activeWorkshop.id,
-        reference: activeWorkshop.title
+        reference: activeWorkshop.title,
+        key: activeKey
       });
 
       const res = await fetch(`/api/workshops/chats/${encodeURIComponent(chatId)}?${queryParams.toString()}`);
@@ -133,7 +145,11 @@ export default function WorkshopChatRoom({
           // Also merge local DB messages if any exist
           try {
             const allChats = DatabaseEngine.getChats();
-            const localMatch = allChats.find(c => c.id === chatId || c.clientEmail?.toLowerCase() === clientEmail);
+            const localMatch = allChats.find(c => 
+              c.id === chatId || 
+              (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+              (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail)
+            );
             if (localMatch && localMatch.messages && localMatch.messages.length > data.conversation.messages.length) {
               data.conversation.messages = localMatch.messages;
             }
@@ -151,11 +167,19 @@ export default function WorkshopChatRoom({
     // Fallback and permanent merging to DatabaseEngine
     try {
       const allChats = DatabaseEngine.getChats();
-      // Find matching chat by ID or email
-      let match = allChats.find(c => c.id === chatId || (c.clientEmail && c.clientEmail.toLowerCase() === clientEmail));
+      // Find matching chat by ID, key, or email
+      let match = allChats.find(c => 
+        c.id === chatId || 
+        (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+        (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail)
+      );
       
       // If there are other fallback chats for this email/workshop, merge their messages
-      const altMatches = allChats.filter(c => c.id !== chatId && c.clientEmail && c.clientEmail.toLowerCase() === clientEmail);
+      const altMatches = allChats.filter(c => 
+        c.id !== chatId && 
+        ((activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+         (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail))
+      );
       let mergedMessages: ChatMessageItem[] = match?.messages || [];
       for (const alt of altMatches) {
         if (alt.messages && Array.isArray(alt.messages)) {
@@ -178,7 +202,7 @@ export default function WorkshopChatRoom({
           registrationId: chatId,
           reference: activeWorkshop.title,
           workshopId: activeWorkshop.id,
-          uniqueAccessKey: clientKey,
+          uniqueAccessKey: activeKey,
           messages: mergedMessages.length > 0 ? mergedMessages : [
             {
               id: `msg-init-${Date.now()}`,
@@ -194,6 +218,9 @@ export default function WorkshopChatRoom({
         DatabaseEngine.saveChats([match, ...allChats.filter(c => c.id !== chatId)]);
       } else {
         match.messages = mergedMessages;
+        if (activeKey && !match.uniqueAccessKey) {
+          match.uniqueAccessKey = activeKey;
+        }
         match.lastUpdated = new Date().toISOString();
         DatabaseEngine.saveChats(allChats);
       }
@@ -291,6 +318,7 @@ export default function WorkshopChatRoom({
       }
     }
 
+    const activeKey = activeRegInfo?.key || clientKey || '';
     const payload = {
       content: cleanContent,
       sender: isTeam ? 'team' : 'client',
@@ -298,7 +326,10 @@ export default function WorkshopChatRoom({
       senderRole,
       clientName: currentConversation?.clientName || clientName,
       clientEmail: currentConversation?.clientEmail || clientEmail,
-      reference: activeWorkshop.title
+      reference: activeWorkshop.title,
+      workshopId: activeWorkshop.id,
+      uniqueAccessKey: activeKey,
+      key: activeKey
     };
 
     try {
@@ -311,8 +342,22 @@ export default function WorkshopChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.message) {
-          setMessages(prev => [...prev, data.message]);
+          const newMsgList = [...messages, data.message];
+          setMessages(newMsgList);
           setMessageInput('');
+          
+          // Also persist in DatabaseEngine
+          try {
+            const allChats = DatabaseEngine.getChats();
+            const updated = allChats.map(c => {
+              if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+                return { ...c, messages: newMsgList, lastUpdated: new Date().toISOString() };
+              }
+              return c;
+            });
+            DatabaseEngine.saveChats(updated);
+          } catch (e) {}
+
           // User explicitly sent message -> auto-scroll to bottom of container
           isUserScrolledUpRef.current = false;
           setTimeout(() => scrollToBottomSafely(true), 50);
@@ -340,12 +385,27 @@ export default function WorkshopChatRoom({
 
     try {
       const allChats = DatabaseEngine.getChats();
+      let found = false;
       const updated = allChats.map(c => {
-        if (c.id === currentChatId) {
+        if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+          found = true;
           return { ...c, messages: updatedMessages, lastUpdated: new Date().toISOString() };
         }
         return c;
       });
+      if (!found) {
+        updated.push({
+          id: currentChatId,
+          clientName,
+          clientEmail,
+          registrationId: currentChatId,
+          reference: activeWorkshop.title,
+          workshopId: activeWorkshop.id,
+          uniqueAccessKey: activeKey,
+          messages: updatedMessages,
+          lastUpdated: new Date().toISOString()
+        });
+      }
       DatabaseEngine.saveChats(updated);
     } catch (e) {}
 
@@ -358,6 +418,7 @@ export default function WorkshopChatRoom({
   const handleSaveEdit = async (messageId: string) => {
     const cleanContent = editContent.trim();
     if (!cleanContent) return;
+    const activeKey = activeRegInfo?.key || clientKey || '';
 
     try {
       const res = await fetch(`/api/workshops/chats/${encodeURIComponent(currentChatId)}/messages/${encodeURIComponent(messageId)}`, {
@@ -369,23 +430,48 @@ export default function WorkshopChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m));
+          const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
+          setMessages(updated);
           setEditingMessageId(null);
           setEditContent('');
+
+          try {
+            const allChats = DatabaseEngine.getChats();
+            const dbUpdated = allChats.map(c => {
+              if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+                return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
+              }
+              return c;
+            });
+            DatabaseEngine.saveChats(dbUpdated);
+          } catch (e) {}
           return;
         }
       }
     } catch (e) {}
 
     // Local fallback
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m));
+    const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
+    setMessages(updated);
     setEditingMessageId(null);
     setEditContent('');
+
+    try {
+      const allChats = DatabaseEngine.getChats();
+      const dbUpdated = allChats.map(c => {
+        if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+          return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
+        }
+        return c;
+      });
+      DatabaseEngine.saveChats(dbUpdated);
+    } catch (e) {}
   };
 
   // Delete Message Handler
   const handleDeleteMessage = async (messageId: string) => {
     if (!window.confirm('Are you sure you want to delete this message?')) return;
+    const activeKey = activeRegInfo?.key || clientKey || '';
 
     try {
       const res = await fetch(`/api/workshops/chats/${encodeURIComponent(currentChatId)}/messages/${encodeURIComponent(messageId)}`, {
@@ -393,13 +479,35 @@ export default function WorkshopChatRoom({
       });
 
       if (res.ok) {
-        setMessages(prev => prev.filter(m => m.id !== messageId));
+        const updated = messages.filter(m => m.id !== messageId);
+        setMessages(updated);
+        try {
+          const allChats = DatabaseEngine.getChats();
+          const dbUpdated = allChats.map(c => {
+            if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+              return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
+            }
+            return c;
+          });
+          DatabaseEngine.saveChats(dbUpdated);
+        } catch (e) {}
         return;
       }
     } catch (e) {}
 
     // Local fallback
-    setMessages(prev => prev.filter(m => m.id !== messageId));
+    const updated = messages.filter(m => m.id !== messageId);
+    setMessages(updated);
+    try {
+      const allChats = DatabaseEngine.getChats();
+      const dbUpdated = allChats.map(c => {
+        if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+          return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
+        }
+        return c;
+      });
+      DatabaseEngine.saveChats(dbUpdated);
+    } catch (e) {}
   };
 
   // Insert Link Helper
@@ -487,7 +595,7 @@ export default function WorkshopChatRoom({
   }, [teamConversations, teamSearchQuery]);
 
   return (
-    <div className="flex flex-col h-[520px] bg-[#070B12] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative font-sans">
+    <div className="flex flex-col h-[540px] sm:h-[680px] max-h-[85dvh] min-h-[260px] sm:min-h-[420px] bg-[#070B12] border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl relative font-sans">
       
       {/* ========================================================
           TOP HEADER: WhatsApp-Style Status Bar
@@ -816,39 +924,56 @@ export default function WorkshopChatRoom({
               </div>
             )}
 
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+            <form
+              onSubmit={handleSendMessage}
+              className="p-2 sm:p-3.5 bg-[#0a101d]/98 backdrop-blur-md border-t border-white/10 flex items-end gap-2 sm:gap-3 shrink-0 sticky bottom-0 z-20"
+            >
               {/* Add Link Helper Button */}
               <button
                 type="button"
                 onClick={() => setShowLinkModal(true)}
-                className="p-2.5 bg-white/5 hover:bg-brand-teal/20 text-gray-300 hover:text-brand-teal rounded-xl border border-white/10 hover:border-brand-teal/30 transition-all cursor-pointer shrink-0"
+                className="p-2.5 sm:p-3 bg-white/5 hover:bg-brand-teal/15 text-gray-300 hover:text-brand-teal rounded-xl sm:rounded-2xl border border-white/10 hover:border-brand-teal/30 transition-all cursor-pointer shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
                 title="Share link or website URL"
               >
-                <Link2 className="w-4 h-4" />
+                <Link2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-teal" />
               </button>
 
-              {/* Message Input Field */}
-              <input
-                type="text"
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                placeholder={
-                  activeMode === 'team'
-                    ? `Reply directly to ${currentConversation?.clientName || 'Client'} (paste links or text)...`
-                    : "Ask doubts or paste GitHub/doc links here..."
-                }
-                className="flex-1 min-w-0 bg-brand-dark/90 border border-white/15 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-teal transition-all font-sans"
-              />
+              {/* Message Input: Multi-line Comfortable Textarea */}
+              <div className="flex-1 relative min-w-0">
+                <textarea
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  onFocus={() => {
+                    setTimeout(() => scrollToBottomSafely(true), 150);
+                  }}
+                  rows={1}
+                  placeholder={
+                    activeMode === 'team'
+                      ? `Reply directly to ${currentConversation?.clientName || 'Client'} (Press Enter to send)...`
+                      : "Ask doubts or paste GitHub/doc links (Enter to send, Shift+Enter for new line)..."
+                  }
+                  className="w-full bg-black/70 border border-white/10 focus:border-brand-teal/60 focus:ring-1 focus:ring-brand-teal/30 rounded-xl sm:rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-[15px] sm:text-base text-white placeholder-gray-400 focus:outline-none font-sans resize-none min-h-[48px] sm:min-h-[52px] max-h-32 transition-all leading-relaxed"
+                  style={{
+                    height: 'auto',
+                    overflowY: messageInput.split('\n').length > 3 ? 'auto' : 'hidden'
+                  }}
+                />
+              </div>
 
               {/* Send Button */}
               <button
                 type="submit"
                 disabled={!messageInput.trim() || isSending}
-                className="h-[42px] px-4 sm:px-5 bg-brand-teal hover:bg-emerald-400 text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-brand-teal/15 disabled:opacity-50 shrink-0"
+                className="p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black rounded-xl sm:rounded-2xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
                 title="Send Message"
               >
-                <Send className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Send</span>
+                <Send className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
               </button>
             </form>
           </div>

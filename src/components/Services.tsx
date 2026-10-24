@@ -6,7 +6,7 @@ import {
   Settings, Database, AppWindow, Eye, Check, ChevronRight, Layout,
   Laptop, Server, Clock, Calendar, Shield, HelpCircle, Star, Download,
   Phone, Mail, MessageSquare, FileText, QrCode, MessageCircle, ExternalLink, ShieldCheck,
-  Github, Linkedin, CheckCircle2
+  Github, Linkedin, CheckCircle2, Code
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -56,10 +56,37 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       budget?: string;
       timeline?: string;
       timestamp: string;
+      chatId?: string;
     }
   }>(() => {
+    let keys: Record<string, any> = {};
     const saved = localStorage.getItem('scoders_registered_services');
-    return saved ? JSON.parse(saved) : {};
+    if (saved) {
+      try {
+        keys = JSON.parse(saved) || {};
+      } catch (e) {}
+    }
+    try {
+      const dbRegs = DatabaseEngine.getServiceRegistrations();
+      if (Array.isArray(dbRegs)) {
+        for (const reg of dbRegs) {
+          if (reg.serviceId && reg.uniqueKey && !keys[reg.serviceId]) {
+            keys[reg.serviceId] = {
+              key: reg.uniqueKey,
+              name: reg.clientProfile?.name || 'Registered Client',
+              email: reg.clientProfile?.email || '',
+              role: 'Developer',
+              requirements: reg.projectRequirements,
+              budget: reg.budget,
+              timeline: reg.timeline,
+              chatId: reg.chatId || `chat-svc-${reg.uniqueKey}`,
+              timestamp: reg.registrationDate || new Date().toISOString()
+            };
+          }
+        }
+      }
+    } catch (e) {}
+    return keys;
   });
 
   // Modals controller
@@ -358,6 +385,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
     const generatedKey = `BTD-SERV-${serviceCode}-${timestamp}-${randomHex}`;
 
+    const mockChatId = `chat-svc-${generatedKey}`;
     const newKeys = {
       ...registeredKeys,
       [registeringService.id]: {
@@ -368,6 +396,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         requirements: regRequirements,
         budget: regBudget || 'TBD',
         timeline: regTimeline || 'TBD',
+        chatId: mockChatId,
         timestamp: new Date().toLocaleString(),
       }
     };
@@ -378,7 +407,6 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     // Complete relational DatabaseEngine integration
     try {
       const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
-      const mockChatId = 'CHT-SVC-' + Date.now().toString().slice(-4);
       const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
       const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
       const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
@@ -428,13 +456,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       const currentPayments = DatabaseEngine.getPayments();
       DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
 
-      // Save Chat Conversation
+      // Save Chat Conversation with deterministic key linkage
       const dbChat: ChatConversation = {
         id: mockChatId,
         clientName: regName,
         clientEmail: regEmail,
         registrationId: regId,
         reference: registeringService.title,
+        serviceId: registeringService.id,
+        uniqueAccessKey: generatedKey,
         messages: [
           { id: 'msg-init-1', sender: 'team', content: `Welcome ${regName} to S-CODERS! We have created a separate database and conversation workspace for your project '${registeringService.title}'. Our team has reviewed your requirements: "${regRequirements}". Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) will reach out shortly.`, timestamp: new Date().toISOString() }
         ],
@@ -500,13 +530,30 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     // Key validation criteria: BTD-SERV-SERVCODE-XXXX-XXXX
     const expectedPrefix = `BTD-SERV-${serviceCode}-`;
     if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
+      // Look up existing registration in DatabaseEngine
+      const serviceRegs = DatabaseEngine.getServiceRegistrations();
+      const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
+      const allChats = DatabaseEngine.getChats();
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+      const restoredName = existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
+      const restoredEmail = existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
+      const restoredRole = existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
+      const restoredBudget = existingReg?.budget || 'TBD';
+      const restoredTimeline = existingReg?.timeline || 'TBD';
+      const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+
       const newKeys = {
         ...registeredKeys,
         [registeringService.id]: {
           key: trimmed,
-          name: currentUser?.name || 'Manual Access',
-          email: currentUser?.email || 'manual@access.key',
-          purpose: 'Unlocked via existing license key',
+          name: restoredName,
+          email: restoredEmail,
+          role: restoredRole,
+          budget: restoredBudget,
+          timeline: restoredTimeline,
+          chatId: restoredChatId,
+          purpose: 'Unlocked via verified license key',
           timestamp: new Date().toLocaleString(),
         }
       };
@@ -542,6 +589,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
       const generatedKey = `BTD-SERV-${serviceCode}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+      const mockChatId = `chat-svc-${generatedKey}`;
       const newKeys = {
         ...registeredKeys,
         [registeringService.id]: {
@@ -552,6 +600,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           requirements: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
           budget: `Paid ₹${qrPayAmount.toLocaleString()}`,
           timeline: regTimeline || 'Active Workflow',
+          chatId: mockChatId,
           timestamp: new Date().toLocaleString(),
         }
       };
@@ -562,7 +611,6 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       // Save Relational Database Record
       try {
         const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
-        const mockChatId = 'CHT-SVC-' + Date.now().toString().slice(-4);
         const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
         const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
         const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
@@ -1548,7 +1596,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           const regInfo = registeredKeys[serviceId] || { key: 'ENTER-KEY-TO-VERIFY', name: currentUser?.name || 'Authorized Client' };
 
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-3 md:p-6">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-6">
               {/* Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1559,49 +1607,53 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
 
               {/* Workspace Layout Container - Extra Large & High Space Capacity */}
               <motion.div
-                initial={{ scale: 0.96, opacity: 0, y: 20 }}
+                initial={{ scale: 0.98, opacity: 0, y: 10 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.96, opacity: 0, y: 20 }}
-                className="relative w-full max-w-[1440px] h-[96vh] sm:h-[94vh] max-h-[98vh] bg-[#020516] border border-brand-teal/25 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col justify-between"
+                exit={{ scale: 0.98, opacity: 0, y: 10 }}
+                className="relative w-full max-w-[1440px] h-[100dvh] sm:h-[94vh] sm:max-h-[96dvh] bg-[#020516] border-0 sm:border sm:border-white/10 sm:rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col"
               >
-                {/* Visual Header */}
-                <div className="px-5 py-4 sm:px-8 sm:py-5 bg-brand-dark/70 border-b border-white/10 flex flex-wrap items-center justify-between gap-4 shrink-0">
-                  <div className="flex items-center gap-3.5">
-                    <div className="p-3 bg-brand-teal/15 rounded-2xl border border-brand-teal/30 text-brand-teal">
-                      {getIcon(activeWorkspaceService.icon, "w-6 h-6")}
+                {/* Visual Header - Compact & Responsive */}
+                <div className="px-3.5 py-2.5 sm:px-6 sm:py-3.5 bg-brand-dark/90 border-b border-white/10 flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="p-2 sm:p-2.5 bg-brand-teal/15 rounded-xl border border-brand-teal/30 text-brand-teal shrink-0">
+                      {getIcon(activeWorkspaceService.icon, "w-4 h-4 sm:w-5 sm:h-5")}
                     </div>
-                    <div>
-                      <span className="text-[10px] sm:text-xs font-mono text-brand-teal uppercase tracking-widest font-bold block">
+                    <div className="min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold block truncate">
                         ACTIVE SERVICE CONSOLE
                       </span>
-                      <h3 className="font-display font-black text-xl sm:text-2xl text-white leading-tight mt-0.5">
+                      <h3 className="font-display font-extrabold text-sm sm:text-lg text-white leading-tight truncate">
                         {activeWorkspaceService.title} Workspace
                       </h3>
                     </div>
                   </div>
 
                   {/* Key and Info indicators */}
-                  <div className="flex items-center gap-3">
-                    <div className="hidden md:flex flex-col items-end text-right font-mono">
-                      <span className="text-[10px] text-gray-400 uppercase tracking-widest">Licensed to</span>
-                      <span className="text-sm text-white font-bold">{regInfo.name}</span>
-                    </div>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-2 flex items-center gap-2.5 text-xs sm:text-sm font-mono text-brand-teal">
-                      <Shield className="w-4 h-4 text-brand-teal" />
-                      <span className="font-bold tracking-wide">{regInfo.key}</span>
-                    </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
+                      type="button"
+                      onClick={() => handleCopyKey(regInfo.key)}
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-1.5 flex items-center gap-1.5 text-xs font-mono text-brand-teal transition-all cursor-pointer"
+                      title="Click to copy your unique license key"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-brand-teal shrink-0" />
+                      <span className="font-bold tracking-wide truncate max-w-[100px] sm:max-w-none">{regInfo.key}</span>
+                      <Copy className="w-3 h-3 text-gray-400 ml-1 shrink-0 hidden sm:inline" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveWorkspaceService(null)}
-                      className="p-2.5 bg-white/5 hover:bg-white/15 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
+                      className="p-1.5 sm:p-2 bg-white/5 hover:bg-white/15 rounded-xl text-gray-300 hover:text-white transition-colors cursor-pointer border border-white/10 flex items-center gap-1"
                       title="Close Console"
                     >
-                      <X className="w-6 h-6" />
+                      <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-[11px] font-mono uppercase font-bold sm:hidden">Close</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Main Content Area - Renders custom Project Space Dashboard with spacious scrolling */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-brand-dark/40 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
+                <div className="flex-1 overflow-y-auto p-2 sm:p-5 md:p-6 bg-brand-dark/40 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
                   <ServiceProjectSpaceDashboard 
                     service={activeWorkspaceService} 
                     regInfo={regInfo} 
@@ -1609,29 +1661,6 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                     currentUser={currentUser}
                     onClose={() => setActiveWorkspaceService(null)} 
                   />
-                </div>
-
-                {/* Footer action bar */}
-                <div className="px-5 py-4 sm:px-8 sm:py-5 bg-brand-dark/60 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 shrink-0">
-                  <p className="text-xs sm:text-sm text-gray-400 font-sans flex items-center gap-2">
-                    <span>💡</span>
-                    <span>This is a live sandboxed prototype matching your actual custom deployment pipeline structure.</span>
-                  </p>
-                  <div className="flex items-center gap-3.5 w-full sm:w-auto">
-                    <button
-                      onClick={() => handleCopyKey(regInfo.key)}
-                      className="flex-1 sm:flex-initial px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 hover:text-white font-mono text-xs sm:text-sm uppercase font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Copy className="w-4 h-4 text-brand-teal" />
-                      Copy License Key
-                    </button>
-                    <button
-                      onClick={() => setActiveWorkspaceService(null)}
-                      className="flex-1 sm:flex-initial px-6 py-3 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 active:scale-95"
-                    >
-                      Save & Close Console
-                    </button>
-                  </div>
                 </div>
               </motion.div>
             </div>
@@ -2746,6 +2775,9 @@ export function ServiceProjectSpaceDashboard({
   currentUser?: AppUser | null;
   onClose: () => void; 
 }) {
+  // Tab controller matching Workshop section layout (5 clean tabs)
+  const [activeTab, setActiveTab] = useState<'discussion' | 'sandbox' | 'resources' | 'developers' | 'feedback'>('discussion');
+
   // Feedback Form State
   const [feedName, setFeedName] = useState(regInfo.name || '');
   const [feedEmail, setFeedEmail] = useState(regInfo.email || '');
@@ -2753,6 +2785,25 @@ export function ServiceProjectSpaceDashboard({
   const [feedRating, setFeedRating] = useState(5);
   const [feedExperience, setFeedExperience] = useState('');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  // Playground resolver for active service
+  const renderServicePlayground = () => {
+    switch (service.id) {
+      case 'ai':
+        return <AiAgentPlayground />;
+      case 'mobile':
+        return <MobileAppPlayground />;
+      case 'web':
+        return <WebsiteStylerPlayground />;
+      case 'cloud':
+      case 'software':
+        return <ApiClientPlayground />;
+      case 'design':
+        return <DesignSystemPlayground />;
+      default:
+        return <ConsultancyAdvisorPlayground />;
+    }
+  };
 
   // File download states (Identical to Workshop high-fidelity download system)
   const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
@@ -2848,33 +2899,28 @@ export function ServiceProjectSpaceDashboard({
   };
 
   return (
-    <div className="space-y-8 text-white font-sans max-w-7xl mx-auto pb-6">
-      {/* 1. TOP LIFECYCLE STATUS BANNER */}
-      <div className="bg-[#25d366]/10 border border-[#25d366]/30 p-6 sm:p-7 rounded-3xl shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-2.5">
-          <div className="flex items-center gap-2.5">
-            <span className="w-3 h-3 rounded-full bg-[#25d366] animate-pulse" />
-            <span className="text-xs sm:text-sm font-mono font-black uppercase tracking-wider text-[#25d366]">
-              PROJECT LIFE-CYCLE ACTIVE
-            </span>
-          </div>
-          <span className="text-xs font-mono text-gray-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-            Registered Budget: <strong className="text-white">{regInfo.budget || 'TBD'}</strong> • Timeline: <strong className="text-white">{regInfo.timeline || 'TBD'}</strong>
+    <div className="space-y-4 sm:space-y-6 text-white font-sans max-w-7xl mx-auto pb-6">
+      {/* 1. TOP LIFECYCLE STATUS BANNER (COMPACT & RESPONSIVE) */}
+      <div className="bg-[#25d366]/10 border border-[#25d366]/30 px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse shrink-0" />
+          <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">
+            PROJECT LIFE-CYCLE ACTIVE
+          </span>
+          <span className="text-gray-500 text-xs hidden md:inline">•</span>
+          <span className="text-xs text-gray-300 hidden md:inline truncate">
+            Budget: <strong className="text-white">{regInfo.budget || 'TBD'}</strong> • Timeline: <strong className="text-white">{regInfo.timeline || 'TBD'}</strong> • Direct 1-on-1 sprint coordination with S-CODERS Lead Developers
           </span>
         </div>
-        <h4 className="text-lg sm:text-xl font-bold text-white mb-2">No Upfront Payment Required</h4>
-        <p className="text-gray-200 text-sm sm:text-base leading-relaxed max-w-5xl">
-          Your registered project is officially initiated in our engineering pipeline. Pricing and milestones are determined dynamically after direct 1-on-1 requirements alignment. Our lead developers will connect with you via Call / WhatsApp and Zoom meeting to coordinate.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <a
             href="https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#25D366]/20 cursor-pointer"
+            className="px-3.5 py-1.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-[#25D366]/20 cursor-pointer active:scale-95"
           >
-            <MessageCircle className="w-4 h-4 text-black" />
-            <span>Join Service WhatsApp Group</span>
+            <MessageCircle className="w-3.5 h-3.5 text-black" />
+            <span>Join WhatsApp Group</span>
           </a>
         </div>
       </div>
@@ -3142,158 +3188,198 @@ export function ServiceProjectSpaceDashboard({
         </div>
       </div>
 
-      {/* 3. MIDDLE SECTION: PROGRESS FILES & WHATSAPP-STYLE LIVE CHAT (SPACIOUS 2-COLUMN GRID) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-start">
-        
-        {/* PROGRESS FILES / PDF SECTION - IDENTICAL TO WORKSHOP FILE DOWNLOADING */}
-        <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-xl min-h-[520px] space-y-5">
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-4 border-b border-white/10 pb-3">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-brand-teal" />
-                <h4 className="text-sm font-mono font-bold text-white uppercase tracking-widest">Progress Files & Spec PDFs</h4>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-teal/15 text-brand-teal border border-brand-teal/30 font-bold">
-                ENGINEERING DELIVERABLES
-              </span>
-            </div>
-            
-            <p className="text-xs sm:text-sm text-gray-300 mb-4 leading-relaxed">
-              Whenever you log in with your key, the verified architecture blueprints, UI wireframes, and database specifications generated by S-CODERS are available for direct download into your system's File Explorer.
-            </p>
-
-            {/* File Explorer Instructions Tip - Clean structured card layout matching Workshop */}
-            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono text-gray-300 space-y-2.5 mb-4">
-              <div className="flex items-center gap-2 text-brand-teal font-bold text-xs uppercase tracking-wider">
-                <FileText className="w-4 h-4 shrink-0" />
-                <span>File Explorer & Downloads Guide</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] leading-relaxed">
-                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
-                  <span className="text-brand-teal font-bold shrink-0">1.</span>
-                  <span>Your file downloads directly into your operating system's <code className="text-brand-teal bg-white/10 px-1 py-0.5 rounded">Downloads</code> folder in File Explorer / Finder.</span>
-                </div>
-                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
-                  <span className="text-brand-teal font-bold shrink-0">2.</span>
-                  <span>In File Explorer, open <code className="text-cyan-300 bg-white/10 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser.</span>
-                </div>
-                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
-                  <span className="text-brand-teal font-bold shrink-0">3.</span>
-                  <span>Click <strong className="text-brand-teal">Open</strong> to preview documents immediately in your browser tab.</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Download Success Banner */}
-            {downloadSuccessNotice && (
-              <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-emerald-500/10 mb-4">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="font-semibold">{downloadSuccessNotice}</span>
-                </div>
-                {lastDownloadedItem && (
-                  <a
-                    href={`/api/services/view/${encodeURIComponent(lastDownloadedItem.id)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-emerald-400 text-black hover:bg-emerald-300 font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Open / View in Browser</span>
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* 4 Specification Files Grid */}
-            <div className="space-y-3 flex-grow">
-              {[
-                { id: 'Project_Architecture_Spec.pdf', title: 'Project Architecture Blueprint', desc: 'Tech stack flow, system diagram & parameters', size: '1.8 MB', filename: 'Project_Architecture_Spec.pdf' },
-                { id: 'Interactive_UI_Mockups_v1.pdf', title: 'Interactive UI Mockups & Flows', desc: 'High fidelity wireframes & layout templates', size: '4.5 MB', filename: 'Interactive_UI_Mockups_v1.pdf' },
-                { id: 'Database_Schema_Spec.pdf', title: 'Relational Database Schema Spec', desc: 'PostgreSQL structures, attributes & indices', size: '1.2 MB', filename: 'Database_Schema_Spec.pdf' },
-                { id: 'AI_Agent_Logic_Flowchart.pdf', title: 'AI Agent & Routing Logic Flowchart', desc: 'Structured chain-of-thought routing blueprint', size: '2.4 MB', filename: 'AI_Agent_Logic_Flowchart.pdf' }
-              ].map((file) => (
-                <div key={file.id} className="p-3.5 sm:p-4 bg-brand-dark/70 border border-white/10 hover:border-brand-teal/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left transition-all group">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="block text-sm font-bold text-white group-hover:text-brand-teal transition-colors truncate">{file.title}</span>
-                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-white/10 text-gray-300 shrink-0">{file.size}</span>
-                    </div>
-                    <span className="block text-xs text-gray-400 truncate mt-0.5">{file.desc}</span>
-                    <span className="block text-[10px] text-gray-500 font-mono mt-0.5 truncate">{file.filename}</span>
-                  </div>
-
-                  <div className="shrink-0 flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
-                    {downloadingItem === file.id ? (
-                      <div className="w-36 space-y-1 font-mono text-left">
-                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-teal transition-all duration-200" style={{ width: `${downloadProgress}%` }} />
-                        </div>
-                        <div className="flex justify-between text-[10px] text-brand-teal font-bold">
-                          <span>Saving...</span>
-                          <span>{downloadProgress}%</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => handleDownloadResource(file.id, file.title, e)}
-                          disabled={downloadingItem !== null}
-                          className="px-3 py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all cursor-pointer border border-brand-teal/30 hover:border-brand-teal flex items-center gap-1.5 font-mono text-xs font-bold disabled:opacity-50 shadow-sm"
-                          title={`Download ${file.title} directly into File Explorer`}
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Download</span>
-                        </button>
-
-                        <a
-                          href={`/api/services/view/${encodeURIComponent(file.id)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white rounded-xl transition-all cursor-pointer border border-white/10 flex items-center gap-1.5 font-mono text-xs shadow-sm"
-                          title={`Open ${file.title} directly in new tab`}
-                        >
-                          <Eye className="w-3.5 h-3.5 text-brand-teal" />
-                          <span>Open</span>
-                        </a>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Master Download All ZIP Bundle Button */}
-          <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <span className="text-xs font-mono text-gray-400">
-              Need all specifications at once?
-            </span>
+      {/* 2. HIGH-FIDELITY SERVICE WORKSPACE TABBED CONTAINER (EXACT MATCH TO WORKSHOP DESIGN) */}
+      <div className="bg-brand-dark/60 border border-white/10 rounded-3xl overflow-hidden shadow-xl mt-2">
+        {/* Tab Headers */}
+        <div className="grid grid-cols-3 bg-brand-dark/90 border-b border-white/10 p-1.5 sm:p-2">
+          {[
+            { id: 'discussion', label: 'Live Discussion', icon: MessageCircle },
+            { id: 'sandbox', label: 'Interactive Prototype', icon: Code },
+            { id: 'resources', label: 'Downloads Locker', icon: Download },
+          ].map(t => (
             <button
-              type="button"
-              onClick={(e) => handleDownloadResource('scoders_service_project_specs_bundle.zip', 'Service Specs Complete Bundle', e)}
-              disabled={downloadingItem !== null}
-              className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/20 shadow-sm"
-              title="Download entire specification bundle in ZIP format"
+              key={t.id}
+              onClick={() => setActiveTab(t.id as any)}
+              className={`py-3 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-mono font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === t.id
+                  ? 'bg-brand-teal text-brand-dark shadow-md font-extrabold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
             >
-              <Download className="w-4 h-4 text-brand-teal" />
-              <span>Download All Specs (ZIP Bundle)</span>
+              <t.icon className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">{t.label}</span>
+              <span className="sm:hidden">{t.id === 'discussion' ? 'Chat' : t.id === 'sandbox' ? 'Prototype' : 'Files'}</span>
             </button>
-          </div>
+          ))}
         </div>
 
-        {/* CHATBOX SECTION - WHATSAPP-STYLE INDIVIDUAL CHAT SYSTEM */}
-        <div className="min-h-[520px]">
-          <ServiceChatRoom
-            activeService={service}
-            activeRegInfo={regInfo}
-            isRegistered={true}
-            isAdmin={isAdmin}
-            currentUser={currentUser}
-          />
-        </div>
+        {/* Tab Panels */}
+        <div className="p-3 sm:p-6 min-h-[480px]">
+          {/* TAB 1: INTERACTIVE PROTOTYPE SANDBOX */}
+          {activeTab === 'sandbox' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs font-mono text-gray-400 pb-2 border-b border-white/10">
+                <span className="font-semibold text-gray-300">{service.title} Live Prototype Simulator</span>
+                <span className="text-brand-teal font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" />
+                  Prototype Active
+                </span>
+              </div>
+              {renderServicePlayground()}
+            </div>
+          )}
 
+          {/* TAB 2: PROGRESS FILES & SPEC PDFS */}
+          {activeTab === 'resources' && (
+            <div className="space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/10">
+                <div>
+                  <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block font-bold">
+                    Engineering Deliverables & Spec PDFs
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Verified Documentation Binaries (Direct OS File Explorer Download)
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                Whenever you log in with your key, the verified architecture blueprints, UI wireframes, and database specifications generated by S-CODERS are available for direct download into your system's File Explorer.
+              </p>
+
+              {/* File Explorer Instructions Tip */}
+              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono text-gray-300 space-y-2.5">
+                <div className="flex items-center gap-2 text-brand-teal font-bold text-xs uppercase tracking-wider">
+                  <FileText className="w-4 h-4 shrink-0" />
+                  <span>File Explorer & Downloads Guide</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] leading-relaxed">
+                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                    <span className="text-brand-teal font-bold shrink-0">1.</span>
+                    <span>Your file downloads directly into your operating system's <code className="text-brand-teal bg-white/10 px-1 py-0.5 rounded">Downloads</code> folder in File Explorer / Finder.</span>
+                  </div>
+                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                    <span className="text-brand-teal font-bold shrink-0">2.</span>
+                    <span>In File Explorer, open <code className="text-cyan-300 bg-white/10 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser.</span>
+                  </div>
+                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
+                    <span className="text-brand-teal font-bold shrink-0">3.</span>
+                    <span>Click <strong className="text-brand-teal">Open</strong> to preview documents immediately in your browser tab.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Download Success Banner */}
+              {downloadSuccessNotice && (
+                <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-emerald-500/10">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="font-semibold">{downloadSuccessNotice}</span>
+                  </div>
+                  {lastDownloadedItem && (
+                    <a
+                      href={`/api/services/view/${encodeURIComponent(lastDownloadedItem.id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-emerald-400 text-black hover:bg-emerald-300 font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Open / View in Browser</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* 4 Specification Files Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { id: 'Project_Architecture_Spec.pdf', title: 'Project Architecture Blueprint', desc: 'Tech stack flow, system diagram & parameters', size: '1.8 MB', filename: 'Project_Architecture_Spec.pdf' },
+                  { id: 'Interactive_UI_Mockups_v1.pdf', title: 'Interactive UI Mockups & Flows', desc: 'High fidelity wireframes & layout templates', size: '4.5 MB', filename: 'Interactive_UI_Mockups_v1.pdf' },
+                  { id: 'Database_Schema_Spec.pdf', title: 'Relational Database Schema Spec', desc: 'PostgreSQL structures, attributes & indices', size: '1.2 MB', filename: 'Database_Schema_Spec.pdf' },
+                  { id: 'AI_Agent_Logic_Flowchart.pdf', title: 'AI Agent & Routing Logic Flowchart', desc: 'Structured chain-of-thought routing blueprint', size: '2.4 MB', filename: 'AI_Agent_Logic_Flowchart.pdf' }
+                ].map((file) => (
+                  <div key={file.id} className="p-4 bg-brand-dark/70 border border-white/10 hover:border-brand-teal/30 rounded-2xl flex flex-col justify-between gap-3 text-left transition-all group">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="block text-sm font-bold text-white group-hover:text-brand-teal transition-colors truncate">{file.title}</span>
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-white/10 text-gray-300 shrink-0">{file.size}</span>
+                      </div>
+                      <span className="block text-xs text-gray-400 truncate mt-1">{file.desc}</span>
+                      <span className="block text-[10px] text-gray-500 font-mono mt-1 truncate">{file.filename}</span>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/5 flex items-center gap-2">
+                      {downloadingItem === file.id ? (
+                        <div className="w-full space-y-1 font-mono text-left">
+                          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-brand-teal transition-all duration-200" style={{ width: `${downloadProgress}%` }} />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-brand-teal font-bold">
+                            <span>Saving...</span>
+                            <span>{downloadProgress}%</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDownloadResource(file.id, file.title, e)}
+                            disabled={downloadingItem !== null}
+                            className="flex-1 px-3 py-2 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal rounded-xl transition-all cursor-pointer border border-brand-teal/30 hover:border-brand-teal flex items-center justify-center gap-1.5 font-mono text-xs font-bold disabled:opacity-50 shadow-sm"
+                            title={`Download ${file.title} directly into File Explorer`}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download</span>
+                          </button>
+
+                          <a
+                            href={`/api/services/view/${encodeURIComponent(file.id)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white rounded-xl transition-all cursor-pointer border border-white/10 flex items-center gap-1.5 font-mono text-xs shadow-sm"
+                            title={`Open ${file.title} directly in new tab`}
+                          >
+                            <Eye className="w-3.5 h-3.5 text-brand-teal" />
+                            <span>Open</span>
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Master Download All ZIP Bundle Button */}
+              <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-xs font-mono text-gray-400">
+                  Need all specifications at once?
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => handleDownloadResource('scoders_service_project_specs_bundle.zip', 'Service Specs Complete Bundle', e)}
+                  disabled={downloadingItem !== null}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/20 shadow-sm"
+                  title="Download entire specification bundle in ZIP format"
+                >
+                  <Download className="w-4 h-4 text-brand-teal" />
+                  <span>Download All Specs (ZIP Bundle)</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: LIVE DISCUSSION (WHATSAPP-STYLE FULL-WIDTH SPACIOUS CHAT) */}
+          {activeTab === 'discussion' && (
+            <ServiceChatRoom
+              activeService={service}
+              activeRegInfo={regInfo}
+              isRegistered={true}
+              isAdmin={isAdmin}
+              currentUser={currentUser}
+            />
+          )}
+        </div>
       </div>
 
       {/* 4. FULL WIDTH BOTTOM SECTION: FEEDBACK FORM (SPACIOUS & PROMINENT) */}
@@ -3399,6 +3485,34 @@ export function ServiceProjectSpaceDashboard({
               </motion.div>
             )}
           </form>
+        </div>
+      </div>
+
+      {/* 5. Mobile-Friendly Bottom Action Bar (Inline at bottom of scroll, never blocks chat input or keyboard!) */}
+      <div className="block sm:hidden p-4 bg-brand-dark/90 border border-white/10 rounded-2xl space-y-3">
+        <p className="text-xs text-gray-400 font-sans flex items-center gap-2">
+          <span>💡</span>
+          <span>Live sandboxed prototype for {service.title}.</span>
+        </p>
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(regInfo.key);
+              alert('License key copied to clipboard!');
+            }}
+            className="flex-1 py-3 px-3 bg-white/5 border border-white/10 text-gray-200 text-xs font-mono font-bold rounded-xl flex items-center justify-center gap-1.5"
+          >
+            <Copy className="w-3.5 h-3.5 text-brand-teal" />
+            Copy Key
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 px-3 bg-brand-teal text-brand-dark text-xs font-display font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-brand-teal/20"
+          >
+            Save & Close
+          </button>
         </div>
       </div>
 

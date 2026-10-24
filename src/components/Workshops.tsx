@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Calendar, MapPin, Users, Award, Sparkles, MessageSquare, 
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
@@ -66,10 +66,34 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
       email: string;
       role: string;
       timestamp: string;
+      chatId?: string;
     }
   }>(() => {
+    let keys: Record<string, any> = {};
     const saved = localStorage.getItem('scoders_registered_workshops');
-    return saved ? JSON.parse(saved) : {};
+    if (saved) {
+      try {
+        keys = JSON.parse(saved) || {};
+      } catch (e) {}
+    }
+    try {
+      const dbRegs = DatabaseEngine.getWorkshopRegistrations();
+      if (Array.isArray(dbRegs)) {
+        for (const reg of dbRegs) {
+          if (reg.workshopId && reg.uniqueAccessKey && !keys[reg.workshopId]) {
+            keys[reg.workshopId] = {
+              key: reg.uniqueAccessKey,
+              name: reg.participantProfile?.name || 'Registered Attendee',
+              email: reg.participantProfile?.email || '',
+              role: reg.participantProfile?.role || 'Attendee',
+              chatId: reg.chatId || `chat-wksp-${reg.uniqueAccessKey}`,
+              timestamp: reg.paymentDate || new Date().toISOString()
+            };
+          }
+        }
+      }
+    } catch (e) {}
+    return keys;
   });
 
   // Registration Form States
@@ -328,6 +352,7 @@ export default function TenantDashboard() {
     const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
     const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
     const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+    const mockChatId = `chat-wksp-${generatedKey}`;
 
     // 3. Save to localStorage registered workshops
     const newKeys = {
@@ -339,6 +364,7 @@ export default function TenantDashboard() {
         role: safeRole,
         tickets: payTicketsCount,
         totalPaid: totalAmount,
+        chatId: mockChatId,
         timestamp: new Date().toLocaleDateString()
       }
     };
@@ -352,7 +378,6 @@ export default function TenantDashboard() {
       const regId = 'reg-wksp-' + Date.now();
       const mockPdfId = 'file-pdf-' + Date.now();
       const mockSrcId = 'file-src-' + Date.now();
-      const mockChatId = 'chat-wksp-' + Date.now();
 
       const dbRegistration: WorkshopRegistration = {
         id: regId,
@@ -602,28 +627,42 @@ export default function TenantDashboard() {
     const expectedPrefix = `BTD-WKSP-${code}-`;
 
     if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
+      // Look up existing registration in DatabaseEngine or chats
+      const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
+      const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
+      const allChats = DatabaseEngine.getChats();
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+      const restoredName = existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee';
+      const restoredEmail = existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com';
+      const restoredRole = existingReg?.participantProfile?.role || 'Registered Developer';
+      const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`;
+
       const newKeys = {
         ...registeredKeys,
         [activeWorkshop.id]: {
           key: trimmed,
-          name: currentUser?.name || 'Manual Attendee',
-          email: currentUser?.email || 'manual@wksp-pass.in',
-          role: 'Registered Developer',
+          name: restoredName,
+          email: restoredEmail,
+          role: restoredRole,
+          tickets: 1,
+          totalPaid: existingReg?.amountPaid || 1499,
+          chatId: restoredChatId,
           timestamp: new Date().toLocaleDateString()
         }
       };
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
 
-      // Ensure individual chat is initialized for manual pass holder
+      // Ensure individual chat is initialized for pass holder with key linkage
       try {
-        const manualChatId = `chat-wksp-${activeWorkshop.id}-${trimmed}`;
+        const manualChatId = restoredChatId;
         const existingChats = DatabaseEngine.getChats();
         if (!existingChats.some(c => c.id === manualChatId || c.uniqueAccessKey === trimmed)) {
           const manualChat: ChatConversation = {
             id: manualChatId,
-            clientName: currentUser?.name || 'Registered Attendee',
-            clientEmail: currentUser?.email || 'manual@wksp-pass.in',
+            clientName: restoredName,
+            clientEmail: restoredEmail,
             registrationId: trimmed,
             workshopId: activeWorkshop.id,
             reference: activeWorkshop.title,
