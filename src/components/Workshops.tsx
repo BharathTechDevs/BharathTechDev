@@ -25,6 +25,7 @@ import {
   triggerFileDownload
 } from '../utils/workshopAssetGenerator';
 import WorkshopChatRoom from './WorkshopChatRoom';
+import { OnlineCodePlayground } from './OnlineCodePlayground';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -138,8 +139,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   
   // Sandbox State
   const [sandboxCode, setSandboxCode] = useState('');
-  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
-  const [isCompiling, setIsCompiling] = useState(false);
+  const [showTrialPlayground, setShowTrialPlayground] = useState(false);
 
   // Download States
   const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
@@ -293,7 +293,6 @@ export default function TenantDashboard() {
   );
 }`);
     }
-    setTerminalLogs([]);
   }, [selectedWorkshopId]);
 
   // Handle key creation & registration (starts Razorpay payment flow)
@@ -713,36 +712,6 @@ export default function TenantDashboard() {
     navigator.clipboard.writeText(keyText);
     setCopiedKey(true);
     setTimeout(() => setCopiedKey(false), 2000);
-  };
-
-  // RUN CODE SANDBOX SIMULATION
-  const handleRunSandbox = () => {
-    setIsCompiling(true);
-    setTerminalLogs([
-      `🕒 [${new Date().toLocaleTimeString()}] COMPILING SOURCE FILES (TSX -> ESNext Node)...`,
-      `⚙️ Checking dependencies map in package.json...`,
-      `🔍 Resolving system import: "@google/genai"`
-    ]);
-
-    setTimeout(() => {
-      setTerminalLogs(prev => [
-        ...prev,
-        `🔑 Verifying local keychain token auth: [${activeRegInfo?.key || 'MOCK_KEY'}]`,
-        `🚀 Executing application server thread...`,
-        `📟 [CONSOLE LOG]: Initializing Agent Core...`,
-        `📡 Contacting Google Cloud Run server routing to Gemini endpoint...`,
-      ]);
-    }, 1000);
-
-    setTimeout(() => {
-      setTerminalLogs(prev => [
-        ...prev,
-        `📟 [CONSOLE LOG]: Gemini response fetched successfully!`,
-        `📝 [RESPONSE TEXT]:\n   1. Analyze subject line triggers.\n   2. Map to dynamic categorization tags.\n   3. Forward split payloads via Webhook triggers.`,
-        `✅ BUILD AND EXECUTION FINISHED SUCCESSFULLY (Status: 0, Time: 2.14s)`
-      ]);
-      setIsCompiling(false);
-    }, 2200);
   };
 
   // RESOURCE DOWNLOAD HANDLER: Generates real, verified files and saves directly to user's File Explorer / Downloads
@@ -1274,47 +1243,15 @@ export default function TenantDashboard() {
                         {/* Tab Panels */}
                         <div className="p-4 sm:p-7 min-h-[480px]">
                           
-                          {/* TAB 1: SANDBOX IDE */}
+                          {/* TAB 1: REAL ONLINE COMPILER & PLAYGROUND IDE */}
                           {activeTab === 'sandbox' && (
-                            <div className="space-y-5">
-                              <div className="flex items-center justify-between text-xs font-mono text-gray-400">
-                                <span className="font-semibold text-gray-300">main.ts (Interactive Full-Stack Sandbox)</span>
-                                <span className="text-brand-teal font-bold flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" />
-                                  Live Compiler Ready
-                                </span>
-                              </div>
-                              <div className="border border-white/10 rounded-2xl overflow-hidden bg-brand-dark/95 shadow-inner">
-                                <textarea
-                                  value={sandboxCode}
-                                  onChange={(e) => setSandboxCode(e.target.value)}
-                                  className="w-full bg-transparent text-sm p-5 text-emerald-300 font-mono focus:outline-none h-60 resize-none leading-relaxed"
-                                  placeholder="// Write your custom workspace code here..."
-                                />
-                              </div>
-
-                              <div className="flex justify-between items-center gap-3">
-                                <button
-                                  onClick={handleRunSandbox}
-                                  disabled={isCompiling}
-                                  className="px-6 py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/15"
-                                >
-                                  {isCompiling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-                                  Run Code Sandbox
-                                </button>
-                                <span className="text-xs text-gray-400 font-mono">Environment: TypeScript • Node 20 runtime</span>
-                              </div>
-
-                              {/* Terminal Display */}
-                              {terminalLogs.length > 0 && (
-                                <div className="bg-[#010309] border border-white/10 rounded-2xl p-5 font-mono text-xs space-y-2 text-emerald-400 max-h-56 overflow-y-auto shadow-inner">
-                                  {terminalLogs.map((log, i) => (
-                                    <div key={i} className={log.includes('📟') ? 'text-white font-bold' : log.includes('✅') ? 'text-emerald-300 font-extrabold' : ''}>
-                                      {log}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                            <div className="space-y-4">
+                              <OnlineCodePlayground
+                                workshopTitle={activeWorkshop.title}
+                                initialLanguage={activeWorkshop.id === 'w-1' ? 'python' : 'react'}
+                                initialCode={sandboxCode}
+                                onCodeChange={setSandboxCode}
+                              />
                             </div>
                           )}
 
@@ -1505,6 +1442,27 @@ export default function TenantDashboard() {
                             <Eye className="w-4 h-4" />
                             Enter Existing Pass Key
                           </button>
+                        </div>
+
+                        {/* Direct Trial Playground Toggle */}
+                        <div className="pt-3 border-t border-white/5 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowTrialPlayground(!showTrialPlayground)}
+                            className="text-xs font-mono text-brand-teal hover:text-white px-4 py-2 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/30 rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer"
+                          >
+                            <Code className="w-4 h-4 text-brand-teal" />
+                            <span>{showTrialPlayground ? 'Hide Online Code Playground' : '⚡ Open Online Compiler & Playground Sandbox'}</span>
+                          </button>
+
+                          {showTrialPlayground && (
+                            <div className="mt-5 text-left">
+                              <OnlineCodePlayground
+                                workshopTitle={`${activeWorkshop.title} (Playground Sandbox)`}
+                                initialLanguage={activeWorkshop.id === 'w-1' ? 'python' : 'react'}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
