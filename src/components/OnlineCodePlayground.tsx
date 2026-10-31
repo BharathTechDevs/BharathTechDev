@@ -12,6 +12,7 @@ import {
   Eye,
   Sparkles,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Monitor,
   Smartphone,
@@ -972,6 +973,9 @@ interface AiDebugResult {
   explanation: string;
   correctedCode: string;
   suggestedFixSummary: string;
+  testExecutionOutput?: string;
+  testExecutionSuccess?: boolean;
+  testExitCode?: number;
 }
 
 interface AiExplainResult {
@@ -1061,6 +1065,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [panelLayout, setPanelLayout] = useState<'split' | 'editor' | 'console'>('split');
   const [previewViewport, setPreviewViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [detectedLangNotice, setDetectedLangNotice] = useState<string | null>(null);
   const [languageSearchQuery, setLanguageSearchQuery] = useState<string>('');
@@ -1261,8 +1266,9 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
 
   // EXECUTION DISPATCHER
-  const handleRunCode = async () => {
+  const handleRunCode = async (overrideCode?: string) => {
     if (isRunning) return;
+    const targetCode = typeof overrideCode === 'string' ? overrideCode : code;
 
     setIsRunning(true);
     setRunStage('preparing');
@@ -1274,7 +1280,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     // 1. WEB UI EXECUTION (HTML / React)
     if (language === 'html' || language === 'react') {
       setActiveTab('preview');
-      renderWebSandbox(language, code);
+      renderWebSandbox(language, targetCode);
       setIsRunning(false);
       setRunStage('done');
       saveHistoryItem({
@@ -1282,7 +1288,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
         timestamp: new Date().toLocaleTimeString(),
         language,
         fileName: activeFile.name,
-        code,
+        code: targetCode,
         status: 'success',
         durationMs: 45,
       });
@@ -1311,7 +1317,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           language,
-          code,
+          code: targetCode,
           stdin: showStdin && stdin ? stdin : undefined,
         }),
       });
@@ -1372,7 +1378,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
               timestamp: new Date().toLocaleTimeString(),
               language,
               fileName: activeFile.name,
-              code,
+              code: targetCode,
               status: data.exitCode === 0 ? 'success' : 'error',
               durationMs: data.executionTimeMs,
             });
@@ -1398,7 +1404,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             language,
-            code,
+            code: targetCode,
             stdin: showStdin ? stdin : undefined,
           }),
         });
@@ -1521,13 +1527,20 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     }
   };
 
-  // 1-Click Apply AI Fix
-  const handleApplyAiFix = () => {
+  // 1-Click Apply AI Fix & Run Execution
+  const handleApplyAiFix = (autoRun: boolean = true) => {
     if (!aiDebugResult?.correctedCode) return;
-    handleCodeChange(aiDebugResult.correctedCode);
-    setAppliedFixNotice('✨ AI-corrected code applied to editor! Click "Run Code" to verify.');
+    const targetCode = aiDebugResult.correctedCode;
+    handleCodeChange(targetCode);
+    setAppliedFixNotice(autoRun ? '✨ AI fix applied! Automatically running corrected code...' : '✨ AI-corrected code applied to editor.');
     setStderrOutput(null);
     setAiDebugResult(null);
+
+    if (autoRun) {
+      setTimeout(() => {
+        handleRunCode(targetCode);
+      }, 80);
+    }
   };
 
   // AI LINE-BY-LINE CODE EXPLAINER
@@ -1788,6 +1801,37 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
             <Download className="w-3.5 h-3.5" />
           </button>
 
+          {/* Panel Layout View Toggles */}
+          <div className="hidden md:flex items-center gap-0.5 bg-white/5 p-0.5 rounded-xl border border-white/10 text-xs font-mono">
+            <button
+              onClick={() => setPanelLayout('split')}
+              className={`px-2 py-1 rounded-lg transition-colors ${
+                panelLayout === 'split' ? 'bg-brand-teal text-brand-dark font-bold shadow-sm' : 'text-gray-400 hover:text-white'
+              }`}
+              title="Balanced 50/50 Split View"
+            >
+              Split
+            </button>
+            <button
+              onClick={() => setPanelLayout('editor')}
+              className={`px-2 py-1 rounded-lg transition-colors ${
+                panelLayout === 'editor' ? 'bg-brand-teal text-brand-dark font-bold shadow-sm' : 'text-gray-400 hover:text-white'
+              }`}
+              title="Wide Editor View"
+            >
+              Editor Max
+            </button>
+            <button
+              onClick={() => setPanelLayout('console')}
+              className={`px-2 py-1 rounded-lg transition-colors ${
+                panelLayout === 'console' ? 'bg-brand-teal text-brand-dark font-bold shadow-sm' : 'text-gray-400 hover:text-white'
+              }`}
+              title="Terminal / Output View"
+            >
+              Console Max
+            </button>
+          </div>
+
           {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
@@ -1811,7 +1855,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
           {/* MASTER RUN CODE BUTTON */}
           <button
-            onClick={handleRunCode}
+            onClick={() => handleRunCode()}
             disabled={isRunning}
             className="px-4 py-1.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-brand-teal/25"
           >
@@ -2091,112 +2135,131 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
           </div>
         )}
 
-        {/* SPLIT PANE: EDITOR (LEFT) + OUTPUT (RIGHT) */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-white/10">
+        {/* SPLIT / ADAPTIVE PANE: EDITOR (LEFT) + OUTPUT (RIGHT) */}
+        <div
+          className={`flex-1 grid divide-y lg:divide-y-0 divide-white/10 ${
+            panelLayout === 'split'
+              ? 'grid-cols-1 lg:grid-cols-2 lg:divide-x'
+              : 'grid-cols-1'
+          }`}
+        >
           {/* LEFT: SOURCE CODE EDITOR */}
-          <div className="flex flex-col bg-[#050811] relative">
-            {/* File Tabs Bar */}
-            <div className="bg-[#080D18] px-2 py-1.5 border-b border-white/10 flex items-center justify-between gap-1 overflow-x-auto">
-              <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-                {files.map((file, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setActiveFileIndex(idx)}
-                    className={`group px-3 py-1 rounded-lg text-xs font-mono flex items-center gap-1.5 cursor-pointer border transition-colors ${
-                      activeFileIndex === idx
-                        ? 'bg-[#131A29] text-brand-teal border-brand-teal/40 font-semibold shadow-sm'
-                        : 'bg-white/5 text-gray-400 border-transparent hover:text-white hover:bg-white/10'
-                    }`}
+          {panelLayout !== 'console' && (
+            <div className="flex flex-col bg-[#050811] relative">
+              {/* File Tabs Bar */}
+              <div className="bg-[#080D18] px-2 py-1.5 border-b border-white/10 flex items-center justify-between gap-1 overflow-x-auto">
+                <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                  {files.map((file, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setActiveFileIndex(idx)}
+                      className={`group px-3 py-1 rounded-lg text-xs font-mono flex items-center gap-1.5 cursor-pointer border transition-colors ${
+                        activeFileIndex === idx
+                          ? 'bg-[#131A29] text-brand-teal border-brand-teal/40 font-semibold shadow-sm'
+                          : 'bg-white/5 text-gray-400 border-transparent hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <FileCode className="w-3.5 h-3.5 text-brand-teal/70" />
+                      <span>{file.name}</span>
+                      {files.length > 1 && (
+                        <button
+                          onClick={(e) => handleRemoveFile(idx, e)}
+                          className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity ml-1"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={handleAddFile}
+                    className="p-1 text-gray-400 hover:text-brand-teal bg-white/5 hover:bg-white/10 rounded-lg text-xs font-mono flex items-center gap-1 cursor-pointer"
+                    title="Add file to project"
                   >
-                    <FileCode className="w-3.5 h-3.5 text-brand-teal/70" />
-                    <span>{file.name}</span>
-                    {files.length > 1 && (
-                      <button
-                        onClick={(e) => handleRemoveFile(idx, e)}
-                        className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity ml-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="text-[10px] hidden sm:inline">File</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {panelLayout === 'editor' && (
+                    <button
+                      onClick={() => setPanelLayout('split')}
+                      className="text-[10px] font-mono text-brand-teal hover:underline px-2 py-0.5 bg-brand-teal/10 rounded"
+                    >
+                      Restore Split View
+                    </button>
+                  )}
+                  <div className="text-[10px] text-gray-500 font-mono hidden sm:block shrink-0 pr-2">
+                    <kbd className="bg-white/10 px-1 py-0.5 rounded text-gray-300">Ctrl</kbd> +{' '}
+                    <kbd className="bg-white/10 px-1 py-0.5 rounded text-gray-300">Enter</kbd> to run
                   </div>
-                ))}
+                </div>
+              </div>
 
-                <button
-                  onClick={handleAddFile}
-                  className="p-1 text-gray-400 hover:text-brand-teal bg-white/5 hover:bg-white/10 rounded-lg text-xs font-mono flex items-center gap-1 cursor-pointer"
-                  title="Add file to project"
+              {/* Editor Area with Line Numbers */}
+              <div className="relative flex-1 flex overflow-hidden min-h-[560px] sm:min-h-[640px] lg:min-h-[720px]">
+                <pre
+                  aria-hidden="true"
+                  style={{ fontSize: `${fontSize}px` }}
+                  className="w-12 py-3.5 select-none bg-[#070B14] text-gray-600 font-mono text-right pr-3 shrink-0 border-r border-white/5 overflow-hidden leading-6 font-normal m-0"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="text-[10px] hidden sm:inline">File</span>
-                </button>
-              </div>
+                  {lineNumbersString}
+                </pre>
 
-              <div className="text-[10px] text-gray-500 font-mono hidden sm:block shrink-0 pr-2">
-                <kbd className="bg-white/10 px-1 py-0.5 rounded text-gray-300">Ctrl</kbd> +{' '}
-                <kbd className="bg-white/10 px-1 py-0.5 rounded text-gray-300">Enter</kbd> to run
-              </div>
-            </div>
-
-            {/* Editor Area with Line Numbers */}
-            <div className="relative flex-1 flex overflow-hidden min-h-[340px] sm:min-h-[460px]">
-              <pre
-                aria-hidden="true"
-                style={{ fontSize: `${fontSize}px` }}
-                className="w-12 py-3 select-none bg-[#070B14] text-gray-600 font-mono text-right pr-3 shrink-0 border-r border-white/5 overflow-hidden leading-6 font-normal m-0"
-              >
-                {lineNumbersString}
-              </pre>
-
-              <textarea
-                ref={textareaRef}
-                value={code}
-                onChange={(e) => handleCodeChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoComplete="off"
-                autoCorrect="off"
-                style={{ fontSize: `${fontSize}px` }}
-                placeholder={`// Write or paste your ${currentLangMeta.name} program here...`}
-                className={`w-full flex-1 bg-transparent text-emerald-300 font-mono p-3 focus:outline-none resize-none leading-6 overflow-y-auto selection:bg-brand-teal/25 font-normal ${
-                  lineWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'
-                }`}
-              />
-            </div>
-
-            {/* Bottom Bar for Stdin */}
-            <div className="bg-[#080D18] border-t border-white/5 p-2 px-3 flex items-center justify-between">
-              <button
-                onClick={() => setShowStdin(!showStdin)}
-                className="text-[11px] font-mono text-gray-400 hover:text-brand-teal flex items-center gap-1.5 cursor-pointer"
-              >
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStdin ? 'rotate-180' : ''}`} />
-                <span>{showStdin ? 'Hide Standard Input (stdin)' : 'Pass Standard Input (stdin)'}</span>
-              </button>
-              <span className="text-[10px] font-mono text-gray-500">
-                {code.split('\n').length} lines • UTF-8 • {tabSpaces} spaces
-              </span>
-            </div>
-
-            {/* Stdin Input Area */}
-            {showStdin && (
-              <div className="p-3 bg-[#03060F] border-t border-white/5">
-                <label className="text-[10px] font-mono text-brand-teal uppercase tracking-wider block mb-1">
-                  Standard Input (input() / Scanner / cin / readline):
-                </label>
                 <textarea
-                  value={stdin}
-                  onChange={(e) => setStdin(e.target.value)}
-                  placeholder="Enter input values here (one per line)..."
-                  rows={2}
-                  className="w-full bg-[#080D18] border border-white/10 rounded-lg p-2 text-xs font-mono text-white focus:outline-none focus:border-brand-teal"
+                  ref={textareaRef}
+                  value={code}
+                  onChange={(e) => handleCodeChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  style={{ fontSize: `${fontSize}px` }}
+                  placeholder={`// Write or paste your ${currentLangMeta.name} program here...`}
+                  className={`w-full flex-1 bg-transparent text-emerald-300 font-mono p-3.5 focus:outline-none resize-none leading-6 overflow-y-auto selection:bg-brand-teal/25 font-normal ${
+                    lineWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'
+                  }`}
                 />
               </div>
-            )}
-          </div>
+
+              {/* Bottom Bar for Stdin */}
+              <div className="bg-[#080D18] border-t border-white/5 p-2 px-3 flex items-center justify-between">
+                <button
+                  onClick={() => setShowStdin(!showStdin)}
+                  className="text-[11px] font-mono text-gray-400 hover:text-brand-teal flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStdin ? 'rotate-180' : ''}`} />
+                  <span>{showStdin ? 'Hide Standard Input (stdin)' : 'Pass Standard Input (stdin)'}</span>
+                </button>
+                <span className="text-[10px] font-mono text-gray-500">
+                  {code.split('\n').length} lines • UTF-8 • {tabSpaces} spaces
+                </span>
+              </div>
+
+              {/* Stdin Input Area */}
+              {showStdin && (
+                <div className="p-3 bg-[#03060F] border-t border-white/5">
+                  <label className="text-[10px] font-mono text-brand-teal uppercase tracking-wider block mb-1">
+                    Standard Input (input() / Scanner / cin / readline):
+                  </label>
+                  <textarea
+                    value={stdin}
+                    onChange={(e) => setStdin(e.target.value)}
+                    placeholder="Enter input values here (one per line)..."
+                    rows={2}
+                    className="w-full bg-[#080D18] border border-white/10 rounded-lg p-2 text-xs font-mono text-white focus:outline-none focus:border-brand-teal"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* RIGHT: OUTPUT / LIVE PREVIEW / AI DEBUGGER / LIBRARIES */}
-          <div className="flex flex-col bg-[#070B14] relative">
+          {panelLayout !== 'editor' && (
+            <div className="flex flex-col bg-[#070B14] relative">
             {/* Output Tabs Bar */}
             <div className="bg-[#080D18] px-3 py-2 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-1">
@@ -2305,7 +2368,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                             : 'bg-red-500/10 text-red-400 border border-red-500/20'
                         }`}
                       >
-                        {executionStats.exitCode === 0 ? 'EXIT 0 (OK)' : `EXIT ${executionStats.exitCode}`}
+                        {executionStats.exitCode === 0 ? 'EXIT 0 (OK)' : `EXIT ${executionStats.exitCode || 1} (Error)`}
                       </span>
                       {executionStats.timeMs !== undefined && (
                         <span className="text-gray-400">{executionStats.timeMs}ms</span>
@@ -2331,7 +2394,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
             {/* TAB 1: TERMINAL / CONSOLE OUTPUT */}
             {activeTab === 'console' && (
-              <div className="flex-1 flex flex-col bg-[#03060F] min-h-[340px] sm:min-h-[460px] overflow-hidden">
+              <div className="flex-1 flex flex-col bg-[#03060F] min-h-[560px] sm:min-h-[640px] lg:min-h-[720px] overflow-hidden">
                 {/* Scrollable Terminal Output History */}
                 <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto font-mono text-xs space-y-3">
                   {/* Stdout stream */}
@@ -2361,8 +2424,21 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                     </div>
                   )}
 
-                  {/* Stderr / Compiler Error Display */}
-                  {stderrOutput && (
+                  {/* Non-Fatal Warnings & Notices (Exit Code 0) - Separated from fatal errors */}
+                  {!isRunning && executionStats && executionStats.exitCode === 0 && stderrOutput && (
+                    <div className="mt-3 p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl text-amber-200 text-xs leading-relaxed">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-400 pb-1.5 mb-1.5 border-b border-amber-500/20">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Compiler / Runtime Notices & Warnings (Exit Code 0 - Success):</span>
+                      </div>
+                      <div className="whitespace-pre-wrap font-mono text-[11px] text-amber-200/90">
+                        {stderrOutput}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fatal Compiler / Runtime Error Display - ONLY rendered on true failure (Exit Code != 0) */}
+                  {!isRunning && executionStats && executionStats.exitCode !== 0 && (
                     <div className="mt-3 p-3.5 bg-red-950/40 border border-red-500/40 rounded-xl text-red-300 text-xs leading-relaxed">
                       <div className="flex items-center justify-between pb-2 border-b border-red-500/20 mb-2">
                         <div className="flex items-center gap-1.5 font-bold text-red-400">
@@ -2386,7 +2462,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                       </div>
 
                       <div className="whitespace-pre-wrap font-mono text-[11px] text-red-200">
-                        {stderrOutput}
+                        {stderrOutput || `Process exited with error code ${executionStats.exitCode}.`}
                       </div>
                     </div>
                   )}
@@ -2421,14 +2497,31 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                         <p className="text-cyan-200 text-xs leading-relaxed mt-0.5">{aiDebugResult.suggestedFixSummary}</p>
                       </div>
 
-                      {/* 1-Click Apply Fix Button */}
-                      <div className="pt-2 flex items-center gap-2">
+                      {/* Verified Output Preview if available */}
+                      {aiDebugResult.testExecutionOutput && (
+                        <div className="p-2.5 bg-black/60 border border-emerald-500/30 rounded-lg text-xs font-mono space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            Verified Output with Fix:
+                          </span>
+                          <pre className="text-emerald-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">{aiDebugResult.testExecutionOutput}</pre>
+                        </div>
+                      )}
+
+                      {/* 1-Click Apply Fix Buttons */}
+                      <div className="pt-2 flex items-center gap-2 flex-wrap">
                         <button
-                          onClick={handleApplyAiFix}
+                          onClick={() => handleApplyAiFix(true)}
                           className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-black font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          <span>Apply 1-Click Fix to Code</span>
+                          <span>Apply Fix & Run Now</span>
+                        </button>
+                        <button
+                          onClick={() => handleApplyAiFix(false)}
+                          className="px-3 py-2 bg-white/10 hover:bg-white/15 text-white font-mono text-xs rounded-xl transition-all cursor-pointer"
+                        >
+                          Apply to Editor Only
                         </button>
                         <button
                           onClick={() => setAiDebugResult(null)}
@@ -2440,14 +2533,24 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                     </div>
                   )}
 
-                  {/* Execution Success Stamp */}
+                  {/* Accurate Execution Status Notification */}
                   {executionStats && executionStats.exitCode === 0 && !isRunning && (
-                    <div className="pt-3 mt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-gray-500 font-mono">
-                      <span className="flex items-center gap-1 text-emerald-400">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Program executed successfully.
+                    <div className="pt-3 mt-3 border-t border-emerald-500/20 flex items-center justify-between text-[11px] text-gray-400 font-mono">
+                      <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Program executed successfully (Exit Code: 0).
                       </span>
                       <span>Runtime: {executionStats.language || currentLangMeta.name}</span>
+                    </div>
+                  )}
+
+                  {executionStats && executionStats.exitCode !== 0 && !isRunning && (
+                    <div className="pt-3 mt-3 border-t border-red-500/25 flex items-center justify-between text-[11px] text-red-400 font-mono bg-red-950/20 p-2.5 rounded-lg">
+                      <span className="flex items-center gap-1.5 font-bold text-red-300">
+                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        Program terminated with error (Exit Code: {executionStats.exitCode || 1}).
+                      </span>
+                      <span className="text-gray-400">Runtime: {executionStats.language || currentLangMeta.name}</span>
                     </div>
                   )}
 
@@ -2523,7 +2626,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
             {/* TAB 2: LIVE UI PREVIEW */}
             <div
-              className={`flex-1 bg-[#050811] flex flex-col items-center justify-center p-2 min-h-[340px] sm:min-h-[460px] ${
+              className={`flex-1 bg-[#050811] flex flex-col items-center justify-center p-2 min-h-[560px] sm:min-h-[640px] lg:min-h-[720px] ${
                 activeTab === 'preview' ? 'block' : 'hidden'
               }`}
             >
@@ -2567,7 +2670,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
             {/* TAB 3: AI TUTOR */}
             {activeTab === 'ai' && (
-              <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-4 bg-[#03060F] min-h-[340px] sm:min-h-[460px]">
+              <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-4 bg-[#03060F] min-h-[560px] sm:min-h-[640px] lg:min-h-[720px]">
                 <div className="flex items-center justify-between pb-3 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-cyan-400" />
@@ -2651,7 +2754,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
             {/* TAB 4: LIBRARIES & PACKAGES INFO */}
             {activeTab === 'packages' && (
-              <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-4 bg-[#03060F] min-h-[340px] sm:min-h-[460px]">
+              <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-4 bg-[#03060F] min-h-[560px] sm:min-h-[640px] lg:min-h-[720px]">
                 <div className="flex items-center justify-between pb-3 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <Package className="w-4 h-4 text-amber-400" />
@@ -2693,7 +2796,8 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
               </div>
             )}
           </div>
-        </div>
+        )}
+      </div>
       </div>
 
       {/* VS CODE BOTTOM STATUS BAR */}

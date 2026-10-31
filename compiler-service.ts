@@ -170,7 +170,7 @@ export class InteractiveSession {
   private listeners: ((event: SessionEvent) => void)[] = [];
   private eventQueue: SessionEvent[] = [];
   private idleTimer?: NodeJS.Timeout;
-  private cpuTimer?: NodeJS.Timeout;
+  private sessionMaxTimer?: NodeJS.Timeout;
 
   constructor(
     id: string,
@@ -189,25 +189,26 @@ export class InteractiveSession {
     this.lastActiveTime = Date.now();
     this.plotFile = plotFile;
 
-    // Hard ceiling for runaway CPU (infinite loops e.g. while True: pass): 25 seconds
-    this.cpuTimer = setTimeout(() => {
-      this.handleTimeout("cpu");
-    }, 25000);
+    // Generous wall-clock session ceiling: 5 minutes (300 seconds)
+    // Allows ample time for multi-step interactive programs (e.g. calculators, quizzes)
+    this.sessionMaxTimer = setTimeout(() => {
+      this.handleTimeout("max_time");
+    }, 300000);
 
-    // Idle wait for user input timeout in terminal: 60 seconds
+    // Inactivity timeout: 120 seconds of zero output or input
     this.resetIdleTimer();
 
     this.attachHandlers();
   }
 
-  private resetIdleTimer() {
+  public resetIdleTimer() {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       this.handleTimeout("idle");
-    }, 60000);
+    }, 120000);
   }
 
-  private handleTimeout(kind: "cpu" | "idle") {
+  private handleTimeout(kind: "max_time" | "idle") {
     if (this.isClosed) return;
     this.isClosed = true;
     try {
@@ -217,8 +218,8 @@ export class InteractiveSession {
     const elapsed = Date.now() - this.startTime;
     const timeoutMsg =
       kind === "idle"
-        ? `\n[Interactive Timeout]: Program was waiting for user input in the console. Session expired after 60s of inactivity. Click 'Run Code' to restart.`
-        : `\n[Execution Timed Out]: Program exceeded CPU limit (25.0s). Please check for infinite loops or heavy operations.`;
+        ? `\n[Interactive Timeout]: Session expired after 120s of inactivity waiting for user input. Click 'Run Code' to restart.`
+        : `\n[Execution Limit]: Session reached maximum 5-minute runtime ceiling. Click 'Run Code' to restart.`;
 
     this.emit({
       type: "stderr",
@@ -387,7 +388,7 @@ export class InteractiveSession {
 
   private cleanup() {
     if (this.idleTimer) clearTimeout(this.idleTimer);
-    if (this.cpuTimer) clearTimeout(this.cpuTimer);
+    if (this.sessionMaxTimer) clearTimeout(this.sessionMaxTimer);
     setTimeout(() => {
       try {
         if (fs.existsSync(this.tempDir)) {
@@ -548,7 +549,19 @@ except Exception:
     const isCpp = normLang === "cpp" || normLang === "c++";
     const srcFile = path.join(tempDir, isCpp ? "main.cpp" : "main.c");
     const binFile = path.join(tempDir, "program.out");
-    fs.writeFileSync(srcFile, code, "utf-8");
+
+    // Inject unbuffered stdio constructor to ensure printf() streams immediately
+    // without waiting for buffer flush or newline before scanf()
+    const unbufShim = `
+#include <stdio.h>
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((constructor)) static void _scoders_unbuf_init(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+}
+#endif
+`;
+    fs.writeFileSync(srcFile, unbufShim + "\n" + code, "utf-8");
 
     const compiler = isCpp ? "g++" : "gcc";
     const compileArgs = isCpp
@@ -558,11 +571,16 @@ except Exception:
     // Compile first with clean compilation timeout
     const compRes = await runProcess(compiler, compileArgs, undefined, tempDir, undefined, COMPILE_TIMEOUT_MS);
     if (compRes.exitCode !== 0) {
-      // Spawn dummy process that immediately exits with compiler diagnostics
-      const child = spawn("echo", [compRes.stderr || compRes.stdout]);
+      // Spawn helper that outputs the real compiler diagnostic to stderr and exits with code 1
+      const child = spawn("sh", [
+        "-c",
+        'printf "%s" "$1" >&2; exit 1',
+        "--",
+        `[${compiler.toUpperCase()} Compilation Error]:\n${compRes.stderr || compRes.stdout}`,
+      ]);
       const session = new InteractiveSession(
         sessionId,
-        isCpp ? "C++20" : "C17",
+        isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
         `${compiler} GNU 12.3`,
         tempDir,
         child
@@ -575,14 +593,25 @@ except Exception:
       };
     }
 
-    const child = spawn(binFile, [], {
-      cwd: tempDir,
-      env: {
-        ...process.env,
-        LANG: "C.UTF-8",
-        LC_ALL: "C.UTF-8",
-      },
-    });
+    // Run executable unbuffered via stdbuf if available
+    const hasStdbuf = fs.existsSync("/usr/bin/stdbuf");
+    const child = hasStdbuf
+      ? spawn("stdbuf", ["-i0", "-o0", "-e0", binFile], {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            LANG: "C.UTF-8",
+            LC_ALL: "C.UTF-8",
+          },
+        })
+      : spawn(binFile, [], {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            LANG: "C.UTF-8",
+            LC_ALL: "C.UTF-8",
+          },
+        });
 
     const session = new InteractiveSession(
       sessionId,
@@ -635,36 +664,237 @@ except Exception:
 
   // 5. TypeScript Interactive Session
   if (normLang === "typescript" || normLang === "ts") {
-    const transformed = esbuild.transformSync(code, {
-      loader: "ts",
-      target: "node20",
-    });
-    const jsFile = path.join(tempDir, "script.js");
-    fs.writeFileSync(jsFile, transformed.code, "utf-8");
+    try {
+      const transformed = esbuild.transformSync(code, {
+        loader: "ts",
+        target: "node20",
+      });
+      const jsFile = path.join(tempDir, "script.js");
+      fs.writeFileSync(jsFile, transformed.code, "utf-8");
 
-    const child = spawn(process.execPath, ["--max-old-space-size=256", jsFile], {
-      cwd: tempDir,
-    });
+      const child = spawn(process.execPath, ["--max-old-space-size=256", jsFile], {
+        cwd: tempDir,
+      });
 
-    const session = new InteractiveSession(
-      sessionId,
-      "TypeScript",
-      `TypeScript 5.8 + Node.js ${process.version}`,
-      tempDir,
-      child
-    );
+      const session = new InteractiveSession(
+        sessionId,
+        "TypeScript",
+        `TypeScript 5.8 + Node.js ${process.version}`,
+        tempDir,
+        child
+      );
 
-    activeSessions.set(sessionId, session);
-    if (initialStdin) session.sendInput(initialStdin);
+      activeSessions.set(sessionId, session);
+      if (initialStdin) session.sendInput(initialStdin);
 
-    return {
-      sessionId,
-      language: "TypeScript",
-      runtimeVersion: `TypeScript 5.8 (Interactive Terminal)`,
-    };
+      return {
+        sessionId,
+        language: "TypeScript",
+        runtimeVersion: `TypeScript 5.8 (Interactive Terminal)`,
+      };
+    } catch (tsErr: any) {
+      const child = spawn("sh", [
+        "-c",
+        'printf "%s" "$1" >&2; exit 1',
+        "--",
+        `[TypeScript Compilation Error]:\n${tsErr.message}`,
+      ]);
+      const session = new InteractiveSession(
+        sessionId,
+        "TypeScript",
+        `TypeScript 5.8 (Error)`,
+        tempDir,
+        child
+      );
+      activeSessions.set(sessionId, session);
+      return {
+        sessionId,
+        language: "TypeScript",
+        runtimeVersion: "TypeScript 5.8 (Compilation Error)",
+      };
+    }
   }
 
-  // 6. Bash Interactive Session
+  // 6. Go (Golang) Interactive Session
+  if (normLang === "go" || normLang === "golang") {
+    const hasGo = fs.existsSync("/usr/bin/go");
+    if (hasGo) {
+      const goFile = path.join(tempDir, "main.go");
+      fs.writeFileSync(goFile, code, "utf-8");
+
+      const child = spawn("go", ["run", goFile], {
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          GOCACHE: path.join(tempDir, ".gocache"),
+          TMPDIR: tempDir,
+        },
+      });
+
+      const session = new InteractiveSession(
+        sessionId,
+        "Go (Golang)",
+        "Go 1.19+ Runtime",
+        tempDir,
+        child
+      );
+
+      activeSessions.set(sessionId, session);
+      if (initialStdin) session.sendInput(initialStdin);
+
+      return {
+        sessionId,
+        language: "Go (Golang)",
+        runtimeVersion: "Go 1.19+ (Interactive Terminal)",
+      };
+    }
+  }
+
+  // 7. Rust Interactive Session
+  if (normLang === "rust" || normLang === "rs") {
+    const hasRustc = fs.existsSync("/usr/bin/rustc");
+    if (hasRustc) {
+      const rsFile = path.join(tempDir, "main.rs");
+      const binFile = path.join(tempDir, "program.out");
+      fs.writeFileSync(rsFile, code, "utf-8");
+
+      const compRes = await runProcess("rustc", ["-O", rsFile, "-o", binFile], undefined, tempDir, undefined, COMPILE_TIMEOUT_MS);
+      if (compRes.exitCode !== 0) {
+        const child = spawn("sh", [
+          "-c",
+          'printf "%s" "$1" >&2; exit 1',
+          "--",
+          `[Rustc Compilation Error]:\n${compRes.stderr || compRes.stdout}`,
+        ]);
+        const session = new InteractiveSession(
+          sessionId,
+          "Rust",
+          "rustc 1.75+",
+          tempDir,
+          child
+        );
+        activeSessions.set(sessionId, session);
+        return {
+          sessionId,
+          language: "Rust",
+          runtimeVersion: "rustc (Compilation Error)",
+        };
+      }
+
+      const hasStdbuf = fs.existsSync("/usr/bin/stdbuf");
+      const child = hasStdbuf
+        ? spawn("stdbuf", ["-i0", "-o0", "-e0", binFile], { cwd: tempDir })
+        : spawn(binFile, [], { cwd: tempDir });
+
+      const session = new InteractiveSession(
+        sessionId,
+        "Rust",
+        "rustc 1.75+ Native Binary",
+        tempDir,
+        child
+      );
+
+      activeSessions.set(sessionId, session);
+      if (initialStdin) session.sendInput(initialStdin);
+
+      return {
+        sessionId,
+        language: "Rust",
+        runtimeVersion: "Rust 1.75+ (Interactive Terminal)",
+      };
+    }
+  }
+
+  // 8. PHP Interactive Session
+  if (normLang === "php") {
+    const hasPhp = fs.existsSync("/usr/bin/php");
+    if (hasPhp) {
+      const phpFile = path.join(tempDir, "script.php");
+      fs.writeFileSync(phpFile, code, "utf-8");
+
+      const child = spawn("php", ["-d", "display_errors=1", phpFile], {
+        cwd: tempDir,
+      });
+
+      const session = new InteractiveSession(
+        sessionId,
+        "PHP",
+        "PHP 8.2 CLI",
+        tempDir,
+        child
+      );
+
+      activeSessions.set(sessionId, session);
+      if (initialStdin) session.sendInput(initialStdin);
+
+      return {
+        sessionId,
+        language: "PHP",
+        runtimeVersion: "PHP 8.2 (Interactive Terminal)",
+      };
+    }
+  }
+
+  // 9. Ruby Interactive Session
+  if (normLang === "ruby" || normLang === "rb") {
+    const hasRuby = fs.existsSync("/usr/bin/ruby");
+    if (hasRuby) {
+      const rbFile = path.join(tempDir, "script.rb");
+      fs.writeFileSync(rbFile, code, "utf-8");
+
+      const child = spawn("ruby", ["-W1", rbFile], {
+        cwd: tempDir,
+      });
+
+      const session = new InteractiveSession(
+        sessionId,
+        "Ruby",
+        "Ruby 3.1",
+        tempDir,
+        child
+      );
+
+      activeSessions.set(sessionId, session);
+      if (initialStdin) session.sendInput(initialStdin);
+
+      return {
+        sessionId,
+        language: "Ruby",
+        runtimeVersion: "Ruby 3.1 (Interactive Terminal)",
+      };
+    }
+  }
+
+  // 10. SQLite Interactive Session
+  if (normLang === "sql" || normLang === "sqlite") {
+    const hasSqlite = fs.existsSync("/usr/bin/sqlite3");
+    if (hasSqlite) {
+      const sqlFile = path.join(tempDir, "query.sql");
+      const fullSql = `.headers on\n.mode box\n${code}`;
+      fs.writeFileSync(sqlFile, fullSql, "utf-8");
+
+      const child = spawn("sqlite3", [":memory:", "-init", sqlFile], {
+        cwd: tempDir,
+      });
+
+      const session = new InteractiveSession(
+        sessionId,
+        "SQL (SQLite 3)",
+        "SQLite 3 In-Memory",
+        tempDir,
+        child
+      );
+
+      activeSessions.set(sessionId, session);
+      return {
+        sessionId,
+        language: "SQL (SQLite 3)",
+        runtimeVersion: "SQLite 3 (Interactive Engine)",
+      };
+    }
+  }
+
+  // 11. Bash Interactive Session
   if (normLang === "bash" || normLang === "sh") {
     const shFile = path.join(tempDir, "script.sh");
     fs.writeFileSync(shFile, code, "utf-8");
@@ -690,7 +920,16 @@ except Exception:
 
   // Fallback for other languages (executeCode batch wrapped into session stream)
   const batchResult = await executeCode(normLang, code, initialStdin);
-  const child = spawn("echo", [batchResult.stdout]);
+  const exitCodeToUse = batchResult.success ? 0 : (batchResult.exitCode || 1);
+  const child = spawn("sh", [
+    "-c",
+    'if [ -n "$1" ]; then printf "%s\\n" "$1"; fi; if [ -n "$2" ]; then printf "%s\\n" "$2" >&2; fi; exit "$3"',
+    "--",
+    batchResult.stdout || "",
+    batchResult.stderr || "",
+    String(exitCodeToUse),
+  ]);
+
   const session = new InteractiveSession(
     sessionId,
     batchResult.language,
@@ -699,10 +938,6 @@ except Exception:
     child
   );
   activeSessions.set(sessionId, session);
-
-  if (batchResult.stderr) {
-    session.emit({ type: "stderr", text: batchResult.stderr });
-  }
 
   return {
     sessionId,
@@ -1155,7 +1390,16 @@ except Exception:
       const isCpp = normLang === "cpp" || normLang === "c++";
       const srcFile = path.join(tempDir, isCpp ? "main.cpp" : "main.c");
       const binFile = path.join(tempDir, "program.out");
-      fs.writeFileSync(srcFile, code, "utf-8");
+      const unbufShim = `
+#include <stdio.h>
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((constructor)) static void _scoders_unbuf_init(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+}
+#endif
+`;
+      fs.writeFileSync(srcFile, unbufShim + "\n" + code, "utf-8");
 
       const compiler = isCpp ? "g++" : "gcc";
       const hasCompiler = fs.existsSync(`/usr/bin/${compiler}`);
@@ -1179,7 +1423,11 @@ except Exception:
           };
         }
 
-        const runRes = await runProcess(binFile, [], stdin, tempDir, undefined, DEFAULT_EXECUTION_TIMEOUT_MS);
+        const hasStdbuf = fs.existsSync("/usr/bin/stdbuf");
+        const runRes = hasStdbuf
+          ? await runProcess("stdbuf", ["-i0", "-o0", "-e0", binFile], stdin, tempDir, undefined, DEFAULT_EXECUTION_TIMEOUT_MS)
+          : await runProcess(binFile, [], stdin, tempDir, undefined, DEFAULT_EXECUTION_TIMEOUT_MS);
+
         return {
           success: runRes.exitCode === 0,
           stdout: runRes.stdout || "[Process completed with 0 output]",
@@ -1312,6 +1560,37 @@ except Exception:
     // 8. RUST
     // -------------------------------------------------------------
     if (normLang === "rust" || normLang === "rs") {
+      const hasRustc = fs.existsSync("/usr/bin/rustc");
+      if (hasRustc) {
+        const rsFile = path.join(tempDir, "main.rs");
+        const binFile = path.join(tempDir, "program.out");
+        fs.writeFileSync(rsFile, code, "utf-8");
+        const compRes = await runProcess("rustc", ["-O", rsFile, "-o", binFile], undefined, tempDir, undefined, COMPILE_TIMEOUT_MS);
+        if (compRes.exitCode !== 0) {
+          return {
+            success: false,
+            stdout: "",
+            stderr: `Rustc Compilation Error:\n${compRes.stderr || compRes.stdout}`,
+            exitCode: compRes.exitCode,
+            executionTimeMs: compRes.executionTimeMs,
+            language: "Rust",
+            runtimeVersion: "rustc 1.75",
+            detectedLanguage: autoDetected ? "rust" : undefined,
+          };
+        }
+        const runRes = await runProcess(binFile, [], stdin, tempDir);
+        return {
+          success: runRes.exitCode === 0,
+          stdout: runRes.stdout,
+          stderr: runRes.stderr,
+          exitCode: runRes.exitCode,
+          executionTimeMs: compRes.executionTimeMs + runRes.executionTimeMs,
+          language: autoDetected ? "Rust 1.75 (Auto-Detected)" : "Rust (Rustc 1.75)",
+          runtimeVersion: "Rust 1.75 Native Compiler",
+          detectedLanguage: autoDetected ? "rust" : undefined,
+        };
+      }
+
       const wandboxRes = await executeWandbox("rust-1.82.0", code, stdin);
       return {
         ...wandboxRes,

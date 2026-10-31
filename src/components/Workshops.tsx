@@ -1241,11 +1241,11 @@ export default function TenantDashboard() {
                         </div>
 
                         {/* Tab Panels */}
-                        <div className="p-4 sm:p-7 min-h-[480px]">
+                        <div className={`min-h-[540px] transition-all ${activeTab === 'sandbox' ? 'p-1.5 sm:p-3' : 'p-4 sm:p-7'}`}>
                           
                           {/* TAB 1: REAL ONLINE COMPILER & PLAYGROUND IDE */}
                           {activeTab === 'sandbox' && (
-                            <div className="space-y-4">
+                            <div className="w-full">
                               <OnlineCodePlayground
                                 workshopTitle={activeWorkshop.title}
                                 initialLanguage={activeWorkshop.id === 'w-1' ? 'python' : 'react'}

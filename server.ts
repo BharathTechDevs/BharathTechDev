@@ -1,6 +1,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -1846,12 +1848,12 @@ Return ONLY valid JSON matching this schema:
       let parsed: any = null;
       try {
         const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error("AI Gateway timeout")), 8000)
+          setTimeout(() => reject(new Error("AI Gateway timeout")), 15000)
         );
 
         const response = await Promise.race([
           client.models.generateContent({
-            model: "gemini-3.8-flash",
+            model: "gemini-3.5-flash-lite",
             contents: prompt,
             config: {
               responseMimeType: "application/json",
@@ -1867,12 +1869,21 @@ Return ONLY valid JSON matching this schema:
       }
 
       if (parsed && parsed.errorType) {
+        const finalCorrected = parsed.correctedCode || code;
+        let testResult: any = null;
+        try {
+          testResult = await executeCode(language || "auto", finalCorrected, req.body?.stdin);
+        } catch {}
+
         return res.json({
           errorType: parsed.errorType || "Diagnostic Warning",
           line: typeof parsed.line === 'number' ? parsed.line : null,
           explanation: parsed.explanation || "Diagnostic analysis completed.",
-          correctedCode: parsed.correctedCode || code,
+          correctedCode: finalCorrected,
           suggestedFixSummary: parsed.suggestedFixSummary || "Code corrected to fix runtime issues.",
+          testExecutionOutput: testResult?.stdout || "",
+          testExecutionSuccess: testResult?.success ?? true,
+          testExitCode: testResult?.exitCode ?? 0,
         });
       }
 
@@ -1904,6 +1915,9 @@ Return ONLY valid JSON matching this schema:
           explanation: "The program paused waiting for interactive user input or exceeded the CPU limit. Please enter values in the terminal console prompt when prompted.",
           correctedCode: code,
           suggestedFixSummary: fixSummary,
+          testExecutionOutput: stdout || "",
+          testExecutionSuccess: true,
+          testExitCode: 0,
         });
       }
 
@@ -1931,12 +1945,20 @@ Return ONLY valid JSON matching this schema:
         fixSummary = "Imported standard library alternative.";
       }
 
+      let testResult: any = null;
+      try {
+        testResult = await executeCode(language || "auto", autoCorrected, req.body?.stdin);
+      } catch {}
+
       return res.json({
         errorType: detectedType,
         line: errorLine,
         explanation: `Diagnostic analysis of execution failure: ${errText.slice(0, 300) || "Process failed with non-zero exit code"}.`,
         correctedCode: autoCorrected,
         suggestedFixSummary: fixSummary,
+        testExecutionOutput: testResult?.stdout || "",
+        testExecutionSuccess: testResult?.success ?? true,
+        testExitCode: testResult?.exitCode ?? 0,
       });
     }
   });
@@ -1967,8 +1989,16 @@ Return ONLY valid JSON matching this schema:
         });
       }
 
-      const prompt = `You are the S-CODERS Lead Technical Instructor.
-Explain this ${language || 'code'} program line-by-line in a clear, educational, beautifully structured way for students, engineers, and clients.
+      const prompt = `You are the S-CODERS Lead Technical Instructor and Senior Software Engineer.
+Your task is to provide an exhaustive, precise, program-specific line-by-line explanation for this ${language || 'code'} program. 
+
+Follow this rigorous 6-step analysis process before responding:
+1. Identify the programming language precisely.
+2. Read and understand the complete source code.
+3. Identify the core purpose and logic of the program.
+4. Understand every variable, data type, condition, loop, function, and operation used.
+5. Trace how the program works step by step from initialization to exit.
+6. Generate a response where EVERY single line-by-line explanation is specifically tailored to THIS exact code (never provide generic placeholders like "Initialization & Logic" unless explicitly applicable to those lines).
 
 Source Code:
 \`\`\`${language || 'text'}
@@ -1977,25 +2007,25 @@ ${code}
 
 Return ONLY valid JSON with this structure:
 {
-  "summary": "1-2 sentence high-level summary of what this program does",
+  "summary": "1-2 sentence precise summary of what this exact program accomplishes",
   "keyConcepts": ["Concept 1", "Concept 2", "Concept 3"],
   "lineByLine": [
-    { "lines": "1-4", "title": "Section Title", "explanation": "Detailed explanation of what these lines do" }
+    { "lines": "1-3", "title": "Section Title", "explanation": "Detailed explanation of what these specific lines do" }
   ],
-  "complexity": "Time & space complexity summary"
+  "complexity": "Time & space complexity summary (e.g. O(1), O(n), etc.)"
 }`;
 
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("AI Gateway timeout")), 2000)
+        setTimeout(() => reject(new Error("AI Gateway timeout")), 15000)
       );
 
       const response = await Promise.race([
         client.models.generateContent({
-          model: "gemini-3.8-flash",
+          model: "gemini-3.5-flash-lite",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
-            temperature: 0.3,
+            temperature: 0.2,
           },
         }),
         timeoutPromise
