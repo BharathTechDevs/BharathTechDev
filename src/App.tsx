@@ -449,7 +449,7 @@ export default function App() {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setCurrentView('workshops'); window.scrollTo(0,0); }}
+                        onClick={() => { setCurrentView('workshops'); }}
                         className="flex items-center gap-1.5 text-sm font-mono font-bold text-brand-teal hover:text-white transition-colors cursor-pointer group self-start focus:outline-none"
                       >
                         Browse Workshops
@@ -569,10 +569,10 @@ export default function App() {
           {currentView === 'workshops' && (
             <motion.div
               key="workshops"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
             >
               <Suspense fallback={<ViewLoader />}>
                 <Workshops onBookWorkshop={handleBookWorkshopInApp} />
@@ -746,15 +746,15 @@ export default function App() {
             {/* Middle Quick Links */}
             <div className="flex flex-col items-center gap-4">
               <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-xs text-gray-400 font-medium">
-                <button onClick={() => { setCurrentView('home'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Home</button>
-                <button onClick={() => { setCurrentView('services'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Services</button>
-                <button onClick={() => { setCurrentView('workshops'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Workshops</button>
-                <button onClick={() => { setCurrentView('about'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About Us</button>
-                <button onClick={() => { setCurrentView('crew'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">The Crew</button>
-                <button onClick={() => { setCurrentView('communities'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Communities</button>
-                <button onClick={() => { setCurrentView('careers'); window.scrollTo(0,0); }} className="hover:text-brand-teal text-brand-teal font-semibold transition-colors cursor-pointer focus:outline-none">Careers</button>
-                <button onClick={() => { setCurrentView('networking'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Networking & Achievements</button>
-                <button onClick={() => { setCurrentView('contact'); window.scrollTo(0,0); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Contact</button>
+                <button onClick={() => { setCurrentView('home'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Home</button>
+                <button onClick={() => { setCurrentView('services'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Services</button>
+                <button onClick={() => { setCurrentView('workshops'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Workshops</button>
+                <button onClick={() => { setCurrentView('about'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About Us</button>
+                <button onClick={() => { setCurrentView('crew'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">The Crew</button>
+                <button onClick={() => { setCurrentView('communities'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Communities</button>
+                <button onClick={() => { setCurrentView('careers'); }} className="hover:text-brand-teal text-brand-teal font-semibold transition-colors cursor-pointer focus:outline-none">Careers</button>
+                <button onClick={() => { setCurrentView('networking'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Networking & Achievements</button>
+                <button onClick={() => { setCurrentView('contact'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Contact</button>
               </div>
               <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 text-[10px] text-gray-500 font-mono tracking-wider">
                 <span className="text-gray-700">POLICIES:</span>

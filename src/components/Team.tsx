@@ -23,6 +23,9 @@ interface LeaderInfo {
   linkedinUrl: string;
   linkedinHandle: string;
   email: string;
+  phone?: string;
+  phoneDisplay?: string;
+  whatsappUrl?: string;
 }
 
 const DEFAULT_CREW_MEMBERS: LeaderInfo[] = [
@@ -41,7 +44,10 @@ const DEFAULT_CREW_MEMBERS: LeaderInfo[] = [
     githubHandle: 'Shreyas-73',
     linkedinUrl: 'https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android',
     linkedinHandle: 'Shreyas M.',
-    email: 'scoders82@gmail.com'
+    email: 'scoders82@gmail.com',
+    phone: '+918310463417',
+    phoneDisplay: '+91 8310463417',
+    whatsappUrl: 'https://wa.me/918310463417'
   },
   {
     id: 'lokesh',
@@ -54,11 +60,14 @@ const DEFAULT_CREW_MEMBERS: LeaderInfo[] = [
     photoUrl: '/cofounder.jpg',
     bio: 'Vibe Coder & AI-Assisted Developer. Specializes in rapid prototyping, prompt engineering, smart workflow automations, and practical product innovation.',
     expertise: ['Vibe Coding', 'AI Prototyping', 'Prompt Engineering', 'Product Strategy'],
-    githubUrl: 'https://github.com/Lokesh132005',
-    githubHandle: 'Lokesh132005',
-    linkedinUrl: 'https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app',
+    githubUrl: 'https://github.com/lokeee1307-source',
+    githubHandle: 'lokeee1307-source',
+    linkedinUrl: 'https://www.linkedin.com/in/lokesh-a-281069404',
     linkedinHandle: 'Lokesh A.',
-    email: 'scoders82@gmail.com'
+    email: 'scoders82@gmail.com',
+    phone: '+918880901476',
+    phoneDisplay: '+91 8880 901476',
+    whatsappUrl: 'https://wa.me/918880901476'
   },
   {
     id: 'bhuvan',
@@ -75,7 +84,10 @@ const DEFAULT_CREW_MEMBERS: LeaderInfo[] = [
     githubHandle: 'Gowda487',
     linkedinUrl: 'https://www.linkedin.com/in/bhuvan-m-102835326/',
     linkedinHandle: 'Bhuvan M.',
-    email: 'scoders82@gmail.com'
+    email: 'scoders82@gmail.com',
+    phone: '+916363905989',
+    phoneDisplay: '+91 63639 05989',
+    whatsappUrl: 'https://wa.me/916363905989'
   }
 ];
 

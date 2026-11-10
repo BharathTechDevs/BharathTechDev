@@ -127,8 +127,8 @@ export default function Header({
               lightBg={false}
               horizontal={false}
               className="!items-start !text-left scale-90 sm:scale-100 origin-left"
-              onAdminClick={() => { onViewChange('admin'); window.scrollTo(0, 0); }} 
-              onClick={() => { onViewChange('home'); window.scrollTo(0, 0); }}
+              onAdminClick={() => { onViewChange('admin'); }} 
+              onClick={() => { onViewChange('home'); }}
             />
           </div>
 
@@ -136,7 +136,7 @@ export default function Header({
           <nav ref={navRef} className="hidden lg:flex items-center gap-1 xl:gap-2">
             {/* Home Option */}
             <button
-              onClick={() => { onViewChange('home'); window.scrollTo(0, 0); }}
+              onClick={() => { onViewChange('home'); }}
               className={`px-3 xl:px-4 py-2 rounded-xl text-xs xl:text-sm font-medium tracking-wide transition-all duration-300 cursor-pointer focus:outline-none ${
                 currentView === 'home'
                   ? 'text-white bg-[#1F4959] border border-[#5C7C89]/40 shadow-sm'
@@ -199,7 +199,6 @@ export default function Header({
                                     onViewChange(item.view);
                                   }
                                   setActiveDropdown(null);
-                                  window.scrollTo(0, 0);
                                 }}
                                 className={`w-full text-left p-2.5 rounded-xl transition-all duration-200 flex items-start gap-3 cursor-pointer group/item ${
                                   itemActive
@@ -366,7 +365,6 @@ export default function Header({
                   onClick={() => {
                     onViewChange('home');
                     setMobileMenuOpen(false);
-                    window.scrollTo(0, 0);
                   }}
                   className={`w-full min-h-[44px] flex items-center justify-between px-4 py-3 border rounded-2xl text-xs font-mono font-bold tracking-wider uppercase transition-all duration-300 cursor-pointer focus:outline-none ${
                     currentView === 'home'
@@ -429,7 +427,6 @@ export default function Header({
                                       onViewChange(item.view);
                                     }
                                     setMobileMenuOpen(false);
-                                    window.scrollTo(0, 0);
                                   }}
                                   className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer text-left ${
                                     itemActive

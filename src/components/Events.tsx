@@ -993,11 +993,13 @@ export default function Events() {
       ) : (
         /* EVENTS GRID */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredEvents.map(evt => (
+          {filteredEvents.map((evt, idx) => (
             <motion.div
               key={evt.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: (idx % 4) * 0.1 }}
               className="bg-brand-card/60 border border-white/10 hover:border-brand-teal/40 rounded-3xl overflow-hidden transition-all duration-300 flex flex-col group shadow-xl hover:shadow-[0_0_30px_rgba(34,211,238,0.15)]"
             >
               {/* Event Banner - Large and High-Resolution matching Networking & Achievements */}

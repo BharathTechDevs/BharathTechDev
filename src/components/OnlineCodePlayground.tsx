@@ -1036,13 +1036,18 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   const [isWaitingInput, setIsWaitingInput] = useState<boolean>(false);
   const [waitingPromptText, setWaitingPromptText] = useState<string>('');
   const terminalInputRef = useRef<HTMLInputElement>(null);
-  const consoleBottomRef = useRef<HTMLDivElement>(null);
+  const terminalScrollContainerRef = useRef<HTMLDivElement>(null);
   const activeEventSourceRef = useRef<EventSource | null>(null);
+  const isInitialTerminalMount = useRef<boolean>(true);
 
-  // Auto-scroll terminal log to bottom on new output or prompt
+  // Auto-scroll terminal log internally to bottom ONLY on new output or prompt — NEVER scrolls the browser window
   useEffect(() => {
-    if (activeTab === 'console') {
-      consoleBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isInitialTerminalMount.current) {
+      isInitialTerminalMount.current = false;
+      return;
+    }
+    if (activeTab === 'console' && terminalScrollContainerRef.current) {
+      terminalScrollContainerRef.current.scrollTop = terminalScrollContainerRef.current.scrollHeight;
     }
   }, [consoleOutput, isWaitingInput, stderrOutput]);
 
@@ -1352,9 +1357,6 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
           } else if (data.type === 'waiting_input') {
             setIsWaitingInput(true);
             setWaitingPromptText(data.text || 'Waiting for user input...');
-            setTimeout(() => {
-              terminalInputRef.current?.focus();
-            }, 60);
           } else if (data.type === 'plot' && data.plotImageBase64) {
             setPlotImageBase64(data.plotImageBase64);
           } else if (data.type === 'exit') {
@@ -2396,7 +2398,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
             {activeTab === 'console' && (
               <div className="flex-1 flex flex-col bg-[#03060F] min-h-[560px] sm:min-h-[640px] lg:min-h-[720px] overflow-hidden">
                 {/* Scrollable Terminal Output History */}
-                <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto font-mono text-xs space-y-3">
+                <div ref={terminalScrollContainerRef} className="flex-1 p-3.5 sm:p-4 overflow-y-auto font-mono text-xs space-y-3">
                   {/* Stdout stream */}
                   <div className="whitespace-pre-wrap text-emerald-400 leading-relaxed font-mono select-text">
                     {consoleOutput || (isRunning ? 'Starting program execution...' : 'Click "Run Code" to execute.')}
@@ -2554,8 +2556,8 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                     </div>
                   )}
 
-                  {/* Invisible scroll target */}
-                  <div ref={consoleBottomRef} />
+                  {/* Bottom padding */}
+                  <div className="h-2" />
                 </div>
 
                 {/* DOCKED INTERACTIVE TERMINAL INPUT BAR */}

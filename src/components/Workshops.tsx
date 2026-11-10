@@ -501,12 +501,6 @@ export default function TenantDashboard() {
       actionText: "Enter Workshop & Sandbox",
       onAction: () => {
         setShowEmailNotice(false);
-        setTimeout(() => {
-          const el = document.getElementById('workshop-classroom-section');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 150);
       }
     });
     setShowEmailNotice(true);
@@ -1497,7 +1491,13 @@ export default function TenantDashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Host 1: Shreyas M. (Founder & CEO) */}
-            <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-[#f87171]/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-[#f87171]/10 flex flex-col justify-between overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-[#f87171]/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-[#f87171]/10 flex flex-col justify-between overflow-hidden"
+            >
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#f87171] to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
 
               <div className="space-y-4">
@@ -1561,10 +1561,16 @@ export default function TenantDashboard() {
                   <span>LinkedIn</span>
                 </a>
               </div>
-            </div>
+            </motion.div>
 
             {/* Host 2: Lokesh A. (Co-Founder) */}
-            <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-purple-500/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-purple-500/10 flex flex-col justify-between overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-purple-500/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-purple-500/10 flex flex-col justify-between overflow-hidden"
+            >
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
 
               <div className="space-y-4">
@@ -1610,7 +1616,7 @@ export default function TenantDashboard() {
               {/* Social Profiles & Contact */}
               <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
                 <a
-                  href="https://github.com/Lokesh132005"
+                  href="https://github.com/lokeee1307-source"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -1619,7 +1625,7 @@ export default function TenantDashboard() {
                   <span>GitHub</span>
                 </a>
                 <a
-                  href="https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app"
+                  href="https://www.linkedin.com/in/lokesh-a-281069404"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -1628,10 +1634,16 @@ export default function TenantDashboard() {
                   <span>LinkedIn</span>
                 </a>
               </div>
-            </div>
+            </motion.div>
 
             {/* Host 3: Bhuvan M. (Tech Lead) */}
-            <div className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-brand-teal/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-brand-teal/10 flex flex-col justify-between overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="group relative bg-gradient-to-b from-[#181926]/90 to-[#0e1017]/95 border border-white/10 hover:border-brand-teal/50 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-brand-teal/10 flex flex-col justify-between overflow-hidden"
+            >
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-brand-teal to-transparent opacity-40 group-hover:opacity-100 transition-opacity" />
 
               <div className="space-y-4">
@@ -1700,7 +1712,7 @@ export default function TenantDashboard() {
                   <span>Email</span>
                 </a>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 

@@ -3069,7 +3069,7 @@ export function ServiceProjectSpaceDashboard({
             {/* Social & Contact Buttons */}
             <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-white/10">
               <a
-                href="https://github.com/Lokesh132005"
+                href="https://github.com/lokeee1307-source"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
@@ -3078,7 +3078,7 @@ export function ServiceProjectSpaceDashboard({
                 <span>GitHub</span>
               </a>
               <a
-                href="https://www.linkedin.com/in/lokesh-a-62b217316?utm_source=share_via&utm_content=profile&utm_medium=android_app"
+                href="https://www.linkedin.com/in/lokesh-a-281069404"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
