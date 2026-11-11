@@ -162,6 +162,7 @@ export default function App() {
   const handleViewChange = (view: string) => {
     const targetView = view as AppView;
     setCurrentView(targetView);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     try {
       if (targetView === 'careers') {
         window.history.pushState({ view: 'careers' }, '', '/careers');
@@ -174,6 +175,19 @@ export default function App() {
       }
     } catch (e) {}
   };
+
+  // Prevent browser from restoring stale scroll offsets on navigation
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
+
+  // Whenever currentView changes, immediately place the user at top (0, 0)
+  // so the section opens from its top header, and scrolling occurs only when the user manually scrolls
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [currentView]);
 
   // Synchronize browser URL navigation (back/forward, direct link, hashchange)
   useEffect(() => {
@@ -409,7 +423,7 @@ export default function App() {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setCurrentView('about'); window.scrollTo(0,0); }}
+                        onClick={() => { handleViewChange('about'); }}
                         className="flex items-center gap-1.5 text-sm font-mono font-bold text-brand-teal hover:text-white transition-colors cursor-pointer group self-start focus:outline-none"
                       >
                         View About & Crew
@@ -429,7 +443,7 @@ export default function App() {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setCurrentView('services'); window.scrollTo(0,0); }}
+                        onClick={() => { handleViewChange('services'); }}
                         className="flex items-center gap-1.5 text-sm font-mono font-bold text-brand-teal hover:text-white transition-colors cursor-pointer group self-start focus:outline-none"
                       >
                         Explore Services
@@ -449,7 +463,7 @@ export default function App() {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setCurrentView('workshops'); }}
+                        onClick={() => { handleViewChange('workshops'); }}
                         className="flex items-center gap-1.5 text-sm font-mono font-bold text-brand-teal hover:text-white transition-colors cursor-pointer group self-start focus:outline-none"
                       >
                         Browse Workshops
@@ -469,7 +483,7 @@ export default function App() {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setCurrentView('communities'); window.scrollTo(0,0); }}
+                        onClick={() => { handleViewChange('communities'); }}
                         className="flex items-center gap-1.5 text-sm font-mono font-bold text-brand-teal hover:text-white transition-colors cursor-pointer group self-start focus:outline-none"
                       >
                         View Community Hub
@@ -509,7 +523,7 @@ export default function App() {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setCurrentView('contact'); window.scrollTo(0,0); }}
+                        onClick={() => { handleViewChange('contact'); }}
                         className="flex items-center gap-1.5 text-sm font-mono font-bold text-brand-teal hover:text-white transition-colors cursor-pointer group self-start focus:outline-none"
                       >
                         Get In Touch
@@ -746,15 +760,15 @@ export default function App() {
             {/* Middle Quick Links */}
             <div className="flex flex-col items-center gap-4">
               <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-xs text-gray-400 font-medium">
-                <button onClick={() => { setCurrentView('home'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Home</button>
-                <button onClick={() => { setCurrentView('services'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Services</button>
-                <button onClick={() => { setCurrentView('workshops'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Workshops</button>
-                <button onClick={() => { setCurrentView('about'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About Us</button>
-                <button onClick={() => { setCurrentView('crew'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">The Crew</button>
-                <button onClick={() => { setCurrentView('communities'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Communities</button>
-                <button onClick={() => { setCurrentView('careers'); }} className="hover:text-brand-teal text-brand-teal font-semibold transition-colors cursor-pointer focus:outline-none">Careers</button>
-                <button onClick={() => { setCurrentView('networking'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Networking & Achievements</button>
-                <button onClick={() => { setCurrentView('contact'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Contact</button>
+                <button onClick={() => { handleViewChange('home'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Home</button>
+                <button onClick={() => { handleViewChange('services'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Services</button>
+                <button onClick={() => { handleViewChange('workshops'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Workshops</button>
+                <button onClick={() => { handleViewChange('about'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">About Us</button>
+                <button onClick={() => { handleViewChange('crew'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">The Crew</button>
+                <button onClick={() => { handleViewChange('communities'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Communities</button>
+                <button onClick={() => { handleViewChange('careers'); }} className="hover:text-brand-teal text-brand-teal font-semibold transition-colors cursor-pointer focus:outline-none">Careers</button>
+                <button onClick={() => { handleViewChange('networking'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Networking & Achievements</button>
+                <button onClick={() => { handleViewChange('contact'); }} className="hover:text-brand-teal transition-colors cursor-pointer focus:outline-none">Contact</button>
               </div>
               <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 text-[10px] text-gray-500 font-mono tracking-wider">
                 <span className="text-gray-700">POLICIES:</span>

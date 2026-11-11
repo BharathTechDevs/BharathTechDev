@@ -873,7 +873,7 @@ export default function TenantDashboard() {
   }, [activeRegInfo, registeredKeys, currentUser]);
 
   return (
-    <section id="workshops" className="py-24 bg-brand-dark relative overflow-hidden">
+    <section className="py-24 bg-brand-dark relative overflow-hidden">
       {/* Ambient background glow */}
       <div className="absolute left-0 bottom-1/4 w-[400px] h-[400px] ambient-glow rounded-full pointer-events-none" />
 
@@ -1170,7 +1170,7 @@ export default function TenantDashboard() {
 
                   {/* GATE CONTROL: If registered, reveal interactive classroom. If not, show Register banner */}
                   {isRegistered ? (
-                    <div id="workshop-classroom-section" className="pt-8 mt-8 border-t border-white/5 space-y-6">
+                    <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
                       <div className="bg-brand-dark/80 p-5 rounded-2xl border border-brand-teal/20 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20">

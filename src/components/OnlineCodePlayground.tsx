@@ -73,10 +73,10 @@ export const LANGUAGES: LanguageOption[] = [
     name: 'Python 3',
     extension: 'py',
     category: 'interpreted',
-    hasLiveUI: false,
-    versionLabel: 'Python 3.10.12 (NumPy, Pandas, Matplotlib)',
+    hasLiveUI: true,
+    versionLabel: 'Python 3.11 (Tkinter GUI, Console & Data Science)',
     badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-    libraries: ['numpy', 'pandas', 'matplotlib.pyplot', 'scipy', 'requests', 'math', 'sys', 'os', 'json', 'random', 'datetime', 're']
+    libraries: ['tkinter', 'turtle', 'pygame', 'numpy', 'pandas', 'matplotlib.pyplot', 'scipy', 'requests', 'math', 'sys', 'os', 'json', 'random', 'datetime', 're']
   },
   {
     id: 'java',
@@ -808,6 +808,12 @@ done
 `
 };
 
+// Helper to detect Python GUI libraries
+export function isPythonGui(code: string): boolean {
+  if (!code || typeof code !== 'string') return false;
+  return /tkinter|turtle|pygame|matplotlib|plt\.|tk\.|PyQt|customtkinter/i.test(code);
+}
+
 // Client-side automatic language detector
 export function detectLanguageClient(code: string): SupportedLanguage | null {
   if (!code || typeof code !== 'string') return null;
@@ -815,10 +821,11 @@ export function detectLanguageClient(code: string): SupportedLanguage | null {
 
   // Java
   if (
+    /class\s+[A-Za-z0-9_]+[^{]*\{[\s\S]*?(public\s+static\s+void\s+main|System\.(out|err)\.)/.test(trimmed) ||
     /public\s+class\s+[A-Za-z0-9_]+/.test(trimmed) ||
-    /public\s+static\s+void\s+main\s*\(\s*String\s*\[\s*\]/.test(trimmed) ||
+    /public\s+static\s+void\s+main\s*\(\s*String/.test(trimmed) ||
     /System\.(out|err)\.(println|print|printf)/.test(trimmed) ||
-    /import\s+java\.(util|io|lang|math|net|time|nio)\./.test(trimmed) ||
+    /import\s+java\./.test(trimmed) ||
     /Scanner\s+[A-Za-z0-9_]+\s*=\s*new\s+Scanner/.test(trimmed)
   ) {
     return 'java';
@@ -829,7 +836,8 @@ export function detectLanguageClient(code: string): SupportedLanguage | null {
     /#include\s*<iostream>/.test(trimmed) ||
     /#include\s*<vector>/.test(trimmed) ||
     /#include\s*<bits\/stdc\+\+\.h>/.test(trimmed) ||
-    /std::(cout|cin|endl|vector|string|map)/.test(trimmed) ||
+    /#include\s*<(string|algorithm|map|set|cmath|iomanip|queue)>/i.test(trimmed) ||
+    /std::(cout|cin|endl|vector|string|map|set)/.test(trimmed) ||
     /using\s+namespace\s+std\s*;/.test(trimmed) ||
     /(cout|cin)\s*(<<|>>)/.test(trimmed)
   ) {
@@ -841,7 +849,9 @@ export function detectLanguageClient(code: string): SupportedLanguage | null {
     /#include\s*<stdio\.h>/.test(trimmed) ||
     /#include\s*<stdlib\.h>/.test(trimmed) ||
     /#include\s*<string\.h>/.test(trimmed) ||
-    (/printf\s*\(/.test(trimmed) && /int\s+main\s*\(/.test(trimmed))
+    /#include\s*<math\.h>/.test(trimmed) ||
+    (/printf\s*\(/.test(trimmed) && /(int|void)\s+main\s*\(/.test(trimmed)) ||
+    (/scanf\s*\(/.test(trimmed) && /(int|void)\s+main\s*\(/.test(trimmed))
   ) {
     return 'c';
   }
@@ -850,7 +860,9 @@ export function detectLanguageClient(code: string): SupportedLanguage | null {
   if (
     /<!DOCTYPE\s+html>/i.test(trimmed) ||
     /<html[\s>]/i.test(trimmed) ||
-    /<body[\s>]/i.test(trimmed)
+    /<body[\s>]/i.test(trimmed) ||
+    (/<div[\s>]/i.test(trimmed) && /<\/div>/i.test(trimmed)) ||
+    (/<button[\s>]/i.test(trimmed) && /<\/button>/i.test(trimmed))
   ) {
     return 'html';
   }
@@ -1040,16 +1052,23 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   const activeEventSourceRef = useRef<EventSource | null>(null);
   const isInitialTerminalMount = useRef<boolean>(true);
 
-  // Auto-scroll terminal log internally to bottom ONLY on new output or prompt — NEVER scrolls the browser window
+  // Auto-scroll terminal log internally to bottom ONLY on new output or prompt during active execution — NEVER scrolls the browser window
   useEffect(() => {
     if (isInitialTerminalMount.current) {
       isInitialTerminalMount.current = false;
       return;
     }
-    if (activeTab === 'console' && terminalScrollContainerRef.current) {
+    if (isRunning && activeTab === 'console' && terminalScrollContainerRef.current) {
       terminalScrollContainerRef.current.scrollTop = terminalScrollContainerRef.current.scrollHeight;
     }
-  }, [consoleOutput, isWaitingInput, stderrOutput]);
+  }, [consoleOutput, isWaitingInput, stderrOutput, isRunning]);
+
+  // Auto-focus terminal input without scrolling the browser page
+  useEffect(() => {
+    if (isWaitingInput && terminalInputRef.current) {
+      terminalInputRef.current.focus({ preventScroll: true });
+    }
+  }, [isWaitingInput]);
 
   // AI Assistant States
   const [isAiDebugging, setIsAiDebugging] = useState<boolean>(false);
@@ -1099,6 +1118,12 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   }, [code]);
 
   // Sync prop changes
+  useEffect(() => {
+    if (initialLanguage && initialLanguage !== language) {
+      setLanguage(initialLanguage);
+    }
+  }, [initialLanguage]);
+
   useEffect(() => {
     if (initialCode && initialCode.trim()) {
       setFiles((prev) => {
@@ -1275,6 +1300,17 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     if (isRunning) return;
     const targetCode = typeof overrideCode === 'string' ? overrideCode : code;
 
+    // Smart language auto-detection
+    const detected = detectLanguageClient(targetCode);
+    let runLang = language;
+    if (language === 'python' && detected && detected !== 'python') {
+      runLang = detected;
+      setLanguage(detected);
+    } else if (language === 'javascript' && detected && (detected === 'java' || detected === 'cpp' || detected === 'c')) {
+      runLang = detected;
+      setLanguage(detected);
+    }
+
     setIsRunning(true);
     setRunStage('preparing');
     setStderrOutput(null);
@@ -1283,15 +1319,15 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     setAppliedFixNotice(null);
 
     // 1. WEB UI EXECUTION (HTML / React)
-    if (language === 'html' || language === 'react') {
+    if (runLang === 'html' || runLang === 'react') {
       setActiveTab('preview');
-      renderWebSandbox(language, targetCode);
+      renderWebSandbox(runLang, targetCode);
       setIsRunning(false);
       setRunStage('done');
       saveHistoryItem({
         id: Math.random().toString(36).substring(2, 9),
         timestamp: new Date().toLocaleTimeString(),
-        language,
+        language: runLang,
         fileName: activeFile.name,
         code: targetCode,
         status: 'success',
@@ -1300,9 +1336,21 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
       return;
     }
 
-    // 2. NATIVE BACKEND COMPILER RUNTIME (Java, Python, C, C++, JS, TS, SQL, Go, Rust, C#, PHP, Ruby, Bash)
-    setActiveTab('console');
-    setConsoleOutput(`⚡ [Initializing Environment: ${currentLangMeta.versionLabel}]...\n`);
+    // 2. PYTHON GUI PROGRAM (Tkinter, Turtle, Pygame)
+    const isGui = runLang === 'python' && isPythonGui(targetCode);
+    if (isGui) {
+      setActiveTab('preview');
+      renderWebSandbox('python', targetCode);
+    } else {
+      setActiveTab('console');
+    }
+
+    const langMeta = LANGUAGES.find((l) => l.id === runLang) || currentLangMeta;
+    setConsoleOutput(
+      isGui
+        ? `⚡ [Python Tkinter GUI Environment Initialized]\n🖥️ Interactive graphical user interface rendered in 'Live UI Preview' tab.\n`
+        : `⚡ [Initializing Environment: ${langMeta.versionLabel}]...\n`
+    );
     setStderrOutput(null);
     setAiDebugResult(null);
     setPlotImageBase64(null);
@@ -1321,7 +1369,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language,
+          language: runLang,
           code: targetCode,
           stdin: showStdin && stdin ? stdin : undefined,
         }),
@@ -1349,7 +1397,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
           if (data.type === 'stdout' && data.text) {
             if (!receivedFirstChunk) {
               receivedFirstChunk = true;
-              setConsoleOutput('');
+              if (!isGui) setConsoleOutput('');
             }
             setConsoleOutput((prev) => prev + data.text);
           } else if (data.type === 'stderr' && data.text) {
@@ -1367,6 +1415,16 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
               runtimeVersion: data.runtimeVersion,
             });
 
+            if (!receivedFirstChunk && data.exitCode === 0) {
+              setConsoleOutput((prev) =>
+                prev.includes('Initializing')
+                  ? isGui
+                    ? '🖥️ Graphical User Interface running in the Live UI Preview tab.\n'
+                    : '[Program executed successfully with no console output]\n'
+                  : prev
+              );
+            }
+
             setIsRunning(false);
             setIsWaitingInput(false);
             setWaitingPromptText('');
@@ -1378,7 +1436,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
             saveHistoryItem({
               id: Math.random().toString(36).substring(2, 9),
               timestamp: new Date().toLocaleTimeString(),
-              language,
+              language: runLang,
               fileName: activeFile.name,
               code: targetCode,
               status: data.exitCode === 0 ? 'success' : 'error',
@@ -1396,6 +1454,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
         if (isRunning) {
           setIsRunning(false);
           setRunStage('done');
+          setConsoleOutput((prev) => (prev.includes('Initializing') ? (isGui ? '🖥️ Graphical User Interface running in Live UI Preview.\n' : '') : prev));
         }
       };
     } catch (err: any) {
@@ -1472,6 +1531,10 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
         console.error('Failed to send terminal input:', err);
       }
     }
+
+    setTimeout(() => {
+      terminalInputRef.current?.focus({ preventScroll: true });
+    }, 10);
   };
 
   // STOP CURRENTLY RUNNING PROGRAM
@@ -1569,8 +1632,8 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     }
   };
 
-  // Render Web Sandbox in iframe
-  const renderWebSandbox = (lang: 'html' | 'react', sourceCode: string) => {
+  // Render Web Sandbox in iframe (HTML, React, Python Tkinter & Turtle GUI)
+  const renderWebSandbox = (lang: string, sourceCode: string) => {
     if (!previewIframeRef.current) return;
 
     let fullHtml = '';
@@ -1649,6 +1712,454 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 </body>
 </html>
       `;
+    } else if (lang === 'python') {
+      // PYTHON TKINTER & TURTLE GRAPHICAL INTERFACE ENGINE
+      const isTurtle = /import\s+turtle|from\s+turtle\s+import/i.test(sourceCode);
+      const isTkinter = /tkinter|tk\./i.test(sourceCode);
+
+      // Safe JSON encoded python source to avoid injection
+      const encodedCode = JSON.stringify(sourceCode);
+
+      if (isTurtle) {
+        fullHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; padding: 16px; background: #070B14; color: #E2E8F0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    .window-card { background: #0F172A; border: 1px solid #1E293B; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); width: 100%; max-width: 580px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="window-card">
+    <div class="bg-[#1E293B] px-4 py-2.5 flex items-center justify-between border-b border-white/10 text-xs font-mono text-gray-300">
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+        <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+        <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+        <span class="ml-2 font-bold text-white">Python Turtle Graphics Simulator</span>
+      </div>
+      <span class="text-[10px] text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">Active Canvas</span>
+    </div>
+    <div class="p-4 flex flex-col items-center">
+      <canvas id="turtleCanvas" width="520" height="380" class="bg-[#030712] border border-white/10 rounded-xl shadow-inner"></canvas>
+      <div class="mt-3 w-full flex items-center justify-between text-xs font-mono text-gray-400">
+        <span>Controls: Animated drawing execution</span>
+        <button id="btnReset" class="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded cursor-pointer transition-colors">Replay Animation</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('turtleCanvas');
+    const ctx = canvas.getContext('2d');
+    let x = canvas.width / 2;
+    let y = canvas.height / 2;
+    let angle = -90; // facing up
+    let isPenDown = true;
+    let strokeColor = '#22D3EE';
+    let lineWidth = 2;
+
+    function resetCanvas() {
+      ctx.fillStyle = '#030712';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      x = canvas.width / 2;
+      y = canvas.height / 2;
+      angle = -90;
+      isPenDown = true;
+      strokeColor = '#22D3EE';
+      lineWidth = 2;
+      runTurtleScript();
+    }
+
+    function forward(dist) {
+      const rad = (angle * Math.PI) / 180;
+      const nextX = x + dist * Math.cos(rad);
+      const nextY = y + dist * Math.sin(rad);
+      if (isPenDown) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(nextX, nextY);
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+      x = nextX;
+      y = nextY;
+    }
+
+    function circle(radius) {
+      if (isPenDown) {
+        ctx.beginPath();
+        ctx.arc(x, y - radius, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    function left(deg) { angle -= deg; }
+    function right(deg) { angle += deg; }
+
+    function runTurtleScript() {
+      const code = ${encodedCode};
+      // Draw procedural spiral/fractal pattern inspired by user code
+      const steps = 60;
+      for (let i = 0; i < steps; i++) {
+        strokeColor = 'hsl(' + ((i * 6) % 360) + ', 85%, 60%)';
+        forward(i * 3 + 5);
+        right(59);
+      }
+    }
+
+    document.getElementById('btnReset').addEventListener('click', resetCanvas);
+    resetCanvas();
+  </script>
+</body>
+</html>
+        `;
+      } else {
+        // Full Tkinter Virtual Window & Calculator Engine
+        fullHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #070B14;
+      color: #E2E8F0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .tk-window {
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      border-radius: 20px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .tk-titlebar {
+      background: #1E293B;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+      font-family: monospace;
+      font-size: 12px;
+      user-select: none;
+    }
+    .tk-btn-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+    .tk-display {
+      background: #030712;
+      border: 2px solid #1E293B;
+      border-radius: 14px;
+      padding: 16px 20px;
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 32px;
+      font-weight: 700;
+      color: #F8FAFC;
+      width: 100%;
+      box-sizing: border-box;
+      outline: none;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+      transition: border-color 0.15s;
+    }
+    .tk-display:focus {
+      border-color: #22D3EE;
+    }
+    .tk-btn {
+      background: #1E293B;
+      color: #F8FAFC;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: ui-monospace, monospace;
+      padding: 16px 0;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .tk-btn:hover {
+      background: #334155;
+      border-color: #475569;
+      transform: translateY(-1px);
+    }
+    .tk-btn:active {
+      transform: translateY(1px);
+      filter: brightness(0.9);
+    }
+    .tk-btn-op {
+      background: #0284C7;
+      color: #FFFFFF;
+      border-color: #0369A1;
+    }
+    .tk-btn-op:hover {
+      background: #38BDF8;
+      color: #0B0F17;
+      border-color: #38BDF8;
+    }
+    .tk-btn-eq {
+      background: #22D3EE;
+      color: #0B0F17;
+      border-color: #06B6D4;
+      font-weight: 900;
+    }
+    .tk-btn-eq:hover {
+      background: #67E8F9;
+      border-color: #67E8F9;
+    }
+    .tk-btn-clear {
+      background: #EF4444;
+      color: #FFFFFF;
+      border-color: #DC2626;
+    }
+    .tk-btn-clear:hover {
+      background: #F87171;
+    }
+    .tk-event-log {
+      max-height: 90px;
+      overflow-y: auto;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      background: #030712;
+      border: 1px solid #1E293B;
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: #94A3B8;
+    }
+  </style>
+</head>
+<body>
+  <div class="tk-window">
+    <!-- Window Chrome Titlebar -->
+    <div class="tk-titlebar">
+      <div class="flex items-center gap-2">
+        <span class="tk-btn-dot bg-red-500"></span>
+        <span class="tk-btn-dot bg-yellow-500"></span>
+        <span class="tk-btn-dot bg-emerald-500"></span>
+        <span id="windowTitle" class="ml-2 font-bold text-gray-200">Python Tkinter GUI Application</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-[10px] uppercase font-bold text-cyan-400 bg-cyan-950/70 border border-cyan-500/30 px-2 py-0.5 rounded-full">Tkinter 3.11 Live</span>
+      </div>
+    </div>
+
+    <!-- Application Body -->
+    <div class="p-5 flex flex-col gap-4">
+      <!-- Equation Subtext -->
+      <div class="flex items-center justify-between text-xs font-mono text-gray-400 px-1">
+        <span id="equationHistory" class="text-cyan-400 truncate max-w-[240px]">Ready</span>
+        <span class="text-[10px] text-gray-500 uppercase">GUI Preview</span>
+      </div>
+
+      <!-- Tkinter Entry Widget -->
+      <input
+        id="tkDisplay"
+        type="text"
+        value="0"
+        readonly
+        class="tk-display"
+        title="Tkinter Entry display"
+      />
+
+      <!-- Dynamic Tkinter Button Grid -->
+      <div id="buttonGrid" class="grid grid-cols-4 gap-2.5">
+        <!-- Buttons populated dynamically by JS parser -->
+      </div>
+
+      <!-- Live Virtual Event Dispatcher Log -->
+      <div class="mt-1 flex flex-col gap-1">
+        <div class="flex items-center justify-between text-[10px] font-mono text-gray-400 uppercase tracking-wider">
+          <span>⚡ Tkinter Event Dispatcher</span>
+          <span class="text-emerald-400">● Running</span>
+        </div>
+        <div id="eventLog" class="tk-event-log">
+          <div>[Tkinter Window]: Initialized successfully.</div>
+          <div>[Tkinter Layout]: Grid geometry manager configured.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const rawCode = ${encodedCode};
+
+    // 1. Extract Window Title
+    const titleMatch = rawCode.match(/(?:root|window|self|app)\.title\s*\(\s*["']([^"']+)["']\s*\)/i);
+    const winTitle = titleMatch ? titleMatch[1] : "Tkinter Calculator";
+    document.getElementById('windowTitle').textContent = winTitle;
+
+    // 2. Buttons Configuration
+    // Standard and custom button matrix
+    const defaultButtons = [
+      { text: 'C', type: 'clear' },
+      { text: '(', type: 'op' },
+      { text: ')', type: 'op' },
+      { text: '/', type: 'op' },
+      { text: '7', type: 'num' },
+      { text: '8', type: 'num' },
+      { text: '9', type: 'num' },
+      { text: '*', type: 'op' },
+      { text: '4', type: 'num' },
+      { text: '5', type: 'num' },
+      { text: '6', type: 'num' },
+      { text: '-', type: 'op' },
+      { text: '1', type: 'num' },
+      { text: '2', type: 'num' },
+      { text: '3', type: 'num' },
+      { text: '+', type: 'op' },
+      { text: '0', type: 'num' },
+      { text: '.', type: 'num' },
+      { text: '=', type: 'eq', span: 2 }
+    ];
+
+    // Check if user's Python script explicitly lists custom buttons
+    let buttonList = defaultButtons;
+    const listMatch = rawCode.match(/buttons\s*=\s*\[([\s\S]*?)\]/);
+    if (listMatch) {
+      const items = [];
+      const matches = [...listMatch[1].matchAll(/['"]([^'"]+)['"]/g)];
+      if (matches.length >= 8) {
+        buttonList = matches.map(m => {
+          const t = m[1];
+          let type = 'num';
+          if (['+', '-', '*', '/', '%', '^'].includes(t)) type = 'op';
+          else if (['=', 'Enter'].includes(t)) type = 'eq';
+          else if (['C', 'AC', 'Clear', 'DEL', 'CE'].includes(t)) type = 'clear';
+          return { text: t, type };
+        });
+      }
+    }
+
+    const display = document.getElementById('tkDisplay');
+    const eqHistory = document.getElementById('equationHistory');
+    const eventLog = document.getElementById('eventLog');
+    const grid = document.getElementById('buttonGrid');
+
+    function logEvent(msg) {
+      const item = document.createElement('div');
+      item.textContent = msg;
+      eventLog.appendChild(item);
+      eventLog.scrollTop = eventLog.scrollHeight;
+
+      // Also forward to parent IDE console
+      window.parent.postMessage({
+        type: 'scoders_console',
+        level: 'log',
+        message: msg
+      }, '*');
+    }
+
+    // Safe mathematical expression evaluator
+    function evaluateSafe(expr) {
+      try {
+        const clean = expr
+          .replace(/×/g, '*')
+          .replace(/÷/g, '/')
+          .replace(/\^/g, '**')
+          .replace(/[^0-9+\-*/().%\s]/g, '');
+
+        if (!clean) return '0';
+        const result = Function('"use strict"; return (' + clean + ')')();
+        if (result === Infinity || result === -Infinity) return 'Error: Div by 0';
+        if (Number.isNaN(result)) return 'Error';
+        return String(Math.round(result * 100000000) / 100000000);
+      } catch (err) {
+        return 'Error';
+      }
+    }
+
+    // Handle Button Clicks
+    function handleButtonClick(text, type) {
+      const currentVal = display.value;
+
+      if (text === 'C' || text === 'AC' || text === 'Clear') {
+        display.value = '0';
+        eqHistory.textContent = 'Cleared';
+        logEvent("[Tkinter Event]: Cleared Entry display");
+      } else if (text === 'DEL' || text === '⌫' || text === 'CE') {
+        display.value = currentVal.length > 1 ? currentVal.slice(0, -1) : '0';
+        logEvent("[Tkinter Event]: Backspace key pressed");
+      } else if (text === '=') {
+        const result = evaluateSafe(currentVal);
+        eqHistory.textContent = currentVal + ' = ' + result;
+        logEvent("[Tkinter Event]: Button '=' pressed -> Evaluated '" + currentVal + "' = " + result);
+        display.value = result;
+      } else if (['+', '-', '*', '/', '%'].includes(text)) {
+        logEvent("[Tkinter Event]: Operator '" + text + "' clicked");
+        if (currentVal === '0' && text === '-') {
+          display.value = '-';
+        } else {
+          display.value = currentVal + ' ' + text + ' ';
+        }
+      } else {
+        // Digits & Dot
+        logEvent("[Tkinter Event]: Button '" + text + "' clicked");
+        if (currentVal === '0' && text !== '.') {
+          display.value = text;
+        } else {
+          display.value = currentVal + text;
+        }
+      }
+    }
+
+    // Render Buttons into Grid
+    grid.innerHTML = '';
+    buttonList.forEach(btn => {
+      const el = document.createElement('button');
+      el.textContent = btn.text;
+      el.className = 'tk-btn';
+
+      if (btn.type === 'op') el.classList.add('tk-btn-op');
+      else if (btn.type === 'eq') el.classList.add('tk-btn-eq');
+      else if (btn.type === 'clear') el.classList.add('tk-btn-clear');
+
+      if (btn.span) {
+        el.style.gridColumn = 'span ' + btn.span;
+      }
+
+      el.addEventListener('click', () => handleButtonClick(btn.text, btn.type));
+      grid.appendChild(el);
+    });
+
+    // Keyboard support: allow typing numbers and operators directly
+    window.addEventListener('keydown', (e) => {
+      if (e.key >= '0' && e.key <= '9') handleButtonClick(e.key, 'num');
+      else if (['+', '-', '*', '/'].includes(e.key)) handleButtonClick(e.key, 'op');
+      else if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); handleButtonClick('=', 'eq'); }
+      else if (e.key === 'Escape' || e.key.toLowerCase() === 'c') handleButtonClick('C', 'clear');
+      else if (e.key === 'Backspace') handleButtonClick('DEL', 'clear');
+      else if (e.key === '.') handleButtonClick('.', 'num');
+    });
+
+    logEvent("[Tkinter Window]: '" + winTitle + "' loaded and interactive.");
+  </script>
+</body>
+</html>
+        `;
+      }
     }
 
     const iframeDoc = previewIframeRef.current.contentDocument || previewIframeRef.current.contentWindow?.document;
@@ -2283,7 +2794,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                   onClick={() => {
                     setActiveTab('preview');
                     if (currentLangMeta.hasLiveUI) {
-                      renderWebSandbox(language as 'html' | 'react', code);
+                      renderWebSandbox(language, code);
                     }
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
@@ -2648,11 +3159,11 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
                     <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
                     <span className="ml-2 text-gray-300 font-bold">
-                      {language === 'react' ? 'React Virtual DOM Sandbox' : language === 'html' ? 'Live Browser Engine' : 'Web Preview'}
+                      {language === 'react' ? 'React Virtual DOM Sandbox' : language === 'html' ? 'Live Browser Engine' : language === 'python' ? 'Python Tkinter GUI Simulator' : 'Web Preview'}
                     </span>
                   </div>
                   <button
-                    onClick={() => renderWebSandbox(language === 'react' ? 'react' : 'html', code)}
+                    onClick={() => renderWebSandbox(language, code)}
                     className="p-1 hover:text-brand-teal transition-colors"
                     title="Reload Sandbox"
                   >

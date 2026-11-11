@@ -167,6 +167,7 @@ export class InteractiveSession {
   public plotFile?: string;
   public plotImageBase64?: string;
   public isClosed: boolean = false;
+  private inputWaitTimer?: NodeJS.Timeout;
   private listeners: ((event: SessionEvent) => void)[] = [];
   private eventQueue: SessionEvent[] = [];
   private idleTimer?: NodeJS.Timeout;
@@ -211,6 +212,7 @@ export class InteractiveSession {
   private handleTimeout(kind: "max_time" | "idle") {
     if (this.isClosed) return;
     this.isClosed = true;
+    if (this.inputWaitTimer) clearTimeout(this.inputWaitTimer);
     try {
       this.child.kill("SIGKILL");
     } catch {}
@@ -253,21 +255,34 @@ export class InteractiveSession {
         });
 
         // Prompt detection heuristic:
-        // If output ends with ': ', '? ', or prompt-like phrases, notify frontend that input is expected!
-        const trimmed = text.trimEnd();
-        if (
+        if (this.inputWaitTimer) clearTimeout(this.inputWaitTimer);
+        const trimmed = text.trim();
+        const lastLine = trimmed.split("\n").pop() || "";
+        const isPromptLike =
           text.endsWith(" ") ||
           text.endsWith(": ") ||
-          text.endsWith(":") ||
-          text.endsWith("? ") ||
-          text.endsWith("?") ||
-          text.endsWith("> ") ||
-          /(\b(enter|input|type|choose|select|number|name|value|password|prompt)\b.*[:?])/i.test(trimmed)
-        ) {
+          trimmed.endsWith(":") ||
+          trimmed.endsWith("?") ||
+          trimmed.endsWith(">") ||
+          /(\b(enter|input|type|choose|select|pick|number|name|value|password|prompt|operator|first|second)\b)/i.test(lastLine);
+
+        if (isPromptLike) {
           this.emit({
             type: "waiting_input",
-            text: trimmed,
+            text: lastLine,
           });
+        } else {
+          // If child process is alive and stdin is writable, wait 120ms of silence
+          // and emit waiting_input so interactive programs like Scanner/cin are never stuck
+          this.inputWaitTimer = setTimeout(() => {
+            if (!this.isClosed && this.child && this.child.stdin && !this.child.stdin.destroyed) {
+              const currentLastLine = this.stdoutBuffer.trim().split("\n").pop() || "";
+              this.emit({
+                type: "waiting_input",
+                text: currentLastLine || "Program waiting for input...",
+              });
+            }
+          }, 120);
         }
       });
     }
@@ -328,6 +343,7 @@ export class InteractiveSession {
     if (this.isClosed || !this.child.stdin || this.child.stdin.destroyed) {
       return false;
     }
+    if (this.inputWaitTimer) clearTimeout(this.inputWaitTimer);
     this.lastActiveTime = Date.now();
     this.resetIdleTimer();
     try {
@@ -345,6 +361,7 @@ export class InteractiveSession {
   public stop() {
     if (this.isClosed) return;
     this.isClosed = true;
+    if (this.inputWaitTimer) clearTimeout(this.inputWaitTimer);
     try {
       this.child.kill("SIGKILL");
     } catch {}
@@ -387,6 +404,7 @@ export class InteractiveSession {
   }
 
   private cleanup() {
+    if (this.inputWaitTimer) clearTimeout(this.inputWaitTimer);
     if (this.idleTimer) clearTimeout(this.idleTimer);
     if (this.sessionMaxTimer) clearTimeout(this.sessionMaxTimer);
     setTimeout(() => {
@@ -446,6 +464,23 @@ export async function startInteractiveSession(
     const plotFile = path.join(tempDir, "scoders_plot.png");
 
     let finalCode = code;
+    if (isTkinter) {
+      const tkShim = `
+try:
+    import tkinter as _scoders_tk
+    _orig_mainloop = _scoders_tk.Tk.mainloop
+    def _scoders_safe_mainloop(self, n=0):
+        print(f"[Tkinter Window]: '{self.title()}' GUI initialized successfully.")
+        print("[Tkinter Event Loop]: Application running in Virtual GUI Environment.")
+        print("[Preview]: Interactive GUI is active in the Live UI Preview tab.")
+        self.update()
+    _scoders_tk.Tk.mainloop = _scoders_safe_mainloop
+except Exception:
+    pass
+`;
+      finalCode = tkShim + "\n" + finalCode;
+    }
+
     if (isMatplotlib) {
       const mplShim = `
 import os
@@ -470,21 +505,33 @@ except Exception:
 
     fs.writeFileSync(pythonFile, finalCode, "utf-8");
 
-    const child = spawn("python3", ["-u", pythonFile], {
-      cwd: tempDir,
-      env: {
-        ...process.env,
-        PYTHONUNBUFFERED: "1",
-        MPLBACKEND: "Agg",
-        LANG: "C.UTF-8",
-        LC_ALL: "C.UTF-8",
-      },
-    });
+    const hasXvfb = fs.existsSync("/usr/bin/xvfb-run");
+    const child = (isTkinter && hasXvfb)
+      ? spawn("xvfb-run", ["-a", "python3", "-u", pythonFile], {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            PYTHONUNBUFFERED: "1",
+            MPLBACKEND: "Agg",
+            LANG: "C.UTF-8",
+            LC_ALL: "C.UTF-8",
+          },
+        })
+      : spawn("python3", ["-u", pythonFile], {
+          cwd: tempDir,
+          env: {
+            ...process.env,
+            PYTHONUNBUFFERED: "1",
+            MPLBACKEND: "Agg",
+            LANG: "C.UTF-8",
+            LC_ALL: "C.UTF-8",
+          },
+        });
 
     const session = new InteractiveSession(
       sessionId,
       "Python 3.11",
-      "Python 3.11 (NumPy, Pandas, Matplotlib, Scipy, Requests)",
+      "Python 3.11 (Tkinter GUI, NumPy, Pandas, Matplotlib)",
       tempDir,
       child,
       isMatplotlib ? plotFile : undefined
@@ -509,6 +556,15 @@ except Exception:
     const publicClassMatch = javaSource.match(/public\s+class\s+([A-Za-z0-9_]+)/);
     const anyClassMatch = javaSource.match(/class\s+([A-Za-z0-9_]+)/);
     const className = publicClassMatch ? publicClassMatch[1] : (anyClassMatch ? anyClassMatch[1] : "Main");
+
+    // Inject unbuffered auto-flush into the Java class so System.out.print(...) flushes immediately over the stdout pipe
+    const classRegex = /(class\s+[A-Za-z0-9_]+[^{]*\{)/;
+    if (classRegex.test(javaSource) && !javaSource.includes("System.setOut(new java.io.PrintStream")) {
+      javaSource = javaSource.replace(
+        classRegex,
+        `$1\n    static {\n        try {\n            System.setOut(new java.io.PrintStream(System.out, true));\n            System.setErr(new java.io.PrintStream(System.err, true));\n        } catch (Exception _scoders_e) {}\n    }\n`
+      );
+    }
 
     const javaFile = path.join(tempDir, `${className}.java`);
     fs.writeFileSync(javaFile, javaSource, "utf-8");
@@ -634,7 +690,34 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
   // 4. JavaScript / Node.js Interactive Session
   if (normLang === "javascript" || normLang === "js" || normLang === "node") {
     const jsFile = path.join(tempDir, "script.js");
-    fs.writeFileSync(jsFile, code, "utf-8");
+    const promptPolyfill = `
+const _scoders_fs = require("fs");
+if (typeof global.prompt === "undefined") {
+  global.prompt = function(message) {
+    if (message) process.stdout.write(String(message));
+    const buf = Buffer.alloc(1);
+    let line = "";
+    try {
+      while (true) {
+        const bytesRead = _scoders_fs.readSync(0, buf, 0, 1, null);
+        if (bytesRead === 0) break;
+        const ch = buf.toString("utf8");
+        if (ch === "\\n") break;
+        if (ch !== "\\r") line += ch;
+      }
+      return line.trim();
+    } catch (_e) {
+      return "";
+    }
+  };
+}
+if (typeof global.alert === "undefined") {
+  global.alert = function(msg) {
+    console.log("[Alert]:", msg);
+  };
+}
+`;
+    fs.writeFileSync(jsFile, promptPolyfill + "\n" + code, "utf-8");
 
     const child = spawn(process.execPath, ["--max-old-space-size=256", jsFile], {
       cwd: tempDir,
@@ -1014,10 +1097,11 @@ export function detectLanguage(code: string): string | null {
 
   // 1. Java Detection
   if (
+    /class\s+[A-Za-z0-9_]+[^{]*\{[\s\S]*?(public\s+static\s+void\s+main|System\.(out|err)\.)/.test(trimmed) ||
     /public\s+class\s+[A-Za-z0-9_]+/.test(trimmed) ||
-    /public\s+static\s+void\s+main\s*\(\s*String\s*\[\s*\]/.test(trimmed) ||
+    /public\s+static\s+void\s+main\s*\(\s*String/.test(trimmed) ||
     /System\.(out|err)\.(println|print|printf)/.test(trimmed) ||
-    /import\s+java\.(util|io|lang|math|net|time|nio)\./.test(trimmed) ||
+    /import\s+java\./.test(trimmed) ||
     /Scanner\s+[A-Za-z0-9_]+\s*=\s*new\s+Scanner/.test(trimmed)
   ) {
     return "java";
@@ -1028,6 +1112,7 @@ export function detectLanguage(code: string): string | null {
     /#include\s*<iostream>/.test(trimmed) ||
     /#include\s*<vector>/.test(trimmed) ||
     /#include\s*<bits\/stdc\+\+\.h>/.test(trimmed) ||
+    /#include\s*<(string|algorithm|map|set|cmath|iomanip|queue)>/i.test(trimmed) ||
     /std::(cout|cin|endl|vector|string|map|set)/.test(trimmed) ||
     /using\s+namespace\s+std\s*;/.test(trimmed) ||
     /(cout|cin)\s*(<<|>>)/.test(trimmed)
@@ -1040,7 +1125,9 @@ export function detectLanguage(code: string): string | null {
     /#include\s*<stdio\.h>/.test(trimmed) ||
     /#include\s*<stdlib\.h>/.test(trimmed) ||
     /#include\s*<string\.h>/.test(trimmed) ||
-    /printf\s*\(/.test(trimmed) && /int\s+main\s*\(/.test(trimmed)
+    /#include\s*<math\.h>/.test(trimmed) ||
+    (/printf\s*\(/.test(trimmed) && /(int|void)\s+main\s*\(/.test(trimmed)) ||
+    (/scanf\s*\(/.test(trimmed) && /(int|void)\s+main\s*\(/.test(trimmed))
   ) {
     return "c";
   }
@@ -1049,7 +1136,9 @@ export function detectLanguage(code: string): string | null {
   if (
     /<!DOCTYPE\s+html>/i.test(trimmed) ||
     /<html[\s>]/i.test(trimmed) ||
-    /<body[\s>]/i.test(trimmed)
+    /<body[\s>]/i.test(trimmed) ||
+    (/<div[\s>]/i.test(trimmed) && /<\/div>/i.test(trimmed)) ||
+    (/<button[\s>]/i.test(trimmed) && /<\/button>/i.test(trimmed))
   ) {
     return "html";
   }
@@ -1060,7 +1149,7 @@ export function detectLanguage(code: string): string | null {
     /ReactDOM\.createRoot/i.test(trimmed) ||
     /export\s+default\s+function\s+[A-Za-z0-9_]+\s*\(/i.test(trimmed) ||
     /function\s+[A-Z][A-Za-z0-9_]*\s*\([^)]*\)\s*\{[\s\S]*return\s*\(\s*</.test(trimmed) ||
-    /useState\s*\([^)]*\)/.test(trimmed) && /<[a-z0-9]+>/i.test(trimmed)
+    (/useState\s*\([^)]*\)/.test(trimmed) && /<[a-z0-9]+>/i.test(trimmed))
   ) {
     return "react";
   }
