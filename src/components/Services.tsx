@@ -3000,23 +3000,32 @@ export function ServiceProjectSpaceDashboard({
                 href="https://www.linkedin.com/in/shreyas-shreyas-97187638b?utm_source=share_via&utm_content=profile&utm_medium=member_android"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0077b5]/10 hover:bg-[#0077b5]/20 border border-[#0077b5]/30 hover:border-[#0077b5]/60 rounded-xl text-[#38bdf8] hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Linkedin className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>LinkedIn</span>
               </a>
               <a
                 href="tel:+918310463417"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
-                <Phone className="w-3.5 h-3.5 text-[#f87171]" />
-                <span>+91 8310463417</span>
+                <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                <span>+91 83104 63417</span>
+              </a>
+              <a
+                href="https://WA.me/918310463417"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-xl text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>WhatsApp</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-[#f87171]/20 border border-[#f87171]/30 hover:border-[#f87171]/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
-                <Mail className="w-3.5 h-3.5 text-[#f87171]" />
+                <Mail className="w-3.5 h-3.5 text-brand-teal" />
                 <span>Email</span>
               </a>
             </div>
@@ -3087,10 +3096,26 @@ export function ServiceProjectSpaceDashboard({
                 <span>LinkedIn</span>
               </a>
               <a
-                href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                href="tel:+918880901476"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
-                <Mail className="w-3.5 h-3.5 text-purple-400" />
+                <Phone className="w-3.5 h-3.5 text-brand-teal" />
+                <span>+91 88809 01476</span>
+              </a>
+              <a
+                href="https://WA.me/918880901476"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-xl text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>WhatsApp</span>
+              </a>
+              <a
+                href="mailto:scoders82@gmail.com"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+              >
+                <Mail className="w-3.5 h-3.5 text-brand-teal" />
                 <span>Email</span>
               </a>
             </div>
@@ -3165,20 +3190,20 @@ export function ServiceProjectSpaceDashboard({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5 text-brand-teal" />
-                <span>+91 6363905989</span>
+                <span>+91 63639 05989</span>
               </a>
               <a
                 href="https://wa.me/916363905989"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 hover:border-[#25D366]/50 rounded-xl text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 border-[#25D366]/50 rounded-xl text-emerald-300 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
                 <span>WhatsApp</span>
               </a>
               <a
                 href="mailto:scoders82@gmail.com"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-brand-teal/30 hover:border-brand-teal/60 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-brand-teal/20 border border-white/10 hover:border-brand-teal/40 rounded-xl text-gray-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-sm"
               >
                 <Mail className="w-3.5 h-3.5 text-brand-teal" />
                 <span>Email</span>
