@@ -31,6 +31,17 @@ function sanitizeOutput(buffer: string): string {
   return buffer;
 }
 
+// Helper to normalize invisible copy-paste artifacts (BOM, zero-width chars, NBSP, CRLF)
+export function sanitizeSourceCode(raw: string): string {
+  if (!raw || typeof raw !== "string") return "";
+  return raw
+    .replace(/^\uFEFF/, "")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+}
+
 // Executes a shell command with timeout, buffer limits, and custom environment
 function runProcess(
   cmd: string,
@@ -264,7 +275,7 @@ export class InteractiveSession {
           trimmed.endsWith(":") ||
           trimmed.endsWith("?") ||
           trimmed.endsWith(">") ||
-          /(\b(enter|input|type|choose|select|pick|number|name|value|password|prompt|operator|first|second)\b)/i.test(lastLine);
+          /(\b(enter|input|type|choose|select|pick|number|numbers|name|value|values|password|prompt|operator|first|second)\b)/i.test(lastLine);
 
         if (isPromptLike) {
           this.emit({
@@ -285,7 +296,19 @@ export class InteractiveSession {
           }, 120);
         }
       });
+    } else {
+      // Fallback
     }
+
+    // Also handle programs that start reading stdin immediately without printing a prompt first (e.g. `cin >> a >> b;`)
+    this.inputWaitTimer = setTimeout(() => {
+      if (!this.isClosed && !this.stdoutBuffer && !this.stderrBuffer && this.child && this.child.stdin && !this.child.stdin.destroyed) {
+        this.emit({
+          type: "waiting_input",
+          text: "Program is waiting for standard input (e.g., cin / scanf / input)...",
+        });
+      }
+    }, 350);
 
     if (this.child.stderr) {
       this.child.stderr.on("data", (chunk: Buffer | string) => {
@@ -352,6 +375,15 @@ export class InteractiveSession {
         type: "stdin",
         text: input + "\n",
       });
+      // If process remains blocked waiting for another read (e.g. `cin >> a >> b;` after receiving only `a`), re-arm prompt
+      this.inputWaitTimer = setTimeout(() => {
+        if (!this.isClosed && this.child && this.child.stdin && !this.child.stdin.destroyed) {
+          this.emit({
+            type: "waiting_input",
+            text: "Program is still running and waiting for next input value...",
+          });
+        }
+      }, 280);
       return true;
     } catch {
       return false;
@@ -439,18 +471,23 @@ export function stopInteractiveSession(sessionId: string): boolean {
 
 export async function startInteractiveSession(
   language: string,
-  code: string,
+  rawCode: string,
   initialStdin?: string
 ): Promise<{ sessionId: string; language: string; runtimeVersion: string }> {
+  const code = sanitizeSourceCode(rawCode);
   let normLang = (language || "auto").toLowerCase().trim();
   const detected = detectLanguage(code);
 
   if (normLang === "auto" || normLang === "detect") {
     normLang = detected || "python";
-  } else if (normLang === "python" && detected && detected !== "python") {
+  } else if (
+    (normLang === "python" || normLang === "javascript" || normLang === "react" || normLang === "html") &&
+    detected &&
+    detected !== normLang
+  ) {
     normLang = detected;
-  } else if (normLang === "javascript" && detected && (detected === "java" || detected === "cpp" || detected === "c")) {
-    normLang = detected;
+  } else if (normLang === "c" && detected === "cpp") {
+    normLang = "cpp";
   }
 
   const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -550,8 +587,8 @@ except Exception:
     };
   }
 
-  // 2. Java Interactive Session
-  if (normLang === "java") {
+  // 2. Java Interactive Session (only when local OpenJDK exists; otherwise falls through to cloud batch)
+  if (normLang === "java" && fs.existsSync("/usr/bin/java")) {
     let javaSource = code.replace(/^\s*package\s+[^;]+;/gm, "// [Package ignored]");
     const publicClassMatch = javaSource.match(/public\s+class\s+([A-Za-z0-9_]+)/);
     const anyClassMatch = javaSource.match(/class\s+([A-Za-z0-9_]+)/);
@@ -603,13 +640,15 @@ except Exception:
   // 3. C & C++ Interactive Session
   if (normLang === "c" || normLang === "cpp" || normLang === "c++") {
     const isCpp = normLang === "cpp" || normLang === "c++";
-    const srcFile = path.join(tempDir, isCpp ? "main.cpp" : "main.c");
-    const binFile = path.join(tempDir, "program.out");
+    const compiler = isCpp ? "g++" : "gcc";
+    if (fs.existsSync(`/usr/bin/${compiler}`)) {
+      const srcName = isCpp ? "main.cpp" : "main.c";
+      const srcFile = path.join(tempDir, srcName);
+      const shimFile = path.join(tempDir, "unbuf_shim.h");
+      const binFile = path.join(tempDir, "program.out");
 
-    // Inject unbuffered stdio constructor to ensure printf() streams immediately
-    // without waiting for buffer flush or newline before scanf()
-    const unbufShim = `
-#include <stdio.h>
+      // Keep user's srcFile 100% unmodified via -include unbuf_shim.h so compiler line numbers & code snippets match editor 1:1
+      const unbufShim = `#include <stdio.h>
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((constructor)) static void _scoders_unbuf_init(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -617,74 +656,75 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
 }
 #endif
 `;
-    fs.writeFileSync(srcFile, unbufShim + "\n" + code, "utf-8");
+      fs.writeFileSync(shimFile, unbufShim, "utf-8");
+      fs.writeFileSync(srcFile, code, "utf-8");
 
-    const compiler = isCpp ? "g++" : "gcc";
-    const compileArgs = isCpp
-      ? ["-O2", "-std=c++20", srcFile, "-o", binFile, "-lm"]
-      : ["-O2", "-std=c17", srcFile, "-o", binFile, "-lm"];
+      const compileArgs = isCpp
+        ? ["-O2", "-std=c++20", "-include", "unbuf_shim.h", srcName, "-o", binFile, "-lm"]
+        : ["-O2", "-std=c17", "-include", "unbuf_shim.h", srcName, "-o", binFile, "-lm"];
 
-    // Compile first with clean compilation timeout
-    const compRes = await runProcess(compiler, compileArgs, undefined, tempDir, undefined, COMPILE_TIMEOUT_MS);
-    if (compRes.exitCode !== 0) {
-      // Spawn helper that outputs the real compiler diagnostic to stderr and exits with code 1
-      const child = spawn("sh", [
-        "-c",
-        'printf "%s" "$1" >&2; exit 1',
-        "--",
-        `[${compiler.toUpperCase()} Compilation Error]:\n${compRes.stderr || compRes.stdout}`,
-      ]);
+      // Compile first with clean compilation timeout
+      const compRes = await runProcess(compiler, compileArgs, undefined, tempDir, undefined, COMPILE_TIMEOUT_MS);
+      if (compRes.exitCode !== 0) {
+        // Spawn helper that outputs the real compiler diagnostic to stderr and exits with code 1
+        const child = spawn("sh", [
+          "-c",
+          'printf "%s" "$1" >&2; exit 1',
+          "--",
+          `[${compiler.toUpperCase()} Compilation Error]:\n${compRes.stderr || compRes.stdout}`,
+        ]);
+        const session = new InteractiveSession(
+          sessionId,
+          isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
+          `${compiler} GNU 12.2`,
+          tempDir,
+          child
+        );
+        activeSessions.set(sessionId, session);
+        return {
+          sessionId,
+          language: isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
+          runtimeVersion: `${compiler} GNU 12.2 (Compiler Error)`,
+        };
+      }
+
+      // Run executable unbuffered via stdbuf if available
+      const hasStdbuf = fs.existsSync("/usr/bin/stdbuf");
+      const child = hasStdbuf
+        ? spawn("stdbuf", ["-i0", "-o0", "-e0", binFile], {
+            cwd: tempDir,
+            env: {
+              ...process.env,
+              LANG: "C.UTF-8",
+              LC_ALL: "C.UTF-8",
+            },
+          })
+        : spawn(binFile, [], {
+            cwd: tempDir,
+            env: {
+              ...process.env,
+              LANG: "C.UTF-8",
+              LC_ALL: "C.UTF-8",
+            },
+          });
+
       const session = new InteractiveSession(
         sessionId,
-        isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
-        `${compiler} GNU 12.3`,
+        isCpp ? "C++20" : "C17",
+        `${compiler} GNU 12.2 Linux`,
         tempDir,
         child
       );
+
       activeSessions.set(sessionId, session);
+      if (initialStdin) session.sendInput(initialStdin);
+
       return {
         sessionId,
         language: isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
-        runtimeVersion: `${compiler} GNU 12.3 (Compiler Error)`,
+        runtimeVersion: `${compiler} GNU 12.2 (Interactive Terminal)`,
       };
     }
-
-    // Run executable unbuffered via stdbuf if available
-    const hasStdbuf = fs.existsSync("/usr/bin/stdbuf");
-    const child = hasStdbuf
-      ? spawn("stdbuf", ["-i0", "-o0", "-e0", binFile], {
-          cwd: tempDir,
-          env: {
-            ...process.env,
-            LANG: "C.UTF-8",
-            LC_ALL: "C.UTF-8",
-          },
-        })
-      : spawn(binFile, [], {
-          cwd: tempDir,
-          env: {
-            ...process.env,
-            LANG: "C.UTF-8",
-            LC_ALL: "C.UTF-8",
-          },
-        });
-
-    const session = new InteractiveSession(
-      sessionId,
-      isCpp ? "C++20" : "C17",
-      `${compiler} GNU 12.3 Linux`,
-      tempDir,
-      child
-    );
-
-    activeSessions.set(sessionId, session);
-    if (initialStdin) session.sendInput(initialStdin);
-
-    return {
-      sessionId,
-      language: isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
-      runtimeVersion: `${compiler} GNU 12.3 (Interactive Terminal)`,
-    };
   }
 
   // 4. JavaScript / Node.js Interactive Session
@@ -1036,56 +1076,148 @@ async function executeWandbox(
   stdin?: string
 ): Promise<ExecutionResult> {
   const startTime = Date.now();
+  const maxAttempts = 2;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch("https://wandbox.org/api/compile.json", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "curl/7.88.1",
+        },
+        body: JSON.stringify({
+          compiler,
+          code,
+          stdin: stdin || "",
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if ((response.status === 429 || response.status === 502 || response.status === 503) && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Wandbox compiler service returned HTTP ${response.status}`);
+      }
+
+      const data: any = await response.json();
+      const elapsed = Date.now() - startTime;
+
+      const compilerOut = data.compiler_output ? `[Compilation Log]:\n${data.compiler_output}\n` : "";
+      const stdout = (compilerOut + (data.program_output || "")).trim();
+      const stderr = ((data.compiler_error || "") + (data.program_error || "")).trim();
+      const exitCode = parseInt(data.status ?? "0", 10);
+
+      return {
+        success: exitCode === 0 && !data.compiler_error,
+        stdout: sanitizeOutput(stdout),
+        stderr: sanitizeOutput(stderr),
+        exitCode,
+        executionTimeMs: elapsed,
+        language: compiler,
+        runtimeVersion: "Wandbox Cloud Compiler",
+      };
+    } catch (err: any) {
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 800));
+        continue;
+      }
+      const elapsed = Date.now() - startTime;
+      return {
+        success: false,
+        stdout: "",
+        stderr: `Cloud Compiler Fallback Error: ${err.message}`,
+        exitCode: 1,
+        executionTimeMs: elapsed,
+        language: compiler,
+      };
+    }
+  }
+
+  return {
+    success: false,
+    stdout: "",
+    stderr: "Cloud Compiler Fallback Error: Unable to complete compilation.",
+    exitCode: 1,
+    executionTimeMs: Date.now() - startTime,
+    language: compiler,
+  };
+}
+
+// Official Go Playground Cloud Execution Engine (fast & reliable when local Go isn't installed)
+async function executeGoPlayground(code: string): Promise<ExecutionResult & { networkFailed?: boolean }> {
+  const startTime = Date.now();
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-
-    const response = await fetch("https://wandbox.org/api/compile.json", {
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch("https://go.dev/_/compile?backend=", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "curl/7.88.1",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        compiler,
-        code,
-        stdin: stdin || "",
-      }),
+      body: new URLSearchParams({
+        version: "2",
+        body: code,
+        withVet: "true",
+      }).toString(),
       signal: controller.signal,
     });
-
     clearTimeout(timeout);
 
     if (!response.ok) {
-      throw new Error(`Wandbox compiler service returned HTTP ${response.status}`);
+      return {
+        success: false,
+        stdout: "",
+        stderr: `Go Playground returned HTTP ${response.status}`,
+        exitCode: 1,
+        executionTimeMs: Date.now() - startTime,
+        language: "Go (Golang)",
+        networkFailed: true,
+      };
     }
 
     const data: any = await response.json();
     const elapsed = Date.now() - startTime;
-
-    const compilerOut = data.compiler_output ? `[Compilation Log]:\n${data.compiler_output}\n` : "";
-    const stdout = (compilerOut + (data.program_output || "")).trim();
-    const stderr = ((data.compiler_error || "") + (data.program_error || "")).trim();
-    const exitCode = parseInt(data.status ?? "0", 10);
+    const events: any[] = Array.isArray(data.Events) ? data.Events : [];
+    const stdout = events
+      .filter((e) => e.Kind !== "stderr")
+      .map((e) => e.Message || "")
+      .join("");
+    const stderrEvents = events
+      .filter((e) => e.Kind === "stderr")
+      .map((e) => e.Message || "")
+      .join("");
+    const errors = (data.Errors || "").trim();
+    const vetErrors = (data.VetErrors || "").trim();
+    const combinedStderr = [errors, stderrEvents, vetErrors].filter(Boolean).join("\n").trim();
+    const hasCompileError = errors.length > 0;
 
     return {
-      success: exitCode === 0 && !data.compiler_error,
+      success: !hasCompileError,
       stdout: sanitizeOutput(stdout),
-      stderr: sanitizeOutput(stderr),
-      exitCode,
+      stderr: sanitizeOutput(combinedStderr),
+      exitCode: hasCompileError ? 1 : 0,
       executionTimeMs: elapsed,
-      language: compiler,
-      runtimeVersion: "Wandbox Cloud Compiler",
+      language: "Go (Golang 1.23)",
+      runtimeVersion: "Go Playground Official Engine",
     };
   } catch (err: any) {
-    const elapsed = Date.now() - startTime;
     return {
       success: false,
       stdout: "",
-      stderr: `Cloud Compiler Fallback Error: ${err.message}`,
+      stderr: `Go Playground Error: ${err?.message || "Network failure"}`,
       exitCode: 1,
-      executionTimeMs: elapsed,
-      language: compiler,
+      executionTimeMs: Date.now() - startTime,
+      language: "Go (Golang)",
+      networkFailed: true,
     };
   }
 }
@@ -1109,13 +1241,12 @@ export function detectLanguage(code: string): string | null {
 
   // 2. C++ Detection
   if (
-    /#include\s*<iostream>/.test(trimmed) ||
-    /#include\s*<vector>/.test(trimmed) ||
-    /#include\s*<bits\/stdc\+\+\.h>/.test(trimmed) ||
-    /#include\s*<(string|algorithm|map|set|cmath|iomanip|queue)>/i.test(trimmed) ||
-    /std::(cout|cin|endl|vector|string|map|set)/.test(trimmed) ||
+    /#include\s*<iostream>/i.test(trimmed) ||
+    /#include\s*<bits\/stdc\+\+\.h>/i.test(trimmed) ||
+    /#include\s*<(vector|string|algorithm|map|set|unordered_map|unordered_set|cmath|cstdio|cstdlib|cstring|iomanip|queue|stack|deque|list|sstream|fstream|numeric|array|tuple|memory)>/i.test(trimmed) ||
+    /std::(cout|cin|cerr|endl|vector|string|map|set|printf|scanf|getline)/.test(trimmed) ||
     /using\s+namespace\s+std\s*;/.test(trimmed) ||
-    /(cout|cin)\s*(<<|>>)/.test(trimmed)
+    /\b(cout|cin|cerr)\s*(<<|>>)/.test(trimmed)
   ) {
     return "cpp";
   }
@@ -1190,16 +1321,14 @@ export function detectLanguage(code: string): string | null {
 
   // 10. Ruby Detection
   if (
-    (/puts\s+["']/.test(trimmed) || /require\s+['"]/.test(trimmed)) &&
-    /def\s+[A-Za-z0-9_]+/.test(trimmed) &&
-    /\bend\b/.test(trimmed) &&
-    !trimmed.includes("def ") && !trimmed.includes(":")
+    (/puts\s+["'\w]/.test(trimmed) || /require\s+['"]/.test(trimmed)) &&
+    (/\bdef\s+[A-Za-z0-9_]+/.test(trimmed) && /\bend\b/.test(trimmed) && !trimmed.includes(":\n") || /^\s*puts\s+/m.test(trimmed))
   ) {
     return "ruby";
   }
 
   // 11. SQL Detection
-  if (/^\s*(SELECT|INSERT\s+INTO|CREATE\s+TABLE|UPDATE|DELETE\s+FROM|WITH)\b/i.test(trimmed)) {
+  if (/^\s*(SELECT|INSERT\s+INTO|CREATE\s+TABLE|UPDATE|DELETE\s+FROM|WITH)\b/im.test(trimmed)) {
     return "sql";
   }
 
@@ -1237,13 +1366,14 @@ export function detectLanguage(code: string): string | null {
 
 export async function executeCode(
   language: string,
-  code: string,
+  rawCode: string,
   stdin?: string
 ): Promise<ExecutionResult> {
+  const code = sanitizeSourceCode(rawCode);
   let normLang = (language || "auto").toLowerCase().trim();
   const startTime = Date.now();
 
-  // If user selected "auto" or if language is clearly mismatched (e.g. user selected Python but pasted Java),
+  // If user selected "auto" or if language is clearly mismatched (e.g. user selected Python/React but pasted Java/C++),
   // automatically detect and execute using the real language!
   const detected = detectLanguage(code);
   let autoDetected = false;
@@ -1251,12 +1381,15 @@ export async function executeCode(
   if (normLang === "auto" || normLang === "detect") {
     normLang = detected || "python";
     autoDetected = true;
-  } else if (normLang === "python" && detected && detected !== "python") {
-    // Highly common user pattern: user has default Python tab open, but pastes Java / C++ / HTML / React code
+  } else if (
+    (normLang === "python" || normLang === "javascript" || normLang === "react" || normLang === "html") &&
+    detected &&
+    detected !== normLang
+  ) {
     normLang = detected;
     autoDetected = true;
-  } else if (normLang === "javascript" && detected && (detected === "java" || detected === "cpp" || detected === "c")) {
-    normLang = detected;
+  } else if (normLang === "c" && detected === "cpp") {
+    normLang = "cpp";
     autoDetected = true;
   }
 
@@ -1477,10 +1610,11 @@ except Exception:
     // -------------------------------------------------------------
     if (normLang === "c" || normLang === "cpp" || normLang === "c++") {
       const isCpp = normLang === "cpp" || normLang === "c++";
-      const srcFile = path.join(tempDir, isCpp ? "main.cpp" : "main.c");
+      const srcName = isCpp ? "main.cpp" : "main.c";
+      const srcFile = path.join(tempDir, srcName);
+      const shimFile = path.join(tempDir, "unbuf_shim.h");
       const binFile = path.join(tempDir, "program.out");
-      const unbufShim = `
-#include <stdio.h>
+      const unbufShim = `#include <stdio.h>
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((constructor)) static void _scoders_unbuf_init(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -1488,15 +1622,16 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
 }
 #endif
 `;
-      fs.writeFileSync(srcFile, unbufShim + "\n" + code, "utf-8");
+      fs.writeFileSync(shimFile, unbufShim, "utf-8");
+      fs.writeFileSync(srcFile, code, "utf-8");
 
       const compiler = isCpp ? "g++" : "gcc";
       const hasCompiler = fs.existsSync(`/usr/bin/${compiler}`);
 
       if (hasCompiler) {
         const compileArgs = isCpp
-          ? ["-O2", "-std=c++20", srcFile, "-o", binFile, "-lm"]
-          : ["-O2", "-std=c17", srcFile, "-o", binFile, "-lm"];
+          ? ["-O2", "-std=c++20", "-include", "unbuf_shim.h", srcName, "-o", binFile, "-lm"]
+          : ["-O2", "-std=c17", "-include", "unbuf_shim.h", srcName, "-o", binFile, "-lm"];
 
         const compRes = await runProcess(compiler, compileArgs, undefined, tempDir, undefined, COMPILE_TIMEOUT_MS);
         if (compRes.exitCode !== 0) {
@@ -1507,7 +1642,7 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
             exitCode: compRes.exitCode,
             executionTimeMs: compRes.executionTimeMs,
             language: isCpp ? "C++20 (GNU G++)" : "C17 (GNU GCC)",
-            runtimeVersion: `${compiler} GNU 12.3`,
+            runtimeVersion: `${compiler} GNU 12.2`,
             detectedLanguage: autoDetected ? (isCpp ? "cpp" : "c") : undefined,
           };
         }
@@ -1524,7 +1659,7 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
           exitCode: runRes.exitCode,
           executionTimeMs: compRes.executionTimeMs + runRes.executionTimeMs,
           language: isCpp ? (autoDetected ? "C++20 (Auto-Detected)" : "C++20 (GNU G++)") : (autoDetected ? "C17 (Auto-Detected)" : "C17 (GNU GCC)"),
-          runtimeVersion: `${compiler} GNU 12.3 Linux x86_64`,
+          runtimeVersion: `${compiler} GNU 12.2 Linux x86_64`,
           detectedLanguage: autoDetected ? (isCpp ? "cpp" : "c") : undefined,
         };
       }
@@ -1595,7 +1730,7 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
     }
 
     // -------------------------------------------------------------
-    // 6. SQL (SQLite 3)
+    // 6. SQL (SQLite 3 - native binary or Python stdlib sqlite3)
     // -------------------------------------------------------------
     if (normLang === "sql" || normLang === "sqlite") {
       const hasSqlite = fs.existsSync("/usr/bin/sqlite3");
@@ -1613,6 +1748,81 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
           detectedLanguage: autoDetected ? "sql" : undefined,
         };
       }
+
+      // Built-in Python sqlite3 engine (zero external binary required)
+      const sqlFile = path.join(tempDir, "query.sql");
+      const pyRunner = path.join(tempDir, "run_sql.py");
+      fs.writeFileSync(sqlFile, code, "utf-8");
+      const pyScript = `
+import sqlite3, sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    sql_text = f.read()
+
+conn = sqlite3.connect(":memory:")
+cur = conn.cursor()
+
+# Split statements cleanly while handling strings/comments
+stmts = []
+buf = []
+for line in sql_text.splitlines():
+    stripped = line.strip()
+    if stripped.startswith("--"):
+        continue
+    buf.append(line)
+    joined = "\\n".join(buf)
+    if sqlite3.complete_statement(joined):
+        if joined.strip():
+            stmts.append(joined.strip())
+        buf = []
+leftover = "\\n".join(buf).strip()
+if leftover:
+    stmts.append(leftover)
+
+def print_table(headers, rows):
+    str_rows = [[("NULL" if v is None else str(v)) for v in r] for r in rows]
+    widths = [len(str(h)) for h in headers]
+    for r in str_rows:
+        for i, cell in enumerate(r):
+            widths[i] = max(widths[i], len(cell))
+    sep = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    print(sep)
+    print("| " + " | ".join(str(headers[i]).ljust(widths[i]) for i in range(len(headers))) + " |")
+    print(sep)
+    for r in str_rows:
+        print("| " + " | ".join(r[i].ljust(widths[i]) for i in range(len(headers))) + " |")
+    print(sep)
+
+try:
+    outputs = 0
+    for s in stmts:
+        cur.execute(s)
+        if cur.description is not None:
+            headers = [d[0] for d in cur.description]
+            rows = cur.fetchall()
+            print_table(headers, rows)
+            outputs += 1
+        elif cur.rowcount is not None and cur.rowcount >= 0:
+            pass
+    conn.commit()
+    if outputs == 0:
+        print("[SQL script executed successfully. 0 result sets returned]")
+except sqlite3.Error as e:
+    print(f"SQLite Error: {e}", file=sys.stderr)
+    sys.exit(1)
+`;
+      fs.writeFileSync(pyRunner, pyScript, "utf-8");
+      const res = await runProcess("python3", [pyRunner, sqlFile], undefined, tempDir);
+      return {
+        success: res.exitCode === 0,
+        stdout: res.stdout || (res.exitCode === 0 ? "[Query executed successfully. 0 rows returned]" : ""),
+        stderr: res.stderr,
+        exitCode: res.exitCode,
+        executionTimeMs: res.executionTimeMs,
+        language: autoDetected ? "SQL SQLite (Auto-Detected)" : "SQL (SQLite 3)",
+        runtimeVersion: "SQLite 3 (In-Memory Relational Engine)",
+        detectedLanguage: autoDetected ? "sql" : undefined,
+      };
     }
 
     // -------------------------------------------------------------
@@ -1634,6 +1844,22 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
           runtimeVersion: "Go 1.22",
           detectedLanguage: autoDetected ? "go" : undefined,
         };
+      }
+
+      if (!stdin || !stdin.trim()) {
+        const goPg = await executeGoPlayground(code);
+        if (!goPg.networkFailed) {
+          return {
+            success: goPg.success,
+            stdout: goPg.stdout,
+            stderr: goPg.stderr,
+            exitCode: goPg.exitCode,
+            executionTimeMs: goPg.executionTimeMs,
+            language: autoDetected ? "Go 1.23 (Auto-Detected)" : "Go (Golang 1.23)",
+            runtimeVersion: goPg.runtimeVersion,
+            detectedLanguage: autoDetected ? "go" : undefined,
+          };
+        }
       }
 
       const wandboxRes = await executeWandbox("go-1.23.2", code, stdin);
@@ -1693,11 +1919,11 @@ __attribute__((constructor)) static void _scoders_unbuf_init(void) {
     // 9. C# (.NET / Mono)
     // -------------------------------------------------------------
     if (normLang === "csharp" || normLang === "cs" || normLang === "c#") {
-      const wandboxRes = await executeWandbox("dotnetcore-8.0.402", code, stdin);
+      const wandboxRes = await executeWandbox("mono-6.12.0.199", code, stdin);
       return {
         ...wandboxRes,
-        language: autoDetected ? "C# .NET 8 (Auto-Detected)" : "C# (.NET Core 8.0)",
-        runtimeVersion: ".NET Core 8.0.402 Runtime",
+        language: autoDetected ? "C# (Auto-Detected)" : "C# (Mono CLR 6.12)",
+        runtimeVersion: "Mono CLR 6.12.0.199 Runtime",
         detectedLanguage: autoDetected ? "csharp" : undefined,
       };
     }

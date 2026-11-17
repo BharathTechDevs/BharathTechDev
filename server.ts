@@ -17,6 +17,8 @@ import {
   getInteractiveSession,
   sendInteractiveInput,
   stopInteractiveSession,
+  sanitizeSourceCode,
+  detectLanguage,
 } from "./compiler-service.ts";
 
 dotenv.config();
@@ -34,24 +36,45 @@ process.on("unhandledRejection", (reason, promise) => {
   console.warn("[Server] Unhandled Rejection at:", promise, "reason:", reason);
 });
 
-// Email template generator for Service Profile Acceptance
+function escapeEmailHtml(val: any): string {
+  return String(val ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Email template generator for Service Registration & UID Notification
 function getServiceAcceptanceEmailHtml({
   clientName,
   serviceTitle,
   uniqueKey,
   actionUrl,
+  validFrom,
+  validUntil,
 }: {
   clientName: string;
   serviceTitle: string;
   uniqueKey: string;
   actionUrl: string;
+  validFrom?: string;
+  validUntil?: string;
 }) {
+  const safeName = escapeEmailHtml(clientName || "Valued Client");
+  const safeService = escapeEmailHtml(serviceTitle || "Custom Software Development");
+  const safeKey = escapeEmailHtml(uniqueKey);
+  const safeUrl = escapeEmailHtml(actionUrl);
+  const validUntilDisplay = validUntil
+    ? new Date(validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : "6 Months from Issue";
+
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>S-CODERS Project Idea Registered</title>
+      <title>S-CODERS Service Registration & Unique Code (UID)</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
@@ -61,49 +84,57 @@ function getServiceAcceptanceEmailHtml({
               <tr>
                 <td style="padding: 32px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #22D3EE;">
                   <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
-                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharat Tech Developers • Bengaluru, India</p>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Bharat Tech Developers • Official Service Division</p>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 24px 32px; text-align: center;">
                   <div style="display: inline-block; padding: 10px 24px; border-radius: 9999px; background-color: rgba(34, 211, 238, 0.15); border: 1px solid #22D3EE;">
                     <span style="font-size: 13px; font-weight: 800; color: #22D3EE; text-transform: uppercase;">
-                      ✓ PROJECT IDEA REGISTERED SUCCESSFULLY
+                      ✓ SERVICE REGISTRATION CONFIRMED
                     </span>
                   </div>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
-                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${safeName}</strong>,</p>
                   <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                    Your project idea has been got registered and our team will contact you within 24hrs thank you for choosing S-CODERS Bharat tech developers.
+                    Thank you for registering with S-CODERS (Bharat Tech Developers)! Your service request for <strong>${safeService}</strong> has been confirmed and your dedicated workspace is ready.
                   </p>
-                  <p style="font-size: 13px; color: #94A3B8; margin: 0;">
-                    Project Scope: <strong>${serviceTitle}</strong>
+                  <p style="font-size: 13px; color: #CBD5E1; margin: 0; line-height: 1.6;">
+                    <strong>Selected Service:</strong> ${safeService}<br/>
+                    <strong>Code Validity Window:</strong> Active through <strong>${validUntilDisplay}</strong>
                   </p>
                 </td>
               </tr>
               <tr>
-                <td style="padding: 0 32px 30px 32px;">
+                <td style="padding: 0 32px 24px 32px;">
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px; text-align: center;">
                     <tr>
-                      <td style="font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace; letter-spacing: 1px;">Your Unique Service Registration Key</td>
+                      <td style="font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace; letter-spacing: 1px;">Your Unique Registration Code (UID)</td>
                     </tr>
                     <tr>
                       <td style="padding: 12px 0; font-size: 22px; font-weight: 900; color: #22D3EE; font-family: monospace; letter-spacing: 2px;">
-                        ${uniqueKey}
+                        ${safeKey}
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding-top: 10px; font-size: 13px; color: #CBD5E1;">
-                        You can enter this access key on our website anytime to track your project progress and communicate with our engineering team.
+                      <td style="padding-top: 10px; font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                        Please keep this unique registration code safe, as it may be required for future access to the S-CODERS website and your dedicated Service Workspace.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top: 14px;">
+                        <div style="background-color: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 10px; padding: 12px 14px; text-align: left; font-size: 12px; color: #FDE68A; line-height: 1.6;">
+                          <strong>Security & Recovery Notice:</strong> You are responsible for keeping your unique registration code (UID) secure. If you lose or misplace your UID, recovering access to your service workspace will require additional email verification through our recovery portal.
+                        </div>
                       </td>
                     </tr>
                     <tr>
                       <td align="center" style="padding-top: 20px;">
-                        <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: #22D3EE; color: #0B0F17; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                          Open Website & Enter Unique Key →
+                        <a href="${safeUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: #22D3EE; color: #0B0F17; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
+                          Open Service Workspace →
                         </a>
                       </td>
                     </tr>
@@ -112,7 +143,8 @@ function getServiceAcceptanceEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 10px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -135,6 +167,10 @@ function getWorkshopEmailHtml({
   actionUrl,
   paymentId,
   reason,
+  workshopDate,
+  workshopTime,
+  workshopLocation,
+  validUntil,
 }: {
   status: 'SUCCESS' | 'FAILED';
   clientName: string;
@@ -145,16 +181,30 @@ function getWorkshopEmailHtml({
   actionUrl: string;
   paymentId?: string;
   reason?: string;
+  workshopDate?: string;
+  workshopTime?: string;
+  workshopLocation?: string;
+  validUntil?: string;
 }) {
   const isSuccess = status === 'SUCCESS';
-  const formattedAmount = `₹${amount.toLocaleString('en-IN')}`;
+  const formattedAmount = amount === 0 ? 'FREE / COMPLIMENTARY' : `₹${amount.toLocaleString('en-IN')} ${currency}`;
+  const safeName = escapeEmailHtml(clientName || "Valued Masterclass Participant");
+  const safeTitle = escapeEmailHtml(workshopTitle || "S-CODERS Technical Workshop");
+  const safeKey = escapeEmailHtml(uniqueKey || "BTD-WKSP-PASS");
+  const safePayId = escapeEmailHtml(paymentId || "pay_rzp_scoders");
+  const safeDate = escapeEmailHtml(workshopDate || "Scheduled Upcoming Session");
+  const safeTime = escapeEmailHtml(workshopTime || "10:00 AM IST");
+  const safeLocation = escapeEmailHtml(workshopLocation || "S-CODERS Live Interactive Classroom & Zoom");
+  const validUntilDisplay = validUntil
+    ? new Date(validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : "30 Days from Registration";
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>S-CODERS Workshop Payment ${status}</title>
+      <title>S-CODERS Workshop ${isSuccess ? 'Registration & UID Pass' : 'Payment Failed'}</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
@@ -171,26 +221,23 @@ function getWorkshopEmailHtml({
                 <td style="padding: 24px 32px; text-align: center;">
                   <div style="display: inline-block; padding: 8px 20px; border-radius: 9999px; background-color: ${isSuccess ? 'rgba(34, 211, 238, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; border: 1px solid ${isSuccess ? '#22D3EE' : '#EF4444'};">
                     <span style="font-size: 13px; font-weight: 700; color: ${isSuccess ? '#22D3EE' : '#FCA5A5'}; text-transform: uppercase;">
-                      ${isSuccess ? '✓ PAYMENT DONE SUCCESSFULLY' : '✕ PAYMENT FAILED'}
+                      ${isSuccess ? '✓ PAYMENT CONFIRMED & WORKSHOP REGISTERED' : '✕ PAYMENT FAILED'}
                     </span>
                   </div>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
-                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${safeName}</strong>,</p>
                   ${isSuccess ? `
                     <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                      Your payment has been done successfully and thank you for choosing S-CODERS Bharat tech developers and you can continue with the workshop session.
+                      Thank you for registering for the S-CODERS workshop! Your payment has been verified and your seat in <strong>${safeTitle}</strong> is officially confirmed.
                     </p>
                   ` : `
                     <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
-                      Your payment has been failed so kindly try once again for payment.
+                      Your workshop payment did not go through. Kindly retry your payment to receive your workshop UID and classroom access.
                     </p>
                   `}
-                  <p style="font-size: 13px; color: #94A3B8; margin: 0;">
-                    Workshop Title: <strong>${workshopTitle}</strong> (Amount: ${formattedAmount} ${currency})
-                  </p>
                 </td>
               </tr>
               <tr>
@@ -198,23 +245,51 @@ function getWorkshopEmailHtml({
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
                     ${isSuccess ? `
                       <tr>
-                        <td style="padding-bottom: 8px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Your Unique Workshop Access Key</td>
-                        <td align="right" style="padding-bottom: 8px; font-size: 16px; font-weight: 900; color: #22D3EE; font-family: monospace;">${uniqueKey || 'BTD-WKSH-PASS'}</td>
+                        <td style="padding-bottom: 10px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Unique Workshop Registration Code (UID)</td>
+                        <td align="right" style="padding-bottom: 10px; font-size: 17px; font-weight: 900; color: #22D3EE; font-family: monospace;">${safeKey}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Razorpay Payment ID:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${paymentId || 'pay_rzp_scoders'}</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Workshop Name:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${safeTitle}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Workshop Date & Time:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #CBD5E1;">${safeDate} • ${safeTime}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Location / Mode:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #CBD5E1;">${safeLocation}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Amount Paid:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #10B981;">${formattedAmount}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Verified Payment ID:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${safePayId}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">UID Valid Until:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FDE68A;">${validUntilDisplay}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 14px;">
+                          <div style="background-color: rgba(34, 211, 238, 0.08); border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 10px; padding: 14px; font-size: 12px; color: #E2E8F0; line-height: 1.65;">
+                            <strong style="color: #22D3EE;">Safe-Keeping & Mid-Session Rejoin Instructions:</strong><br/>
+                            Please keep your unique registration code (<strong>${safeKey}</strong>) safe. If you lose internet connection, refresh, or accidentally exit the website during the workshop session, simply return to the Workshop section on our website and select <em>"Enter Existing Pass"</em> with your UID to immediately rejoin your classroom and workspace. Recovering a lost UID requires email verification.
+                          </div>
+                        </td>
                       </tr>
                     ` : `
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #EF4444; font-weight: 700;">Failure Details:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${reason || 'Payment was declined or interrupted.'}</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${escapeEmailHtml(reason || 'Payment was declined or interrupted.')}</td>
                       </tr>
                     `}
                     <tr>
                       <td colspan="2" align="center" style="padding-top: 20px;">
-                        <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: ${isSuccess ? '#22D3EE' : '#EF4444'}; color: ${isSuccess ? '#0B0F17' : '#FFFFFF'}; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                          ${isSuccess ? 'Open Website & Access Workshop Session →' : 'Retry Payment on Website →'}
+                        <a href="${escapeEmailHtml(actionUrl)}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: ${isSuccess ? '#22D3EE' : '#EF4444'}; color: ${isSuccess ? '#0B0F17' : '#FFFFFF'}; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
+                          ${isSuccess ? 'Open Website & Enter Workshop Session →' : 'Retry Payment on Website →'}
                         </a>
                       </td>
                     </tr>
@@ -223,7 +298,8 @@ function getWorkshopEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 10px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -246,6 +322,12 @@ function getEventEmailHtml({
   actionUrl,
   paymentId,
   reason,
+  eventDate,
+  eventDay,
+  eventTime,
+  eventLocation,
+  eventDescription,
+  validUntil,
 }: {
   status: 'SUCCESS' | 'FAILED';
   clientName: string;
@@ -256,16 +338,34 @@ function getEventEmailHtml({
   actionUrl: string;
   paymentId?: string;
   reason?: string;
+  eventDate?: string;
+  eventDay?: string;
+  eventTime?: string;
+  eventLocation?: string;
+  eventDescription?: string;
+  validUntil?: string;
 }) {
   const isSuccess = status === 'SUCCESS';
-  const formattedAmount = `₹${amount.toLocaleString('en-IN')}`;
+  const formattedAmount = amount === 0 ? 'FREE ENTRY PASS' : `₹${amount.toLocaleString('en-IN')} ${currency}`;
+  const safeName = escapeEmailHtml(clientName || "Valued Attendee");
+  const safeTitle = escapeEmailHtml(eventTitle || "S-CODERS Tech Summit");
+  const safeCode = escapeEmailHtml(ticketCode || "SC-EVT-PASS");
+  const safePayId = escapeEmailHtml(paymentId || "pay_rzp_scoders");
+  const safeDate = escapeEmailHtml(eventDate || "Upcoming Scheduled Date");
+  const safeDay = escapeEmailHtml(eventDay || "");
+  const safeTime = escapeEmailHtml(eventTime || "10:00 AM IST");
+  const safeLocation = escapeEmailHtml(eventLocation || "S-CODERS Venue, Bengaluru");
+  const safeDesc = escapeEmailHtml(eventDescription || "Bring your UID pass code at check-in or enter it on the Events portal to view/download your digital pass.");
+  const validUntilDisplay = validUntil
+    ? new Date(validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : "Valid through Event Completion";
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>S-CODERS Event Ticket ${status}</title>
+      <title>S-CODERS Event Registration & Pass UID</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
@@ -282,26 +382,23 @@ function getEventEmailHtml({
                 <td style="padding: 24px 32px; text-align: center;">
                   <div style="display: inline-block; padding: 8px 20px; border-radius: 9999px; background-color: ${isSuccess ? 'rgba(34, 211, 238, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; border: 1px solid ${isSuccess ? '#22D3EE' : '#EF4444'};">
                     <span style="font-size: 13px; font-weight: 700; color: ${isSuccess ? '#22D3EE' : '#FCA5A5'}; text-transform: uppercase;">
-                      ${isSuccess ? '✓ PAYMENT DONE SUCCESSFULLY' : '✕ PAYMENT METHOD FAILED'}
+                      ${isSuccess ? '✓ EVENT REGISTRATION CONFIRMED' : '✕ PAYMENT METHOD FAILED'}
                     </span>
                   </div>
                 </td>
               </tr>
               <tr>
                 <td style="padding: 0 32px 20px 32px;">
-                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${clientName}</strong>,</p>
+                  <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${safeName}</strong>,</p>
                   ${isSuccess ? `
                     <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                      Your payment has been done successfully so here are your tickets just grab it!
+                      Thank you for registering for <strong>${safeTitle}</strong>! Your registration and payment confirmation are complete, and your official event pass code is below.
                     </p>
                   ` : `
                     <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
-                      Your payment method has been failed so try once again.
+                      Your payment method failed, so no event pass was issued. Kindly retry payment to confirm your event registration.
                     </p>
                   `}
-                  <p style="font-size: 13px; color: #94A3B8; margin: 0;">
-                    Event: <strong>${eventTitle}</strong> (${formattedAmount} ${currency})
-                  </p>
                 </td>
               </tr>
               <tr>
@@ -309,28 +406,48 @@ function getEventEmailHtml({
                   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
                     ${isSuccess ? `
                       <tr>
-                        <td style="padding-bottom: 8px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Verified Event Pass Code</td>
-                        <td align="right" style="padding-bottom: 8px; font-size: 18px; font-weight: 900; color: #22D3EE; font-family: monospace;">${ticketCode}</td>
+                        <td style="padding-bottom: 10px; font-size: 11px; color: #64748B; text-transform: uppercase; font-family: monospace;">Unique Event Registration Code (UID)</td>
+                        <td align="right" style="padding-bottom: 10px; font-size: 18px; font-weight: 900; color: #22D3EE; font-family: monospace;">${safeCode}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Payment Txn ID:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${paymentId || 'pay_rzp_scoders'}</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Complete Event Name:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${safeTitle}</td>
                       </tr>
                       <tr>
-                        <td colspan="2" style="padding-top: 14px; font-size: 12px; color: #94A3B8; border-top: 1px solid #1E293B;">
-                          You can view your ticket pass both right here in this email and on our website by clicking the link below:
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Event Location / Venue:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #CBD5E1;">${safeLocation}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Event Date & Timing:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #CBD5E1;">${safeDate}${safeDay ? ` (${safeDay})` : ''} • ${safeTime}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Pass Fee / Payment ID:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #10B981;">${formattedAmount} • ${safePayId}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Pass Valid Until:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FDE68A;">${validUntilDisplay}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 14px;">
+                          <div style="background-color: rgba(15, 23, 42, 0.9); border: 1px solid #334155; border-radius: 10px; padding: 14px; font-size: 12px; color: #CBD5E1; line-height: 1.6;">
+                            <strong style="color: #38BDF8;">Important Event Details:</strong><br/>
+                            ${safeDesc}<br/><br/>
+                            <strong style="color: #FDE68A;">Keep Your UID Safe:</strong> Please store your unique event registration code (<strong>${safeCode}</strong>) safely for check-in verification and future event pass access on our website.
+                          </div>
                         </td>
                       </tr>
                     ` : `
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #EF4444; font-weight: 700;">Failure Reason:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${reason || 'Payment method failed or was declined.'}</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; color: #FCA5A5;">${escapeEmailHtml(reason || 'Payment method failed or was declined.')}</td>
                       </tr>
                     `}
                     <tr>
                       <td colspan="2" align="center" style="padding-top: 20px;">
-                        <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: ${isSuccess ? '#22D3EE' : '#EF4444'}; color: ${isSuccess ? '#0B0F17' : '#FFFFFF'}; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                          ${isSuccess ? 'Click Here to View Ticket on Website →' : 'Retry Payment Method on Website →'}
+                        <a href="${escapeEmailHtml(actionUrl)}" target="_blank" style="display: inline-block; padding: 14px 28px; background-color: ${isSuccess ? '#22D3EE' : '#EF4444'}; color: ${isSuccess ? '#0B0F17' : '#FFFFFF'}; text-decoration: none; font-weight: 800; font-size: 13px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">
+                          ${isSuccess ? 'View & Verify Event Ticket on Website →' : 'Retry Payment Method on Website →'}
                         </a>
                       </td>
                     </tr>
@@ -339,7 +456,138 @@ function getEventEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #64748B; margin: 0;">From: scoders82@gmail.com • © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 10px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// Email template for UID Recovery OTP Verification
+function getUidRecoveryOtpEmailHtml({
+  email,
+  otpCode,
+  sectionLabel,
+}: {
+  email: string;
+  otpCode: string;
+  sectionLabel: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>S-CODERS UID Recovery Verification Code</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden;">
+              <tr>
+                <td style="padding: 28px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #22D3EE;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Registration Code (UID) Recovery Verification</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 28px 32px;">
+                  <p style="font-size: 15px; color: #F8FAFC; margin: 0 0 14px 0;">Hello,</p>
+                  <p style="font-size: 14px; color: #CBD5E1; line-height: 1.6; margin: 0 0 20px 0;">
+                    We received a request to recover your <strong>S-CODERS ${escapeEmailHtml(sectionLabel)}</strong> Unique Registration Code (UID) associated with <strong>${escapeEmailHtml(email)}</strong>.
+                  </p>
+                  <div style="background-color: #0F172A; border: 1px solid #22D3EE; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
+                    <span style="display: block; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">One-Time Verification Code (Valid for 10 Minutes)</span>
+                    <span style="font-size: 32px; font-weight: 900; color: #22D3EE; font-family: monospace; letter-spacing: 6px;">${escapeEmailHtml(otpCode)}</span>
+                  </div>
+                  <p style="font-size: 12px; color: #94A3B8; line-height: 1.6; margin: 0;">
+                    Enter this verification code on the S-CODERS website to reveal and resend your active UIDs. If you did not request code recovery, please ignore this email.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 18px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0;">Official Security Verification from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// Email template summarizing recovered UIDs after successful OTP verification
+function getUidRecoverySummaryEmailHtml({
+  email,
+  records,
+}: {
+  email: string;
+  records: Array<{ section: string; itemTitle: string; uid: string; validUntil: string; status: string }>;
+}) {
+  const rowsHtml = records
+    .map(
+      (r) => `
+      <tr>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #1E293B; font-size: 12px; color: #38BDF8; text-transform: uppercase; font-weight: 700;">${escapeEmailHtml(r.section)}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #1E293B; font-size: 12px; color: #F8FAFC;">${escapeEmailHtml(r.itemTitle)}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #22D3EE; font-family: monospace; font-weight: 900;">${escapeEmailHtml(r.uid)}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #1E293B; font-size: 11px; color: #CBD5E1;">${escapeEmailHtml(new Date(r.validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }))}</td>
+      </tr>
+    `
+    )
+    .join("");
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>S-CODERS Recovered Unique Registration Codes (UID)</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0B0F17; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0F17; padding: 40px 10px;">
+        <tr>
+          <td align="center">
+            <table width="620" border="0" cellspacing="0" cellpadding="0" style="background-color: #131A29; border-radius: 16px; border: 1px solid #1E293B; overflow: hidden;">
+              <tr>
+                <td style="padding: 28px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); text-align: center; border-bottom: 2px solid #10B981;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #FFFFFF;">S <span style="color: #22D3EE;">⚡</span> CODERS</h1>
+                  <p style="margin: 4px 0 0 0; font-size: 11px; color: #10B981; text-transform: uppercase; letter-spacing: 1.5px;">Verified Registration Code Recovery</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 28px 32px;">
+                  <p style="font-size: 15px; color: #F8FAFC; margin: 0 0 12px 0;">Hello,</p>
+                  <p style="font-size: 14px; color: #CBD5E1; line-height: 1.6; margin: 0 0 20px 0;">
+                    Your email verification for <strong>${escapeEmailHtml(email)}</strong> succeeded. Here are your active S-CODERS registration codes (UIDs):
+                  </p>
+                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 12px; border: 1px solid #334155;">
+                    <tr style="background-color: #1E293B;">
+                      <th align="left" style="padding: 10px 8px; font-size: 10px; color: #94A3B8; text-transform: uppercase;">Section</th>
+                      <th align="left" style="padding: 10px 8px; font-size: 10px; color: #94A3B8; text-transform: uppercase;">Registration</th>
+                      <th align="left" style="padding: 10px 8px; font-size: 10px; color: #94A3B8; text-transform: uppercase;">UID Code</th>
+                      <th align="left" style="padding: 10px 8px; font-size: 10px; color: #94A3B8; text-transform: uppercase;">Valid Until</th>
+                    </tr>
+                    ${rowsHtml}
+                  </table>
+                  <p style="font-size: 12px; color: #FDE68A; line-height: 1.6; margin: 18px 0 0 0;">
+                    Please store these UIDs securely. You can use them anytime to access your Service workspace, rejoin a Workshop session mid-way if disconnected, or retrieve your Event pass.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 18px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0;">Official Automated Recovery Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
                 </td>
               </tr>
             </table>
@@ -486,23 +734,32 @@ function getPaymentEmailHtml({
   `;
 }
 
-// Helper to send email via SMTP or test fallback
+// Official S-CODERS email sender constant
+const OFFICIAL_SCODERS_EMAIL = "escoders@gmail.com";
+
+// Helper to send email via SMTP or Ethereal / console fallback
 async function sendEmailNotification({
   to,
   subject,
   html,
+  from: fromOverride,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  from?: string;
+  replyTo?: string;
 }) {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const port = Number(process.env.SMTP_PORT) || 587;
-  const from = process.env.SMTP_FROM || '"S-CODERS (Bharat Tech Developers)" <scoders82@gmail.com>';
+  const from = fromOverride || process.env.SMTP_FROM || `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`;
+  const effectiveReplyTo = replyTo || OFFICIAL_SCODERS_EMAIL;
 
   let transporter;
+  let isTestTransport = false;
   if (host && user && pass) {
     transporter = nodemailer.createTransport({
       host,
@@ -523,24 +780,28 @@ async function sendEmailNotification({
           pass: testAccount.pass,
         },
       });
+      isTestTransport = true;
     } catch (err) {
-      console.log(`[SIMULATED EMAIL DISPATCH] To: ${to} | Subject: ${subject}`);
-      return { success: true, simulated: true };
+      const simId = `sim_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      console.log(`[SIMULATED EMAIL DISPATCH] From: ${from} | To: ${to} | Subject: ${subject}`);
+      return { success: true, simulated: true, from, replyTo: effectiveReplyTo, messageId: simId };
     }
   }
 
   try {
     const info = await transporter.sendMail({
       from,
+      replyTo: effectiveReplyTo,
       to,
       subject,
       html,
     });
-    console.log(`[Email Sent Successfully] To: ${to} | MessageId: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    const previewUrl = isTestTransport ? nodemailer.getTestMessageUrl(info) || undefined : undefined;
+    console.log(`[Email Sent Successfully] From: ${from} | To: ${to} | MessageId: ${info.messageId}${previewUrl ? ` | Preview: ${previewUrl}` : ""}`);
+    return { success: true, from, replyTo: effectiveReplyTo, messageId: info.messageId, previewUrl };
   } catch (err: any) {
     console.error("Failed to send email via SMTP:", err.message);
-    return { success: false, error: err.message };
+    return { success: false, from, replyTo: effectiveReplyTo, error: err.message };
   }
 }
 
@@ -1762,81 +2023,253 @@ async function startServer() {
     return res.json({ success });
   });
 
+  // Helper: deterministic multi-language compiler/runtime diagnostic & repair engine
+  function diagnoseCompilerErrorDeterministic(lang: string, src: string, rawErr: string): {
+    errorType: string;
+    line: number | null;
+    explanation: string;
+    correctedCode: string;
+    suggestedFixSummary: string;
+  } {
+    const normLang = (lang || "").toLowerCase();
+    const errText = String(rawErr || "");
+    const lines = src.split("\n");
+    let errorLine: number | null = null;
+    const lineMatch =
+      errText.match(/main\.(?:cpp|c):(\d+):/i) ||
+      errText.match(/\.java:(\d+):/i) ||
+      errText.match(/\.go:(\d+):/i) ||
+      errText.match(/\.rs:(\d+):/i) ||
+      errText.match(/line\s+(\d+)/i) ||
+      errText.match(/:(\d+):/);
+    if (lineMatch) {
+      errorLine = parseInt(lineMatch[1], 10);
+    }
+
+    let fixed = src;
+    let errorType = "Compilation / Runtime Error";
+    let explanation = errText.trim().slice(0, 400) || "Program failed to compile or exited with a non-zero status.";
+    let suggestedFixSummary = "Review the compiler diagnostic above and fix the syntax or symbol issue.";
+
+    // 1. Replace smart/curly quotes pasted from mobile keyboards or rich-text editors
+    if (/[“”‘’]/.test(fixed)) {
+      fixed = fixed.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+      errorType = "Invalid Smart Quotes (Unicode Punctuation)";
+      explanation = "Smart/curly quotes (“ ” or ‘ ’) from a rich-text editor or mobile keyboard are not valid string delimiters in source code.";
+      suggestedFixSummary = "Replaced curly/smart quotes with standard ASCII quotes.";
+      return { errorType, line: errorLine, explanation, correctedCode: fixed, suggestedFixSummary };
+    }
+
+    // 2. C / C++ Diagnostics
+    if (normLang === "cpp" || normLang === "c++" || normLang === "c") {
+      if ((errText.includes("cout") || errText.includes("cin")) && errText.includes("was not declared") && !fixed.includes("<iostream>")) {
+        fixed = `#include <iostream>\n${fixed}`;
+        errorType = "Missing Header (<iostream>)";
+        explanation = "`cout` / `cin` require the `<iostream>` header to be included.";
+        suggestedFixSummary = "Added `#include <iostream>` at the top of the file.";
+      } else if (normLang === "c" && (errText.includes("printf") || errText.includes("scanf")) && !fixed.includes("<stdio.h>")) {
+        fixed = `#include <stdio.h>\n${fixed}`;
+        errorType = "Missing Header (<stdio.h>)";
+        explanation = "`printf` / `scanf` require `<stdio.h>` to be included.";
+        suggestedFixSummary = "Added `#include <stdio.h>` at the top of the file.";
+      } else if (/(cout|cin|endl|string|vector)\s*.*(was not declared|did you mean\s+['‘"]std::)/.test(errText) && !fixed.includes("using namespace std") && !fixed.includes("std::cout")) {
+        const incEnd = fixed.lastIndexOf("#include");
+        if (incEnd !== -1) {
+          const nlIdx = fixed.indexOf("\n", incEnd);
+          fixed = fixed.slice(0, nlIdx + 1) + "using namespace std;\n" + fixed.slice(nlIdx + 1);
+        } else {
+          fixed = `using namespace std;\n${fixed}`;
+        }
+        errorType = "Missing Namespace (std)";
+        explanation = "Standard library identifiers like `cout`, `cin`, or `endl` need either `std::` prefix or `using namespace std;`.";
+        suggestedFixSummary = "Added `using namespace std;` after header includes.";
+      } else if (/no match for.*operator>>/.test(errText) && /\b((?:std::)?cout)\s*>>/.test(fixed)) {
+        fixed = fixed.replace(/\b((?:std::)?cout)\s*>>/g, "$1 <<");
+        errorType = "Stream Operator Direction Error";
+        explanation = "`cout` outputs data using the insertion operator `<<`, not `>>`.";
+        suggestedFixSummary = "Changed `cout >>` to `cout <<`.";
+      } else if (/no match for.*operator<</.test(errText) && /\b((?:std::)?cin)\s*<</.test(fixed)) {
+        fixed = fixed.replace(/\b((?:std::)?cin)\s*<</g, "$1 >>");
+        errorType = "Stream Operator Direction Error";
+        explanation = "`cin` reads input using the extraction operator `>>`, not `<<`.";
+        suggestedFixSummary = "Changed `cin <<` to `cin >>`.";
+      } else if (/expected\s*['‘"]?;['’"]?/.test(errText) && errorLine && errorLine >= 1) {
+        // GCC reports `expected ';' before 'return'` at either the current line (where ';' belongs) or the next line (`return`)
+        const targetIdxCandidates = [Math.max(0, errorLine - 2), Math.max(0, errorLine - 1)];
+        for (const idx of targetIdxCandidates) {
+          const lineTrim = (lines[idx] || "").trim();
+          if (
+            lineTrim &&
+            !lineTrim.startsWith("#") &&
+            !lineTrim.startsWith("//") &&
+            !lineTrim.endsWith(";") &&
+            !lineTrim.endsWith("{") &&
+            !lineTrim.endsWith("}") &&
+            !lineTrim.endsWith(":") &&
+            !lineTrim.startsWith("return")
+          ) {
+            lines[idx] = lines[idx].replace(/\s*$/, ";");
+            fixed = lines.join("\n");
+            break;
+          }
+        }
+        if (fixed === src && lines[Math.max(0, errorLine - 1)]?.trim() && !lines[Math.max(0, errorLine - 1)].trim().endsWith(";")) {
+          const idx = Math.max(0, errorLine - 1);
+          lines[idx] = lines[idx].replace(/\s*$/, ";");
+          fixed = lines.join("\n");
+        }
+        errorType = "SyntaxError (Missing Semicolon ';')";
+        explanation = `The C/C++ compiler expected a semicolon ';' near line ${errorLine}.`;
+        suggestedFixSummary = `Added missing ';' near line ${Math.max(1, errorLine - 1)}.`;
+      } else if (errText.includes("expected '}' at end of input")) {
+        fixed = fixed.trimEnd() + "\n}\n";
+        errorType = "SyntaxError (Unclosed Brace '}')";
+        explanation = "A block or function is missing its closing curly brace '}'.";
+        suggestedFixSummary = "Added closing brace '}' at the end of the program.";
+      } else {
+        const firstErr = errText.split("\n").find((l) => l.includes("error:")) || errText.split("\n")[0];
+        errorType = "C/C++ Compiler Diagnostic";
+        explanation = firstErr ? firstErr.trim() : explanation;
+        suggestedFixSummary = "Check variable declarations, semicolons, headers, and braces on the flagged line.";
+      }
+      return { errorType, line: errorLine, explanation, correctedCode: fixed, suggestedFixSummary };
+    }
+
+    // 3. Python Diagnostics
+    const nameErrMatch = errText.match(/NameError:\s*name\s*['"](\w+)['"]\s*is not defined/i);
+    if (nameErrMatch) {
+      const wrongName = nameErrMatch[1];
+      const varMatches = Array.from(src.matchAll(/(\w+)\s*=/g)).map((m) => m[1]);
+      const candidate = varMatches.find((v) => v.toLowerCase().startsWith(wrongName.toLowerCase().slice(0, 2)));
+      if (candidate) {
+        fixed = src.replace(new RegExp(`\\b${wrongName}\\b`, "g"), candidate);
+        suggestedFixSummary = `Replaced undefined identifier '${wrongName}' with '${candidate}'.`;
+      } else {
+        suggestedFixSummary = `Define '${wrongName}' before referencing it.`;
+      }
+      errorType = "NameError (Undefined Identifier)";
+      explanation = `Identifier '${wrongName}' was used before being defined.`;
+    } else if (errText.includes("SyntaxError")) {
+      errorType = "SyntaxError (Invalid Syntax)";
+      explanation = errText.split("\n").slice(-3).join(" ").trim() || explanation;
+      suggestedFixSummary = "Check colons, parentheses, quotes, or brackets near the flagged line.";
+    } else if (errText.includes("IndentationError")) {
+      errorType = "IndentationError (Inconsistent Indentation)";
+      explanation = "Python requires consistent indentation inside code blocks.";
+      suggestedFixSummary = "Standardize indentation to 4 spaces per block.";
+    } else if (errText.includes("TypeError")) {
+      errorType = "TypeError (Incompatible Types)";
+      explanation = errText.split("\n").slice(-2).join(" ").trim() || explanation;
+      suggestedFixSummary = "Convert operands to compatible types (e.g., str(), int(), float()).";
+    } else if (errText.includes("ModuleNotFoundError") || errText.includes("No module named")) {
+      errorType = "ModuleNotFoundError (Missing Library)";
+      explanation = errText.split("\n").slice(-2).join(" ").trim() || explanation;
+      suggestedFixSummary = "Verify module name or use a built-in standard library alternative.";
+    }
+
+    return { errorType, line: errorLine, explanation, correctedCode: fixed, suggestedFixSummary };
+  }
+
   // AI CODING ASSISTANT & DEBUGGER: Explain Error & Auto-Correct Code
   app.post("/api/compiler/ai-debug", async (req, res) => {
-    const { language, code, stderr, stdout, exitCode } = req.body || {};
-    if (!code || typeof code !== "string") {
+    const { language, code: rawCode, stderr, stdout, exitCode, stdin } = req.body || {};
+    if (!rawCode || typeof rawCode !== "string") {
       return res.status(400).json({ error: "No code provided for debugging." });
     }
+    const sanitizedCode = sanitizeSourceCode(rawCode);
+    const detectedLang = detectLanguage(sanitizedCode);
+    const effectiveLang =
+      !language || language === "auto" || ((language === "python" || language === "javascript" || language === "react" || language === "html") && detectedLang)
+        ? (detectedLang || language || "auto")
+        : (language === "c" && detectedLang === "cpp" ? "cpp" : language);
+
     try {
       const errText = String(stderr || "");
 
-      // Immediate check: If the issue was EOFError, missing input, or waiting on stdin,
-      // DO NOT let the AI or fallback change working code!
+      // 1. Check if failure was due to waiting on interactive stdin
       if (
         errText.includes("EOFError") ||
         errText.includes("EOF when reading a line") ||
         errText.includes("Interactive Timeout") ||
+        errText.includes("Execution Timed Out") ||
         errText.includes("waiting for user input") ||
-        errText.includes("NoSuchElementException") // Java Scanner waiting for next line
+        errText.includes("NoSuchElementException")
       ) {
         return res.json({
           errorType: "Interactive Input Required (Console Stdin)",
           line: null,
           explanation:
-            "Your source code and syntax are completely correct! The program executed an interactive input function (e.g. input() or Scanner), but received no value in the console. You simply need to type your input into the terminal input prompt at the bottom of the console.",
-          correctedCode: code,
+            "Your source code and syntax are valid! The program paused waiting for interactive input (e.g. cin, scanf, input(), or Scanner). Enter the values in the terminal input bar at the bottom while running, or supply them in 'Pass Standard Input (stdin)' before clicking Run Code.",
+          correctedCode: sanitizedCode,
           suggestedFixSummary:
-            "Code is already 100% correct. Enter values into the interactive terminal prompt at the bottom of the console.",
+            "Code is already correct. Supply input values in the terminal prompt or Standard Input (stdin) panel.",
+          testExecutionOutput: stdout || "",
+          testExecutionSuccess: true,
+          testExitCode: 0,
         });
       }
+
+      // 2. PRE-CHECK: Compile/Execute sanitized code BEFORE reporting any error so valid code is NEVER falsely flagged!
+      const preCheck = await executeCode(effectiveLang, sanitizedCode, stdin);
+      if (preCheck.success && preCheck.exitCode === 0) {
+        const wasSanitized = sanitizedCode !== rawCode;
+        const langChanged = language && effectiveLang !== language.toLowerCase();
+        return res.json({
+          errorType: wasSanitized
+            ? "Invisible Paste Characters Cleaned (Code Valid)"
+            : langChanged
+            ? `Environment Switched to ${effectiveLang.toUpperCase()} (Code Valid)`
+            : "No Syntax or Runtime Errors Detected (Code Valid)",
+          line: null,
+          explanation: wasSanitized
+            ? "Your program logic is completely valid! Hidden copy-paste characters (such as non-breaking spaces or BOM markers) were cleaned so it compiles cleanly."
+            : langChanged
+            ? `Your ${effectiveLang.toUpperCase()} code is completely valid and executed cleanly once matched to the ${effectiveLang.toUpperCase()} runtime.`
+            : "Good news: your source code compiled and executed cleanly with Exit Code 0. No errors were found in the program itself.",
+          correctedCode: sanitizedCode,
+          suggestedFixSummary: "Code verified successfully. Click 'Apply Fix & Run Now' to execute and view the output.",
+          testExecutionOutput: preCheck.stdout || "[Program executed successfully]",
+          testExecutionSuccess: true,
+          testExitCode: 0,
+        });
+      }
+
+      // Real error confirmed by actual compiler/runtime!
+      const confirmedErr = preCheck.stderr || errText;
 
       let client: GoogleGenAI | null = null;
       try {
         client = getGeminiClient();
-      } catch (keyErr) {
-        // Fallback without API key
+      } catch {
+        client = null;
       }
 
-      if (!client) {
-        // Deterministic diagnostic fallback
-        const lines = (stderr || "").split("\n");
-        const errLine = lines.find((l: string) => l.includes("Error:") || l.includes("Exception:") || l.includes("error:"));
-        return res.json({
-          errorType: errLine ? errLine.split(":")[0].trim() : "Execution Diagnostic",
-          line: null,
-          explanation: stderr || "Execution exited with a non-zero code.",
-          correctedCode: code,
-          suggestedFixSummary: "Check error trace above. Please verify syntax and variable definitions.",
-        });
-      }
-
-      const prompt = `You are the S-CODERS Senior Compiler & AI Debugger for Bharat Tech Developers.
-Analyze the following ${language || 'code'} program and its execution failure diagnostics.
+      if (client) {
+        const prompt = `You are the S-CODERS Senior Compiler & AI Debugger.
+Analyze the following ${effectiveLang} program and its ACTUAL compiler/runtime error diagnostic.
 
 Source Code:
-\`\`\`${language || 'text'}
-${code}
+\`\`\`${effectiveLang}
+${sanitizedCode}
 \`\`\`
 
-Execution Diagnostics:
+Actual Compiler/Runtime Diagnostics:
 Stderr:
-${stderr || "(None)"}
+${confirmedErr || "(None)"}
 
 Stdout:
-${stdout || "(None)"}
+${preCheck.stdout || stdout || "(None)"}
 
-Exit Code: ${exitCode ?? 1}
+Exit Code: ${preCheck.exitCode ?? exitCode ?? 1}
 
-Your task:
-1. Identify the exact error type (e.g. NameError, SyntaxError, TypeError, NullPointerException, UndefinedVariable, ModuleNotFoundError, IndentationError, EOFError/MissingInput, Timeout, etc.).
+Rules:
+1. Only diagnose real syntax, type, linker, or runtime errors shown by the compiler/runtime. Never invent false errors.
 2. Pinpoint the exact line number where the issue originates if determinable, otherwise null.
-3. If the error is an EOFError, missing input, or waiting for stdin, clearly state that the code is correct and only needs user input entered in the terminal console. DO NOT alter the code if it is already correct.
-4. Provide a clear, friendly 2-3 sentence explanation of WHY this error happened.
-5. Provide the COMPLETE corrected code that fixes the error and executes cleanly without breaking user intent. If code was already correct (e.g. input wait), keep original code.
-6. Provide a short 1-2 sentence summary of the fix.
+3. Provide a clear 2-3 sentence explanation of WHY this error happened.
+4. Provide the COMPLETE corrected source code preserving the user's intent.
+5. Provide a concise 1-2 sentence summary of the fix.
 
-Return ONLY valid JSON matching this schema:
+Return ONLY valid JSON:
 {
   "errorType": "string",
   "line": number or null,
@@ -1845,120 +2278,89 @@ Return ONLY valid JSON matching this schema:
   "suggestedFixSummary": "string"
 }`;
 
-      let parsed: any = null;
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error("AI Gateway timeout")), 15000)
-        );
-
-        const response = await Promise.race([
-          client.models.generateContent({
-            model: "gemini-3.5-flash-lite",
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              temperature: 0.2,
-            },
-          }),
-          timeoutPromise
-        ]);
-
-        parsed = JSON.parse(response.text || "{}");
-      } catch (geminiErr: any) {
-        console.log("[AI Gateway activating instant heuristic engine]:", geminiErr?.message || geminiErr);
-      }
-
-      if (parsed && parsed.errorType) {
-        const finalCorrected = parsed.correctedCode || code;
-        let testResult: any = null;
         try {
-          testResult = await executeCode(language || "auto", finalCorrected, req.body?.stdin);
-        } catch {}
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("AI Gateway timeout")), 15000)
+          );
 
-        return res.json({
-          errorType: parsed.errorType || "Diagnostic Warning",
-          line: typeof parsed.line === 'number' ? parsed.line : null,
-          explanation: parsed.explanation || "Diagnostic analysis completed.",
-          correctedCode: finalCorrected,
-          suggestedFixSummary: parsed.suggestedFixSummary || "Code corrected to fix runtime issues.",
-          testExecutionOutput: testResult?.stdout || "",
-          testExecutionSuccess: testResult?.success ?? true,
-          testExitCode: testResult?.exitCode ?? 0,
-        });
+          const response = await Promise.race([
+            client.models.generateContent({
+              model: "gemini-4-hydrogen",
+              contents: prompt,
+              config: {
+                responseMimeType: "application/json",
+                temperature: 0.2,
+              },
+            }),
+            timeoutPromise,
+          ]);
+
+          const parsed = JSON.parse(response.text || "{}");
+          if (parsed && parsed.errorType) {
+            const finalCorrected = sanitizeSourceCode(parsed.correctedCode || sanitizedCode);
+            const testResult = await executeCode(effectiveLang, finalCorrected, stdin);
+            return res.json({
+              errorType: parsed.errorType,
+              line: typeof parsed.line === "number" ? parsed.line : null,
+              explanation: parsed.explanation || confirmedErr,
+              correctedCode: finalCorrected,
+              suggestedFixSummary: parsed.suggestedFixSummary || "Code updated to resolve the error.",
+              testExecutionOutput: testResult.stdout || testResult.stderr || "",
+              testExecutionSuccess: testResult.success && testResult.exitCode === 0,
+              testExitCode: testResult.exitCode,
+            });
+          }
+        } catch (geminiErr: any) {
+          console.log("[AI Debugger using deterministic compiler diagnostics]:", geminiErr?.message || geminiErr);
+        }
       }
 
-      // If not parsed, trigger heuristic diagnostic engine directly
-      throw new Error("Activating heuristic fallback");
-    } catch (err: any) {
-      console.warn("[Compiler AI Debug API Warning - Activating Heuristic Diagnostics Engine]:", err?.message || err);
-      
-      // Resilient heuristic engine: parses compiler/interpreter errors directly
-      const errText = String(stderr || err?.message || "");
-      let detectedType = "Runtime Diagnostic";
-      let errorLine: number | null = null;
-      let fixSummary = "Refactored code to eliminate runtime errors.";
-      let autoCorrected = code;
-
-      // Line number detection: e.g. line 2 or :2:
-      const lineMatch = errText.match(/line (\d+)/i) || errText.match(/:(\d+):/);
-      if (lineMatch) {
-        errorLine = parseInt(lineMatch[1], 10);
-      }
-
-      // Check timeout
-      if (errText.includes("Timed Out") || errText.includes("Timeout")) {
-        detectedType = "Execution Timeout / Input Wait";
-        fixSummary = "Provide input via the terminal console or check for long loops.";
-        return res.json({
-          errorType: detectedType,
-          line: null,
-          explanation: "The program paused waiting for interactive user input or exceeded the CPU limit. Please enter values in the terminal console prompt when prompted.",
-          correctedCode: code,
-          suggestedFixSummary: fixSummary,
-          testExecutionOutput: stdout || "",
-          testExecutionSuccess: true,
-          testExitCode: 0,
-        });
-      }
-
-      // Python NameError: name 'XYZ' is not defined
-      const nameErrMatch = errText.match(/NameError:\s*name\s*['"](\w+)['"]\s*is not defined/i);
-      if (nameErrMatch) {
-        detectedType = "NameError (Undefined Variable / Identifier)";
-        const wrongName = nameErrMatch[1];
-        // Look for similar declared variable in code
-        const varMatches = Array.from(code.matchAll(/(\w+)\s*=/g)).map(m => m[1]);
-        const matchCandidate = varMatches.find(v => v.toLowerCase().startsWith(wrongName.toLowerCase().slice(0, 2)) || wrongName.toLowerCase().startsWith(v.toLowerCase().slice(0, 2))) || "name";
-        autoCorrected = code.replace(new RegExp(`\\b${wrongName}\\b`, "g"), matchCandidate);
-        fixSummary = `Replaced undefined variable '${wrongName}' with defined identifier '${matchCandidate}'.`;
-      } else if (errText.includes("SyntaxError")) {
-        detectedType = "SyntaxError (Invalid Syntax)";
-        fixSummary = "Corrected unexpected token or missing punctuation.";
-      } else if (errText.includes("IndentationError")) {
-        detectedType = "IndentationError (Inconsistent Indentation)";
-        fixSummary = "Standardized block indentation to 4 spaces.";
-      } else if (errText.includes("TypeError")) {
-        detectedType = "TypeError (Mismatched Operand / Argument Type)";
-        fixSummary = "Cast incompatible types to valid data types.";
-      } else if (errText.includes("ModuleNotFoundError") || errText.includes("No module named")) {
-        detectedType = "ModuleNotFoundError (Missing Library)";
-        fixSummary = "Imported standard library alternative.";
-      }
-
+      // Deterministic iterative multi-pass compiler diagnostic & repair fallback
+      let currentCode = sanitizedCode;
+      let currentErr = confirmedErr;
+      let firstDiag = diagnoseCompilerErrorDeterministic(effectiveLang, currentCode, currentErr);
+      let latestDiag = firstDiag;
+      const fixSummaries: string[] = [];
       let testResult: any = null;
-      try {
-        testResult = await executeCode(language || "auto", autoCorrected, req.body?.stdin);
-      } catch {}
+
+      for (let pass = 0; pass < 4; pass++) {
+        latestDiag = pass === 0 ? firstDiag : diagnoseCompilerErrorDeterministic(effectiveLang, currentCode, currentErr);
+        if (latestDiag.correctedCode === currentCode) break;
+        fixSummaries.push(latestDiag.suggestedFixSummary);
+        currentCode = latestDiag.correctedCode;
+        try {
+          testResult = await executeCode(effectiveLang, currentCode, stdin);
+          if (testResult.success && testResult.exitCode === 0) {
+            break;
+          }
+          currentErr = testResult.stderr || currentErr;
+        } catch {
+          break;
+        }
+      }
 
       return res.json({
-        errorType: detectedType,
-        line: errorLine,
-        explanation: `Diagnostic analysis of execution failure: ${errText.slice(0, 300) || "Process failed with non-zero exit code"}.`,
-        correctedCode: autoCorrected,
-        suggestedFixSummary: fixSummary,
-        testExecutionOutput: testResult?.stdout || "",
-        testExecutionSuccess: testResult?.success ?? true,
-        testExitCode: testResult?.exitCode ?? 0,
+        errorType: firstDiag.errorType,
+        line: firstDiag.line,
+        explanation: firstDiag.explanation,
+        correctedCode: currentCode,
+        suggestedFixSummary: fixSummaries.length > 0 ? fixSummaries.join(" ") : firstDiag.suggestedFixSummary,
+        testExecutionOutput: testResult?.success ? testResult.stdout : "",
+        testExecutionSuccess: Boolean(testResult?.success && testResult?.exitCode === 0),
+        testExitCode: testResult ? testResult.exitCode : (preCheck.exitCode || 1),
+      });
+    } catch (err: any) {
+      console.warn("[Compiler AI Debug Warning]:", err?.message || err);
+      const diag = diagnoseCompilerErrorDeterministic(effectiveLang, sanitizedCode, String(stderr || err?.message || ""));
+      return res.json({
+        errorType: diag.errorType,
+        line: diag.line,
+        explanation: diag.explanation,
+        correctedCode: diag.correctedCode,
+        suggestedFixSummary: diag.suggestedFixSummary,
+        testExecutionOutput: "",
+        testExecutionSuccess: false,
+        testExitCode: 1,
       });
     }
   });
@@ -2021,7 +2423,7 @@ Return ONLY valid JSON with this structure:
 
       const response = await Promise.race([
         client.models.generateContent({
-          model: "gemini-3.5-flash-lite",
+          model: "gemini-4-hydrogen",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -2468,20 +2870,23 @@ Return ONLY valid JSON with this structure:
   app.post(["/api/workshops/chats/:chatId/messages", "/api/services/chats/:chatId/messages", "/api/chats/:chatId/messages"], (req, res) => {
     try {
       const chatId = req.params.chatId;
-      const { content, sender, senderName, senderRole, clientEmail, clientName, reference, uniqueAccessKey, key } = req.body;
+      const { content, sender, senderName, senderRole, clientEmail, clientName, reference, uniqueAccessKey, key, conversationId } = req.body;
 
       if (!content || !content.trim()) {
         return res.status(400).json({ error: "Message content cannot be empty." });
       }
 
       const activeKey = (uniqueAccessKey || key || "").trim().toUpperCase();
+      const normalizedEmail = (clientEmail || "").trim().toLowerCase();
       const appState = getStoredAppState();
       const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
 
       let conversation = chatsList.find(c => 
-        c.id === chatId || 
-        (activeKey && (c.uniqueAccessKey?.toUpperCase() === activeKey || c.id.includes(activeKey))) ||
-        c.registrationId === chatId
+        c.id === chatId ||
+        (conversationId && c.id === conversationId) ||
+        (activeKey && (c.uniqueAccessKey?.toUpperCase() === activeKey || c.id?.toUpperCase().includes(activeKey))) ||
+        c.registrationId === chatId ||
+        (normalizedEmail && !normalizedEmail.includes("manual") && normalizedEmail !== "client@scoders.dev" && normalizedEmail !== "attendee@scoders.com" && c.clientEmail?.toLowerCase() === normalizedEmail && reference && c.reference === reference)
       );
 
       if (!conversation) {
@@ -2530,7 +2935,8 @@ Return ONLY valid JSON with this structure:
   app.put(["/api/workshops/chats/:chatId/messages/:messageId", "/api/services/chats/:chatId/messages/:messageId", "/api/chats/:chatId/messages/:messageId"], (req, res) => {
     try {
       const { chatId, messageId } = req.params;
-      const { content } = req.body;
+      const { content, key, conversationId } = req.body || {};
+      const activeKey = ((req.query.key as string) || key || "").trim().toUpperCase();
 
       if (!content || !content.trim()) {
         return res.status(400).json({ error: "Updated content cannot be empty." });
@@ -2539,26 +2945,45 @@ Return ONLY valid JSON with this structure:
       const appState = getStoredAppState();
       const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
 
-      const conversation = chatsList.find(c => c.id === chatId || c.registrationId === chatId || c.uniqueAccessKey === chatId);
-      if (!conversation) {
+      const matchingChats = chatsList.filter(c =>
+        c.id === chatId ||
+        (conversationId && c.id === conversationId) ||
+        c.registrationId === chatId ||
+        (activeKey && (c.uniqueAccessKey?.toUpperCase() === activeKey || c.id?.toUpperCase().includes(activeKey))) ||
+        (Array.isArray(c.messages) && c.messages.some((m: any) => m.id === messageId))
+      );
+
+      if (matchingChats.length === 0) {
         return res.status(404).json({ error: "Conversation not found." });
       }
 
-      const message = (conversation.messages || []).find((m: any) => m.id === messageId);
-      if (!message) {
-        return res.status(404).json({ error: "Message not found." });
+      let updatedMessage: any = null;
+      let primaryConversation: any = null;
+      const nowIso = new Date().toISOString();
+
+      for (const conv of matchingChats) {
+        const msg = (conv.messages || []).find((m: any) => m.id === messageId);
+        if (msg) {
+          msg.content = content.trim();
+          msg.edited = true;
+          msg.editedAt = nowIso;
+          conv.lastUpdated = nowIso;
+          updatedMessage = msg;
+          if (!primaryConversation || conv.id === chatId || conv.id === conversationId) {
+            primaryConversation = conv;
+          }
+        }
       }
 
-      message.content = content.trim();
-      message.edited = true;
-      message.editedAt = new Date().toISOString();
-      conversation.lastUpdated = new Date().toISOString();
+      if (!updatedMessage) {
+        return res.status(404).json({ error: "Message not found." });
+      }
 
       appState["db_chats"] = chatsList;
       saveStoredAppState(appState);
 
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.json({ success: true, message, conversation });
+      res.json({ success: true, message: updatedMessage, conversation: primaryConversation });
     } catch (err: any) {
       console.error("Error editing message:", err);
       res.status(500).json({ error: "Failed to edit message: " + err.message });
@@ -2569,23 +2994,48 @@ Return ONLY valid JSON with this structure:
   app.delete(["/api/workshops/chats/:chatId/messages/:messageId", "/api/services/chats/:chatId/messages/:messageId", "/api/chats/:chatId/messages/:messageId"], (req, res) => {
     try {
       const { chatId, messageId } = req.params;
+      const activeKey = ((req.query.key as string) || "").trim().toUpperCase();
+      const conversationId = ((req.query.conversationId as string) || "").trim();
 
       const appState = getStoredAppState();
       const chatsList: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
 
-      const conversation = chatsList.find(c => c.id === chatId || c.registrationId === chatId || c.uniqueAccessKey === chatId);
-      if (!conversation) {
+      const matchingChats = chatsList.filter(c =>
+        c.id === chatId ||
+        (conversationId && c.id === conversationId) ||
+        c.registrationId === chatId ||
+        (activeKey && (c.uniqueAccessKey?.toUpperCase() === activeKey || c.id?.toUpperCase().includes(activeKey))) ||
+        (Array.isArray(c.messages) && c.messages.some((m: any) => m.id === messageId))
+      );
+
+      if (matchingChats.length === 0) {
         return res.status(404).json({ error: "Conversation not found." });
       }
 
-      conversation.messages = (conversation.messages || []).filter((m: any) => m.id !== messageId);
-      conversation.lastUpdated = new Date().toISOString();
+      const nowIso = new Date().toISOString();
+      let primaryConversation: any = null;
+
+      for (const conv of matchingChats) {
+        const prevLen = (conv.messages || []).length;
+        conv.messages = (conv.messages || []).filter((m: any) => m.id !== messageId);
+        if (conv.messages.length !== prevLen) {
+          conv.lastUpdated = nowIso;
+        }
+        if (!primaryConversation || conv.id === chatId || conv.id === conversationId) {
+          primaryConversation = conv;
+        }
+      }
 
       appState["db_chats"] = chatsList;
       saveStoredAppState(appState);
 
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.json({ success: true, deletedId: messageId, remaining: conversation.messages.length });
+      res.json({
+        success: true,
+        deletedId: messageId,
+        remaining: primaryConversation ? (primaryConversation.messages || []).length : 0,
+        conversation: primaryConversation
+      });
     } catch (err: any) {
       console.error("Error deleting message:", err);
       res.status(500).json({ error: "Failed to delete message: " + err.message });
@@ -3318,27 +3768,1106 @@ Return ONLY valid JSON with this structure:
     return `http://${host || "localhost:3000"}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
   };
 
-  // 1. Service Registration Accepted Email Endpoint
+  // ============================================================================
+  // UNIFIED UID REGISTRATION, AUTOMATED EMAIL DISPATCH, DEDUPLICATION & RECOVERY
+  // ============================================================================
+  type RegistrationSection = "service" | "workshop" | "event";
+
+  interface RegistrationUidRecord {
+    uid: string;
+    section: RegistrationSection;
+    itemId: string;
+    itemTitle: string;
+    clientName: string;
+    clientEmail: string;
+    clientPhone?: string;
+    clientOrg?: string;
+    clientRole?: string;
+    amount: number;
+    currency: string;
+    paymentStatus: "NOT_REQUIRED" | "VERIFIED" | "PENDING" | "FAILED";
+    paymentId?: string;
+    orderId?: string;
+    dedupeKey: string;
+    chatId?: string;
+    metadata?: {
+      date?: string;
+      day?: string;
+      time?: string;
+      location?: string;
+      description?: string;
+      requirements?: string;
+      budget?: string;
+      timeline?: string;
+    };
+    issuedAt: string;
+    validFrom: string;
+    validUntil: string;
+    status: "ACTIVE" | "EXPIRED" | "REVOKED";
+    confirmationEmailSent: boolean;
+    confirmationEmailSentAt?: string;
+    emailFrom?: string;
+    emailMessageId?: string;
+  }
+
+  function normalizeSectionName(raw: string): RegistrationSection | null {
+    const val = String(raw || "").trim().toLowerCase();
+    if (val === "service" || val === "services") return "service";
+    if (val === "workshop" || val === "workshops") return "workshop";
+    if (val === "event" || val === "events") return "event";
+    return null;
+  }
+
+  function computeUidValidityWindow(section: RegistrationSection, scheduledDateStr?: string): { validFrom: string; validUntil: string } {
+    const now = new Date();
+    const validFrom = now.toISOString();
+    let expiryMs = now.getTime();
+
+    if (section === "service") {
+      // Services stay active for 180 days from registration
+      expiryMs += 180 * 24 * 60 * 60 * 1000;
+    } else if (section === "workshop") {
+      // Workshops stay valid for 30 days OR scheduled date + 30 days (whichever is later)
+      expiryMs += 30 * 24 * 60 * 60 * 1000;
+      if (scheduledDateStr) {
+        const parsed = Date.parse(scheduledDateStr);
+        if (!isNaN(parsed)) {
+          expiryMs = Math.max(expiryMs, parsed + 30 * 24 * 60 * 60 * 1000);
+        }
+      }
+    } else {
+      // Events stay valid for at least 30 days OR 7 days past the scheduled event date
+      expiryMs += 30 * 24 * 60 * 60 * 1000;
+      if (scheduledDateStr) {
+        const parsed = Date.parse(scheduledDateStr);
+        if (!isNaN(parsed)) {
+          expiryMs = Math.max(expiryMs, parsed + 7 * 24 * 60 * 60 * 1000);
+        }
+      }
+    }
+
+    return {
+      validFrom,
+      validUntil: new Date(expiryMs).toISOString(),
+    };
+  }
+
+  function collectAllExistingUids(appState: Record<string, any>): Set<string> {
+    const existing = new Set<string>();
+    const uidRecords: any[] = Array.isArray(appState["db_registration_uids"]) ? appState["db_registration_uids"] : [];
+    const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+    const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+    const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+
+    for (const r of uidRecords) if (r?.uid) existing.add(String(r.uid).trim().toUpperCase());
+    for (const r of svcRegs) if (r?.uniqueKey) existing.add(String(r.uniqueKey).trim().toUpperCase());
+    for (const r of wkspRegs) if (r?.uniqueAccessKey) existing.add(String(r.uniqueAccessKey).trim().toUpperCase());
+    for (const t of evtTickets) if (t?.ticketCode) existing.add(String(t.ticketCode).trim().toUpperCase());
+    return existing;
+  }
+
+  function generateCollisionFreeUid(section: RegistrationSection, itemId: string, appState: Record<string, any>): string {
+    const existing = collectAllExistingUids(appState);
+    const cleanCode = String(itemId || section)
+      .replace(/[^a-zA-Z0-9-]/g, "")
+      .substring(0, 6)
+      .toUpperCase() || section.toUpperCase();
+
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const randA = crypto.randomBytes(2).toString("hex").toUpperCase();
+      const randB = crypto.randomBytes(2).toString("hex").toUpperCase();
+      let candidate = "";
+      if (section === "service") {
+        candidate = `BTD-SERV-${cleanCode.substring(0, 4)}-${randA}-${randB}`;
+      } else if (section === "workshop") {
+        candidate = `BTD-WKSP-${cleanCode.substring(0, 6)}-${randA}-${randB}`;
+      } else {
+        candidate = `SC-EVT-${randA}${randB}`;
+      }
+      if (!existing.has(candidate.toUpperCase())) {
+        return candidate;
+      }
+    }
+    return `${section === "event" ? "SC-EVT" : section === "workshop" ? "BTD-WKSP" : "BTD-SERV"}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+  }
+
+  function appendEmailDispatchLog(
+    appState: Record<string, any>,
+    entry: {
+      section: string;
+      to: string;
+      from: string;
+      subject: string;
+      uid?: string;
+      dedupeKey?: string;
+      itemTitle?: string;
+      status: "SENT" | "FAILED" | "SKIPPED_DUPLICATE";
+      messageId?: string;
+      previewUrl?: string;
+      simulated?: boolean;
+      error?: string;
+      detailsSummary?: string;
+    }
+  ) {
+    const logs: any[] = Array.isArray(appState["db_email_logs"]) ? [...appState["db_email_logs"]] : [];
+    logs.unshift({
+      id: `EML-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`,
+      ...entry,
+      timestamp: new Date().toISOString(),
+    });
+    appState["db_email_logs"] = logs.slice(0, 500);
+  }
+
+  function isPaymentVerifiedForRegistration(
+    section: RegistrationSection,
+    amount: number,
+    paymentId: string | undefined,
+    orderId: string | undefined,
+    paymentStatusRaw: string | undefined,
+    appState: Record<string, any>
+  ): { ok: boolean; reason?: string; status: "NOT_REQUIRED" | "VERIFIED" | "FAILED" | "PENDING" } {
+    if (section === "service") {
+      return { ok: true, status: "NOT_REQUIRED" };
+    }
+    const cleanStatus = String(paymentStatusRaw || "").trim().toUpperCase();
+    if (["FAILED", "CANCELLED", "DECLINED", "ERROR"].includes(cleanStatus)) {
+      return { ok: false, status: "FAILED", reason: "Payment failed or was cancelled. Email and UID cannot be issued." };
+    }
+    if (["PENDING", "CREATED", "INITIATED", "UNKNOWN"].includes(cleanStatus)) {
+      return { ok: false, status: "PENDING", reason: "Payment is still pending confirmation. Confirmation email triggers only after payment verification." };
+    }
+
+    // Free events or complimentary 0-amount passes
+    if (Number(amount) === 0 && (section === "event" || cleanStatus === "FREE" || (paymentId && paymentId.startsWith("FREE_")))) {
+      return { ok: true, status: "VERIFIED" };
+    }
+
+    if (!paymentId || String(paymentId).trim().length < 5) {
+      return { ok: false, status: "PENDING", reason: "Missing verified payment transaction ID. Complete payment before requesting UID & email." };
+    }
+
+    const paymentsList: any[] = Array.isArray(appState["db_payments"]) ? appState["db_payments"] : [];
+    const ordersList: any[] = Array.isArray(appState["db_razorpay_orders"]) ? appState["db_razorpay_orders"] : [];
+
+    // Check if explicitly marked FAILED in server orders/payments
+    const failedOrder = orderId ? ordersList.find((o) => o.orderId === orderId && o.status === "FAILED") : null;
+    if (failedOrder) {
+      return { ok: false, status: "FAILED", reason: "Order payment verification failed." };
+    }
+
+    const confirmedInPayments = paymentsList.some(
+      (p) => (p.id === paymentId || p.razorpayPaymentId === paymentId) && p.status === "Successful"
+    );
+    const confirmedInOrders = orderId
+      ? ordersList.some((o) => o.orderId === orderId && o.status === "PAID")
+      : false;
+    const isDirectUtrOrVerifiedClient =
+      cleanStatus === "VERIFIED" ||
+      cleanStatus === "PAID" ||
+      cleanStatus === "SUCCESS" ||
+      cleanStatus === "SUCCESSFUL" ||
+      String(paymentId).startsWith("UPI_UTR_") ||
+      String(paymentId).startsWith("pay_");
+
+    if (confirmedInPayments || confirmedInOrders || isDirectUtrOrVerifiedClient) {
+      return { ok: true, status: "VERIFIED" };
+    }
+
+    return { ok: false, status: "PENDING", reason: "Payment could not be confirmed." };
+  }
+
+  function findExistingRecordByKeyOrUid(
+    appState: Record<string, any>,
+    uid: string,
+    sectionFilter?: RegistrationSection | null
+  ): { record?: RegistrationUidRecord; revoked?: boolean; expired?: boolean } {
+    const normalizedUid = uid.trim().toUpperCase();
+    const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+      ? appState["db_registration_uids"]
+      : [];
+    const revokedMap: Record<string, any> =
+      appState["scoders_revoked_passes"] && typeof appState["scoders_revoked_passes"] === "object"
+        ? appState["scoders_revoked_passes"]
+        : {};
+
+    if (revokedMap[normalizedUid]) {
+      return { revoked: true };
+    }
+
+    let matched = uidRecords.find(
+      (r) =>
+        r?.uid?.trim().toUpperCase() === normalizedUid &&
+        (!sectionFilter || r.section === sectionFilter)
+    );
+
+    if (matched) {
+      if (matched.status === "REVOKED") return { record: matched, revoked: true };
+      const expiryTime = Date.parse(matched.validUntil);
+      if (matched.status === "EXPIRED" || (!isNaN(expiryTime) && expiryTime < Date.now())) {
+        return { record: { ...matched, status: "EXPIRED" }, expired: true };
+      }
+      return { record: matched };
+    }
+
+    // Backward-compatible lookup in legacy appState collections (services / workshops / event tickets)
+    if (!sectionFilter || sectionFilter === "service") {
+      const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+      const svc = svcRegs.find((s) => s?.uniqueKey?.trim().toUpperCase() === normalizedUid);
+      if (svc) {
+        const validity = computeUidValidityWindow("service", svc.projectSubmissionDate || svc.registrationDate);
+        return {
+          record: {
+            uid: svc.uniqueKey,
+            section: "service",
+            itemId: svc.serviceId || "service",
+            itemTitle: svc.selectedServiceTitle || "S-CODERS Service",
+            clientName: svc.clientProfile?.name || "Registered Client",
+            clientEmail: svc.clientProfile?.email || "client@scoders.dev",
+            clientPhone: svc.clientProfile?.phone,
+            clientOrg: svc.clientProfile?.company,
+            amount: 0,
+            currency: "INR",
+            paymentStatus: "NOT_REQUIRED",
+            dedupeKey: `legacy-svc-${svc.uniqueKey}`,
+            chatId: svc.chatId,
+            metadata: {
+              requirements: svc.projectRequirements,
+              budget: svc.budget,
+              timeline: svc.timeline,
+            },
+            issuedAt: svc.registrationDate || new Date().toISOString(),
+            validFrom: validity.validFrom,
+            validUntil: svc.projectSubmissionDate ? new Date(Math.max(Date.now() + 86400000, Date.parse(svc.projectSubmissionDate) + 150 * 86400000)).toISOString() : validity.validUntil,
+            status: "ACTIVE",
+            confirmationEmailSent: true,
+          },
+        };
+      }
+    }
+
+    if (!sectionFilter || sectionFilter === "workshop") {
+      const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+      const wksp = wkspRegs.find((w) => w?.uniqueAccessKey?.trim().toUpperCase() === normalizedUid);
+      if (wksp) {
+        if (wksp.isRevoked || wksp.paymentStatus === "Revoked") {
+          return { revoked: true };
+        }
+        const validity = computeUidValidityWindow("workshop");
+        return {
+          record: {
+            uid: wksp.uniqueAccessKey,
+            section: "workshop",
+            itemId: wksp.workshopId || "workshop",
+            itemTitle: wksp.workshopTitle || "S-CODERS Workshop",
+            clientName: wksp.participantProfile?.name || "Registered Participant",
+            clientEmail: wksp.participantProfile?.email || "attendee@scoders.com",
+            clientPhone: wksp.participantProfile?.phone,
+            clientRole: wksp.participantProfile?.role,
+            amount: Number(wksp.amountPaid) || 0,
+            currency: "INR",
+            paymentStatus: "VERIFIED",
+            paymentId: wksp.transactionId,
+            dedupeKey: `legacy-wksp-${wksp.uniqueAccessKey}`,
+            chatId: wksp.chatId,
+            issuedAt: wksp.paymentDate || new Date().toISOString(),
+            validFrom: validity.validFrom,
+            validUntil: validity.validUntil,
+            status: "ACTIVE",
+            confirmationEmailSent: true,
+          },
+        };
+      }
+    }
+
+    if (!sectionFilter || sectionFilter === "event") {
+      const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+      const tkt = evtTickets.find(
+        (t) =>
+          t?.ticketCode?.trim().toUpperCase() === normalizedUid ||
+          (t?.id && String(t.id).trim().toUpperCase() === normalizedUid)
+      );
+      if (tkt) {
+        if (tkt.status === "Ticket Cancelled") return { revoked: true };
+        const validity = computeUidValidityWindow("event", tkt.eventDate);
+        return {
+          record: {
+            uid: tkt.ticketCode,
+            section: "event",
+            itemId: tkt.eventId || "event",
+            itemTitle: tkt.eventName || "S-CODERS Event",
+            clientName: tkt.participantName || "Registered Attendee",
+            clientEmail: tkt.participantEmail || "attendee@scoders.dev",
+            clientPhone: tkt.participantPhone,
+            clientOrg: tkt.participantOrg,
+            amount: Number(tkt.amountPaid) || 0,
+            currency: "INR",
+            paymentStatus: "VERIFIED",
+            paymentId: tkt.paymentId,
+            orderId: tkt.orderId,
+            dedupeKey: `legacy-evt-${tkt.ticketCode}`,
+            metadata: {
+              date: tkt.eventDate,
+              day: tkt.eventDay,
+              time: tkt.eventTime,
+              location: tkt.eventLocation,
+            },
+            issuedAt: tkt.bookingDate || new Date().toISOString(),
+            validFrom: validity.validFrom,
+            validUntil: validity.validUntil,
+            status: "ACTIVE",
+            confirmationEmailSent: true,
+          },
+        };
+      }
+    }
+
+    return {};
+  }
+
+  // Unified Registration + Unique UID Generation + Automatic Email Notification (escoders@gmail.com)
+  app.post("/api/registrations/register-and-notify", async (req, res) => {
+    try {
+      const {
+        section: rawSection,
+        itemId,
+        itemTitle,
+        clientName,
+        clientEmail,
+        clientPhone,
+        clientOrg,
+        clientRole,
+        amount = 0,
+        currency = "INR",
+        paymentStatus,
+        paymentId,
+        orderId,
+        idempotencyKey,
+        requestedUid,
+        chatId,
+        metadata = {},
+        actionUrl,
+      } = req.body || {};
+
+      const section = normalizeSectionName(rawSection);
+      if (!section) {
+        return res.status(400).json({ success: false, error: "Invalid registration section. Must be service, workshop, or event." });
+      }
+
+      const cleanEmail = String(clientEmail || "").trim().toLowerCase();
+      const cleanName = String(clientName || "").trim() || "Valued Client";
+      const cleanItemId = String(itemId || itemTitle || section).trim();
+      const cleanItemTitle = String(itemTitle || "S-CODERS Registration").trim();
+      if (!cleanEmail || !cleanEmail.includes("@")) {
+        return res.status(400).json({ success: false, error: "Valid client email address is required." });
+      }
+
+      const appState = getStoredAppState();
+
+      // 1. Gate check: Workshop & paid Events MUST have verified payment confirmation
+      const payCheck = isPaymentVerifiedForRegistration(
+        section,
+        Number(amount) || 0,
+        paymentId,
+        orderId,
+        paymentStatus,
+        appState
+      );
+      if (!payCheck.ok) {
+        return res.status(402).json({
+          success: false,
+          paymentRequired: true,
+          paymentStatus: payCheck.status,
+          error: payCheck.reason || "Payment must be verified before issuing UID or sending email.",
+        });
+      }
+
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+        ? [...appState["db_registration_uids"]]
+        : [];
+
+      const computedDedupeKey = String(
+        idempotencyKey ||
+          (paymentId
+            ? `${section}:pay:${String(paymentId).trim()}`
+            : orderId
+            ? `${section}:ord:${String(orderId).trim()}`
+            : `${section}:reg:${cleanEmail}:${cleanItemId.toLowerCase()}`)
+      );
+
+      // 2. Strict Deduplication: Prevent duplicate UIDs & duplicate confirmation emails
+      const existingRecordIdx = uidRecords.findIndex((r) => {
+        if (!r || r.section !== section) return false;
+        if (r.status === "REVOKED") return false;
+        const notExpired = isNaN(Date.parse(r.validUntil)) || Date.parse(r.validUntil) >= Date.now();
+        if (!notExpired) return false;
+        if (r.dedupeKey && r.dedupeKey === computedDedupeKey) return true;
+        if (paymentId && r.paymentId && r.paymentId === String(paymentId).trim()) return true;
+        if (orderId && r.orderId && r.orderId === String(orderId).trim()) return true;
+        // For service or free event, also deduplicate active identical email+item registration
+        if (
+          (section === "service" || (section === "event" && Number(amount) === 0)) &&
+          r.clientEmail?.toLowerCase() === cleanEmail &&
+          r.itemId?.toLowerCase() === cleanItemId.toLowerCase() &&
+          r.status === "ACTIVE"
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      if (existingRecordIdx >= 0) {
+        const existingRecord = uidRecords[existingRecordIdx];
+        appendEmailDispatchLog(appState, {
+          section,
+          to: cleanEmail,
+          from: OFFICIAL_SCODERS_EMAIL,
+          subject: `Deduplicated ${section} registration (${existingRecord.uid})`,
+          uid: existingRecord.uid,
+          dedupeKey: computedDedupeKey,
+          itemTitle: cleanItemTitle,
+          status: "SKIPPED_DUPLICATE",
+          detailsSummary: "Existing active UID returned; duplicate email prevented.",
+        });
+        saveStoredAppState(appState);
+
+        return res.json({
+          success: true,
+          deduplicated: true,
+          alreadyRegistered: true,
+          uid: existingRecord.uid,
+          emailSent: false,
+          emailSkippedDuplicate: true,
+          emailFrom: OFFICIAL_SCODERS_EMAIL,
+          record: existingRecord,
+        });
+      }
+
+      // 3. Mint guaranteed-unique registration UID & compute validity window
+      const existingAllUids = collectAllExistingUids(appState);
+      let finalUid =
+        requestedUid && typeof requestedUid === "string" && !existingAllUids.has(requestedUid.trim().toUpperCase())
+          ? requestedUid.trim().toUpperCase()
+          : generateCollisionFreeUid(section, cleanItemId, appState);
+
+      const { validFrom, validUntil } = computeUidValidityWindow(section, metadata?.date);
+      const targetUrl =
+        actionUrl && String(actionUrl).startsWith("http")
+          ? String(actionUrl)
+          : resolveAppUrl(
+              req,
+              section === "service"
+                ? `/?view=services&key=${finalUid}`
+                : section === "workshop"
+                ? `/?view=workshops&key=${finalUid}`
+                : `/?view=events&ticket=${finalUid}`
+            );
+
+      // 4. Build section-specific automated email & dispatch from escoders@gmail.com
+      let subject = "";
+      let html = "";
+      if (section === "service") {
+        subject = `✅ Service Registered - Your Unique S-CODERS Code (${finalUid})`;
+        html = getServiceAcceptanceEmailHtml({
+          clientName: cleanName,
+          serviceTitle: cleanItemTitle,
+          uniqueKey: finalUid,
+          actionUrl: targetUrl,
+          validFrom,
+          validUntil,
+        });
+      } else if (section === "workshop") {
+        subject = `🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (${finalUid})`;
+        html = getWorkshopEmailHtml({
+          status: "SUCCESS",
+          clientName: cleanName,
+          workshopTitle: cleanItemTitle,
+          amount: Number(amount) || 0,
+          currency,
+          uniqueKey: finalUid,
+          actionUrl: targetUrl,
+          paymentId: paymentId || `pay_wksp_${Date.now()}`,
+          workshopDate: metadata?.date,
+          workshopTime: metadata?.time,
+          workshopLocation: metadata?.location,
+          validUntil,
+        });
+      } else {
+        subject = `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${finalUid})`;
+        html = getEventEmailHtml({
+          status: "SUCCESS",
+          clientName: cleanName,
+          eventTitle: cleanItemTitle,
+          amount: Number(amount) || 0,
+          currency,
+          ticketCode: finalUid,
+          actionUrl: targetUrl,
+          paymentId: paymentId || (Number(amount) === 0 ? `FREE_PASS_${Date.now()}` : `pay_evt_${Date.now()}`),
+          eventDate: metadata?.date,
+          eventDay: metadata?.day,
+          eventTime: metadata?.time,
+          eventLocation: metadata?.location,
+          eventDescription: metadata?.description,
+          validUntil,
+        });
+      }
+
+      const emailRes = await sendEmailNotification({
+        to: cleanEmail,
+        subject,
+        html,
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+
+      const newRecord: RegistrationUidRecord = {
+        uid: finalUid,
+        section,
+        itemId: cleanItemId,
+        itemTitle: cleanItemTitle,
+        clientName: cleanName,
+        clientEmail: cleanEmail,
+        clientPhone: clientPhone ? String(clientPhone).trim() : undefined,
+        clientOrg: clientOrg ? String(clientOrg).trim() : undefined,
+        clientRole: clientRole ? String(clientRole).trim() : undefined,
+        amount: Number(amount) || 0,
+        currency,
+        paymentStatus: payCheck.status,
+        paymentId: paymentId ? String(paymentId).trim() : undefined,
+        orderId: orderId ? String(orderId).trim() : undefined,
+        dedupeKey: computedDedupeKey,
+        chatId: chatId || undefined,
+        metadata,
+        issuedAt: validFrom,
+        validFrom,
+        validUntil,
+        status: "ACTIVE",
+        confirmationEmailSent: Boolean(emailRes.success),
+        confirmationEmailSentAt: emailRes.success ? new Date().toISOString() : undefined,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        emailMessageId: emailRes.messageId,
+      };
+
+      uidRecords.unshift(newRecord);
+      appState["db_registration_uids"] = uidRecords;
+
+      appendEmailDispatchLog(appState, {
+        section,
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject,
+        uid: finalUid,
+        dedupeKey: computedDedupeKey,
+        itemTitle: cleanItemTitle,
+        status: emailRes.success ? "SENT" : "FAILED",
+        messageId: emailRes.messageId,
+        previewUrl: emailRes.previewUrl,
+        simulated: emailRes.simulated,
+        error: emailRes.error,
+        detailsSummary:
+          section === "service"
+            ? `Service: ${cleanItemTitle} | Safe-keeping & recovery notice included`
+            : section === "workshop"
+            ? `Workshop: ${cleanItemTitle} | Date: ${metadata?.date || "TBD"} | Mid-session rejoin instructions included`
+            : `Event: ${cleanItemTitle} | Venue: ${metadata?.location || "TBD"} | Date: ${metadata?.date || "TBD"} ${metadata?.time || ""}`,
+      });
+
+      saveStoredAppState(appState);
+
+      return res.json({
+        success: true,
+        deduplicated: false,
+        uid: finalUid,
+        validFrom,
+        validUntil,
+        emailSent: Boolean(emailRes.success),
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        previewUrl: emailRes.previewUrl,
+        record: newRecord,
+      });
+    } catch (err: any) {
+      console.error("Unified Registration & Notify Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to register and send notification." });
+    }
+  });
+
+  // Verify UID + Expiration + Revocation across Services, Workshops & Events
+  app.post("/api/registrations/verify-uid", (req, res) => {
+    try {
+      const { uid, section: rawSection } = req.body || {};
+      const cleanUid = String(uid || "").trim().toUpperCase();
+      if (!cleanUid) {
+        return res.status(400).json({ success: false, valid: false, error: "Registration code (UID) is required." });
+      }
+
+      const sectionFilter = rawSection ? normalizeSectionName(rawSection) : null;
+      const appState = getStoredAppState();
+      const lookup = findExistingRecordByKeyOrUid(appState, cleanUid, sectionFilter);
+
+      if (lookup.revoked) {
+        return res.status(403).json({
+          success: false,
+          valid: false,
+          revoked: true,
+          error: `Access code ${cleanUid} has been revoked by an administrator. Please contact ${OFFICIAL_SCODERS_EMAIL}.`,
+        });
+      }
+
+      if (lookup.expired) {
+        // Persist expired status on record if stored in db_registration_uids
+        const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+          ? [...appState["db_registration_uids"]]
+          : [];
+        const idx = uidRecords.findIndex((r) => r?.uid?.trim().toUpperCase() === cleanUid);
+        if (idx >= 0 && uidRecords[idx].status !== "EXPIRED") {
+          uidRecords[idx] = { ...uidRecords[idx], status: "EXPIRED" };
+          appState["db_registration_uids"] = uidRecords;
+          saveStoredAppState(appState);
+        }
+        return res.status(410).json({
+          success: false,
+          valid: false,
+          expired: true,
+          error: `Registration code ${cleanUid} has expired (validity ended ${new Date(lookup.record!.validUntil).toLocaleDateString()}). Please re-register or contact ${OFFICIAL_SCODERS_EMAIL}.`,
+          record: lookup.record,
+        });
+      }
+
+      if (!lookup.record) {
+        return res.status(404).json({
+          success: false,
+          valid: false,
+          error: `No active ${sectionFilter || "registration"} found for code "${cleanUid}". Check the code or use email recovery.`,
+        });
+      }
+
+      return res.json({
+        success: true,
+        valid: true,
+        record: lookup.record,
+      });
+    } catch (err: any) {
+      console.error("Verify UID Error:", err);
+      return res.status(500).json({ success: false, valid: false, error: "Failed to verify registration code." });
+    }
+  });
+
+  // Step 1 of UID Recovery: Send 6-digit OTP verification code from escoders@gmail.com
+  app.post("/api/registrations/recovery/request", async (req, res) => {
+    try {
+      const { email, section: rawSection } = req.body || {};
+      const cleanEmail = String(email || "").trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes("@")) {
+        return res.status(400).json({ success: false, error: "Please enter a valid registered email address." });
+      }
+
+      const sectionFilter = rawSection ? normalizeSectionName(rawSection) : null;
+      const appState = getStoredAppState();
+
+      // Find all matching registrations for this email (both unified db_registration_uids and legacy tables)
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+        ? appState["db_registration_uids"]
+        : [];
+      const matchingCount = uidRecords.filter(
+        (r) =>
+          r.clientEmail?.toLowerCase() === cleanEmail &&
+          (!sectionFilter || r.section === sectionFilter)
+      ).length;
+
+      // Also check legacy tables if unified list doesn't have entries yet
+      const legacySvc = Array.isArray(appState["db_service_registrations"])
+        ? appState["db_service_registrations"].filter((s: any) => s?.clientProfile?.email?.toLowerCase() === cleanEmail)
+        : [];
+      const legacyWksp = Array.isArray(appState["db_workshop_registrations"])
+        ? appState["db_workshop_registrations"].filter((w: any) => w?.participantProfile?.email?.toLowerCase() === cleanEmail)
+        : [];
+      const legacyEvt = Array.isArray(appState["scoders_event_tickets"])
+        ? appState["scoders_event_tickets"].filter((t: any) => t?.participantEmail?.toLowerCase() === cleanEmail)
+        : [];
+
+      const hasAnyRegistration =
+        matchingCount > 0 ||
+        ((!sectionFilter || sectionFilter === "service") && legacySvc.length > 0) ||
+        ((!sectionFilter || sectionFilter === "workshop") && legacyWksp.length > 0) ||
+        ((!sectionFilter || sectionFilter === "event") && legacyEvt.length > 0);
+
+      if (!hasAnyRegistration) {
+        return res.status(404).json({
+          success: false,
+          error: `No active ${sectionFilter || "S-CODERS"} registrations found for ${cleanEmail}.`,
+        });
+      }
+
+      // Generate cryptographically random 6-digit OTP & store hashed with 10 min TTL
+      const otpCode = String(crypto.randomInt(100000, 999999));
+      const otpHash = crypto.createHash("sha256").update(`${cleanEmail}|${otpCode}`).digest("hex");
+      const nowMs = Date.now();
+      const expiresAt = new Date(nowMs + 10 * 60 * 1000).toISOString();
+
+      const otps: any[] = Array.isArray(appState["db_uid_recovery_otps"])
+        ? appState["db_uid_recovery_otps"].filter((o: any) => o.email !== cleanEmail)
+        : [];
+      otps.unshift({
+        email: cleanEmail,
+        section: sectionFilter || "all",
+        otpHash,
+        expiresAt,
+        expiresAtMs: nowMs + 10 * 60 * 1000,
+        attempts: 0,
+        used: false,
+        createdAt: new Date(nowMs).toISOString(),
+      });
+      appState["db_uid_recovery_otps"] = otps.slice(0, 200);
+
+      const sectionLabel =
+        sectionFilter === "service"
+          ? "Service Workspace"
+          : sectionFilter === "workshop"
+          ? "Workshop Session"
+          : sectionFilter === "event"
+          ? "Event Pass"
+          : "Service, Workshop & Event";
+
+      const emailRes = await sendEmailNotification({
+        to: cleanEmail,
+        subject: `🔐 S-CODERS UID Recovery Verification Code: ${otpCode}`,
+        html: getUidRecoveryOtpEmailHtml({
+          email: cleanEmail,
+          otpCode,
+          sectionLabel,
+        }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+
+      appendEmailDispatchLog(appState, {
+        section: sectionFilter || "recovery",
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject: `S-CODERS UID Recovery Verification Code`,
+        status: emailRes.success ? "SENT" : "FAILED",
+        messageId: emailRes.messageId,
+        previewUrl: emailRes.previewUrl,
+        simulated: emailRes.simulated,
+        detailsSummary: `6-digit email verification OTP dispatched for ${sectionLabel} recovery.`,
+      });
+      saveStoredAppState(appState);
+
+      return res.json({
+        success: true,
+        message: `A 6-digit verification code has been sent to ${cleanEmail} from ${OFFICIAL_SCODERS_EMAIL}.`,
+        expiresAt,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        previewUrl: emailRes.previewUrl,
+      });
+    } catch (err: any) {
+      console.error("Recovery Request Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to initiate email verification recovery." });
+    }
+  });
+
+  // Step 2 of UID Recovery: Verify OTP, reveal active/expired status & optionally resend summary email
+  app.post("/api/registrations/recovery/verify", async (req, res) => {
+    try {
+      const { email, otp, section: rawSection, resendEmail = true } = req.body || {};
+      const cleanEmail = String(email || "").trim().toLowerCase();
+      const cleanOtp = String(otp || "").trim();
+
+      if (!cleanEmail || !cleanOtp) {
+        return res.status(400).json({ success: false, error: "Email and 6-digit verification code are required." });
+      }
+
+      const sectionFilter = rawSection ? normalizeSectionName(rawSection) : null;
+      const appState = getStoredAppState();
+      const otps: any[] = Array.isArray(appState["db_uid_recovery_otps"]) ? [...appState["db_uid_recovery_otps"]] : [];
+      const otpIdx = otps.findIndex((o) => o.email === cleanEmail && !o.used);
+
+      if (otpIdx < 0) {
+        return res.status(400).json({ success: false, error: "No pending verification code found. Please request a new code." });
+      }
+
+      const otpRecord = otps[otpIdx];
+      if (Date.now() > Number(otpRecord.expiresAtMs || 0)) {
+        otps[otpIdx] = { ...otpRecord, used: true };
+        appState["db_uid_recovery_otps"] = otps;
+        saveStoredAppState(appState);
+        return res.status(410).json({ success: false, error: "Verification code has expired. Please request a new code." });
+      }
+
+      if (Number(otpRecord.attempts || 0) >= 5) {
+        return res.status(429).json({ success: false, error: "Too many invalid attempts. Please request a new verification code." });
+      }
+
+      const candidateHash = crypto.createHash("sha256").update(`${cleanEmail}|${cleanOtp}`).digest("hex");
+      if (candidateHash !== otpRecord.otpHash) {
+        otps[otpIdx] = { ...otpRecord, attempts: Number(otpRecord.attempts || 0) + 1 };
+        appState["db_uid_recovery_otps"] = otps;
+        saveStoredAppState(appState);
+        return res.status(401).json({ success: false, error: "Invalid verification code. Please check your inbox and try again." });
+      }
+
+      // Mark OTP verified & consumed
+      otps[otpIdx] = { ...otpRecord, used: true, verifiedAt: new Date().toISOString() };
+      appState["db_uid_recovery_otps"] = otps;
+
+      // Gather all registrations belonging to this verified email
+      const recoveredMap = new Map<string, RegistrationUidRecord>();
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+        ? appState["db_registration_uids"]
+        : [];
+      const revokedMap: Record<string, any> = appState["scoders_revoked_passes"] || {};
+
+      for (const r of uidRecords) {
+        if (r?.clientEmail?.toLowerCase() === cleanEmail && (!sectionFilter || r.section === sectionFilter)) {
+          const isRevoked = r.status === "REVOKED" || Boolean(revokedMap[r.uid.toUpperCase()]);
+          const isExpired = !isNaN(Date.parse(r.validUntil)) && Date.parse(r.validUntil) < Date.now();
+          recoveredMap.set(r.uid.toUpperCase(), {
+            ...r,
+            status: isRevoked ? "REVOKED" : isExpired ? "EXPIRED" : "ACTIVE",
+          });
+        }
+      }
+
+      // Also include any legacy synced entries not yet in db_registration_uids
+      if (!sectionFilter || sectionFilter === "service") {
+        const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+        for (const s of svcRegs) {
+          if (s?.clientProfile?.email?.toLowerCase() === cleanEmail && s.uniqueKey && !recoveredMap.has(s.uniqueKey.toUpperCase())) {
+            const w = computeUidValidityWindow("service", s.projectSubmissionDate);
+            recoveredMap.set(s.uniqueKey.toUpperCase(), {
+              uid: s.uniqueKey,
+              section: "service",
+              itemId: s.serviceId || "service",
+              itemTitle: s.selectedServiceTitle || "Service",
+              clientName: s.clientProfile?.name || "Client",
+              clientEmail: cleanEmail,
+              amount: 0,
+              currency: "INR",
+              paymentStatus: "NOT_REQUIRED",
+              dedupeKey: `legacy-svc-${s.uniqueKey}`,
+              chatId: s.chatId,
+              issuedAt: s.registrationDate || w.validFrom,
+              validFrom: w.validFrom,
+              validUntil: w.validUntil,
+              status: "ACTIVE",
+              confirmationEmailSent: true,
+            });
+          }
+        }
+      }
+
+      if (!sectionFilter || sectionFilter === "workshop") {
+        const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+        for (const wk of wkspRegs) {
+          if (wk?.participantProfile?.email?.toLowerCase() === cleanEmail && wk.uniqueAccessKey && !recoveredMap.has(wk.uniqueAccessKey.toUpperCase())) {
+            const w = computeUidValidityWindow("workshop");
+            const isRev = Boolean(wk.isRevoked || wk.paymentStatus === "Revoked" || revokedMap[wk.uniqueAccessKey.toUpperCase()]);
+            recoveredMap.set(wk.uniqueAccessKey.toUpperCase(), {
+              uid: wk.uniqueAccessKey,
+              section: "workshop",
+              itemId: wk.workshopId || "workshop",
+              itemTitle: wk.workshopTitle || "Workshop",
+              clientName: wk.participantProfile?.name || "Participant",
+              clientEmail: cleanEmail,
+              amount: Number(wk.amountPaid) || 0,
+              currency: "INR",
+              paymentStatus: "VERIFIED",
+              paymentId: wk.transactionId,
+              dedupeKey: `legacy-wksp-${wk.uniqueAccessKey}`,
+              chatId: wk.chatId,
+              issuedAt: wk.paymentDate || w.validFrom,
+              validFrom: w.validFrom,
+              validUntil: w.validUntil,
+              status: isRev ? "REVOKED" : "ACTIVE",
+              confirmationEmailSent: true,
+            });
+          }
+        }
+      }
+
+      if (!sectionFilter || sectionFilter === "event") {
+        const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+        for (const t of evtTickets) {
+          if (t?.participantEmail?.toLowerCase() === cleanEmail && t.ticketCode && !recoveredMap.has(t.ticketCode.toUpperCase())) {
+            const w = computeUidValidityWindow("event", t.eventDate);
+            recoveredMap.set(t.ticketCode.toUpperCase(), {
+              uid: t.ticketCode,
+              section: "event",
+              itemId: t.eventId || "event",
+              itemTitle: t.eventName || "Event",
+              clientName: t.participantName || "Attendee",
+              clientEmail: cleanEmail,
+              amount: Number(t.amountPaid) || 0,
+              currency: "INR",
+              paymentStatus: "VERIFIED",
+              paymentId: t.paymentId,
+              orderId: t.orderId,
+              dedupeKey: `legacy-evt-${t.ticketCode}`,
+              metadata: { date: t.eventDate, day: t.eventDay, time: t.eventTime, location: t.eventLocation },
+              issuedAt: t.bookingDate || w.validFrom,
+              validFrom: w.validFrom,
+              validUntil: w.validUntil,
+              status: t.status === "Ticket Cancelled" ? "REVOKED" : "ACTIVE",
+              confirmationEmailSent: true,
+            });
+          }
+        }
+      }
+
+      const allRecovered = Array.from(recoveredMap.values());
+      const activeRecovered = allRecovered.filter((r) => r.status === "ACTIVE");
+
+      let resentEmail = false;
+      if (resendEmail && activeRecovered.length > 0) {
+        const summaryRes = await sendEmailNotification({
+          to: cleanEmail,
+          subject: `🔑 Your Recovered S-CODERS Registration Codes (UID)`,
+          html: getUidRecoverySummaryEmailHtml({
+            email: cleanEmail,
+            records: activeRecovered.map((r) => ({
+              section: r.section,
+              itemTitle: r.itemTitle,
+              uid: r.uid,
+              validUntil: r.validUntil,
+              status: r.status,
+            })),
+          }),
+          from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+          replyTo: OFFICIAL_SCODERS_EMAIL,
+        });
+        resentEmail = Boolean(summaryRes.success);
+        appendEmailDispatchLog(appState, {
+          section: sectionFilter || "recovery",
+          to: cleanEmail,
+          from: OFFICIAL_SCODERS_EMAIL,
+          subject: `Your Recovered S-CODERS Registration Codes (UID)`,
+          uid: activeRecovered.map((r) => r.uid).join(", "),
+          status: summaryRes.success ? "SENT" : "FAILED",
+          messageId: summaryRes.messageId,
+          previewUrl: summaryRes.previewUrl,
+          simulated: summaryRes.simulated,
+          detailsSummary: `Recovered and resent ${activeRecovered.length} active UID(s).`,
+        });
+      }
+
+      saveStoredAppState(appState);
+
+      return res.json({
+        success: true,
+        verified: true,
+        email: cleanEmail,
+        resentEmail,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        registrations: allRecovered,
+        activeCount: activeRecovered.length,
+      });
+    } catch (err: any) {
+      console.error("Recovery Verify Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to verify recovery code." });
+    }
+  });
+
+  // Read sanitized email dispatch audit logs & UID records (excludes OTP codes)
+  app.get("/api/registrations/email-logs", (req, res) => {
+    try {
+      const appState = getStoredAppState();
+      const logs = Array.isArray(appState["db_email_logs"]) ? appState["db_email_logs"] : [];
+      const uidRecords = Array.isArray(appState["db_registration_uids"]) ? appState["db_registration_uids"] : [];
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({
+        success: true,
+        officialSender: OFFICIAL_SCODERS_EMAIL,
+        emailLogs: logs,
+        uidCount: uidRecords.length,
+        uidRecords,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Failed to load email logs." });
+    }
+  });
+
+  // 1. Service Registration Accepted Email Endpoint (Deduplicated & Persisted)
   app.post("/api/email/service-accepted", async (req, res) => {
     try {
-      const { email, clientName, serviceTitle, uniqueKey, actionUrl } = req.body;
-      const targetUrl = actionUrl && actionUrl.startsWith("http")
-        ? actionUrl
-        : resolveAppUrl(req, `/?view=services&key=${uniqueKey || ""}`);
+      const { email, clientName, serviceTitle, uniqueKey, actionUrl, serviceId } = req.body || {};
+      const cleanEmail = String(email || "client@example.com").trim().toLowerCase();
+      const appState = getStoredAppState();
+      const finalKey = String(uniqueKey || "").trim().toUpperCase() || generateCollisionFreeUid("service", serviceId || serviceTitle || "service", appState);
+      const targetUrl = actionUrl && String(actionUrl).startsWith("http")
+        ? String(actionUrl)
+        : resolveAppUrl(req, `/?view=services&key=${finalKey}`);
 
+      // Deduplicate: check if email already sent for this exact UID
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
+      const existing = uidRecords.find((r) => r.section === "service" && r.uid?.toUpperCase() === finalKey && r.confirmationEmailSent);
+      if (existing) {
+        return res.json({
+          success: true,
+          deduplicated: true,
+          uid: existing.uid,
+          emailSent: false,
+          emailFrom: OFFICIAL_SCODERS_EMAIL,
+          message: "Confirmation email already dispatched for this service UID.",
+        });
+      }
+
+      const { validFrom, validUntil } = computeUidValidityWindow("service");
+      const subject = `✅ Service Registered - Your Unique S-CODERS Code (${finalKey})`;
       const result = await sendEmailNotification({
-        to: email || "client@example.com",
-        subject: `✅ Project Profile Accepted Successfully - S-CODERS (Ref: ${uniqueKey || 'BTD-SERV-PROJ'})`,
+        to: cleanEmail,
+        subject,
         html: getServiceAcceptanceEmailHtml({
           clientName: clientName || "Valued Client",
           serviceTitle: serviceTitle || "Custom Software Development",
-          uniqueKey: uniqueKey || `BTD-SERV-${Date.now().toString(36).toUpperCase()}`,
+          uniqueKey: finalKey,
           actionUrl: targetUrl,
+          validFrom,
+          validUntil,
         }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
       });
+
+      const record: RegistrationUidRecord = {
+        uid: finalKey,
+        section: "service",
+        itemId: String(serviceId || serviceTitle || "service"),
+        itemTitle: String(serviceTitle || "Custom Software Development"),
+        clientName: String(clientName || "Valued Client"),
+        clientEmail: cleanEmail,
+        amount: 0,
+        currency: "INR",
+        paymentStatus: "NOT_REQUIRED",
+        dedupeKey: `service:key:${finalKey}`,
+        issuedAt: validFrom,
+        validFrom,
+        validUntil,
+        status: "ACTIVE",
+        confirmationEmailSent: Boolean(result.success),
+        confirmationEmailSentAt: result.success ? new Date().toISOString() : undefined,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        emailMessageId: result.messageId,
+      };
+      uidRecords.unshift(record);
+      appState["db_registration_uids"] = uidRecords;
+      appendEmailDispatchLog(appState, {
+        section: "service",
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject,
+        uid: finalKey,
+        itemTitle: serviceTitle,
+        status: result.success ? "SENT" : "FAILED",
+        messageId: result.messageId,
+        previewUrl: result.previewUrl,
+        simulated: result.simulated,
+      });
+      saveStoredAppState(appState);
 
       res.json({
         success: true,
+        uid: finalKey,
+        validUntil,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
         message: "Service acceptance email sent successfully.",
         emailSent: result.success,
       });
@@ -3348,31 +4877,129 @@ Return ONLY valid JSON with this structure:
     }
   });
 
-  // 2. Workshop Payment Verified Email Endpoint
+  // 2. Workshop Payment Verified Email Endpoint (Payment-Gated & Deduplicated)
   app.post("/api/email/workshop-payment-verified", async (req, res) => {
     try {
-      const { email, clientName, workshopTitle, amount, currency = "INR", uniqueKey, paymentId, actionUrl } = req.body;
-      const targetUrl = actionUrl && actionUrl.startsWith("http")
-        ? actionUrl
-        : resolveAppUrl(req, `/?view=workshops&key=${uniqueKey || ""}`);
+      const {
+        email,
+        clientName,
+        workshopTitle,
+        workshopId,
+        workshopDate,
+        workshopTime,
+        workshopLocation,
+        amount,
+        currency = "INR",
+        uniqueKey,
+        paymentId,
+        orderId,
+        paymentStatus,
+        actionUrl,
+      } = req.body || {};
 
+      const cleanEmail = String(email || "client@example.com").trim().toLowerCase();
+      const appState = getStoredAppState();
+
+      // Strict payment verification gate
+      const payCheck = isPaymentVerifiedForRegistration("workshop", Number(amount) || 0, paymentId, orderId, paymentStatus, appState);
+      if (!payCheck.ok) {
+        return res.status(402).json({
+          success: false,
+          paymentRequired: true,
+          error: payCheck.reason || "Workshop email can only be sent after verified payment confirmation.",
+        });
+      }
+
+      const finalKey = String(uniqueKey || "").trim().toUpperCase() || generateCollisionFreeUid("workshop", workshopId || workshopTitle || "wksp", appState);
+      const targetUrl = actionUrl && String(actionUrl).startsWith("http")
+        ? String(actionUrl)
+        : resolveAppUrl(req, `/?view=workshops&key=${finalKey}`);
+
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
+      const existing = uidRecords.find(
+        (r) =>
+          r.section === "workshop" &&
+          r.confirmationEmailSent &&
+          (r.uid?.toUpperCase() === finalKey || (paymentId && r.paymentId === String(paymentId).trim()))
+      );
+      if (existing) {
+        return res.json({
+          success: true,
+          deduplicated: true,
+          uid: existing.uid,
+          emailSent: false,
+          emailFrom: OFFICIAL_SCODERS_EMAIL,
+          message: "Workshop confirmation email already dispatched.",
+        });
+      }
+
+      const { validFrom, validUntil } = computeUidValidityWindow("workshop", workshopDate);
+      const subject = `🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (${finalKey})`;
       const result = await sendEmailNotification({
-        to: email || "client@example.com",
-        subject: `✅ Payment Successful - S-CODERS Workshop Access (Key: ${uniqueKey || 'BTD-WKSH'})`,
+        to: cleanEmail,
+        subject,
         html: getWorkshopEmailHtml({
           status: "SUCCESS",
           clientName: clientName || "Valued Masterclass Participant",
           workshopTitle: workshopTitle || "AI Agent & Full-Stack Workshop",
           amount: Number(amount) || 0,
           currency,
-          uniqueKey: uniqueKey || `BTD-WKSH-${Date.now().toString(36).toUpperCase()}`,
+          uniqueKey: finalKey,
           actionUrl: targetUrl,
           paymentId: paymentId || `pay_${Date.now()}`,
+          workshopDate,
+          workshopTime,
+          workshopLocation,
+          validUntil,
         }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
       });
+
+      const record: RegistrationUidRecord = {
+        uid: finalKey,
+        section: "workshop",
+        itemId: String(workshopId || workshopTitle || "workshop"),
+        itemTitle: String(workshopTitle || "AI Agent & Full-Stack Workshop"),
+        clientName: String(clientName || "Valued Masterclass Participant"),
+        clientEmail: cleanEmail,
+        amount: Number(amount) || 0,
+        currency,
+        paymentStatus: "VERIFIED",
+        paymentId: paymentId ? String(paymentId).trim() : undefined,
+        orderId: orderId ? String(orderId).trim() : undefined,
+        dedupeKey: paymentId ? `workshop:pay:${String(paymentId).trim()}` : `workshop:key:${finalKey}`,
+        metadata: { date: workshopDate, time: workshopTime, location: workshopLocation },
+        issuedAt: validFrom,
+        validFrom,
+        validUntil,
+        status: "ACTIVE",
+        confirmationEmailSent: Boolean(result.success),
+        confirmationEmailSentAt: result.success ? new Date().toISOString() : undefined,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        emailMessageId: result.messageId,
+      };
+      uidRecords.unshift(record);
+      appState["db_registration_uids"] = uidRecords;
+      appendEmailDispatchLog(appState, {
+        section: "workshop",
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject,
+        uid: finalKey,
+        itemTitle: workshopTitle,
+        status: result.success ? "SENT" : "FAILED",
+        messageId: result.messageId,
+        previewUrl: result.previewUrl,
+        simulated: result.simulated,
+      });
+      saveStoredAppState(appState);
 
       res.json({
         success: true,
+        uid: finalKey,
+        validUntil,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
         message: "Workshop payment success email dispatched.",
         emailSent: result.success,
       });
@@ -3402,6 +5029,8 @@ Return ONLY valid JSON with this structure:
           actionUrl: targetUrl,
           reason: reason || "Payment was declined, interrupted, or cancelled by user.",
         }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
       });
 
       res.json({
@@ -3415,31 +5044,133 @@ Return ONLY valid JSON with this structure:
     }
   });
 
-  // 4. Event Payment Verified Email Endpoint
+  // 4. Event Payment Verified Email Endpoint (Payment-Gated & Deduplicated)
   app.post("/api/email/event-payment-verified", async (req, res) => {
     try {
-      const { email, clientName, eventTitle, amount, currency = "INR", ticketCode, paymentId, actionUrl } = req.body;
-      const targetUrl = actionUrl && actionUrl.startsWith("http")
-        ? actionUrl
-        : resolveAppUrl(req, `/?view=events&ticket=${ticketCode || ""}`);
+      const {
+        email,
+        clientName,
+        eventTitle,
+        eventId,
+        eventDate,
+        eventDay,
+        eventTime,
+        eventLocation,
+        eventDescription,
+        amount,
+        currency = "INR",
+        ticketCode,
+        paymentId,
+        orderId,
+        paymentStatus,
+        actionUrl,
+      } = req.body || {};
 
+      const cleanEmail = String(email || "client@example.com").trim().toLowerCase();
+      const appState = getStoredAppState();
+
+      // Strict payment verification gate (free events ticketPrice===0 allowed; paid events must be verified)
+      const payCheck = isPaymentVerifiedForRegistration("event", Number(amount) || 0, paymentId, orderId, paymentStatus, appState);
+      if (!payCheck.ok) {
+        return res.status(402).json({
+          success: false,
+          paymentRequired: true,
+          error: payCheck.reason || "Event email can only be sent after verified payment confirmation.",
+        });
+      }
+
+      const finalCode = String(ticketCode || "").trim().toUpperCase() || generateCollisionFreeUid("event", eventId || eventTitle || "evt", appState);
+      const targetUrl = actionUrl && String(actionUrl).startsWith("http")
+        ? String(actionUrl)
+        : resolveAppUrl(req, `/?view=events&ticket=${finalCode}`);
+
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
+      const existing = uidRecords.find(
+        (r) =>
+          r.section === "event" &&
+          r.confirmationEmailSent &&
+          (r.uid?.toUpperCase() === finalCode || (paymentId && r.paymentId === String(paymentId).trim()))
+      );
+      if (existing) {
+        return res.json({
+          success: true,
+          deduplicated: true,
+          uid: existing.uid,
+          emailSent: false,
+          emailFrom: OFFICIAL_SCODERS_EMAIL,
+          message: "Event confirmation email already dispatched.",
+        });
+      }
+
+      const { validFrom, validUntil } = computeUidValidityWindow("event", eventDate);
+      const subject = `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${finalCode})`;
       const result = await sendEmailNotification({
-        to: email || "client@example.com",
-        subject: `🎟️ Payment Done Successfully - S-CODERS Event Pass (${ticketCode || 'SC-EVT'})`,
+        to: cleanEmail,
+        subject,
         html: getEventEmailHtml({
           status: "SUCCESS",
           clientName: clientName || "Valued Attendee",
           eventTitle: eventTitle || "S-CODERS Tech Summit",
           amount: Number(amount) || 0,
           currency,
-          ticketCode: ticketCode || `SC-EVT-${Date.now().toString(36).toUpperCase()}`,
+          ticketCode: finalCode,
           actionUrl: targetUrl,
           paymentId: paymentId || `pay_${Date.now()}`,
+          eventDate,
+          eventDay,
+          eventTime,
+          eventLocation,
+          eventDescription,
+          validUntil,
         }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
       });
+
+      const record: RegistrationUidRecord = {
+        uid: finalCode,
+        section: "event",
+        itemId: String(eventId || eventTitle || "event"),
+        itemTitle: String(eventTitle || "S-CODERS Tech Summit"),
+        clientName: String(clientName || "Valued Attendee"),
+        clientEmail: cleanEmail,
+        amount: Number(amount) || 0,
+        currency,
+        paymentStatus: "VERIFIED",
+        paymentId: paymentId ? String(paymentId).trim() : undefined,
+        orderId: orderId ? String(orderId).trim() : undefined,
+        dedupeKey: paymentId ? `event:pay:${String(paymentId).trim()}` : `event:key:${finalCode}`,
+        metadata: { date: eventDate, day: eventDay, time: eventTime, location: eventLocation, description: eventDescription },
+        issuedAt: validFrom,
+        validFrom,
+        validUntil,
+        status: "ACTIVE",
+        confirmationEmailSent: Boolean(result.success),
+        confirmationEmailSentAt: result.success ? new Date().toISOString() : undefined,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        emailMessageId: result.messageId,
+      };
+      uidRecords.unshift(record);
+      appState["db_registration_uids"] = uidRecords;
+      appendEmailDispatchLog(appState, {
+        section: "event",
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject,
+        uid: finalCode,
+        itemTitle: eventTitle,
+        status: result.success ? "SENT" : "FAILED",
+        messageId: result.messageId,
+        previewUrl: result.previewUrl,
+        simulated: result.simulated,
+      });
+      saveStoredAppState(appState);
 
       res.json({
         success: true,
+        uid: finalCode,
+        validUntil,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
         message: "Event payment success email dispatched with ticket link.",
         emailSent: result.success,
       });

@@ -13,6 +13,7 @@ import EmailNotificationModal, { EmailNotificationData } from './EmailNotificati
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
+import UidRecoveryPanel from './UidRecoveryPanel';
 import { 
   openUpiApp, 
   getActiveMerchantUpi, 
@@ -145,6 +146,9 @@ export default function Events() {
   // Key verification state ("ENTER YOUR KEY")
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [manualKeyInput, setManualKeyInput] = useState('');
+  const [showEventRecovery, setShowEventRecovery] = useState(false);
+  const [verifyingEventKey, setVerifyingEventKey] = useState(false);
+  const [eventKeyError, setEventKeyError] = useState<string | null>(null);
   const [keyLookupNotice, setKeyLookupNotice] = useState<{ type: 'SUCCESS' | 'ERROR'; message: string } | null>(null);
 
   // Event Feedback state
@@ -196,59 +200,108 @@ export default function Events() {
     ];
   });
 
-  // Key Lookup Handler ("ENTER YOUR KEY")
-  const handleVerifyEventKey = (e: React.FormEvent) => {
+  // Key Lookup Handler ("ENTER YOUR KEY") - verified strictly via backend & local issued tickets
+  const handleVerifyEventKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualKeyInput.trim()) return;
+    if (!manualKeyInput.trim() || verifyingEventKey) return;
 
     const trimmedKey = manualKeyInput.trim().toUpperCase();
     const loadedTickets = getEventTickets();
-    const foundTicket = loadedTickets.find(
-      t => t.ticketCode.toUpperCase() === trimmedKey || t.id.toUpperCase() === trimmedKey
+    const foundLocal = loadedTickets.find(
+      t => t.ticketCode.toUpperCase() === trimmedKey || (t.id && t.id.toUpperCase() === trimmedKey)
     );
 
-    if (foundTicket) {
-      setViewingTicket(foundTicket);
-      setKeyLookupNotice({
-        type: 'SUCCESS',
-        message: `✓ Event Pass ${foundTicket.ticketCode} verified & unlocked successfully!`
-      });
-      setShowKeyModal(false);
-      setManualKeyInput('');
-    } else {
-      // Auto-mint pass for valid entry key
-      const mintedTicket: EventTicket = {
-        id: 'TKT-' + Date.now().toString(),
-        ticketCode: trimmedKey.startsWith('SC-EVT-') ? trimmedKey : `SC-EVT-${trimmedKey}`,
-        eventId: events[0]?.id || 'evt-1',
-        eventName: events[0]?.name || 'S-CODERS Tech Conference',
-        eventDate: events[0]?.date || 'Oct 15, 2026',
-        eventDay: events[0]?.day || 'Saturday',
-        eventTime: events[0]?.time || '10:00 AM',
-        eventLocation: events[0]?.location || 'S-CODERS Tech Campus, Bengaluru',
-        participantName: regName || 'Verified Attendee',
-        participantEmail: regEmail || 'attendee@scoders.dev',
-        participantPhone: regPhone || '+91 9999900000',
-        participantOrg: 'S-CODERS Community Member',
-        bookingDate: new Date().toLocaleDateString(),
-        bookingTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        amountPaid: events[0]?.ticketPrice || 0,
-        paymentId: 'pay_rzp_key_unlocked',
-        orderId: 'order_key_unlocked',
-        status: 'Ticket Generated',
-        qrCodeData: `SCODERS|${trimmedKey}|${events[0]?.id || 'evt-1'}|key_unlocked`
-      };
+    setVerifyingEventKey(true);
+    setEventKeyError(null);
 
-      const updated = [mintedTicket, ...loadedTickets];
-      setTickets(updated);
-      saveEventTickets(updated);
-      setViewingTicket(mintedTicket);
-      setKeyLookupNotice({
-        type: 'SUCCESS',
-        message: `✓ Access Key unlocked! Event pass ${mintedTicket.ticketCode} generated.`
+    try {
+      const verifyRes = await fetch('/api/registrations/verify-uid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: trimmedKey, section: 'event' }),
       });
-      setShowKeyModal(false);
-      setManualKeyInput('');
+      const verifyData = await verifyRes.json();
+
+      if (verifyRes.status === 403 || verifyRes.status === 410) {
+        setEventKeyError(verifyData?.error || 'This event ticket code has expired or been revoked.');
+        return;
+      }
+
+      if (verifyRes.ok && verifyData?.valid && verifyData?.record) {
+        const rec = verifyData.record;
+        const ticketToOpen: EventTicket = foundLocal || {
+          id: 'TKT-' + rec.uid,
+          ticketCode: rec.uid,
+          eventId: rec.itemId || events[0]?.id || 'evt-1',
+          eventName: rec.itemTitle || events[0]?.name || 'S-CODERS Event',
+          eventDate: rec.metadata?.date || events[0]?.date || 'Upcoming',
+          eventDay: rec.metadata?.day || events[0]?.day || 'Weekend',
+          eventTime: rec.metadata?.time || events[0]?.time || '10:00 AM IST',
+          eventLocation: rec.metadata?.location || events[0]?.location || 'Bengaluru',
+          participantName: rec.clientName || 'Verified Attendee',
+          participantEmail: rec.clientEmail || 'attendee@scoders.dev',
+          participantPhone: rec.clientPhone || '+91 9999900000',
+          participantOrg: rec.clientOrg || 'S-CODERS Community Member',
+          bookingDate: new Date(rec.issuedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          bookingTime: new Date(rec.issuedAt || Date.now()).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          amountPaid: Number(rec.amount) || 0,
+          paymentId: rec.paymentId || 'VERIFIED_PASS',
+          orderId: rec.orderId || 'VERIFIED_ORDER',
+          status: 'Ticket Generated',
+          qrCodeData: `SCODERS|${rec.uid}|${rec.itemId || 'evt'}|${rec.paymentId || 'VERIFIED'}`
+        };
+
+        if (!foundLocal) {
+          const updated = [ticketToOpen, ...loadedTickets];
+          setTickets(updated);
+          saveEventTickets(updated);
+        }
+
+        setViewingTicket(ticketToOpen);
+        setKeyLookupNotice({
+          type: 'SUCCESS',
+          message: `✓ Event Pass ${ticketToOpen.ticketCode} verified & unlocked successfully!`
+        });
+        setShowKeyModal(false);
+        setManualKeyInput('');
+        setEventKeyError(null);
+        return;
+      }
+
+      if (foundLocal) {
+        if (foundLocal.status === 'Ticket Cancelled') {
+          setEventKeyError(`⛔ Ticket ${foundLocal.ticketCode} has been cancelled/revoked.`);
+          return;
+        }
+        setViewingTicket(foundLocal);
+        setKeyLookupNotice({
+          type: 'SUCCESS',
+          message: `✓ Event Pass ${foundLocal.ticketCode} verified & unlocked successfully!`
+        });
+        setShowKeyModal(false);
+        setManualKeyInput('');
+        setEventKeyError(null);
+        return;
+      }
+
+      setEventKeyError(
+        verifyData?.error || `No active event ticket found for UID "${trimmedKey}". Check your code or recover via email.`
+      );
+    } catch {
+      if (foundLocal) {
+        setViewingTicket(foundLocal);
+        setKeyLookupNotice({
+          type: 'SUCCESS',
+          message: `✓ Event Pass ${foundLocal.ticketCode} verified & unlocked successfully!`
+        });
+        setShowKeyModal(false);
+        setManualKeyInput('');
+        setEventKeyError(null);
+      } else {
+        setEventKeyError(`Unable to verify "${trimmedKey}". Check the code or recover your UID via email.`);
+      }
+    } finally {
+      setVerifyingEventKey(false);
     }
   };
 
@@ -292,10 +345,50 @@ export default function Events() {
       const params = new URLSearchParams(window.location.search);
       const ticketParam = params.get('ticket');
       if (ticketParam) {
-        const matchingTicket = loadedTickets.find(t => t.ticketCode.toUpperCase() === ticketParam.toUpperCase());
+        const cleanParam = ticketParam.trim().toUpperCase();
+        const matchingTicket = loadedTickets.find(t => t.ticketCode.toUpperCase() === cleanParam);
         if (matchingTicket) {
           setViewingTicket(matchingTicket);
           setActiveCategory('tickets');
+        } else {
+          fetch('/api/registrations/verify-uid', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: cleanParam, section: 'event' }),
+          })
+            .then(r => r.json())
+            .then(data => {
+              if (data?.valid && data?.record) {
+                const rec = data.record;
+                const restored: EventTicket = {
+                  id: 'TKT-' + rec.uid,
+                  ticketCode: rec.uid,
+                  eventId: rec.itemId || loadedEvents[0]?.id || 'evt-1',
+                  eventName: rec.itemTitle || loadedEvents[0]?.name || 'S-CODERS Event',
+                  eventDate: rec.metadata?.date || loadedEvents[0]?.date || 'Upcoming',
+                  eventDay: rec.metadata?.day || loadedEvents[0]?.day || 'Weekend',
+                  eventTime: rec.metadata?.time || loadedEvents[0]?.time || '10:00 AM IST',
+                  eventLocation: rec.metadata?.location || loadedEvents[0]?.location || 'Bengaluru',
+                  participantName: rec.clientName || 'Verified Attendee',
+                  participantEmail: rec.clientEmail || 'attendee@scoders.dev',
+                  participantPhone: rec.clientPhone || '+91 9999900000',
+                  participantOrg: rec.clientOrg || 'S-CODERS Community Member',
+                  bookingDate: new Date(rec.issuedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                  bookingTime: new Date(rec.issuedAt || Date.now()).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                  amountPaid: Number(rec.amount) || 0,
+                  paymentId: rec.paymentId || 'VERIFIED_PASS',
+                  orderId: rec.orderId || 'VERIFIED_ORDER',
+                  status: 'Ticket Generated',
+                  qrCodeData: `SCODERS|${rec.uid}|${rec.itemId || 'evt'}|${rec.paymentId || 'VERIFIED'}`
+                };
+                const updated = [restored, ...loadedTickets];
+                setTickets(updated);
+                saveEventTickets(updated);
+                setViewingTicket(restored);
+                setActiveCategory('tickets');
+              }
+            })
+            .catch(() => {});
         }
       }
     } catch (e) {}
@@ -355,9 +448,53 @@ export default function Events() {
 
       // Handle Free event registration directly
       if (isFreeEvent) {
-        const ticketCode = generateUniqueTicketCode();
+        const freePayId = `FREE_PASS_${Date.now()}`;
+        const freeOrdId = `FREE_ORD_${Date.now()}`;
+        let ticketCode = generateUniqueTicketCode();
+        let validUntil: string | undefined;
+        let dispatchedViaUnified = false;
+
+        try {
+          const regRes = await fetch('/api/registrations/register-and-notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              section: 'event',
+              itemId: selectedEvent.id,
+              itemTitle: selectedEvent.name,
+              clientName: regName.trim(),
+              clientEmail: regEmail.trim(),
+              clientPhone: regPhone.trim(),
+              clientOrg: regOrg.trim() || 'Independent Builder',
+              amount: 0,
+              paymentStatus: 'VERIFIED',
+              paymentId: freePayId,
+              orderId: freeOrdId,
+              metadata: {
+                date: selectedEvent.date,
+                day: selectedEvent.day,
+                time: selectedEvent.time,
+                location: selectedEvent.location,
+                description: selectedEvent.description,
+              },
+              actionUrl: `${window.location.origin}/?view=events`,
+            }),
+          });
+          if (regRes.ok) {
+            const regData = await regRes.json();
+            if (regData?.success && regData?.uid) {
+              ticketCode = regData.uid;
+              validUntil = regData.validUntil || regData.record?.validUntil;
+              dispatchedViaUnified = true;
+            }
+          }
+        } catch (err) {
+          console.warn("Unified free event registration fallback:", err);
+        }
+
         const now = new Date();
-        const newTicket: EventTicket = {
+        const existingLocal = tickets.find(t => t.ticketCode.toUpperCase() === ticketCode.toUpperCase());
+        const newTicket: EventTicket = existingLocal || {
           ticketCode,
           eventId: selectedEvent.id,
           eventName: selectedEvent.name,
@@ -372,35 +509,39 @@ export default function Events() {
           bookingDate: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
           bookingTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           amountPaid: 0,
-          paymentId: `FREE_PASS_${Date.now()}`,
-          orderId: `FREE_ORD_${Date.now()}`,
+          paymentId: freePayId,
+          orderId: freeOrdId,
           status: 'Ticket Generated',
           qrCodeData: `SCODERS|${ticketCode}|${selectedEvent.id}|${regEmail.trim()}`
         };
 
-        const updatedTickets = [newTicket, ...tickets];
-        setTickets(updatedTickets);
-        saveEventTickets(updatedTickets);
+        if (!existingLocal) {
+          const updatedTickets = [newTicket, ...tickets];
+          setTickets(updatedTickets);
+          saveEventTickets(updatedTickets);
+        }
 
+        const evtName = selectedEvent.name;
         // Close selected event modal so user sees their generated ticket
         setSelectedEvent(null);
 
-        // Trigger free event pass confirmation email
-        try {
-          fetch('/api/email/event-payment-verified', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: regEmail.trim(),
-              clientName: regName.trim(),
-              eventTitle: selectedEvent.name,
-              amount: 0,
-              ticketCode: ticketCode,
-              paymentId: `FREE_PASS_${Date.now()}`,
-              actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
-            })
-          }).catch(err => console.warn("Free event pass email error:", err));
-        } catch (e) {}
+        if (!dispatchedViaUnified) {
+          try {
+            fetch('/api/email/event-payment-verified', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: regEmail.trim(),
+                clientName: regName.trim(),
+                eventTitle: evtName,
+                amount: 0,
+                ticketCode: ticketCode,
+                paymentId: freePayId,
+                actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+              })
+            }).catch(err => console.warn("Free event pass email error:", err));
+          } catch {}
+        }
 
         setViewingTicket(newTicket);
         setPaymentStatusNotice({
@@ -408,15 +549,15 @@ export default function Events() {
           message: 'Free Event Pass confirmed! Ticket generated successfully.'
         });
 
-        // Trigger Pop-up Email Confirmation from scoders82@gmail.com
         setEmailNoticeData({
           type: 'event',
           recipientEmail: regEmail.trim(),
           recipientName: regName.trim(),
-          subject: `🎟️ Payment/Pass Done Successfully - S-CODERS Event Pass (${ticketCode})`,
-          title: selectedEvent.name,
+          subject: `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${ticketCode})`,
+          title: evtName,
           uniqueKey: ticketCode,
-          messageText: "Your payment / registration has been done successfully so here are your tickets just grab it! S-CODERS Tech Conference / Hackathon pass has been confirmed.",
+          validUntil,
+          messageText: `Your event pass is confirmed! An official email from escoders@gmail.com with event location, timing, details, and your Unique Registration Code (${ticketCode}) has been dispatched to ${regEmail.trim()}.`,
           amount: 0,
           actionText: "View & Download Event Ticket Pass",
           onAction: () => setViewingTicket(newTicket)
@@ -499,25 +640,71 @@ export default function Events() {
     }
   };
 
-  const handleRazorpayEventSuccess = (data: RazorpayPaymentSuccessData) => {
+  const handleRazorpayEventSuccess = async (data: RazorpayPaymentSuccessData) => {
     setShowRazorpayModal(false);
     setIsProcessing(false);
     
     const eventRef = selectedEvent;
-    // Close selected event modal immediately
     setSelectedEvent(null);
 
-    const ticketCode = generateUniqueTicketCode();
     const now = new Date();
     const eventName = eventRef?.name || data.purpose || 'S-CODERS Tech Summit';
-    const verifiedTicket: EventTicket = {
+    const eventDate = eventRef?.date || now.toLocaleDateString();
+    const eventDay = eventRef?.day || 'Saturday';
+    const eventTime = eventRef?.time || '10:00 AM IST';
+    const eventLocation = eventRef?.location || 'S-CODERS Lab, Koramangala, Bengaluru';
+
+    let ticketCode = generateUniqueTicketCode();
+    let validUntil: string | undefined;
+    let dispatchedViaUnified = false;
+
+    try {
+      const regRes = await fetch('/api/registrations/register-and-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'event',
+          itemId: eventRef?.id || 'evt-auto',
+          itemTitle: eventName,
+          clientName: data.clientName,
+          clientEmail: data.email,
+          clientPhone: regPhone.trim() || '+91 8310463417',
+          clientOrg: regOrg.trim() || 'Independent Builder',
+          amount: data.amount,
+          paymentStatus: 'VERIFIED',
+          paymentId: data.razorpay_payment_id,
+          orderId: data.razorpay_order_id,
+          metadata: {
+            date: eventDate,
+            day: eventDay,
+            time: eventTime,
+            location: eventLocation,
+            description: eventRef?.description,
+          },
+          actionUrl: `${window.location.origin}/?view=events`,
+        }),
+      });
+      if (regRes.ok) {
+        const regData = await regRes.json();
+        if (regData?.success && regData?.uid) {
+          ticketCode = regData.uid;
+          validUntil = regData.validUntil || regData.record?.validUntil;
+          dispatchedViaUnified = true;
+        }
+      }
+    } catch (err) {
+      console.warn("Unified paid event registration fallback:", err);
+    }
+
+    const existingLocal = tickets.find(t => t.ticketCode.toUpperCase() === ticketCode.toUpperCase());
+    const verifiedTicket: EventTicket = existingLocal || {
       ticketCode,
       eventId: eventRef?.id || 'evt-auto',
       eventName: eventName,
-      eventDate: eventRef?.date || now.toLocaleDateString(),
-      eventDay: eventRef?.day || 'Saturday',
-      eventTime: eventRef?.time || '10:00 AM IST',
-      eventLocation: eventRef?.location || 'S-CODERS Lab, Koramangala, Bengaluru',
+      eventDate,
+      eventDay,
+      eventTime,
+      eventLocation,
       participantName: data.clientName,
       participantEmail: data.email,
       participantPhone: regPhone.trim() || '+91 8310463417',
@@ -531,26 +718,29 @@ export default function Events() {
       qrCodeData: `SCODERS|${ticketCode}|${eventRef?.id || 'evt-auto'}|${data.razorpay_payment_id}`
     };
 
-    const updatedTickets = [verifiedTicket, ...tickets];
-    setTickets(updatedTickets);
-    saveEventTickets(updatedTickets);
+    if (!existingLocal) {
+      const updatedTickets = [verifiedTicket, ...tickets];
+      setTickets(updatedTickets);
+      saveEventTickets(updatedTickets);
+    }
 
-    // Dispatch Event Payment Success Email to scoders82@gmail.com / user
-    try {
-      fetch('/api/email/event-payment-verified', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: data.email,
-          clientName: data.clientName,
-          eventTitle: eventName,
-          amount: data.amount,
-          ticketCode: ticketCode,
-          paymentId: data.razorpay_payment_id,
-          actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
-        })
-      }).catch(err => console.warn("Event payment email dispatch notice:", err));
-    } catch (e) {}
+    if (!dispatchedViaUnified) {
+      try {
+        fetch('/api/email/event-payment-verified', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.email,
+            clientName: data.clientName,
+            eventTitle: eventName,
+            amount: data.amount,
+            ticketCode: ticketCode,
+            paymentId: data.razorpay_payment_id,
+            actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+          })
+        }).catch(err => console.warn("Event payment email dispatch notice:", err));
+      } catch {}
+    }
 
     setViewingTicket(verifiedTicket);
     setPaymentStatusNotice({
@@ -558,15 +748,15 @@ export default function Events() {
       message: 'Razorpay payment verified successfully! Your event pass has been generated.'
     });
 
-    // Trigger Pop-up Email Confirmation from scoders82@gmail.com
     setEmailNoticeData({
       type: 'event',
       recipientEmail: data.email,
       recipientName: data.clientName,
-      subject: `🎟️ Payment Done Successfully - S-CODERS Event Pass (${ticketCode})`,
+      subject: `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${ticketCode})`,
       title: eventName,
       uniqueKey: ticketCode,
-      messageText: "Your payment has been done successfully so here are your tickets just grab it! S-CODERS Tech Conference / Hackathon pass has been confirmed.",
+      validUntil,
+      messageText: `Your payment has been confirmed and an official email from escoders@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${data.email}.`,
       amount: data.amount,
       actionText: "View & Download Event Ticket Pass",
       onAction: () => setViewingTicket(verifiedTicket)
@@ -575,7 +765,7 @@ export default function Events() {
   };
 
   // Direct UPI Payment & UTR Verification Handler
-  const handleDirectUpiEventRegistration = (e: React.FormEvent) => {
+  const handleDirectUpiEventRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEvent) return;
     if (!regName.trim() || !regEmail.trim() || !regPhone.trim()) {
@@ -590,12 +780,54 @@ export default function Events() {
     setIsProcessing(true);
     setPaymentError(null);
 
-    const ticketCode = generateUniqueTicketCode();
     const now = new Date();
     const utrCode = manualUpiRef.trim();
     const eventName = selectedEvent.name;
+    const upiPayId = `UPI_UTR_${utrCode}`;
+    const upiOrdId = `ORD_UPI_${Date.now()}`;
 
-    const verifiedTicket: EventTicket = {
+    let ticketCode = generateUniqueTicketCode();
+    let validUntil: string | undefined;
+    let dispatchedViaUnified = false;
+
+    try {
+      const regRes = await fetch('/api/registrations/register-and-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'event',
+          itemId: selectedEvent.id,
+          itemTitle: eventName,
+          clientName: regName.trim(),
+          clientEmail: regEmail.trim(),
+          clientPhone: regPhone.trim(),
+          clientOrg: regOrg.trim() || 'Independent Builder',
+          amount: selectedEvent.ticketPrice,
+          paymentStatus: 'VERIFIED',
+          paymentId: upiPayId,
+          orderId: upiOrdId,
+          metadata: {
+            date: selectedEvent.date,
+            day: selectedEvent.day,
+            time: selectedEvent.time,
+            location: selectedEvent.location,
+            description: selectedEvent.description,
+          },
+          actionUrl: `${window.location.origin}/?view=events`,
+        }),
+      });
+      if (regRes.ok) {
+        const regData = await regRes.json();
+        if (regData?.success && regData?.uid) {
+          ticketCode = regData.uid;
+          validUntil = regData.validUntil || regData.record?.validUntil;
+          dispatchedViaUnified = true;
+        }
+      }
+    } catch {}
+
+    const existingLocal = tickets.find(t => t.ticketCode.toUpperCase() === ticketCode.toUpperCase());
+    const verifiedTicket: EventTicket = existingLocal || {
       ticketCode,
       eventId: selectedEvent.id,
       eventName: eventName,
@@ -610,35 +842,41 @@ export default function Events() {
       bookingDate: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       bookingTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       amountPaid: selectedEvent.ticketPrice,
-      paymentId: `UPI_UTR_${utrCode}`,
-      orderId: `ORD_UPI_${Date.now()}`,
+      paymentId: upiPayId,
+      orderId: upiOrdId,
       status: 'Ticket Generated',
-      qrCodeData: `SCODERS|${ticketCode}|${selectedEvent.id}|UPI_UTR_${utrCode}`
+      qrCodeData: `SCODERS|${ticketCode}|${selectedEvent.id}|${upiPayId}`
     };
 
-    const updatedTickets = [verifiedTicket, ...tickets];
-    setTickets(updatedTickets);
-    saveEventTickets(updatedTickets);
+    if (!existingLocal) {
+      const updatedTickets = [verifiedTicket, ...tickets];
+      setTickets(updatedTickets);
+      saveEventTickets(updatedTickets);
+    }
 
+    const paidAmount = selectedEvent.ticketPrice;
+    const recipientEmail = regEmail.trim();
+    const recipientName = regName.trim();
     setSelectedEvent(null);
     setManualUpiRef('');
 
-    // Trigger email
-    try {
-      fetch('/api/email/event-payment-verified', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: regEmail.trim(),
-          clientName: regName.trim(),
-          eventTitle: eventName,
-          amount: selectedEvent.ticketPrice,
-          ticketCode: ticketCode,
-          paymentId: `UPI_UTR_${utrCode}`,
-          actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
-        })
-      }).catch(err => console.warn("UPI event pass email error:", err));
-    } catch (err) {}
+    if (!dispatchedViaUnified) {
+      try {
+        fetch('/api/email/event-payment-verified', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: recipientEmail,
+            clientName: recipientName,
+            eventTitle: eventName,
+            amount: paidAmount,
+            ticketCode: ticketCode,
+            paymentId: upiPayId,
+            actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+          })
+        }).catch(err => console.warn("UPI event pass email error:", err));
+      } catch {}
+    }
 
     setViewingTicket(verifiedTicket);
     setPaymentStatusNotice({
@@ -648,13 +886,14 @@ export default function Events() {
 
     setEmailNoticeData({
       type: 'event',
-      recipientEmail: regEmail.trim(),
-      recipientName: regName.trim(),
-      subject: `🎟️ Payment Done Successfully - S-CODERS Event Pass (${ticketCode})`,
+      recipientEmail,
+      recipientName,
+      subject: `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${ticketCode})`,
       title: eventName,
       uniqueKey: ticketCode,
-      messageText: "Your payment has been done successfully so here are your tickets just grab it! S-CODERS Tech Conference / Hackathon pass has been confirmed.",
-      amount: selectedEvent.ticketPrice,
+      validUntil,
+      messageText: `Your payment has been confirmed and an official email from escoders@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${recipientEmail}.`,
+      amount: paidAmount,
       actionText: "View & Download Event Ticket Pass",
       onAction: () => setViewingTicket(verifiedTicket)
     });
@@ -2183,7 +2422,11 @@ export default function Events() {
               className="bg-brand-card border border-brand-teal/40 rounded-3xl max-w-md w-full p-6 space-y-5 relative shadow-2xl"
             >
               <button
-                onClick={() => setShowKeyModal(false)}
+                onClick={() => {
+                  setShowKeyModal(false);
+                  setShowEventRecovery(false);
+                  setEventKeyError(null);
+                }}
                 className="absolute top-4 right-4 p-2 bg-red-500/20 hover:bg-red-600 text-white rounded-full border border-red-500/50 cursor-pointer transition-all"
               >
                 <X className="w-5 h-5 text-white" />
@@ -2194,36 +2437,89 @@ export default function Events() {
                 <span>Event Access Key Verification</span>
               </div>
 
-              <h3 className="text-xl font-display font-extrabold text-white">
-                Enter Event Ticket Key
-              </h3>
-
-              <p className="text-gray-300 text-xs font-sans">
-                Enter your unique S-CODERS ticket pass key (e.g., <code className="text-brand-teal font-bold font-mono">SC-EVT-9A2X4B</code>) to instantly unlock and view your verified event pass.
-              </p>
-
-              <form onSubmit={handleVerifyEventKey} className="space-y-4 font-mono text-xs">
-                <div>
-                  <label className="block text-gray-400 mb-1 uppercase text-[10px] tracking-widest font-bold">
-                    Ticket / Access Key *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={manualKeyInput}
-                    onChange={e => setManualKeyInput(e.target.value)}
-                    placeholder="e.g. SC-EVT-8F72K9X4"
-                    className="w-full p-3 bg-black/50 border border-brand-teal/30 rounded-xl text-white font-mono text-sm focus:border-brand-teal focus:outline-none uppercase tracking-wider"
-                  />
-                </div>
-
+              <div className="grid grid-cols-2 bg-black/40 p-1 rounded-xl border border-white/5 gap-1">
                 <button
-                  type="submit"
-                  className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20"
+                  type="button"
+                  onClick={() => { setShowEventRecovery(false); setEventKeyError(null); }}
+                  className={`py-2 text-[11px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                    !showEventRecovery ? 'bg-brand-teal text-brand-dark font-bold' : 'text-gray-400 hover:text-white'
+                  }`}
                 >
-                  Unlock & View Ticket Pass
+                  Enter Ticket UID
                 </button>
-              </form>
+                <button
+                  type="button"
+                  onClick={() => { setShowEventRecovery(true); setEventKeyError(null); }}
+                  className={`py-2 text-[11px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                    showEventRecovery ? 'bg-brand-teal text-brand-dark font-bold' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Recover UID
+                </button>
+              </div>
+
+              {!showEventRecovery ? (
+                <>
+                  <div>
+                    <h3 className="text-xl font-display font-extrabold text-white mb-1">
+                      Enter Event Ticket Key
+                    </h3>
+                    <p className="text-gray-300 text-xs font-sans">
+                      Enter your unique S-CODERS ticket UID (e.g., <code className="text-brand-teal font-bold font-mono">SC-EVT-9A2X4B</code>) emailed from <span className="font-mono text-brand-teal">escoders@gmail.com</span> to unlock your verified event pass.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleVerifyEventKey} className="space-y-4 font-mono text-xs">
+                    <div>
+                      <label className="block text-gray-400 mb-1 uppercase text-[10px] tracking-widest font-bold">
+                        Ticket / Access Key *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={manualKeyInput}
+                        onChange={e => {
+                          setManualKeyInput(e.target.value);
+                          setEventKeyError(null);
+                        }}
+                        placeholder="e.g. SC-EVT-8F72K9X4"
+                        className="w-full p-3 bg-black/50 border border-brand-teal/30 rounded-xl text-white font-mono text-sm focus:border-brand-teal focus:outline-none uppercase tracking-wider"
+                      />
+                    </div>
+
+                    {eventKeyError && (
+                      <p className="text-red-400 text-xs font-mono leading-relaxed">{eventKeyError}</p>
+                    )}
+
+                    <div className="space-y-2.5">
+                      <button
+                        type="submit"
+                        disabled={verifyingEventKey}
+                        className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 disabled:opacity-50"
+                      >
+                        {verifyingEventKey ? 'Verifying Event UID...' : 'Unlock & View Ticket Pass'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowEventRecovery(true); setEventKeyError(null); }}
+                        className="w-full text-center text-[11px] font-mono text-brand-teal hover:underline cursor-pointer"
+                      >
+                        Lost your ticket UID? Verify email & recover →
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <UidRecoveryPanel
+                  section="event"
+                  defaultEmail={regEmail}
+                  onRecoveredKeySelect={(uid) => {
+                    setManualKeyInput(uid);
+                    setShowEventRecovery(false);
+                    setEventKeyError(null);
+                  }}
+                />
+              )}
             </motion.div>
           </div>
         )}

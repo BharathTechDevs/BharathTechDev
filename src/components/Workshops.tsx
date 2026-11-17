@@ -26,6 +26,7 @@ import {
 } from '../utils/workshopAssetGenerator';
 import WorkshopChatRoom from './WorkshopChatRoom';
 import { OnlineCodePlayground } from './OnlineCodePlayground';
+import UidRecoveryPanel from './UidRecoveryPanel';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -107,7 +108,8 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [regSuccessKey, setRegSuccessKey] = useState<string | null>(null);
   const [manualKey, setManualKey] = useState('');
   const [manualKeyError, setManualKeyError] = useState<string | null>(null);
-  const [regMode, setRegMode] = useState<'register' | 'enterKey'>('register');
+  const [verifyingManualKey, setVerifyingManualKey] = useState(false);
+  const [regMode, setRegMode] = useState<'register' | 'enterKey' | 'recover'>('register');
   const [payTicketsCount, setPayTicketsCount] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -136,6 +138,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
 
   // Active Workshop Classroom States
   const [activeTab, setActiveTab] = useState<'sandbox' | 'resources' | 'discussion'>('sandbox');
+  const [activeWorkspaceWorkshop, setActiveWorkspaceWorkshop] = useState<WorkshopEvent | null>(null);
   
   // Sandbox State
   const [sandboxCode, setSandboxCode] = useState('');
@@ -302,13 +305,14 @@ export default function TenantDashboard() {
     handleInitiateRazorpayWorkshop();
   };
 
-  const mintAndCompleteWorkshopRegistration = (
+  const mintAndCompleteWorkshopRegistration = async (
     clientName: string,
     clientEmail: string,
     clientRole: string,
     totalAmount: number,
     payMethod: string,
-    txnId: string
+    txnId: string,
+    verifiedOrderId?: string
   ) => {
     const safeName = (clientName || regName || currentUser?.name || 'Workshop Participant').trim();
     const safeEmail = (clientEmail || regEmail || currentUser?.email || 'participant@scoders.com').trim().toLowerCase();
@@ -346,11 +350,50 @@ export default function TenantDashboard() {
       window.dispatchEvent(new Event('scoders_auth_change'));
     }
 
-    // 2. Mint Unique Workshop Access Key
+    // 2. Mint collision-free UID & dispatch escoders@gmail.com confirmation email via unified backend
     const code = activeWorkshop.id.toUpperCase();
     const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
     const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+    let generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+    let validUntil: string | undefined;
+    let dispatchedViaUnified = false;
+
+    try {
+      const regRes = await fetch('/api/registrations/register-and-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'workshop',
+          itemId: activeWorkshop.id,
+          itemTitle: activeWorkshop.title,
+          clientName: safeName,
+          clientEmail: safeEmail,
+          clientPhone: regPhone,
+          clientRole: safeRole,
+          amount: totalAmount,
+          paymentStatus: 'VERIFIED',
+          paymentId: txnId,
+          orderId: verifiedOrderId || razorpayOrderData?.orderId,
+          metadata: {
+            date: activeWorkshop.date,
+            time: (activeWorkshop as any).time || (activeWorkshop as any).startTime || '10:00 AM IST',
+            location: activeWorkshop.location,
+          },
+          actionUrl: `${window.location.origin}/?view=workshops`,
+        }),
+      });
+      if (regRes.ok) {
+        const regData = await regRes.json();
+        if (regData?.success && regData?.uid) {
+          generatedKey = regData.uid;
+          validUntil = regData.validUntil || regData.record?.validUntil;
+          dispatchedViaUnified = true;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Unified workshop registration fallback:", apiErr);
+    }
+
     const mockChatId = `chat-wksp-${generatedKey}`;
 
     // 3. Save to localStorage registered workshops
@@ -372,117 +415,124 @@ export default function TenantDashboard() {
     localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
     setRegSuccessKey(generatedKey);
 
-    // 4. Save to relational DatabaseEngine
+    // 4. Save to relational DatabaseEngine (dedupe check on key)
     try {
-      const regId = 'reg-wksp-' + Date.now();
-      const mockPdfId = 'file-pdf-' + Date.now();
-      const mockSrcId = 'file-src-' + Date.now();
-
-      const dbRegistration: WorkshopRegistration = {
-        id: regId,
-        participantProfile: {
-          name: safeName,
-          email: safeEmail,
-          phone: '+91 99999 00000',
-          role: safeRole
-        },
-        workshopId: activeWorkshop.id,
-        workshopTitle: activeWorkshop.title,
-        paymentStatus: 'Successful',
-        amountPaid: totalAmount,
-        paymentMethod: payMethod,
-        paymentDate: new Date().toISOString().split('T')[0],
-        transactionId: txnId,
-        uniqueAccessKey: generatedKey,
-        materialsFileIds: [mockPdfId, mockSrcId],
-        chatId: mockChatId,
-        feedbackId: null
-      };
       const currentRegs = DatabaseEngine.getWorkshopRegistrations();
-      DatabaseEngine.saveWorkshopRegistrations([dbRegistration, ...currentRegs]);
+      const alreadyStored = currentRegs.some(
+        r => r.uniqueAccessKey?.trim().toUpperCase() === generatedKey.toUpperCase()
+      );
+      if (!alreadyStored) {
+        const regId = 'reg-wksp-' + Date.now();
+        const mockPdfId = 'file-pdf-' + Date.now();
+        const mockSrcId = 'file-src-' + Date.now();
 
-      const dbTx: PaymentTransaction = {
-        id: txnId,
-        clientId: safeEmail,
-        clientName: safeName,
-        clientEmail: safeEmail,
-        amount: totalAmount,
-        paymentMethod: payMethod,
-        status: 'Successful',
-        timestamp: new Date().toISOString(),
-        reference: `Workshop Pass: ${activeWorkshop.title}`,
-        interrupted: false,
-        failureReason: null
-      };
-      const currentPayments = DatabaseEngine.getPayments();
-      DatabaseEngine.savePayments([dbTx, ...currentPayments]);
+        const dbRegistration: WorkshopRegistration = {
+          id: regId,
+          participantProfile: {
+            name: safeName,
+            email: safeEmail,
+            phone: regPhone.trim() || '+91 99999 00000',
+            role: safeRole
+          },
+          workshopId: activeWorkshop.id,
+          workshopTitle: activeWorkshop.title,
+          paymentStatus: 'Successful',
+          amountPaid: totalAmount,
+          paymentMethod: payMethod,
+          paymentDate: new Date().toISOString().split('T')[0],
+          transactionId: txnId,
+          uniqueAccessKey: generatedKey,
+          materialsFileIds: [mockPdfId, mockSrcId],
+          chatId: mockChatId,
+          feedbackId: null
+        };
+        DatabaseEngine.saveWorkshopRegistrations([dbRegistration, ...currentRegs]);
 
-      const dbChat: ChatConversation = {
-        id: mockChatId,
-        clientName: safeName,
-        clientEmail: safeEmail,
-        registrationId: regId,
-        reference: activeWorkshop.title,
-        workshopId: activeWorkshop.id,
-        uniqueAccessKey: generatedKey,
-        messages: [
-          { 
-            id: `msg-wksp-1-${Date.now()}`, 
-            sender: 'team', 
-            senderName: 'S-CODERS Mentor Team',
-            senderRole: 'S-CODERS Founder & CEO',
-            content: `Congratulations ${safeName}! You are officially registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your learning materials, developer sandbox, and schedule access are unlocked. This is your private, individual chat with our mentors—feel free to ask questions or share links!`, 
-            timestamp: new Date().toISOString() 
-          }
-        ],
-        lastUpdated: new Date().toISOString()
-      };
-      const currentChats = DatabaseEngine.getChats();
-      DatabaseEngine.saveChats([dbChat, ...currentChats]);
+        const dbTx: PaymentTransaction = {
+          id: txnId,
+          clientId: safeEmail,
+          clientName: safeName,
+          clientEmail: safeEmail,
+          amount: totalAmount,
+          paymentMethod: payMethod,
+          status: 'Successful',
+          timestamp: new Date().toISOString(),
+          reference: `Workshop Pass: ${activeWorkshop.title}`,
+          interrupted: false,
+          failureReason: null
+        };
+        const currentPayments = DatabaseEngine.getPayments();
+        DatabaseEngine.savePayments([dbTx, ...currentPayments]);
 
-      const dbPdfFile: FileRecord = {
-        id: mockPdfId,
-        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_guide.pdf`,
-        type: 'workshop_pdf',
-        url: '#download-guide-pdf',
-        size: '1.4 MB',
-        clientId: safeEmail,
-        registrationId: regId,
-        uploadDate: new Date().toISOString().split('T')[0]
-      };
-      const dbSrcFile: FileRecord = {
-        id: mockSrcId,
-        name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_boilerplate.zip`,
-        type: 'workshop_source_code',
-        url: '#download-boilerplate-zip',
-        size: '890 KB',
-        clientId: safeEmail,
-        registrationId: regId,
-        uploadDate: new Date().toISOString().split('T')[0]
-      };
-      const currentFiles = DatabaseEngine.getFiles();
-      DatabaseEngine.saveFiles([dbPdfFile, dbSrcFile, ...currentFiles]);
+        const dbChat: ChatConversation = {
+          id: mockChatId,
+          clientName: safeName,
+          clientEmail: safeEmail,
+          registrationId: regId,
+          reference: activeWorkshop.title,
+          workshopId: activeWorkshop.id,
+          uniqueAccessKey: generatedKey,
+          messages: [
+            { 
+              id: `msg-wksp-1-${Date.now()}`, 
+              sender: 'team', 
+              senderName: 'S-CODERS Mentor Team',
+              senderRole: 'S-CODERS Founder & CEO',
+              content: `Congratulations ${safeName}! You are officially registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your learning materials, developer sandbox, and schedule access are unlocked. This is your private, individual chat with our mentors—feel free to ask questions or share links!`, 
+              timestamp: new Date().toISOString() 
+            }
+          ],
+          lastUpdated: new Date().toISOString()
+        };
+        const currentChats = DatabaseEngine.getChats();
+        DatabaseEngine.saveChats([dbChat, ...currentChats]);
+
+        const dbPdfFile: FileRecord = {
+          id: mockPdfId,
+          name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_guide.pdf`,
+          type: 'workshop_pdf',
+          url: '#download-guide-pdf',
+          size: '1.4 MB',
+          clientId: safeEmail,
+          registrationId: regId,
+          uploadDate: new Date().toISOString().split('T')[0]
+        };
+        const dbSrcFile: FileRecord = {
+          id: mockSrcId,
+          name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_boilerplate.zip`,
+          type: 'workshop_source_code',
+          url: '#download-boilerplate-zip',
+          size: '890 KB',
+          clientId: safeEmail,
+          registrationId: regId,
+          uploadDate: new Date().toISOString().split('T')[0]
+        };
+        const currentFiles = DatabaseEngine.getFiles();
+        DatabaseEngine.saveFiles([dbPdfFile, dbSrcFile, ...currentFiles]);
+      }
     } catch (err) {
       console.warn("DB engine workshop registration save error:", err);
     }
 
-    // 5. Trigger automated backend email dispatch from scoders82@gmail.com
-    try {
-      fetch('/api/email/workshop-payment-verified', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: safeEmail,
-          clientName: safeName,
-          workshopTitle: activeWorkshop.title,
-          amount: totalAmount,
-          uniqueKey: generatedKey,
-          paymentId: txnId,
-          actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
-        })
-      }).catch(err => console.warn("Workshop email dispatch warning:", err));
-    } catch (emailErr) {
-      console.warn("Workshop email dispatch error:", emailErr);
+    // 5. Fallback email trigger ONLY if unified backend endpoint failed on network
+    if (!dispatchedViaUnified) {
+      try {
+        fetch('/api/email/workshop-payment-verified', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: safeEmail,
+            clientName: safeName,
+            workshopTitle: activeWorkshop.title,
+            amount: totalAmount,
+            uniqueKey: generatedKey,
+            paymentId: txnId,
+            actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
+          })
+        }).catch(err => console.warn("Workshop email dispatch warning:", err));
+      } catch (emailErr) {
+        console.warn("Workshop email dispatch error:", emailErr);
+      }
     }
 
     // 6. Close the drawer modal immediately
@@ -493,14 +543,16 @@ export default function TenantDashboard() {
       type: 'workshop',
       recipientEmail: safeEmail,
       recipientName: safeName,
-      subject: `🎓 Payment Done Successfully - S-CODERS Workshop Key (${generatedKey})`,
+      subject: `🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (${generatedKey})`,
       title: activeWorkshop.title,
       uniqueKey: generatedKey,
-      messageText: "Your payment has been done successfully and thank you for choosing S-CODERS Bharat tech developers. Your classroom sandbox, downloadable assets, and Zoom meeting access are now unlocked!",
+      validUntil,
+      messageText: `Your payment has been verified and an official email from escoders@gmail.com has been dispatched to ${safeEmail} with your workshop details and Unique Registration Code (${generatedKey}). Keep it safe to rejoin seamlessly anytime.`,
       amount: totalAmount,
       actionText: "Enter Workshop & Sandbox",
       onAction: () => {
         setShowEmailNotice(false);
+        setActiveWorkspaceWorkshop(activeWorkshop);
       }
     });
     setShowEmailNotice(true);
@@ -575,13 +627,14 @@ export default function TenantDashboard() {
 
   const handleRazorpayWorkshopSuccess = (data: RazorpayPaymentSuccessData) => {
     setShowRazorpayModal(false);
-    mintAndCompleteWorkshopRegistration(
+    void mintAndCompleteWorkshopRegistration(
       data.clientName || regName || currentUser?.name || 'Workshop Participant',
       data.email || regEmail || currentUser?.email || 'participant@scoders.com',
       regRole || 'Registered Developer',
       data.amount,
       `Razorpay Gateway (${getActiveMerchantUpi()})`,
-      data.razorpay_payment_id || ('PAY_WKSP_' + Date.now().toString(36).toUpperCase())
+      data.razorpay_payment_id || ('PAY_WKSP_' + Date.now().toString(36).toUpperCase()),
+      data.razorpay_order_id
     );
   };
 
@@ -604,42 +657,38 @@ export default function TenantDashboard() {
     }
   };
 
-  const handleVerifyManualKey = (e: React.FormEvent) => {
+  const handleVerifyManualKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualKey.trim()) return;
+    if (!manualKey.trim() || verifyingManualKey) return;
 
     const trimmed = manualKey.trim().toUpperCase();
 
     // Check if pass has been revoked by admin
     if (DatabaseEngine.isPassRevoked(trimmed)) {
-      setManualKeyError(`⛔ Pass Revoked: Pass key ${trimmed} has been revoked by an administrator. Access is restricted. Please contact scoders82@gmail.com for assistance.`);
+      setManualKeyError(`⛔ Pass Revoked: Pass key ${trimmed} has been revoked by an administrator. Access is restricted. Please contact escoders@gmail.com for assistance.`);
       return;
     }
 
     const code = activeWorkshop.id.toUpperCase();
     const expectedPrefix = `BTD-WKSP-${code}-`;
 
-    if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
-      // Look up existing registration in DatabaseEngine or chats
-      const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
-      const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
-      const allChats = DatabaseEngine.getChats();
-      const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
-
-      const restoredName = existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee';
-      const restoredEmail = existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com';
-      const restoredRole = existingReg?.participantProfile?.role || 'Registered Developer';
-      const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`;
-
+    const unlockWorkshopFromDetails = (
+      targetWorkshop: WorkshopEvent,
+      restoredName: string,
+      restoredEmail: string,
+      restoredRole: string,
+      restoredPaid: number,
+      restoredChatId: string
+    ) => {
       const newKeys = {
         ...registeredKeys,
-        [activeWorkshop.id]: {
+        [targetWorkshop.id]: {
           key: trimmed,
           name: restoredName,
           email: restoredEmail,
           role: restoredRole,
           tickets: 1,
-          totalPaid: existingReg?.amountPaid || 1499,
+          totalPaid: restoredPaid,
           chatId: restoredChatId,
           timestamp: new Date().toLocaleDateString()
         }
@@ -647,18 +696,16 @@ export default function TenantDashboard() {
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
 
-      // Ensure individual chat is initialized for pass holder with key linkage
       try {
-        const manualChatId = restoredChatId;
         const existingChats = DatabaseEngine.getChats();
-        if (!existingChats.some(c => c.id === manualChatId || c.uniqueAccessKey === trimmed)) {
+        if (!existingChats.some(c => c.id === restoredChatId || c.uniqueAccessKey === trimmed)) {
           const manualChat: ChatConversation = {
-            id: manualChatId,
+            id: restoredChatId,
             clientName: restoredName,
             clientEmail: restoredEmail,
             registrationId: trimmed,
-            workshopId: activeWorkshop.id,
-            reference: activeWorkshop.title,
+            workshopId: targetWorkshop.id,
+            reference: targetWorkshop.title,
             uniqueAccessKey: trimmed,
             messages: [
               {
@@ -666,7 +713,7 @@ export default function TenantDashboard() {
                 sender: 'team',
                 senderName: 'S-CODERS Mentor Team',
                 senderRole: 'S-CODERS Founder & CEO',
-                content: `Welcome to the private discussion channel for '${activeWorkshop.title}'! You can clear your technical doubts and share URLs directly with our engineering mentors here.`,
+                content: `Welcome to the private discussion channel for '${targetWorkshop.title}'! You can clear your technical doubts and share URLs directly with our engineering mentors here.`,
                 timestamp: new Date().toISOString()
               }
             ],
@@ -674,13 +721,93 @@ export default function TenantDashboard() {
           };
           DatabaseEngine.saveChats([manualChat, ...existingChats]);
         }
-      } catch (e) {}
+      } catch {}
 
       setShowRegModal(false);
       setManualKey('');
       setManualKeyError(null);
-    } else {
-      setManualKeyError(`Invalid key format. Pass for this session must start with: ${expectedPrefix}`);
+      setActiveWorkspaceWorkshop(targetWorkshop);
+    };
+
+    setVerifyingManualKey(true);
+    setManualKeyError(null);
+
+    try {
+      const verifyRes = await fetch('/api/registrations/verify-uid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: trimmed, section: 'workshop' }),
+      });
+      const verifyData = await verifyRes.json();
+
+      if (verifyRes.ok && verifyData?.valid && verifyData?.record) {
+        const rec = verifyData.record;
+        const matchedWorkshop = workshops.find(w => w.id === rec.itemId) || activeWorkshop;
+        const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
+        const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
+        const allChats = DatabaseEngine.getChats();
+        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+        unlockWorkshopFromDetails(
+          matchedWorkshop,
+          rec.clientName || existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee',
+          rec.clientEmail || existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com',
+          rec.clientRole || existingReg?.participantProfile?.role || 'Registered Developer',
+          Number(rec.amount) || existingReg?.amountPaid || matchedWorkshop.price || 1499,
+          rec.chatId || existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`
+        );
+        return;
+      }
+
+      if (verifyRes.status === 403 || verifyRes.status === 410) {
+        setManualKeyError(verifyData?.error || 'This workshop registration UID is no longer active.');
+        return;
+      }
+
+      // Check local DB before rejecting
+      const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
+      const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
+      const allChats = DatabaseEngine.getChats();
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+      if (existingReg || existingChat) {
+        const matchedWorkshop = workshops.find(w => w.id === existingReg?.workshopId) || activeWorkshop;
+        unlockWorkshopFromDetails(
+          matchedWorkshop,
+          existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee',
+          existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com',
+          existingReg?.participantProfile?.role || 'Registered Developer',
+          existingReg?.amountPaid || matchedWorkshop.price || 1499,
+          existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`
+        );
+        return;
+      }
+
+      setManualKeyError(
+        verifyData?.error ||
+          `No active workshop pass found for UID "${trimmed}". Check your code or recover via email.`
+      );
+    } catch {
+      // Offline fallback with prefix verification
+      if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
+        const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
+        const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
+        const allChats = DatabaseEngine.getChats();
+        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+        unlockWorkshopFromDetails(
+          activeWorkshop,
+          existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee',
+          existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com',
+          existingReg?.participantProfile?.role || 'Registered Developer',
+          existingReg?.amountPaid || activeWorkshop.price || 1499,
+          existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`
+        );
+      } else {
+        setManualKeyError(`Invalid key format. Pass for this session must start with: ${expectedPrefix}`);
+      }
+    } finally {
+      setVerifyingManualKey(false);
     }
   };
 
@@ -871,6 +998,198 @@ export default function TenantDashboard() {
     if (currentUser?.name && currentUser.name !== 'Attendee') return currentUser.name;
     return null;
   }, [activeRegInfo, registeredKeys, currentUser]);
+
+  // Shared spacious classroom tabbed workspace (matches Service Workspace width & padding)
+  const renderWorkshopClassroomTabs = (targetWorkshop: WorkshopEvent, regInfo: any) => (
+    <div className="bg-brand-dark/60 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+      {/* Tab Headers */}
+      <div className="grid grid-cols-3 bg-brand-dark/90 border-b border-white/10 p-1.5 sm:p-2">
+        {[
+          { id: 'sandbox', label: 'Sandbox IDE', shortLabel: 'IDE', icon: Code },
+          { id: 'resources', label: 'Downloads Locker', shortLabel: 'Files', icon: Download },
+          { id: 'discussion', label: 'Live Discussion', shortLabel: 'Chat', icon: MessageCircle },
+        ].map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setActiveTab(t.id as any)}
+            className={`py-3 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-mono font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === t.id
+                ? 'bg-brand-teal text-brand-dark shadow-md font-extrabold'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <t.icon className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">{t.label}</span>
+            <span className="sm:hidden">{t.shortLabel}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Panels - Matching Service Workspace spacing & width */}
+      <div className="p-2.5 sm:p-6 min-h-[480px] transition-all">
+        {/* TAB 1: REAL ONLINE COMPILER & PLAYGROUND IDE */}
+        {activeTab === 'sandbox' && (
+          <div className="w-full space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-gray-400 pb-2 border-b border-white/10">
+              <span className="font-semibold text-gray-300">{targetWorkshop.title} Live Compiler & Sandbox</span>
+              <span className="text-brand-teal font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" />
+                Classroom IDE Active
+              </span>
+            </div>
+            <OnlineCodePlayground
+              workshopTitle={targetWorkshop.title}
+              initialLanguage={targetWorkshop.id === 'w-1' ? 'python' : 'react'}
+              initialCode={sandboxCode}
+              onCodeChange={setSandboxCode}
+            />
+          </div>
+        )}
+
+        {/* TAB 2: DOWNLOADS TRACKER */}
+        {activeTab === 'resources' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+              <div>
+                <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block font-bold">
+                  Verified Developer Assets Locker
+                </span>
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 mt-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Direct save to your computer's File Explorer (Downloads folder)</span>
+                </span>
+              </div>
+
+              {/* Master Download All Button */}
+              <button
+                type="button"
+                onClick={(e) => handleDownloadResource('all', 'scoders_workshop_complete_developer_kit.zip', e)}
+                disabled={downloadingItem !== null}
+                className="px-4 py-2.5 bg-brand-teal/20 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shrink-0 disabled:opacity-50"
+                title="Download all workshop resources in a single zip archive"
+              >
+                <Download className="w-4 h-4" />
+                <span>{downloadingItem === 'all' ? 'Downloading Kit...' : 'Download All Assets (.ZIP)'}</span>
+              </button>
+            </div>
+
+            {/* File Explorer Instructions Tip */}
+            <div className="p-4 sm:p-5 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono text-gray-300 space-y-3">
+              <div className="flex items-center gap-2 text-brand-teal font-bold text-xs uppercase tracking-wider">
+                <span>💡 File Explorer Guide</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1 leading-relaxed">
+                <div className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2.5">
+                  <span className="text-brand-teal font-bold shrink-0">1.</span>
+                  <span>Click <strong className="text-white">Download</strong> to save the verified file directly to your system's <strong className="text-white">Downloads</strong> folder.</span>
+                </div>
+                <div className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2.5">
+                  <span className="text-brand-teal font-bold shrink-0">2.</span>
+                  <span>In File Explorer, open <code className="text-cyan-300 bg-white/10 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser.</span>
+                </div>
+                <div className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2.5">
+                  <span className="text-brand-teal font-bold shrink-0">3.</span>
+                  <span>Click <strong className="text-brand-teal">Open</strong> to preview documents immediately in your browser tab.</span>
+                </div>
+              </div>
+            </div>
+
+            {downloadSuccessNotice && (
+              <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-emerald-500/10">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-semibold">{downloadSuccessNotice}</span>
+                </div>
+                {lastDownloadedItem && (lastDownloadedItem.id === 'pdf_prompt' || lastDownloadedItem.id === 'pdf_slides' || lastDownloadedItem.id === 'json') && (
+                  <a
+                    href={`/api/workshops/view/${lastDownloadedItem.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-emerald-400 text-black hover:bg-emerald-300 font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Open / View in Browser</span>
+                  </a>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {[
+                { id: 'json', title: 'n8n Workflow Blueprints', type: 'JSON Specification', size: '24 KB', filename: 'n8n_ai_workflow_blueprints_scoders.json' },
+                { id: 'pdf_prompt', title: 'Gemini System Prompts', type: 'System Cheat-sheet PDF', size: '180 KB', filename: 'gemini_system_prompts_cheatsheet.pdf' },
+                { id: 'zip', title: 'SaaS Multitenant Boilerplate', type: 'TypeScript React Zip', size: '1.4 MB', filename: 'saas_multitenant_boilerplate.zip' },
+                { id: 'pdf_slides', title: 'Session Deck & Exercises', type: 'Slide Presentation PDF', size: '3.6 MB', filename: 'scoders_workshop_session_deck_exercises.pdf' },
+              ].map(item => (
+                <div key={item.id} className="bg-brand-dark/50 border border-white/10 hover:border-brand-teal/30 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group">
+                  <div className="overflow-hidden min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-bold text-white truncate group-hover:text-brand-teal transition-colors">{item.title}</p>
+                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-white/10 text-gray-300 shrink-0">{item.size}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 font-mono mt-1 truncate">{item.type}</p>
+                    <span className="text-[10px] text-gray-500 font-mono block mt-1 truncate">{item.filename}</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/5 flex items-center gap-2">
+                    {downloadingItem === item.id ? (
+                      <div className="w-full space-y-1.5 py-1">
+                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                        </div>
+                        <div className="flex justify-between text-[11px] font-mono text-brand-teal font-bold">
+                          <span>Saving to File Explorer...</span>
+                          <span>{downloadProgress}%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadResource(item.id, item.filename, e)}
+                          disabled={downloadingItem !== null}
+                          className="flex-1 py-2.5 px-3 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal hover:font-bold rounded-xl transition-all border border-brand-teal/30 hover:border-brand-teal cursor-pointer shadow-sm flex items-center justify-center gap-1.5 font-mono text-xs disabled:opacity-50"
+                          title={`Download ${item.title} directly into File Explorer`}
+                        >
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span>Download</span>
+                        </button>
+
+                        {item.id !== 'zip' ? (
+                          <a
+                            href={`/api/workshops/view/${item.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="py-2.5 px-3.5 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white rounded-xl transition-all border border-white/10 cursor-pointer shadow-sm flex items-center justify-center gap-1.5 font-mono text-xs shrink-0"
+                            title={`Open and view ${item.title} directly in browser`}
+                          >
+                            <Eye className="w-3.5 h-3.5 text-brand-teal" />
+                            <span>Open</span>
+                          </a>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: DISCUSSION LIVE CHATROOM - WhatsApp-Style Individual Persistent Private Chat & S-CODERS Team Portal */}
+        {activeTab === 'discussion' && (
+          <WorkshopChatRoom
+            activeWorkshop={targetWorkshop}
+            activeRegInfo={regInfo}
+            isRegistered={isRegistered}
+            isAdmin={isAdmin}
+            currentUser={currentUser}
+          />
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <section className="py-24 bg-brand-dark relative overflow-hidden">
@@ -1162,45 +1481,47 @@ export default function TenantDashboard() {
                           </div>
                         </div>
                         <div className="text-[11px] text-gray-400">
-                          For questions regarding revocation, contact <span className="text-white font-bold">scoders82@gmail.com</span>
+                          For questions regarding revocation, contact <span className="text-white font-bold">escoders@gmail.com</span>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* GATE CONTROL: If registered, reveal interactive classroom. If not, show Register banner */}
+                  {/* GATE CONTROL: If registered, show active pass & Launch Workspace CTA; full classroom renders spaciously below or in full-screen console */}
                   {isRegistered ? (
-                    <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
-                      <div className="bg-brand-dark/80 p-5 rounded-2xl border border-brand-teal/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="pt-8 mt-8 border-t border-white/5 space-y-4">
+                      <div className="bg-brand-dark/80 p-5 sm:p-6 rounded-2xl border border-brand-teal/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20">
+                          <div className="p-2.5 bg-brand-teal/10 rounded-xl text-brand-teal border border-brand-teal/20 shrink-0">
                             <Shield className="w-5 h-5 animate-pulse" />
                           </div>
                           <div>
-                            <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold">Keychain Active</span>
-                            <h4 className="text-sm font-bold text-white font-sans">Attending Live Session</h4>
-                            <p className="text-[11px] text-gray-500 font-mono mt-0.5">Secure Key: {activeRegInfo.key}</p>
+                            <span className="text-[9px] font-mono text-brand-teal uppercase tracking-widest font-bold block">Keychain Active</span>
+                            <h4 className="text-sm sm:text-base font-bold text-white font-sans">Attending Live Session</h4>
+                            <p className="text-[11px] text-gray-400 font-mono mt-0.5">Secure Key: <span className="text-brand-teal font-bold">{activeRegInfo.key}</span></p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                           <button
+                            type="button"
                             onClick={() => handleCopyKey(activeRegInfo.key)}
-                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-300 hover:text-white transition-all cursor-pointer border border-white/5 flex items-center gap-1.5 text-xs font-mono"
+                            className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-300 hover:text-white transition-all cursor-pointer border border-white/10 flex items-center gap-1.5 text-xs font-mono"
                             title="Copy Pass Key"
                           >
                             {copiedKey ? <Check className="w-3.5 h-3.5 text-brand-teal" /> : <Copy className="w-3.5 h-3.5" />}
                             <span>{copiedKey ? 'Copied' : 'Copy Key'}</span>
                           </button>
-                          <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5">
+                          <span className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5">
                             <ShieldCheck className="w-3.5 h-3.5" />
                             Pass Active
                           </span>
                           {/* Revoke Pass is strictly controlled by Admin, not by client */}
                           {isAdmin && (
                             <button
+                              type="button"
                               onClick={() => handleAdminRevokePass(activeWorkshop.id, activeRegInfo.key, activeRegInfo.name)}
-                              className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 hover:text-red-300 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                              className="px-3 py-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 hover:text-red-300 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                               title="Admin Control: Revoke this pass"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -1210,189 +1531,15 @@ export default function TenantDashboard() {
                         </div>
                       </div>
 
-                      {/* --- HIGH FIDELITY CLASSROOM TABBED CONTAINER (SPACIOUS & EXPANDED) --- */}
-                      <div className="bg-brand-dark/60 border border-white/10 rounded-3xl overflow-hidden mt-6 shadow-xl">
-                        {/* Tab Headers */}
-                        <div className="grid grid-cols-3 bg-brand-dark/90 border-b border-white/10 p-1.5 sm:p-2">
-                          {[
-                            { id: 'sandbox', label: 'Sandbox IDE', icon: Code },
-                            { id: 'resources', label: 'Downloads Locker', icon: Download },
-                            { id: 'discussion', label: 'Live Discussion', icon: MessageCircle },
-                          ].map(t => (
-                            <button
-                              key={t.id}
-                              onClick={() => setActiveTab(t.id as any)}
-                              className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-mono font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                                activeTab === t.id
-                                  ? 'bg-brand-teal text-brand-dark shadow-md'
-                                  : 'text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              <t.icon className="w-4 h-4 shrink-0" />
-                              <span className="hidden sm:inline">{t.label}</span>
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Tab Panels */}
-                        <div className={`min-h-[540px] transition-all ${activeTab === 'sandbox' ? 'p-1.5 sm:p-3' : 'p-4 sm:p-7'}`}>
-                          
-                          {/* TAB 1: REAL ONLINE COMPILER & PLAYGROUND IDE */}
-                          {activeTab === 'sandbox' && (
-                            <div className="w-full">
-                              <OnlineCodePlayground
-                                workshopTitle={activeWorkshop.title}
-                                initialLanguage={activeWorkshop.id === 'w-1' ? 'python' : 'react'}
-                                initialCode={sandboxCode}
-                                onCodeChange={setSandboxCode}
-                              />
-                            </div>
-                          )}
-
-                          {/* TAB 2: DOWNLOADS TRACKER */}
-                          {activeTab === 'resources' && (
-                            <div className="space-y-5">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/10">
-                                <div>
-                                  <span className="text-xs font-mono text-gray-400 uppercase tracking-widest block font-bold">
-                                    Verified Developer Assets Locker
-                                  </span>
-                                  <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Direct save to your computer's File Explorer (Downloads folder)</span>
-                                  </span>
-                                </div>
-                                
-                                {/* Master Download All Button */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleDownloadResource('all', 'scoders_workshop_complete_developer_kit.zip', e)}
-                                  disabled={downloadingItem !== null}
-                                  className="px-4 py-2 bg-brand-teal/20 hover:bg-brand-teal hover:text-brand-dark text-brand-teal border border-brand-teal/40 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shrink-0 disabled:opacity-50"
-                                  title="Download all workshop resources in a single zip archive"
-                                >
-                                  <Download className="w-4 h-4" />
-                                  <span>{downloadingItem === 'all' ? 'Downloading Kit...' : 'Download All Assets (.ZIP)'}</span>
-                                </button>
-                              </div>
-
-                              {/* File Explorer Instructions Tip */}
-                              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono text-gray-300 space-y-2.5">
-                                <div className="flex items-center gap-2 text-brand-teal font-bold text-xs uppercase tracking-wider">
-                                  <span>💡 File Explorer Guide</span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] pt-1">
-                                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
-                                    <span className="text-brand-teal font-bold shrink-0">1.</span>
-                                    <span>Click <strong className="text-white">Download</strong> to save the verified file directly to your system's <strong className="text-white">Downloads</strong> folder.</span>
-                                  </div>
-                                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
-                                    <span className="text-brand-teal font-bold shrink-0">2.</span>
-                                    <span>In File Explorer, open <code className="text-cyan-300 bg-white/10 px-1 py-0.5 rounded">Downloads</code> or press <kbd className="text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">Ctrl + J</kbd> in your browser.</span>
-                                  </div>
-                                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-start gap-2">
-                                    <span className="text-brand-teal font-bold shrink-0">3.</span>
-                                    <span>Click <strong className="text-brand-teal">Open</strong> to preview documents immediately in your browser tab.</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {downloadSuccessNotice && (
-                                <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-emerald-500/10">
-                                  <div className="flex items-center gap-2.5">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                                    <span className="font-semibold">{downloadSuccessNotice}</span>
-                                  </div>
-                                  {lastDownloadedItem && (lastDownloadedItem.id === 'pdf_prompt' || lastDownloadedItem.id === 'pdf_slides' || lastDownloadedItem.id === 'json') && (
-                                    <a
-                                      href={`/api/workshops/view/${lastDownloadedItem.id}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-3 py-1.5 bg-emerald-400 text-black hover:bg-emerald-300 font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-sm"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                      <span>Open / View in Browser</span>
-                                    </a>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {[
-                                  { id: 'json', title: 'n8n Workflow Blueprints', type: 'JSON Specification', size: '24 KB', filename: 'n8n_ai_workflow_blueprints_scoders.json' },
-                                  { id: 'pdf_prompt', title: 'Gemini System Prompts', type: 'System Cheat-sheet PDF', size: '180 KB', filename: 'gemini_system_prompts_cheatsheet.pdf' },
-                                  { id: 'zip', title: 'SaaS Multitenant Boilerplate', type: 'TypeScript React Zip', size: '1.4 MB', filename: 'saas_multitenant_boilerplate.zip' },
-                                  { id: 'pdf_slides', title: 'Session Deck & Exercises', type: 'Slide Presentation PDF', size: '3.6 MB', filename: 'scoders_workshop_session_deck_exercises.pdf' },
-                                ].map(item => (
-                                  <div key={item.id} className="bg-brand-dark/50 border border-white/10 hover:border-brand-teal/30 rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group">
-                                    <div className="overflow-hidden min-w-0">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <p className="text-sm font-bold text-white truncate group-hover:text-brand-teal transition-colors">{item.title}</p>
-                                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-white/10 text-gray-300 shrink-0">{item.size}</span>
-                                      </div>
-                                      <p className="text-xs text-gray-400 font-mono mt-1 truncate">{item.type}</p>
-                                      <span className="text-[10px] text-gray-500 font-mono block mt-1 truncate">{item.filename}</span>
-                                    </div>
-
-                                    <div className="pt-2 border-t border-white/5 flex items-center gap-2">
-                                      {downloadingItem === item.id ? (
-                                        <div className="w-full space-y-1.5 py-1">
-                                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                                            <div className="h-full bg-brand-teal transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
-                                          </div>
-                                          <div className="flex justify-between text-[11px] font-mono text-brand-teal font-bold">
-                                            <span>Saving to File Explorer...</span>
-                                            <span>{downloadProgress}%</span>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => handleDownloadResource(item.id, item.filename, e)}
-                                            disabled={downloadingItem !== null}
-                                            className="flex-1 py-2 px-3 bg-brand-teal/15 hover:bg-brand-teal hover:text-brand-dark text-brand-teal hover:font-bold rounded-xl transition-all border border-brand-teal/30 hover:border-brand-teal cursor-pointer shadow-sm flex items-center justify-center gap-1.5 font-mono text-xs disabled:opacity-50"
-                                            title={`Download ${item.title} directly into File Explorer`}
-                                          >
-                                            <Download className="w-3.5 h-3.5 shrink-0" />
-                                            <span>Download</span>
-                                          </button>
-
-                                          {item.id !== 'zip' ? (
-                                            <a
-                                              href={`/api/workshops/view/${item.id}`}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="py-2 px-3 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white rounded-xl transition-all border border-white/10 cursor-pointer shadow-sm flex items-center justify-center gap-1.5 font-mono text-xs shrink-0"
-                                              title={`Open and view ${item.title} directly in browser`}
-                                            >
-                                              <Eye className="w-3.5 h-3.5 text-brand-teal" />
-                                              <span>Open</span>
-                                            </a>
-                                          ) : null}
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* TAB 3: DISCUSSION LIVE CHATROOM - WhatsApp-Style Individual Persistent Private Chat & S-CODERS Team Portal */}
-                          {activeTab === 'discussion' && (
-                            <WorkshopChatRoom
-                              activeWorkshop={activeWorkshop}
-                              activeRegInfo={activeRegInfo}
-                              isRegistered={isRegistered}
-                              isAdmin={isAdmin}
-                              currentUser={currentUser}
-                            />
-                          )}
-
-                        </div>
-                      </div>
-
+                      <button
+                        type="button"
+                        onClick={() => setActiveWorkspaceWorkshop(activeWorkshop)}
+                        className="w-full py-3.5 px-6 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer shadow-lg shadow-brand-teal/15"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>Launch Classroom Workspace</span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </button>
                     </div>
                   ) : (
                     <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
@@ -1468,6 +1615,52 @@ export default function TenantDashboard() {
           </div>
 
         </div>
+
+      </div>
+
+      {/* FULL-WIDTH UNLOCKED WORKSHOP WORKSPACE (Matches Service Workspace 1440px dimensions & spacing) */}
+      {isRegistered && activeRegInfo && !activeWorkspaceWorkshop && (
+        <div className="max-w-[1440px] mx-auto px-2 sm:px-5 lg:px-6 relative z-10 mb-16">
+          <div className="bg-[#020516]/90 border border-white/10 rounded-3xl p-2.5 sm:p-5 md:p-6 shadow-2xl space-y-4 sm:space-y-5">
+            {/* Top Lifecycle Status Banner matching Service Workspace */}
+            <div className="bg-[#25d366]/10 border border-[#25d366]/30 px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse shrink-0" />
+                <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">
+                  WORKSHOP CLASSROOM ACTIVE
+                </span>
+                <span className="text-gray-500 text-xs hidden md:inline">•</span>
+                <span className="text-xs text-gray-300 hidden md:inline truncate">
+                  {activeWorkshop.title} • Key: <strong className="text-white font-mono">{activeRegInfo.key}</strong>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <a
+                  href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-[#25D366]/20 cursor-pointer active:scale-95"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-black" />
+                  <span>Join WhatsApp Group</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setActiveWorkspaceWorkshop(activeWorkshop)}
+                  className="px-3.5 py-1.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Open Fullscreen Console</span>
+                </button>
+              </div>
+            </div>
+
+            {renderWorkshopClassroomTabs(activeWorkshop, activeRegInfo)}
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-16">
 
         {/* WHO'S RUNNING IT / your hosts Section - Full-Width Showcase */}
         <div className="glass-panel p-6 sm:p-8 md:p-10 rounded-3xl border border-white/10 relative overflow-hidden space-y-6">
@@ -1976,7 +2169,11 @@ export default function TenantDashboard() {
                     </div>
 
                     <button
-                      onClick={() => setShowRegModal(false)}
+                      type="button"
+                      onClick={() => {
+                        setShowRegModal(false);
+                        setActiveWorkspaceWorkshop(activeWorkshop);
+                      }}
                       className="w-full py-4 bg-brand-teal hover:bg-white text-brand-dark font-display font-extrabold text-sm uppercase tracking-wider rounded-2xl transition-all cursor-pointer shadow-lg shadow-brand-teal/20 active:scale-95"
                     >
                       Enter Classroom Workspace
@@ -1996,22 +2193,33 @@ export default function TenantDashboard() {
                     </div>
 
                     {/* Toggle Modes */}
-                    <div className="grid grid-cols-2 bg-brand-dark/50 p-1 rounded-xl mb-5 border border-white/5">
+                    <div className="grid grid-cols-3 bg-brand-dark/50 p-1 rounded-xl mb-5 border border-white/5 gap-1">
                       <button
+                        type="button"
                         onClick={() => { setRegMode('register'); setManualKeyError(null); }}
-                        className={`py-1.5 text-[11px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                        className={`py-1.5 text-[10px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
                           regMode === 'register' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
                       >
                         Register New Pass
                       </button>
                       <button
+                        type="button"
                         onClick={() => { setRegMode('enterKey'); setManualKeyError(null); }}
-                        className={`py-1.5 text-[11px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                        className={`py-1.5 text-[10px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
                           regMode === 'enterKey' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
                       >
                         Enter Existing Pass
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setRegMode('recover'); setManualKeyError(null); }}
+                        className={`py-1.5 text-[10px] font-mono rounded-lg transition-all uppercase cursor-pointer ${
+                          regMode === 'recover' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Recover UID
                       </button>
                     </div>
 
@@ -2097,8 +2305,11 @@ export default function TenantDashboard() {
                           </button>
                         </div>
                       </form>
-                    ) : (
+                    ) : regMode === 'enterKey' ? (
                       <form onSubmit={handleVerifyManualKey} className="space-y-3.5 font-sans">
+                        <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-3 text-[11px] text-blue-200 leading-relaxed">
+                          Lost connection, refreshed, or exited mid-session? Enter the Unique Registration Code emailed to you from <strong className="font-mono text-brand-teal">escoders@gmail.com</strong> to rejoin immediately.
+                        </div>
                         <div>
                           <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Enter Session Pass Key *</label>
                           <input
@@ -2118,16 +2329,34 @@ export default function TenantDashboard() {
                           <p className="text-red-400 text-[11px] font-mono">{manualKeyError}</p>
                         )}
 
-                        <div className="pt-1">
+                        <div className="pt-1 space-y-2.5">
                           <button
                             type="submit"
-                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            disabled={verifyingManualKey}
+                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <Key className="w-3.5 h-3.5" />
-                            Verify & Unlock Session
+                            {verifyingManualKey ? 'Verifying Pass...' : 'Verify & Rejoin Session'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setRegMode('recover'); setManualKeyError(null); }}
+                            className="w-full text-center text-[11px] font-mono text-brand-teal hover:underline cursor-pointer"
+                          >
+                            Forgot your pass UID? Verify email & recover →
                           </button>
                         </div>
                       </form>
+                    ) : (
+                      <UidRecoveryPanel
+                        section="workshop"
+                        defaultEmail={regEmail || currentUser?.email || ''}
+                        onRecoveredKeySelect={(uid) => {
+                          setManualKey(uid);
+                          setRegMode('enterKey');
+                          setManualKeyError(null);
+                        }}
+                      />
                     )}
                   </div>
                 )}
@@ -2135,6 +2364,111 @@ export default function TenantDashboard() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* --- ACTIVE WORKSHOP WORKSPACE (CONSOLE) OVERLAY MODAL — MATCHES SERVICE WORKSPACE DIMENSIONS --- */}
+      <AnimatePresence>
+        {activeWorkspaceWorkshop && (() => {
+          const wkspRegInfo = registeredKeys[activeWorkspaceWorkshop.id] || activeRegInfo || {
+            key: 'PASS-KEY',
+            name: currentUser?.name || 'Registered Attendee',
+            email: currentUser?.email || 'attendee@scoders.com',
+            role: 'Registered Developer',
+            timestamp: new Date().toLocaleDateString()
+          };
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-6">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-brand-dark/95 backdrop-blur-lg"
+              />
+
+              {/* Workspace Layout Container - Identical width, height & spacing to Service Workspace */}
+              <motion.div
+                initial={{ scale: 0.98, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.98, opacity: 0, y: 10 }}
+                className="relative w-full max-w-[1440px] h-[100dvh] sm:h-[94vh] sm:max-h-[96dvh] bg-[#020516] border-0 sm:border sm:border-white/10 sm:rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col"
+              >
+                {/* Visual Header - Compact & Responsive */}
+                <div className="px-3.5 py-2.5 sm:px-6 sm:py-3.5 bg-brand-dark/90 border-b border-white/10 flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="p-2 sm:p-2.5 bg-brand-teal/15 rounded-xl border border-brand-teal/30 text-brand-teal shrink-0">
+                      <Code className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold block truncate">
+                        ACTIVE WORKSHOP CONSOLE
+                      </span>
+                      <h3 className="font-display font-extrabold text-sm sm:text-lg text-white leading-tight truncate">
+                        {activeWorkspaceWorkshop.title} Workspace
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Key and Close controls */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyKey(wkspRegInfo.key)}
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-1.5 flex items-center gap-1.5 text-xs font-mono text-brand-teal transition-all cursor-pointer"
+                      title="Click to copy your unique pass key"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-brand-teal shrink-0" />
+                      <span className="font-bold tracking-wide truncate max-w-[100px] sm:max-w-none">{wkspRegInfo.key}</span>
+                      <Copy className="w-3 h-3 text-gray-400 ml-1 shrink-0 hidden sm:inline" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveWorkspaceWorkshop(null)}
+                      className="p-1.5 sm:p-2 bg-white/5 hover:bg-white/15 rounded-xl text-gray-300 hover:text-white transition-colors cursor-pointer border border-white/10 flex items-center gap-1"
+                      title="Close Console"
+                    >
+                      <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-[11px] font-mono uppercase font-bold sm:hidden">Close</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Main Content Area - Spacious scrolling matching Service Workspace */}
+                <div className="flex-1 overflow-y-auto p-2 sm:p-5 md:p-6 bg-brand-dark/40 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
+                  <div className="space-y-4 sm:space-y-6 text-white font-sans w-full max-w-[1380px] mx-auto pb-6">
+                    {/* Top Status Banner */}
+                    <div className="bg-[#25d366]/10 border border-[#25d366]/30 px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse shrink-0" />
+                        <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">
+                          WORKSHOP SESSION ACTIVE
+                        </span>
+                        <span className="text-gray-500 text-xs hidden md:inline">•</span>
+                        <span className="text-xs text-gray-300 hidden md:inline truncate">
+                          Schedule: <strong className="text-white">{activeWorkspaceWorkshop.date}</strong> ({activeWorkspaceWorkshop.startTime || '10:00 AM IST'}) • Location: <strong className="text-white">{activeWorkspaceWorkshop.location}</strong>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3.5 py-1.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-[#25D366]/20 cursor-pointer active:scale-95"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-black" />
+                          <span>Join WhatsApp Group</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {renderWorkshopClassroomTabs(activeWorkspaceWorkshop, wkspRegInfo)}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* Official S-CODERS Dispatch Email Popup Notification Modal */}

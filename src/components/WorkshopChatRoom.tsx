@@ -93,6 +93,8 @@ export default function WorkshopChatRoom({
   const [isSending, setIsSending] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrlInput, setLinkUrlInput] = useState('');
   const [linkTitleInput, setLinkTitleInput] = useState('');
@@ -101,6 +103,7 @@ export default function WorkshopChatRoom({
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUpRef = useRef(false);
   const prevMessagesCountRef = useRef(0);
+  const lastMutationAtRef = useRef<number>(0);
 
   // Sync admin state
   useEffect(() => {
@@ -125,8 +128,25 @@ export default function WorkshopChatRoom({
     }
   };
 
-  // Fetch or initialize active conversation with permanent message merging
-  const loadConversation = async (chatId: string) => {
+  // Sync localStorage db_chats quietly with authoritative server conversation without triggering a race POST
+  const syncLocalChatsCache = (conv: ChatConversation) => {
+    try {
+      const allChats = DatabaseEngine.getChats();
+      const idx = allChats.findIndex(c => c.id === conv.id);
+      const nextChats = idx >= 0
+        ? allChats.map(c => (c.id === conv.id ? conv : c))
+        : [conv, ...allChats];
+      localStorage.setItem('db_chats', JSON.stringify(nextChats));
+    } catch {}
+  };
+
+  // Fetch or initialize active conversation with permanent persistence
+  const loadConversation = async (chatId: string, force = false) => {
+    // Avoid overwriting optimistic edit/delete state right after a mutation
+    if (!force && Date.now() - lastMutationAtRef.current < 1500) {
+      return;
+    }
+
     const activeKey = activeRegInfo?.key || clientKey || '';
     try {
       const queryParams = new URLSearchParams({
@@ -138,25 +158,18 @@ export default function WorkshopChatRoom({
         key: activeKey
       });
 
-      const res = await fetch(`/api/workshops/chats/${encodeURIComponent(chatId)}?${queryParams.toString()}`);
+      const res = await fetch(`/api/workshops/chats/${encodeURIComponent(chatId)}?${queryParams.toString()}`, {
+        cache: 'no-store'
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.conversation) {
-          // Also merge local DB messages if any exist
-          try {
-            const allChats = DatabaseEngine.getChats();
-            const localMatch = allChats.find(c => 
-              c.id === chatId || 
-              (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
-              (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail)
-            );
-            if (localMatch && localMatch.messages && localMatch.messages.length > data.conversation.messages.length) {
-              data.conversation.messages = localMatch.messages;
-            }
-          } catch (e) {}
-
+          if (!force && Date.now() - lastMutationAtRef.current < 1500) {
+            return;
+          }
           setCurrentConversation(data.conversation);
           setMessages(data.conversation.messages || []);
+          syncLocalChatsCache(data.conversation);
           return;
         }
       }
@@ -266,7 +279,7 @@ export default function WorkshopChatRoom({
   // Initial load
   useEffect(() => {
     setIsLoading(true);
-    loadConversation(currentChatId).finally(() => {
+    loadConversation(currentChatId, true).finally(() => {
       setIsLoading(false);
       setTimeout(() => scrollToBottomSafely(true), 150);
     });
@@ -319,6 +332,7 @@ export default function WorkshopChatRoom({
     }
 
     const activeKey = activeRegInfo?.key || clientKey || '';
+    const resolvedChatId = currentConversation?.id || currentChatId;
     const payload = {
       content: cleanContent,
       sender: isTeam ? 'team' : 'client',
@@ -329,11 +343,14 @@ export default function WorkshopChatRoom({
       reference: activeWorkshop.title,
       workshopId: activeWorkshop.id,
       uniqueAccessKey: activeKey,
-      key: activeKey
+      key: activeKey,
+      conversationId: currentConversation?.id
     };
 
+    lastMutationAtRef.current = Date.now();
+
     try {
-      const res = await fetch(`/api/workshops/chats/${encodeURIComponent(currentChatId)}/messages`, {
+      const res = await fetch(`/api/workshops/chats/${encodeURIComponent(resolvedChatId)}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -342,20 +359,37 @@ export default function WorkshopChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.message) {
-          const newMsgList = [...messages, data.message];
+          const newMsgList = data.conversation?.messages || [...messages, data.message];
+          if (data.conversation) {
+            setCurrentConversation(data.conversation);
+            syncLocalChatsCache(data.conversation);
+          }
           setMessages(newMsgList);
           setMessageInput('');
-          
-          // Also persist in DatabaseEngine
+
+          // Also update local cache cleanly without race POST
           try {
             const allChats = DatabaseEngine.getChats();
-            const updated = allChats.map(c => {
-              if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
-                return { ...c, messages: newMsgList, lastUpdated: new Date().toISOString() };
-              }
-              return c;
-            });
-            DatabaseEngine.saveChats(updated);
+            const exists = allChats.some(c => c.id === resolvedChatId || c.id === currentChatId);
+            const updated = exists
+              ? allChats.map(c => {
+                  if (c.id === resolvedChatId || c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+                    return { ...c, messages: newMsgList, lastUpdated: new Date().toISOString() };
+                  }
+                  return c;
+                })
+              : [{
+                  id: resolvedChatId,
+                  clientName: currentConversation?.clientName || clientName,
+                  clientEmail: currentConversation?.clientEmail || clientEmail,
+                  registrationId: resolvedChatId,
+                  reference: activeWorkshop.title,
+                  workshopId: activeWorkshop.id,
+                  uniqueAccessKey: activeKey,
+                  messages: newMsgList,
+                  lastUpdated: new Date().toISOString()
+                }, ...allChats];
+            localStorage.setItem('db_chats', JSON.stringify(updated));
           } catch (e) {}
 
           // User explicitly sent message -> auto-scroll to bottom of container
@@ -387,7 +421,7 @@ export default function WorkshopChatRoom({
       const allChats = DatabaseEngine.getChats();
       let found = false;
       const updated = allChats.map(c => {
-        if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
+        if (c.id === resolvedChatId || c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
           found = true;
           return { ...c, messages: updatedMessages, lastUpdated: new Date().toISOString() };
         }
@@ -395,10 +429,10 @@ export default function WorkshopChatRoom({
       });
       if (!found) {
         updated.push({
-          id: currentChatId,
+          id: resolvedChatId,
           clientName,
           clientEmail,
-          registrationId: currentChatId,
+          registrationId: resolvedChatId,
           reference: activeWorkshop.title,
           workshopId: activeWorkshop.id,
           uniqueAccessKey: activeKey,
@@ -419,95 +453,141 @@ export default function WorkshopChatRoom({
     const cleanContent = editContent.trim();
     if (!cleanContent) return;
     const activeKey = activeRegInfo?.key || clientKey || '';
+    const resolvedChatId = currentConversation?.id || currentChatId;
+    lastMutationAtRef.current = Date.now();
+
+    const applyLocalEdit = (nextMessages: ChatMessageItem[], serverConv?: ChatConversation) => {
+      if (serverConv) {
+        setCurrentConversation(serverConv);
+      }
+      setMessages(nextMessages);
+      setEditingMessageId(null);
+      setEditContent('');
+      try {
+        const allChats = DatabaseEngine.getChats();
+        const dbUpdated = allChats.map(c => {
+          const isMatch =
+            c.id === resolvedChatId ||
+            c.id === currentChatId ||
+            (activeKey && activeKey !== 'PASS-KEY' && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+            (Array.isArray(c.messages) && c.messages.some(m => m.id === messageId));
+          if (isMatch) {
+            return {
+              ...c,
+              messages: (c.messages || []).map(m =>
+                m.id === messageId
+                  ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() }
+                  : m
+              ),
+              lastUpdated: new Date().toISOString()
+            };
+          }
+          return c;
+        });
+        DatabaseEngine.saveChats(dbUpdated);
+      } catch (e) {}
+    };
 
     try {
-      const res = await fetch(`/api/workshops/chats/${encodeURIComponent(currentChatId)}/messages/${encodeURIComponent(messageId)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: cleanContent })
-      });
+      const res = await fetch(
+        `/api/workshops/chats/${encodeURIComponent(resolvedChatId)}/messages/${encodeURIComponent(messageId)}?key=${encodeURIComponent(activeKey)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: cleanContent,
+            key: activeKey,
+            conversationId: currentConversation?.id
+          })
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
-          setMessages(updated);
-          setEditingMessageId(null);
-          setEditContent('');
-
-          try {
-            const allChats = DatabaseEngine.getChats();
-            const dbUpdated = allChats.map(c => {
-              if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
-                return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
-              }
-              return c;
-            });
-            DatabaseEngine.saveChats(dbUpdated);
-          } catch (e) {}
+          const nextMessages = data.conversation?.messages ||
+            messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
+          applyLocalEdit(nextMessages, data.conversation);
           return;
         }
       }
     } catch (e) {}
 
     // Local fallback
-    const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
-    setMessages(updated);
-    setEditingMessageId(null);
-    setEditContent('');
-
-    try {
-      const allChats = DatabaseEngine.getChats();
-      const dbUpdated = allChats.map(c => {
-        if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
-          return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
-        }
-        return c;
-      });
-      DatabaseEngine.saveChats(dbUpdated);
-    } catch (e) {}
+    const fallbackMessages = messages.map(m =>
+      m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m
+    );
+    applyLocalEdit(fallbackMessages);
   };
 
-  // Delete Message Handler
+  // Delete Message Handler (triggered from non-blocking inline confirm UI, never window.confirm)
   const handleDeleteMessage = async (messageId: string) => {
-    if (!window.confirm('Are you sure you want to delete this message?')) return;
     const activeKey = activeRegInfo?.key || clientKey || '';
+    const resolvedChatId = currentConversation?.id || currentChatId;
+    setDeletingMessageId(messageId);
+    lastMutationAtRef.current = Date.now();
+
+    const applyLocalDelete = (nextMessages: ChatMessageItem[], serverConv?: ChatConversation) => {
+      if (serverConv) {
+        setCurrentConversation(serverConv);
+      }
+      setMessages(nextMessages);
+      setConfirmDeleteMessageId(null);
+      if (editingMessageId === messageId) {
+        setEditingMessageId(null);
+        setEditContent('');
+      }
+      try {
+        const allChats = DatabaseEngine.getChats();
+        const dbUpdated = allChats.map(c => {
+          const isMatch =
+            c.id === resolvedChatId ||
+            c.id === currentChatId ||
+            (activeKey && activeKey !== 'PASS-KEY' && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+            (Array.isArray(c.messages) && c.messages.some(m => m.id === messageId));
+          if (isMatch) {
+            return {
+              ...c,
+              messages: (c.messages || []).filter(m => m.id !== messageId),
+              lastUpdated: new Date().toISOString()
+            };
+          }
+          return c;
+        });
+        localStorage.setItem('db_chats', JSON.stringify(dbUpdated));
+        if (!serverConv) {
+          DatabaseEngine.saveChats(dbUpdated);
+        }
+      } catch (e) {}
+    };
 
     try {
-      const res = await fetch(`/api/workshops/chats/${encodeURIComponent(currentChatId)}/messages/${encodeURIComponent(messageId)}`, {
-        method: 'DELETE'
+      const query = new URLSearchParams({
+        key: activeKey,
+        conversationId: currentConversation?.id || ''
       });
+      const res = await fetch(
+        `/api/workshops/chats/${encodeURIComponent(resolvedChatId)}/messages/${encodeURIComponent(messageId)}?${query.toString()}`,
+        {
+          method: 'DELETE'
+        }
+      );
 
       if (res.ok) {
-        const updated = messages.filter(m => m.id !== messageId);
-        setMessages(updated);
-        try {
-          const allChats = DatabaseEngine.getChats();
-          const dbUpdated = allChats.map(c => {
-            if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
-              return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
-            }
-            return c;
-          });
-          DatabaseEngine.saveChats(dbUpdated);
-        } catch (e) {}
-        return;
+        const data = await res.json();
+        if (data.success) {
+          const nextMessages = data.conversation?.messages || messages.filter(m => m.id !== messageId);
+          applyLocalDelete(nextMessages, data.conversation);
+          setDeletingMessageId(null);
+          return;
+        }
       }
     } catch (e) {}
 
     // Local fallback
     const updated = messages.filter(m => m.id !== messageId);
-    setMessages(updated);
-    try {
-      const allChats = DatabaseEngine.getChats();
-      const dbUpdated = allChats.map(c => {
-        if (c.id === currentChatId || (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase())) {
-          return { ...c, messages: updated, lastUpdated: new Date().toISOString() };
-        }
-        return c;
-      });
-      DatabaseEngine.saveChats(dbUpdated);
-    } catch (e) {}
+    applyLocalDelete(updated);
+    setDeletingMessageId(null);
   };
 
   // Insert Link Helper
@@ -774,12 +854,17 @@ export default function WorkshopChatRoom({
                   ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                   : '';
 
+                const isEditing = editingMessageId === msg.id;
+                const isConfirmingDelete = confirmDeleteMessageId === msg.id;
+
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col max-w-[88%] sm:max-w-[78%] group relative ${
-                      isSelf ? 'ml-auto items-end' : 'mr-auto items-start'
-                    }`}
+                    className={`flex flex-col group relative ${
+                      isEditing
+                        ? 'w-full max-w-full sm:max-w-[85%]'
+                        : 'max-w-[88%] sm:max-w-[78%]'
+                    } ${isSelf ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                   >
                     {/* Sender Identity Tag */}
                     <div className="flex items-center gap-1.5 text-[11px] font-mono text-gray-400 mb-1 px-1">
@@ -802,34 +887,40 @@ export default function WorkshopChatRoom({
                     {/* WhatsApp-Style Message Bubble */}
                     <div
                       className={`relative p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-md ${
+                        isEditing ? 'w-full' : 'max-w-full'
+                      } ${
                         isSelf
                           ? 'bg-[#005c4b]/80 border border-[#005c4b] text-white rounded-tr-none'
                           : 'bg-[#202c33] border border-white/10 text-gray-200 rounded-tl-none'
                       }`}
                     >
                       {/* Message Content with Parsed Links */}
-                      {editingMessageId === msg.id ? (
-                        <div className="space-y-2 min-w-[240px]">
+                      {isEditing ? (
+                        <div className="space-y-2.5 w-full min-w-0">
                           <textarea
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
                             rows={3}
-                            className="w-full p-2 bg-black/50 border border-brand-teal/40 rounded-lg text-xs text-white focus:outline-none focus:border-brand-teal font-sans"
+                            autoFocus
+                            className="w-full p-2.5 bg-black/50 border border-brand-teal/40 rounded-lg text-xs sm:text-sm text-white focus:outline-none focus:border-brand-teal font-sans resize-y min-h-[76px]"
                           />
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => setEditingMessageId(null)}
-                              className="px-2 py-1 bg-white/10 hover:bg-white/20 text-gray-300 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setEditContent('');
+                              }}
+                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-gray-200 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
                             >
-                              <X className="w-3 h-3" /> Cancel
+                              <X className="w-3.5 h-3.5" /> Cancel
                             </button>
                             <button
                               type="button"
                               onClick={() => handleSaveEdit(msg.id)}
-                              className="px-2.5 py-1 bg-emerald-500 text-black font-bold hover:bg-emerald-400 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 bg-emerald-500 text-black font-bold hover:bg-emerald-400 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
                             >
-                              <Check className="w-3 h-3" /> Save
+                              <Check className="w-3.5 h-3.5" /> Save
                             </button>
                           </div>
                         </div>
@@ -839,8 +930,63 @@ export default function WorkshopChatRoom({
                         </div>
                       )}
 
-                      {/* Bubble Footer: Time, Edited Badge, Double Checkmark */}
-                      <div className="flex items-center justify-end gap-1.5 mt-1.5 text-[10px] font-mono text-gray-400">
+                      {/* Inline Non-Blocking Delete Confirmation */}
+                      {isConfirmingDelete && !isEditing && (
+                        <div className="mt-2.5 pt-2.5 border-t border-red-400/30 flex flex-wrap items-center justify-between gap-2 bg-black/40 rounded-xl px-2.5 py-2">
+                          <span className="text-[11px] font-mono text-red-200 font-semibold">
+                            Delete this message?
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteMessageId(null)}
+                              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-gray-200 rounded-lg text-[11px] font-mono cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deletingMessageId === msg.id}
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="px-2.5 py-1 bg-red-500 hover:bg-red-400 text-white font-bold rounded-lg text-[11px] font-mono cursor-pointer disabled:opacity-50"
+                            >
+                              {deletingMessageId === msg.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bubble Footer: Actions, Time, Edited Badge, Double Checkmark */}
+                      <div className="flex items-center justify-end gap-2 mt-1.5 text-[10px] font-mono text-gray-400">
+                        {canModify && !isEditing && !isConfirmingDelete && (
+                          <div className="flex items-center gap-1 mr-auto pr-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmDeleteMessageId(null);
+                                setEditingMessageId(msg.id);
+                                setEditContent(msg.content);
+                              }}
+                              className="p-1 rounded hover:bg-black/30 hover:text-brand-teal text-gray-300/80 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Edit message"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span className="text-[10px] hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setConfirmDeleteMessageId(msg.id);
+                              }}
+                              className="p-1 rounded hover:bg-black/30 hover:text-red-400 text-gray-300/80 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Delete message"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span className="text-[10px] hidden sm:inline">Delete</span>
+                            </button>
+                          </div>
+                        )}
                         {msg.edited && (
                           <span className="text-gray-400 italic text-[9px]">(edited)</span>
                         )}
@@ -851,31 +997,6 @@ export default function WorkshopChatRoom({
                           </span>
                         )}
                       </div>
-
-                      {/* Quick Edit/Delete Hover Controls (for author) */}
-                      {canModify && editingMessageId !== msg.id && (
-                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-black/80 rounded-md px-1.5 py-0.5 border border-white/10 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingMessageId(msg.id);
-                              setEditContent(msg.content);
-                            }}
-                            className="p-1 hover:text-brand-teal text-gray-400 transition-colors cursor-pointer"
-                            title="Edit message"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(msg.id)}
-                            className="p-1 hover:text-red-400 text-gray-400 transition-colors cursor-pointer"
-                            title="Delete message"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -883,100 +1004,95 @@ export default function WorkshopChatRoom({
             )}
           </div>
 
-          {/* ========================================================
-              INPUT BAR: Text Message + Link Sharing + Send
-              ======================================================== */}
-          <div className="p-3 bg-[#0d1424] border-t border-white/10 shrink-0 space-y-2">
-            
-            {/* Team Identity Selector (in team mode only) */}
-            {activeMode === 'team' && (
-              <div className="flex items-center justify-between text-xs font-mono text-gray-300 px-1">
-                <span className="text-gray-400">Replying as:</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setTeamSenderIdentity('shreyas')}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                      teamSenderIdentity === 'shreyas' ? 'bg-brand-teal text-brand-dark' : 'bg-white/5 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Shreyas M (CEO)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTeamSenderIdentity('bhuvan')}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                      teamSenderIdentity === 'bhuvan' ? 'bg-brand-teal text-brand-dark' : 'bg-white/5 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Bhuvan M (Tech Lead)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTeamSenderIdentity('team')}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                      teamSenderIdentity === 'team' ? 'bg-brand-teal text-brand-dark' : 'bg-white/5 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Mentor Team
-                  </button>
-                </div>
+          {/* Team Identity Selector (in team mode only) */}
+          {activeMode === 'team' && (
+            <div className="px-4 py-2 bg-[#0d1424] border-t border-white/10 flex items-center justify-between text-xs font-mono text-gray-300 shrink-0">
+              <span className="text-gray-400">Replying as:</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setTeamSenderIdentity('shreyas')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                    teamSenderIdentity === 'shreyas' ? 'bg-brand-teal text-brand-dark' : 'bg-white/5 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Shreyas M (CEO)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeamSenderIdentity('bhuvan')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                    teamSenderIdentity === 'bhuvan' ? 'bg-brand-teal text-brand-dark' : 'bg-white/5 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Bhuvan M (Tech Lead)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeamSenderIdentity('team')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                    teamSenderIdentity === 'team' ? 'bg-brand-teal text-brand-dark' : 'bg-white/5 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Mentor Team
+                </button>
               </div>
-            )}
+            </div>
+          )}
 
-            <form
-              onSubmit={handleSendMessage}
-              className="p-2 sm:p-3.5 bg-[#0a101d]/98 backdrop-blur-md border-t border-white/10 flex items-end gap-2 sm:gap-3 shrink-0 sticky bottom-0 z-20"
+          {/* INPUT BAR - Matches Service Chat Room spacing cleanly */}
+          <form
+            onSubmit={handleSendMessage}
+            className="p-2 sm:p-3.5 bg-[#0a101d]/98 backdrop-blur-md border-t border-white/10 flex items-end gap-2 sm:gap-3 shrink-0 sticky bottom-0 z-20"
+          >
+            {/* Add Link Helper Button */}
+            <button
+              type="button"
+              onClick={() => setShowLinkModal(true)}
+              className="p-2.5 sm:p-3 bg-white/5 hover:bg-brand-teal/15 text-gray-300 hover:text-brand-teal rounded-xl sm:rounded-2xl border border-white/10 hover:border-brand-teal/30 transition-all cursor-pointer shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
+              title="Share link or website URL"
             >
-              {/* Add Link Helper Button */}
-              <button
-                type="button"
-                onClick={() => setShowLinkModal(true)}
-                className="p-2.5 sm:p-3 bg-white/5 hover:bg-brand-teal/15 text-gray-300 hover:text-brand-teal rounded-xl sm:rounded-2xl border border-white/10 hover:border-brand-teal/30 transition-all cursor-pointer shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
-                title="Share link or website URL"
-              >
-                <Link2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-teal" />
-              </button>
+              <Link2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-teal" />
+            </button>
 
-              {/* Message Input: Multi-line Comfortable Textarea */}
-              <div className="flex-1 relative min-w-0">
-                <textarea
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  onFocus={() => {
-                    setTimeout(() => scrollToBottomSafely(true), 150);
-                  }}
-                  rows={1}
-                  placeholder={
-                    activeMode === 'team'
-                      ? `Reply directly to ${currentConversation?.clientName || 'Client'} (Press Enter to send)...`
-                      : "Ask doubts or paste GitHub/doc links (Enter to send, Shift+Enter for new line)..."
+            {/* Message Input: Multi-line Comfortable Textarea */}
+            <div className="flex-1 relative min-w-0">
+              <textarea
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
                   }
-                  className="w-full bg-black/70 border border-white/10 focus:border-brand-teal/60 focus:ring-1 focus:ring-brand-teal/30 rounded-xl sm:rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-[15px] sm:text-base text-white placeholder-gray-400 focus:outline-none font-sans resize-none min-h-[48px] sm:min-h-[52px] max-h-32 transition-all leading-relaxed"
-                  style={{
-                    height: 'auto',
-                    overflowY: messageInput.split('\n').length > 3 ? 'auto' : 'hidden'
-                  }}
-                />
-              </div>
+                }}
+                onFocus={() => {
+                  setTimeout(() => scrollToBottomSafely(true), 150);
+                }}
+                rows={1}
+                placeholder={
+                  activeMode === 'team'
+                    ? `Reply directly to ${currentConversation?.clientName || 'Client'} (Press Enter to send)...`
+                    : "Ask doubts or paste GitHub/doc links (Enter to send, Shift+Enter for new line)..."
+                }
+                className="w-full bg-black/70 border border-white/10 focus:border-brand-teal/60 focus:ring-1 focus:ring-brand-teal/30 rounded-xl sm:rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-[15px] sm:text-base text-white placeholder-gray-400 focus:outline-none font-sans resize-none min-h-[48px] sm:min-h-[52px] max-h-32 transition-all leading-relaxed"
+                style={{
+                  height: 'auto',
+                  overflowY: messageInput.split('\n').length > 3 ? 'auto' : 'hidden'
+                }}
+              />
+            </div>
 
-              {/* Send Button */}
-              <button
-                type="submit"
-                disabled={!messageInput.trim() || isSending}
-                className="p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black rounded-xl sm:rounded-2xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
-                title="Send Message"
-              >
-                <Send className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-              </button>
-            </form>
-          </div>
+            {/* Send Button */}
+            <button
+              type="submit"
+              disabled={!messageInput.trim() || isSending}
+              className="p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black rounded-xl sm:rounded-2xl font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25 shrink-0 h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center"
+              title="Send Message"
+            >
+              <Send className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+            </button>
+          </form>
 
         </div>
       </div>

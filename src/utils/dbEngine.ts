@@ -598,7 +598,8 @@ export class DatabaseEngine {
         const trackedKeys = [
           'db_service_registrations', 'db_workshop_registrations', 'db_payments',
           'db_feedbacks', 'db_chats', 'db_files', 'db_enquiries', 'db_team_members',
-          'db_gallery_media', 'db_candidate_applications', 'scoders_dynamic_events',
+          'db_gallery_media', 'db_candidate_applications', 'db_registration_uids',
+          'scoders_event_tickets', 'scoders_revoked_passes', 'scoders_dynamic_events',
           'scoders_dynamic_services', 'scoders_dynamic_workshops', 'scoders_dynamic_invoices',
           'scoders_dynamic_networking', 'scoders_saved_candidate_applications',
           'scoders_registered_services', 'scoders_registered_workshops', 'scoders_enquiries',

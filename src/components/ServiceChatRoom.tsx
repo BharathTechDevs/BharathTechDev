@@ -96,6 +96,8 @@ export default function ServiceChatRoom({
   const [isSending, setIsSending] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrlInput, setLinkUrlInput] = useState('');
   const [linkTitleInput, setLinkTitleInput] = useState('');
@@ -104,6 +106,7 @@ export default function ServiceChatRoom({
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUpRef = useRef(false);
   const prevMessagesCountRef = useRef(0);
+  const lastMutationAtRef = useRef<number>(0);
 
   // Sync admin state
   useEffect(() => {
@@ -128,8 +131,25 @@ export default function ServiceChatRoom({
     }
   };
 
-  // Fetch or initialize active conversation with permanent message merging
-  const loadConversation = async (chatId: string) => {
+  // Sync localStorage db_chats quietly with authoritative server conversation without triggering a race POST
+  const syncLocalChatsCache = (conv: ChatConversation) => {
+    try {
+      const allChats = DatabaseEngine.getChats();
+      const idx = allChats.findIndex(c => c.id === conv.id);
+      const nextChats = idx >= 0
+        ? allChats.map(c => (c.id === conv.id ? conv : c))
+        : [conv, ...allChats];
+      localStorage.setItem('db_chats', JSON.stringify(nextChats));
+    } catch {}
+  };
+
+  // Fetch or initialize active conversation with permanent persistence
+  const loadConversation = async (chatId: string, force = false) => {
+    // Avoid overwriting optimistic edit/delete state right after a mutation
+    if (!force && Date.now() - lastMutationAtRef.current < 1500) {
+      return;
+    }
+
     const activeKey = activeRegInfo?.key || clientKey || '';
     try {
       const queryParams = new URLSearchParams({
@@ -141,25 +161,18 @@ export default function ServiceChatRoom({
         key: activeKey
       });
 
-      const res = await fetch(`/api/services/chats/${encodeURIComponent(chatId)}?${queryParams.toString()}`);
+      const res = await fetch(`/api/services/chats/${encodeURIComponent(chatId)}?${queryParams.toString()}`, {
+        cache: 'no-store'
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.conversation) {
-          // Merge local DB messages if any exist
-          try {
-            const allChats = DatabaseEngine.getChats();
-            const localMatch = allChats.find(c => 
-              c.id === chatId || 
-              (activeKey && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
-              (clientEmail && !clientEmail.includes('manual') && c.clientEmail?.toLowerCase() === clientEmail)
-            );
-            if (localMatch && localMatch.messages && localMatch.messages.length > data.conversation.messages.length) {
-              data.conversation.messages = localMatch.messages;
-            }
-          } catch (e) {}
-
+          if (!force && Date.now() - lastMutationAtRef.current < 1500) {
+            return;
+          }
           setCurrentConversation(data.conversation);
           setMessages(data.conversation.messages || []);
+          syncLocalChatsCache(data.conversation);
           return;
         }
       }
@@ -264,7 +277,7 @@ export default function ServiceChatRoom({
   // Initial load
   useEffect(() => {
     setIsLoading(true);
-    loadConversation(currentChatId).finally(() => {
+    loadConversation(currentChatId, true).finally(() => {
       setIsLoading(false);
       setTimeout(() => scrollToBottomSafely(true), 150);
     });
@@ -316,6 +329,7 @@ export default function ServiceChatRoom({
     }
 
     const activeKey = activeRegInfo?.key || clientKey || '';
+    const resolvedChatId = currentConversation?.id || currentChatId;
     const payload = {
       content: cleanContent,
       sender: isTeam ? 'team' : 'client',
@@ -326,11 +340,14 @@ export default function ServiceChatRoom({
       reference: activeService.title,
       serviceId: activeService.id,
       uniqueAccessKey: activeKey,
-      key: activeKey
+      key: activeKey,
+      conversationId: currentConversation?.id
     };
 
+    lastMutationAtRef.current = Date.now();
+
     try {
-      const res = await fetch(`/api/services/chats/${encodeURIComponent(currentChatId)}/messages`, {
+      const res = await fetch(`/api/services/chats/${encodeURIComponent(resolvedChatId)}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -339,27 +356,31 @@ export default function ServiceChatRoom({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.message) {
-          const updatedMessages = [...messages, data.message];
+          const updatedMessages = data.conversation?.messages || [...messages, data.message];
+          if (data.conversation) {
+            setCurrentConversation(data.conversation);
+            syncLocalChatsCache(data.conversation);
+          }
           setMessages(updatedMessages);
           setMessageInput('');
 
           try {
             const allChats = DatabaseEngine.getChats();
-            const exists = allChats.some(c => c.id === currentChatId);
+            const exists = allChats.some(c => c.id === resolvedChatId || c.id === currentChatId);
             const updated = exists 
-              ? allChats.map(c => c.id === currentChatId ? { ...c, messages: updatedMessages, uniqueAccessKey: activeKey || c.uniqueAccessKey, lastUpdated: new Date().toISOString() } : c)
+              ? allChats.map(c => (c.id === resolvedChatId || c.id === currentChatId) ? { ...c, messages: updatedMessages, uniqueAccessKey: activeKey || c.uniqueAccessKey, lastUpdated: new Date().toISOString() } : c)
               : [{
-                  id: currentChatId,
+                  id: resolvedChatId,
                   clientName: currentConversation?.clientName || clientName,
                   clientEmail: currentConversation?.clientEmail || clientEmail,
-                  registrationId: currentChatId,
+                  registrationId: resolvedChatId,
                   reference: activeService.title,
                   serviceId: activeService.id,
                   uniqueAccessKey: activeKey || undefined,
                   messages: updatedMessages,
                   lastUpdated: new Date().toISOString()
                 }, ...allChats];
-            DatabaseEngine.saveChats(updated);
+            localStorage.setItem('db_chats', JSON.stringify(updated));
           } catch (e) {}
 
           isUserScrolledUpRef.current = false;
@@ -388,14 +409,14 @@ export default function ServiceChatRoom({
 
     try {
       const allChats = DatabaseEngine.getChats();
-      const exists = allChats.some(c => c.id === currentChatId);
+      const exists = allChats.some(c => c.id === resolvedChatId || c.id === currentChatId);
       const updated = exists 
-        ? allChats.map(c => c.id === currentChatId ? { ...c, messages: updatedMessages, uniqueAccessKey: activeKey || c.uniqueAccessKey, lastUpdated: new Date().toISOString() } : c)
+        ? allChats.map(c => (c.id === resolvedChatId || c.id === currentChatId) ? { ...c, messages: updatedMessages, uniqueAccessKey: activeKey || c.uniqueAccessKey, lastUpdated: new Date().toISOString() } : c)
         : [{
-            id: currentChatId,
+            id: resolvedChatId,
             clientName: currentConversation?.clientName || clientName,
             clientEmail: currentConversation?.clientEmail || clientEmail,
-            registrationId: currentChatId,
+            registrationId: resolvedChatId,
             reference: activeService.title,
             serviceId: activeService.id,
             uniqueAccessKey: activeKey || undefined,
@@ -414,68 +435,142 @@ export default function ServiceChatRoom({
   const handleSaveEdit = async (messageId: string) => {
     const cleanContent = editContent.trim();
     if (!cleanContent) return;
+    const activeKey = activeRegInfo?.key || clientKey || '';
+    const resolvedChatId = currentConversation?.id || currentChatId;
+    lastMutationAtRef.current = Date.now();
+
+    const applyLocalEdit = (nextMessages: ChatMessageItem[], serverConv?: ChatConversation) => {
+      if (serverConv) {
+        setCurrentConversation(serverConv);
+      }
+      setMessages(nextMessages);
+      setEditingMessageId(null);
+      setEditContent('');
+      try {
+        const allChats = DatabaseEngine.getChats();
+        const updatedChats = allChats.map(c => {
+          const isMatch =
+            c.id === resolvedChatId ||
+            c.id === currentChatId ||
+            (activeKey && activeKey !== 'PASS-SVC-KEY' && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+            (Array.isArray(c.messages) && c.messages.some(m => m.id === messageId));
+          if (isMatch) {
+            return {
+              ...c,
+              messages: (c.messages || []).map(m =>
+                m.id === messageId
+                  ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() }
+                  : m
+              ),
+              lastUpdated: new Date().toISOString()
+            };
+          }
+          return c;
+        });
+        DatabaseEngine.saveChats(updatedChats);
+      } catch (e) {}
+    };
 
     try {
-      const res = await fetch(`/api/services/chats/${encodeURIComponent(currentChatId)}/messages/${encodeURIComponent(messageId)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: cleanContent })
-      });
+      const res = await fetch(
+        `/api/services/chats/${encodeURIComponent(resolvedChatId)}/messages/${encodeURIComponent(messageId)}?key=${encodeURIComponent(activeKey)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: cleanContent,
+            key: activeKey,
+            conversationId: currentConversation?.id
+          })
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
-          setMessages(updated);
-          setEditingMessageId(null);
-          setEditContent('');
-          try {
-            const allChats = DatabaseEngine.getChats();
-            DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: updated } : c));
-          } catch (e) {}
+          const nextMessages = data.conversation?.messages ||
+            messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
+          applyLocalEdit(nextMessages, data.conversation);
           return;
         }
       }
     } catch (e) {}
 
     // Local fallback
-    const updated = messages.map(m => m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m);
-    setMessages(updated);
-    setEditingMessageId(null);
-    setEditContent('');
-    try {
-      const allChats = DatabaseEngine.getChats();
-      DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: updated } : c));
-    } catch (e) {}
+    const fallbackMessages = messages.map(m =>
+      m.id === messageId ? { ...m, content: cleanContent, edited: true, editedAt: new Date().toISOString() } : m
+    );
+    applyLocalEdit(fallbackMessages);
   };
 
-  // Delete Message Handler
+  // Delete Message Handler (triggered from non-blocking inline confirm UI, never window.confirm)
   const handleDeleteMessage = async (messageId: string) => {
-    if (!window.confirm('Are you sure you want to delete this message?')) return;
+    const activeKey = activeRegInfo?.key || clientKey || '';
+    const resolvedChatId = currentConversation?.id || currentChatId;
+    setDeletingMessageId(messageId);
+    lastMutationAtRef.current = Date.now();
+
+    const applyLocalDelete = (nextMessages: ChatMessageItem[], serverConv?: ChatConversation) => {
+      if (serverConv) {
+        setCurrentConversation(serverConv);
+      }
+      setMessages(nextMessages);
+      setConfirmDeleteMessageId(null);
+      if (editingMessageId === messageId) {
+        setEditingMessageId(null);
+        setEditContent('');
+      }
+      try {
+        const allChats = DatabaseEngine.getChats();
+        const updatedChats = allChats.map(c => {
+          const isMatch =
+            c.id === resolvedChatId ||
+            c.id === currentChatId ||
+            (activeKey && activeKey !== 'PASS-SVC-KEY' && c.uniqueAccessKey?.toUpperCase() === activeKey.toUpperCase()) ||
+            (Array.isArray(c.messages) && c.messages.some(m => m.id === messageId));
+          if (isMatch) {
+            return {
+              ...c,
+              messages: (c.messages || []).filter(m => m.id !== messageId),
+              lastUpdated: new Date().toISOString()
+            };
+          }
+          return c;
+        });
+        localStorage.setItem('db_chats', JSON.stringify(updatedChats));
+        if (!serverConv) {
+          DatabaseEngine.saveChats(updatedChats);
+        }
+      } catch (e) {}
+    };
 
     try {
-      const res = await fetch(`/api/services/chats/${encodeURIComponent(currentChatId)}/messages/${encodeURIComponent(messageId)}`, {
-        method: 'DELETE'
+      const query = new URLSearchParams({
+        key: activeKey,
+        conversationId: currentConversation?.id || ''
       });
+      const res = await fetch(
+        `/api/services/chats/${encodeURIComponent(resolvedChatId)}/messages/${encodeURIComponent(messageId)}?${query.toString()}`,
+        {
+          method: 'DELETE'
+        }
+      );
 
       if (res.ok) {
-        const filtered = messages.filter(m => m.id !== messageId);
-        setMessages(filtered);
-        try {
-          const allChats = DatabaseEngine.getChats();
-          DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: filtered } : c));
-        } catch (e) {}
-        return;
+        const data = await res.json();
+        if (data.success) {
+          const nextMessages = data.conversation?.messages || messages.filter(m => m.id !== messageId);
+          applyLocalDelete(nextMessages, data.conversation);
+          setDeletingMessageId(null);
+          return;
+        }
       }
     } catch (e) {}
 
     // Local fallback
     const filtered = messages.filter(m => m.id !== messageId);
-    setMessages(filtered);
-    try {
-      const allChats = DatabaseEngine.getChats();
-      DatabaseEngine.saveChats(allChats.map(c => c.id === currentChatId ? { ...c, messages: filtered } : c));
-    } catch (e) {}
+    applyLocalDelete(filtered);
+    setDeletingMessageId(null);
   };
 
   // Insert Link Helper
@@ -739,12 +834,17 @@ export default function ServiceChatRoom({
                   ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                   : '';
 
+                const isEditing = editingMessageId === msg.id;
+                const isConfirmingDelete = confirmDeleteMessageId === msg.id;
+
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col max-w-[88%] sm:max-w-[78%] group relative ${
-                      isSelf ? 'ml-auto items-end' : 'mr-auto items-start'
-                    }`}
+                    className={`flex flex-col group relative ${
+                      isEditing
+                        ? 'w-full max-w-full sm:max-w-[85%]'
+                        : 'max-w-[88%] sm:max-w-[78%]'
+                    } ${isSelf ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                   >
                     {/* Sender Identity Tag */}
                     <div className="flex items-center gap-1.5 text-[11px] font-mono text-gray-400 mb-1 px-1">
@@ -767,34 +867,40 @@ export default function ServiceChatRoom({
                     {/* WhatsApp-Style Message Bubble */}
                     <div
                       className={`relative p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-md ${
+                        isEditing ? 'w-full' : 'max-w-full'
+                      } ${
                         isSelf
                           ? 'bg-[#005c4b]/80 border border-[#005c4b] text-white rounded-tr-none'
                           : 'bg-[#202c33] border border-white/10 text-gray-200 rounded-tl-none'
                       }`}
                     >
                       {/* Message Content with Parsed Links */}
-                      {editingMessageId === msg.id ? (
-                        <div className="space-y-2 min-w-[240px]">
+                      {isEditing ? (
+                        <div className="space-y-2.5 w-full min-w-0">
                           <textarea
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
                             rows={3}
-                            className="w-full p-2 bg-black/50 border border-brand-teal/40 rounded-lg text-xs text-white focus:outline-none focus:border-brand-teal font-sans"
+                            autoFocus
+                            className="w-full p-2.5 bg-black/50 border border-brand-teal/40 rounded-lg text-xs sm:text-sm text-white focus:outline-none focus:border-brand-teal font-sans resize-y min-h-[76px]"
                           />
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => setEditingMessageId(null)}
-                              className="px-2 py-1 bg-white/10 hover:bg-white/20 text-gray-300 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setEditContent('');
+                              }}
+                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-gray-200 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
                             >
-                              <X className="w-3 h-3" /> Cancel
+                              <X className="w-3.5 h-3.5" /> Cancel
                             </button>
                             <button
                               type="button"
                               onClick={() => handleSaveEdit(msg.id)}
-                              className="px-2.5 py-1 bg-emerald-500 text-black font-bold hover:bg-emerald-400 rounded text-[11px] flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 bg-emerald-500 text-black font-bold hover:bg-emerald-400 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
                             >
-                              <Check className="w-3 h-3" /> Save
+                              <Check className="w-3.5 h-3.5" /> Save
                             </button>
                           </div>
                         </div>
@@ -804,8 +910,63 @@ export default function ServiceChatRoom({
                         </div>
                       )}
 
-                      {/* Bubble Footer: Time, Edited Badge, Double Checkmark */}
-                      <div className="flex items-center justify-end gap-1.5 mt-1.5 text-[10px] font-mono text-gray-400">
+                      {/* Inline Non-Blocking Delete Confirmation */}
+                      {isConfirmingDelete && !isEditing && (
+                        <div className="mt-2.5 pt-2.5 border-t border-red-400/30 flex flex-wrap items-center justify-between gap-2 bg-black/40 rounded-xl px-2.5 py-2">
+                          <span className="text-[11px] font-mono text-red-200 font-semibold">
+                            Delete this message?
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteMessageId(null)}
+                              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-gray-200 rounded-lg text-[11px] font-mono cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deletingMessageId === msg.id}
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="px-2.5 py-1 bg-red-500 hover:bg-red-400 text-white font-bold rounded-lg text-[11px] font-mono cursor-pointer disabled:opacity-50"
+                            >
+                              {deletingMessageId === msg.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bubble Footer: Actions, Time, Edited Badge, Double Checkmark */}
+                      <div className="flex items-center justify-end gap-2 mt-1.5 text-[10px] font-mono text-gray-400">
+                        {canModify && !isEditing && !isConfirmingDelete && (
+                          <div className="flex items-center gap-1 mr-auto pr-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmDeleteMessageId(null);
+                                setEditingMessageId(msg.id);
+                                setEditContent(msg.content);
+                              }}
+                              className="p-1 rounded hover:bg-black/30 hover:text-brand-teal text-gray-300/80 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Edit message"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span className="text-[10px] hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setConfirmDeleteMessageId(msg.id);
+                              }}
+                              className="p-1 rounded hover:bg-black/30 hover:text-red-400 text-gray-300/80 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Delete message"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span className="text-[10px] hidden sm:inline">Delete</span>
+                            </button>
+                          </div>
+                        )}
                         {msg.edited && (
                           <span className="text-gray-400 italic text-[9px]">(edited)</span>
                         )}
@@ -816,31 +977,6 @@ export default function ServiceChatRoom({
                           </span>
                         )}
                       </div>
-
-                      {/* Quick Edit/Delete Hover Controls (for author) */}
-                      {canModify && editingMessageId !== msg.id && (
-                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-black/80 rounded-md px-1.5 py-0.5 border border-white/10 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingMessageId(msg.id);
-                              setEditContent(msg.content);
-                            }}
-                            className="p-1 hover:text-brand-teal text-gray-400 transition-colors cursor-pointer"
-                            title="Edit message"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(msg.id)}
-                            className="p-1 hover:text-red-400 text-gray-400 transition-colors cursor-pointer"
-                            title="Delete message"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );

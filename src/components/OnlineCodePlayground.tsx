@@ -643,28 +643,40 @@ GROUP BY domain
 ORDER BY avg_rating DESC;
 `,
 
-  csharp: `// S-CODERS C# .NET Execution Engine
+  csharp: `// S-CODERS C# Execution Engine
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace ScodersUniversal
 {
-    public record Developer(string Name, string Speciality, int ExperienceYears);
+    public class Developer
+    {
+        public string Name { get; set; }
+        public string Speciality { get; set; }
+        public int ExperienceYears { get; set; }
+
+        public Developer(string name, string speciality, int exp)
+        {
+            Name = name;
+            Speciality = speciality;
+            ExperienceYears = exp;
+        }
+    }
 
     public class Program
     {
         public static void Main(string[] args)
         {
-            Console.WriteLine("⚡ S-CODERS C# .NET Execution Engine");
-            Console.WriteLine($"Running on .NET Runtime: {Environment.Version}");
+            Console.WriteLine("⚡ S-CODERS C# Execution Engine");
+            Console.WriteLine($"Running on CLR Runtime: {Environment.Version}");
 
             var team = new List<Developer>
             {
-                new("Shreyas", "AI Engineering", 6),
-                new("Priya", "Distributed Cloud", 5),
-                new("Karthik", "Security Architecture", 7),
-                new("Sneha", "Frontend Platforms", 4)
+                new Developer("Shreyas", "AI Engineering", 6),
+                new Developer("Priya", "Distributed Cloud", 5),
+                new Developer("Karthik", "Security Architecture", 7),
+                new Developer("Sneha", "Frontend Platforms", 4)
             };
 
             Console.WriteLine("\\nSenior Engineering Lead Roster (Exp >= 5):");
@@ -833,13 +845,12 @@ export function detectLanguageClient(code: string): SupportedLanguage | null {
 
   // C++
   if (
-    /#include\s*<iostream>/.test(trimmed) ||
-    /#include\s*<vector>/.test(trimmed) ||
-    /#include\s*<bits\/stdc\+\+\.h>/.test(trimmed) ||
-    /#include\s*<(string|algorithm|map|set|cmath|iomanip|queue)>/i.test(trimmed) ||
-    /std::(cout|cin|endl|vector|string|map|set)/.test(trimmed) ||
+    /#include\s*<iostream>/i.test(trimmed) ||
+    /#include\s*<bits\/stdc\+\+\.h>/i.test(trimmed) ||
+    /#include\s*<(vector|string|algorithm|map|set|unordered_map|unordered_set|cmath|cstdio|cstdlib|cstring|iomanip|queue|stack|deque|list|sstream|fstream|numeric|array|tuple|memory)>/i.test(trimmed) ||
+    /std::(cout|cin|cerr|endl|vector|string|map|set|printf|scanf|getline)/.test(trimmed) ||
     /using\s+namespace\s+std\s*;/.test(trimmed) ||
-    /(cout|cin)\s*(<<|>>)/.test(trimmed)
+    /\b(cout|cin|cerr)\s*(<<|>>)/.test(trimmed)
   ) {
     return 'cpp';
   }
@@ -1103,6 +1114,8 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   const previewIframeRef = useRef<HTMLIFrameElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastExternalCodeRef = useRef<string | undefined>(initialCode);
+  const lastExternalLangRef = useRef<SupportedLanguage | undefined>(initialLanguage);
 
   const currentLangMeta = useMemo(() => {
     return LANGUAGES.find((l) => l.id === language) || LANGUAGES[0];
@@ -1117,22 +1130,61 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     return null;
   }, [code]);
 
-  // Sync prop changes
+  // Sync external prop changes (only when parent genuinely switched workshops/templates, never echoing local edits)
   useEffect(() => {
-    if (initialLanguage && initialLanguage !== language) {
-      setLanguage(initialLanguage);
+    if (initialLanguage && initialLanguage !== lastExternalLangRef.current) {
+      lastExternalLangRef.current = initialLanguage;
+      const currentCode = initialCode ?? files[0]?.content ?? '';
+      const detected = currentCode.trim().length > 15 ? detectLanguageClient(currentCode) : null;
+      const targetLang = detected || initialLanguage;
+      setLanguage(targetLang);
+      const targetMeta = LANGUAGES.find((l) => l.id === targetLang);
+      setActiveTab(targetMeta?.hasLiveUI ? 'preview' : 'console');
     }
   }, [initialLanguage]);
 
   useEffect(() => {
-    if (initialCode && initialCode.trim()) {
+    if (initialCode && initialCode.trim() && initialCode !== lastExternalCodeRef.current) {
+      lastExternalCodeRef.current = initialCode;
       setFiles((prev) => {
+        if (prev[0]?.content === initialCode) return prev;
         const copy = [...prev];
         copy[0] = { ...copy[0], content: initialCode };
         return copy;
       });
+      const detected = initialCode.trim().length > 15 ? detectLanguageClient(initialCode) : null;
+      if (detected && detected !== language) {
+        const isStrongMatch =
+          detected === 'java' ||
+          detected === 'cpp' ||
+          detected === 'c' ||
+          detected === 'react' ||
+          detected === 'html' ||
+          detected === 'go' ||
+          detected === 'rust' ||
+          detected === 'csharp' ||
+          detected === 'python';
+        if (isStrongMatch) {
+          setLanguage(detected);
+          const targetMeta = LANGUAGES.find((l) => l.id === detected);
+          setActiveTab(targetMeta?.hasLiveUI ? 'preview' : 'console');
+        }
+      }
     }
   }, [initialCode]);
+
+  // On initial mount with pre-filled initialCode (e.g. tab switch), align language if code clearly matches another language
+  useEffect(() => {
+    if (initialCode && initialCode.trim().length > 15) {
+      const detected = detectLanguageClient(initialCode);
+      if (detected && detected !== language && (detected === 'cpp' || detected === 'c' || detected === 'java' || detected === 'go' || detected === 'rust' || detected === 'csharp' || detected === 'python' || detected === 'sql' || detected === 'php' || detected === 'ruby' || detected === 'bash')) {
+        setLanguage(detected);
+        const targetMeta = LANGUAGES.find((l) => l.id === detected);
+        setActiveTab(targetMeta?.hasLiveUI ? 'preview' : 'console');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Save history to localStorage
   const saveHistoryItem = (item: ExecutionHistoryItem) => {
@@ -1157,6 +1209,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
   // Code update handler with smart auto-detection
   const handleCodeChange = (newCode: string) => {
+    lastExternalCodeRef.current = newCode;
     setFiles((prev) => {
       const copy = [...prev];
       copy[activeFileIndex] = { ...copy[activeFileIndex], content: newCode };
@@ -1181,10 +1234,15 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
           detected === 'html' ||
           detected === 'go' ||
           detected === 'rust' ||
-          detected === 'csharp';
+          detected === 'csharp' ||
+          detected === 'sql' ||
+          detected === 'php' ||
+          detected === 'ruby' ||
+          detected === 'bash' ||
+          detected === 'python';
 
         if (isStrongMatch) {
-          handleSwitchLanguage(detected, false);
+          handleSwitchLanguage(detected, false, newCode);
         }
       } else {
         setDetectedLangNotice(null);
@@ -1193,7 +1251,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   };
 
   // Switch Language
-  const handleSwitchLanguage = (targetLang: SupportedLanguage, resetContent = true) => {
+  const handleSwitchLanguage = (targetLang: SupportedLanguage, resetContent = true, incomingCode?: string) => {
     setLanguage(targetLang);
     setDetectedLangNotice(null);
     setAiDebugResult(null);
@@ -1213,11 +1271,18 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
     setFiles((prev) => {
       const copy = [...prev];
-      const isDefaultContent = Object.values(STARTER_TEMPLATES).some((tmpl) => tmpl.trim() === copy[0].content.trim());
-      copy[0] = {
+      const idx = activeFileIndex < copy.length ? activeFileIndex : 0;
+      const baseContent = typeof incomingCode === 'string' ? incomingCode : copy[idx].content;
+      const isDefaultContent = Object.values(STARTER_TEMPLATES).some((tmpl) => tmpl.trim() === baseContent.trim());
+      const nextContent = resetContent || isDefaultContent || !baseContent.trim() ? STARTER_TEMPLATES[targetLang] : baseContent;
+      copy[idx] = {
         name: mainFileName,
-        content: resetContent || isDefaultContent || !copy[0].content.trim() ? STARTER_TEMPLATES[targetLang] : copy[0].content,
+        content: nextContent,
       };
+      if (idx === 0 && nextContent !== baseContent) {
+        lastExternalCodeRef.current = nextContent;
+        if (onCodeChange) onCodeChange(nextContent);
+      }
       return copy;
     });
   };
@@ -1244,7 +1309,13 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
   const handleResetTemplate = () => {
     const tmpl = STARTER_TEMPLATES[language];
-    handleCodeChange(tmpl);
+    lastExternalCodeRef.current = tmpl;
+    setFiles((prev) => {
+      const copy = [...prev];
+      copy[activeFileIndex] = { ...copy[activeFileIndex], content: tmpl };
+      return copy;
+    });
+    if (onCodeChange && activeFileIndex === 0) onCodeChange(tmpl);
     setConsoleOutput('Template reset to default. Click "Run Code" to execute.');
     setStderrOutput(null);
     setPlotImageBase64(null);
@@ -1296,19 +1367,25 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
 
 
   // EXECUTION DISPATCHER
-  const handleRunCode = async (overrideCode?: string) => {
+  const handleRunCode = async (overrideCode?: string, overrideLang?: SupportedLanguage) => {
     if (isRunning) return;
     const targetCode = typeof overrideCode === 'string' ? overrideCode : code;
 
     // Smart language auto-detection
     const detected = detectLanguageClient(targetCode);
-    let runLang = language;
-    if (language === 'python' && detected && detected !== 'python') {
-      runLang = detected;
-      setLanguage(detected);
-    } else if (language === 'javascript' && detected && (detected === 'java' || detected === 'cpp' || detected === 'c')) {
-      runLang = detected;
-      setLanguage(detected);
+    let runLang: SupportedLanguage = overrideLang || language;
+    if (!overrideLang && autoDetectEnabled && detected && detected !== runLang) {
+      const safeToAutoSwitch =
+        runLang === 'python' ||
+        runLang === 'javascript' ||
+        runLang === 'react' ||
+        runLang === 'html' ||
+        (runLang === 'c' && detected === 'cpp') ||
+        (detected === 'java' || detected === 'cpp' || detected === 'go' || detected === 'rust' || detected === 'csharp');
+      if (safeToAutoSwitch) {
+        runLang = detected;
+        setLanguage(detected);
+      }
     }
 
     setIsRunning(true);
@@ -1363,6 +1440,58 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
       activeEventSourceRef.current = null;
     }
 
+    const executeBatchFallback = async (errContext?: any) => {
+      try {
+        const response = await fetch('/api/compiler/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            language: runLang,
+            code: targetCode,
+            stdin: stdin.trim() ? stdin : undefined,
+          }),
+        });
+
+        const data = await response.json();
+        setExecutionStats({
+          timeMs: data.executionTimeMs,
+          exitCode: data.exitCode,
+          language: data.language,
+          runtimeVersion: data.runtimeVersion,
+        });
+
+        if (data.success) {
+          setConsoleOutput(data.stdout || '[Program finished with no stdout output]');
+          setStderrOutput(data.stderr ? data.stderr : null);
+        } else {
+          setConsoleOutput(data.stdout || '');
+          setStderrOutput(data.stderr || 'Execution failed with non-zero exit code.');
+        }
+
+        if (data.plotImageBase64) {
+          setPlotImageBase64(data.plotImageBase64);
+        }
+
+        saveHistoryItem({
+          id: Math.random().toString(36).substring(2, 9),
+          timestamp: new Date().toLocaleTimeString(),
+          language: runLang,
+          fileName: activeFile.name,
+          code: targetCode,
+          status: data.success ? 'success' : 'error',
+          durationMs: data.executionTimeMs,
+        });
+      } catch (fallbackErr: any) {
+        setStderrOutput(`Execution Error: Could not reach execution engine.\n${errContext?.message || fallbackErr?.message || ''}`);
+        setConsoleOutput('');
+      } finally {
+        setIsRunning(false);
+        setIsWaitingInput(false);
+        setWaitingPromptText('');
+        setRunStage('done');
+      }
+    };
+
     try {
       // 1. Start interactive session
       const startResp = await fetch('/api/compiler/session/start', {
@@ -1371,7 +1500,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
         body: JSON.stringify({
           language: runLang,
           code: targetCode,
-          stdin: showStdin && stdin ? stdin : undefined,
+          stdin: stdin.trim() ? stdin : undefined,
         }),
       });
 
@@ -1385,6 +1514,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
       setRunStage('executing');
 
       let receivedFirstChunk = false;
+      let sessionCompleted = false;
 
       // 2. Connect to Server-Sent Events stream
       const eventSource = new EventSource(`/api/compiler/session/stream?sessionId=${currentSessionId}`);
@@ -1408,6 +1538,7 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
           } else if (data.type === 'plot' && data.plotImageBase64) {
             setPlotImageBase64(data.plotImageBase64);
           } else if (data.type === 'exit') {
+            sessionCompleted = true;
             setExecutionStats({
               timeMs: data.executionTimeMs,
               exitCode: data.exitCode,
@@ -1415,14 +1546,18 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
               runtimeVersion: data.runtimeVersion,
             });
 
-            if (!receivedFirstChunk && data.exitCode === 0) {
-              setConsoleOutput((prev) =>
-                prev.includes('Initializing')
-                  ? isGui
-                    ? '🖥️ Graphical User Interface running in the Live UI Preview tab.\n'
-                    : '[Program executed successfully with no console output]\n'
-                  : prev
-              );
+            if (!receivedFirstChunk) {
+              if (data.exitCode === 0) {
+                setConsoleOutput((prev) =>
+                  prev.includes('Initializing')
+                    ? isGui
+                      ? '🖥️ Graphical User Interface running in the Live UI Preview tab.\n'
+                      : '[Program executed successfully with no console output]\n'
+                    : prev
+                );
+              } else {
+                setConsoleOutput((prev) => (prev.includes('Initializing') ? '' : prev));
+              }
             }
 
             setIsRunning(false);
@@ -1451,61 +1586,22 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
       eventSource.onerror = () => {
         eventSource.close();
         activeEventSourceRef.current = null;
-        if (isRunning) {
-          setIsRunning(false);
-          setRunStage('done');
-          setConsoleOutput((prev) => (prev.includes('Initializing') ? (isGui ? '🖥️ Graphical User Interface running in Live UI Preview.\n' : '') : prev));
+        if (!sessionCompleted) {
+          sessionCompleted = true;
+          setActiveSessionId(null);
+          if (!receivedFirstChunk) {
+            // Stream failed before delivering execution result; fall back seamlessly to batch execution
+            void executeBatchFallback();
+          } else {
+            setIsRunning(false);
+            setIsWaitingInput(false);
+            setWaitingPromptText('');
+            setRunStage('done');
+          }
         }
       };
     } catch (err: any) {
-      // Resilient fallback to batch execute
-      try {
-        const response = await fetch('/api/compiler/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            language,
-            code: targetCode,
-            stdin: showStdin ? stdin : undefined,
-          }),
-        });
-
-        const data = await response.json();
-        setExecutionStats({
-          timeMs: data.executionTimeMs,
-          exitCode: data.exitCode,
-          language: data.language,
-          runtimeVersion: data.runtimeVersion,
-        });
-
-        if (data.success) {
-          setConsoleOutput(data.stdout || '[Program finished with no stdout output]');
-          setStderrOutput(data.stderr ? data.stderr : null);
-        } else {
-          setConsoleOutput(data.stdout || '');
-          setStderrOutput(data.stderr || 'Execution failed with non-zero exit code.');
-        }
-
-        if (data.plotImageBase64) {
-          setPlotImageBase64(data.plotImageBase64);
-        }
-
-        saveHistoryItem({
-          id: Math.random().toString(36).substring(2, 9),
-          timestamp: new Date().toLocaleTimeString(),
-          language,
-          fileName: activeFile.name,
-          code,
-          status: data.success ? 'success' : 'error',
-          durationMs: data.executionTimeMs,
-        });
-      } catch (fallbackErr: any) {
-        setStderrOutput(`Execution Error: Could not reach execution engine.\n${err?.message || err}`);
-        setConsoleOutput('');
-      } finally {
-        setIsRunning(false);
-        setRunStage('done');
-      }
+      await executeBatchFallback(err);
     }
   };
 
@@ -1517,8 +1613,8 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
     setIsWaitingInput(false);
     setWaitingPromptText('');
 
-    // Echo input into the terminal output in bold cyan
-    setConsoleOutput((prev) => prev + inputVal + '\n');
+    // Echo input into the terminal output cleanly
+    setConsoleOutput((prev) => (prev.includes('Initializing') ? inputVal + '\n' : prev + inputVal + '\n'));
 
     if (activeSessionId) {
       try {
@@ -1564,16 +1660,18 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   const handleAiDebug = async () => {
     setIsAiDebugging(true);
     setAppliedFixNotice(null);
+    const detectedLang = autoDetectEnabled ? (detectLanguageClient(code) || language) : language;
     try {
       const response = await fetch('/api/compiler/ai-debug', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language,
+          language: detectedLang,
           code,
           stderr: stderrOutput,
           stdout: consoleOutput,
           exitCode: executionStats?.exitCode ?? 1,
+          stdin: stdin.trim() ? stdin : undefined,
         }),
       });
 
@@ -1596,15 +1694,20 @@ export const OnlineCodePlayground: React.FC<OnlineCodePlaygroundProps> = ({
   const handleApplyAiFix = (autoRun: boolean = true) => {
     if (!aiDebugResult?.correctedCode) return;
     const targetCode = aiDebugResult.correctedCode;
+    const detectedTargetLang = detectLanguageClient(targetCode) || language;
     handleCodeChange(targetCode);
-    setAppliedFixNotice(autoRun ? '✨ AI fix applied! Automatically running corrected code...' : '✨ AI-corrected code applied to editor.');
+    setAppliedFixNotice(
+      aiDebugResult.testExecutionSuccess
+        ? (autoRun ? '✨ Verified code applied! Running now...' : '✨ Verified code applied to editor.')
+        : (autoRun ? '✨ AI fix applied! Automatically running corrected code...' : '✨ AI-corrected code applied to editor.')
+    );
     setStderrOutput(null);
     setAiDebugResult(null);
 
     if (autoRun) {
       setTimeout(() => {
-        handleRunCode(targetCode);
-      }, 80);
+        handleRunCode(targetCode, detectedTargetLang);
+      }, 60);
     }
   };
 

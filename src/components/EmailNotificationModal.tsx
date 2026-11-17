@@ -15,6 +15,7 @@ export interface EmailNotificationData {
   uniqueKey: string;
   messageText: string;
   amount?: number;
+  validUntil?: string;
   actionText: string;
   onAction?: () => void;
 }
@@ -184,13 +185,25 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                 {/* Email Dispatch Notice banner */}
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
                   <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                  <div className="text-xs space-y-1">
+                  <div className="text-xs space-y-1.5">
                     <p className="font-semibold text-blue-200">
                       Confirmation Dispatched to {data.recipientEmail}
                     </p>
                     <p className="text-gray-400 leading-relaxed text-[11px]">
                       {data.messageText}
                     </p>
+                    <p className="text-amber-300/90 leading-relaxed text-[11px]">
+                      {isWorkshop
+                        ? 'Tip: Keep this UID safe — if you lose connection, refresh, or exit mid-session, enter it under "Enter Existing Pass" to rejoin immediately.'
+                        : isService
+                        ? 'Please keep this UID secure for future website/workspace access. Recovering a lost UID requires email verification.'
+                        : 'Save this UID safely for future pass access, event check-in verification, and session updates.'}
+                    </p>
+                    {data.validUntil && (
+                      <span className="inline-block text-[10px] font-mono text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                        UID Valid Until: {new Date(data.validUntil).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -275,7 +288,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
             <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-400 font-mono relative z-10">
               <div className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-brand-teal" />
-                <span>Official dispatch confirmation emailed from <strong className="text-brand-teal font-bold">scoders82@gmail.com</strong></span>
+                <span>Official dispatch confirmation emailed from <strong className="text-brand-teal font-bold">escoders@gmail.com</strong></span>
               </div>
               <span className="text-gray-500">© 2026 S-CODERS</span>
             </div>

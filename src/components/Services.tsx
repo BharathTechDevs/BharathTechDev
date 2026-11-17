@@ -19,6 +19,7 @@ import { openUpiApp, generateUpiUrl, getActiveMerchantUpi, DEFAULT_BHUVAN_UPI } 
 import { getLeaderPhoto } from '../utils/leaderPhotos';
 import { downloadServiceSpecPdf, triggerFileDownload } from '../utils/workshopAssetGenerator';
 import ServiceChatRoom from './ServiceChatRoom';
+import UidRecoveryPanel from './UidRecoveryPanel';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -101,8 +102,16 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   const [regBudget, setRegBudget] = useState('');
   const [regTimeline, setRegTimeline] = useState('');
   const [regSuccessKey, setRegSuccessKey] = useState<string | null>(null);
+  const [regSuccessMeta, setRegSuccessMeta] = useState<{
+    email: string;
+    validUntil?: string;
+    deduplicated?: boolean;
+    emailFrom?: string;
+  } | null>(null);
+  const [serviceSubmitting, setServiceSubmitting] = useState(false);
+  const [verifyingKey, setVerifyingKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
-  const [modalMode, setModalMode] = useState<'register' | 'enterKey'>('register');
+  const [modalMode, setModalMode] = useState<'register' | 'enterKey' | 'recover'>('register');
   const [inputtedKey, setInputtedKey] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
 
@@ -281,12 +290,56 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     setTimeline('');
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName || !email || !requirements) return;
 
+    const projectTitle = `S-CODERS Custom ${activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Next.js Website' : 'Single Webpage'}`;
+    let finalProjectUid = `BTD-PROJ-${Date.now().toString(36).toUpperCase()}`;
+
+    try {
+      const apiRes = await fetch('/api/registrations/register-and-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'service',
+          itemId: `proj-${activeTab}`,
+          itemTitle: projectTitle,
+          clientName: clientName.trim(),
+          clientEmail: email.trim(),
+          metadata: {
+            requirements,
+            budget: budget || 'Not Specified',
+            timeline: timeline || 'Not Specified'
+          },
+          actionUrl: `${window.location.origin}/?view=services`
+        })
+      });
+      if (apiRes.ok) {
+        const apiData = await apiRes.json();
+        if (apiData?.uid) {
+          finalProjectUid = apiData.uid;
+        }
+      }
+    } catch (err) {
+      console.warn("Project idea email send notice:", err);
+      try {
+        fetch('/api/email/service-accepted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            clientName: clientName.trim(),
+            serviceTitle: projectTitle,
+            uniqueKey: finalProjectUid,
+            actionUrl: `${window.location.origin}/?view=services`
+          })
+        }).catch(() => {});
+      } catch {}
+    }
+
     const newEnquiry: ServiceEnquiry = {
-      id: Date.now().toString(),
+      id: finalProjectUid,
       category: activeTab,
       clientName,
       email,
@@ -303,11 +356,11 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     // Save in DatabaseEngine Enquiry table
     try {
       const dbEnquiry: EnquiryItem = {
-        id: 'ENQ-' + Date.now().toString().slice(-4),
+        id: finalProjectUid,
         name: clientName,
         email: email,
         phone: '+91 99999 00000',
-        subject: `Project Enquiry: S-CODERS Custom ${activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Next.js Website' : 'Single Webpage'}`,
+        subject: `Project Enquiry: ${projectTitle} [${finalProjectUid}]`,
         message: requirements,
         timestamp: new Date().toISOString(),
         replyStatus: 'Pending',
@@ -320,250 +373,382 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       console.error("Database Engine Enquiry Save Error:", dbErr);
     }
 
-    // Trigger email notification for project idea registration (from scoders82@gmail.com)
-    try {
-      fetch('/api/email/service-accepted', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          clientName: clientName.trim(),
-          serviceTitle: `S-CODERS Custom ${activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Next.js Website' : 'Single Webpage'}`,
-          uniqueKey: `BTD-PROJ-${Date.now().toString(36).toUpperCase()}`,
-          actionUrl: `${window.location.origin}/?view=services`
-        })
-      }).catch(err => console.warn("Project idea email send notice:", err));
-    } catch (e) {}
-
     setFormSubmitted(true);
   };
 
   // Service Keys generators & verifiers
-  const handleRegisterService = (e: React.FormEvent) => {
+  const handleRegisterService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registeringService || !regName || !regEmail || !regRequirements) return;
+    if (!registeringService || !regName || !regEmail || !regRequirements || serviceSubmitting) return;
 
-    // Auto-signup / log-in on the fly if not logged in!
-    let activeClient = currentUser;
-    if (!activeClient) {
-      const newClient: AppUser = {
-        uid: 'client-' + Date.now().toString(),
-        name: regName,
-        email: regEmail,
-        role: 'client',
-        company: 'Independent Client',
-        phone: 'Not Specified',
-        createdAt: new Date().toISOString()
-      };
-      
-      // Save client profile in local client list
-      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-      if (!clients.some(c => c.email.toLowerCase() === regEmail.toLowerCase().trim())) {
-        clients.push(newClient);
-        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-      }
+    setServiceSubmitting(true);
+    setKeyError(null);
 
-      // Save password secure map default for on-demand
-      const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-      if (!passwordsMap[newClient.email.toLowerCase()]) {
-        passwordsMap[newClient.email.toLowerCase()] = 'password';
-        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-      }
-
-      // Log in
-      localStorage.setItem('scoders_user', JSON.stringify(newClient));
-      setCurrentUser(newClient);
-      activeClient = newClient;
-      
-      // Dispatch events to sync other parts of the app
-      window.dispatchEvent(new Event('scoders_auth_change'));
-    }
-
-    const timestamp = Date.now().toString(36).substring(3, 7).toUpperCase();
-    const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
-    const generatedKey = `BTD-SERV-${serviceCode}-${timestamp}-${randomHex}`;
-
-    const mockChatId = `chat-svc-${generatedKey}`;
-    const newKeys = {
-      ...registeredKeys,
-      [registeringService.id]: {
-        key: generatedKey,
-        name: regName,
-        email: regEmail,
-        role: regRole || 'Developer',
-        requirements: regRequirements,
-        budget: regBudget || 'TBD',
-        timeline: regTimeline || 'TBD',
-        chatId: mockChatId,
-        timestamp: new Date().toLocaleString(),
-      }
-    };
-
-    setRegisteredKeys(newKeys);
-    localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
-
-    // Complete relational DatabaseEngine integration
     try {
-      const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
-      const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
-      const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
-      const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
+      const cleanEmail = regEmail.trim().toLowerCase();
+      const cleanName = regName.trim();
 
-      const dbServiceReg: ServiceRegistration = {
-        id: regId,
-        clientProfile: {
-          name: regName,
-          email: regEmail,
-          phone: '+91 99999 00000',
-          company: 'Independent Client'
-        },
-        serviceId: registeringService.id,
-        selectedServiceTitle: registeringService.title,
-        uniqueKey: generatedKey,
-        projectRequirements: regRequirements,
-        budget: regBudget || 'TBD',
-        timeline: regTimeline || 'TBD',
-        projectStatus: 'Pending',
-        registrationDate: new Date().toISOString().split('T')[0],
-        projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        sourceCodeFileId: mockSrcFileId,
-        pdfFileId: mockPdfFileId,
-        chatId: mockChatId,
-        feedbackId: null,
-        invoiceId: mockInvoiceId
+      // Auto-signup / log-in on the fly if not logged in!
+      let activeClient = currentUser;
+      if (!activeClient) {
+        const newClient: AppUser = {
+          uid: 'client-' + Date.now().toString(),
+          name: cleanName,
+          email: cleanEmail,
+          role: 'client',
+          company: 'Independent Client',
+          phone: 'Not Specified',
+          createdAt: new Date().toISOString()
+        };
+
+        const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
+        const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
+        if (!clients.some(c => c.email.toLowerCase() === cleanEmail)) {
+          clients.push(newClient);
+          localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
+        }
+
+        const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
+        if (!passwordsMap[cleanEmail]) {
+          passwordsMap[cleanEmail] = 'password';
+          localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
+        }
+
+        localStorage.setItem('scoders_user', JSON.stringify(newClient));
+        setCurrentUser(newClient);
+        activeClient = newClient;
+        window.dispatchEvent(new Event('scoders_auth_change'));
+      }
+
+      const timestamp = Date.now().toString(36).substring(3, 7).toUpperCase();
+      const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
+      let generatedKey = `BTD-SERV-${serviceCode}-${timestamp}-${randomHex}`;
+      let validUntil: string | undefined;
+      let isDeduplicated = false;
+      let dispatchedViaUnified = false;
+
+      // Authoritative backend registration: mints collision-free UID, deduplicates, persists, & sends email from escoders@gmail.com
+      try {
+        const regRes = await fetch('/api/registrations/register-and-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            section: 'service',
+            itemId: registeringService.id,
+            itemTitle: registeringService.title,
+            clientName: cleanName,
+            clientEmail: cleanEmail,
+            clientRole: regRole || 'Developer',
+            metadata: {
+              requirements: regRequirements,
+              budget: regBudget || 'TBD',
+              timeline: regTimeline || 'TBD',
+            },
+          })
+        });
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          if (regData?.success && regData?.uid) {
+            generatedKey = regData.uid;
+            validUntil = regData.validUntil || regData.record?.validUntil;
+            isDeduplicated = Boolean(regData.deduplicated);
+            dispatchedViaUnified = true;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Unified service registration fallback:", apiErr);
+      }
+
+      const mockChatId = `chat-svc-${generatedKey}`;
+      const newKeys = {
+        ...registeredKeys,
+        [registeringService.id]: {
+          key: generatedKey,
+          name: cleanName,
+          email: cleanEmail,
+          role: regRole || 'Developer',
+          requirements: regRequirements,
+          budget: regBudget || 'TBD',
+          timeline: regTimeline || 'TBD',
+          chatId: mockChatId,
+          timestamp: new Date().toLocaleString(),
+        }
       };
 
-      // Save registration
-      const currentRegs = DatabaseEngine.getServiceRegistrations();
-      DatabaseEngine.saveServiceRegistrations([dbServiceReg, ...currentRegs]);
+      setRegisteredKeys(newKeys);
+      localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
 
-      // Save Payment Transaction
-      const dbPayment: PaymentTransaction = {
-        id: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
-        clientId: regEmail,
-        clientName: regName,
-        clientEmail: regEmail,
-        amount: 10000, // deposit simulation
-        paymentMethod: 'UPI (PhonePe)',
-        status: 'Successful',
-        timestamp: new Date().toISOString(),
-        reference: `Deposit payment for S-CODERS ${registeringService.title}`,
-        interrupted: false,
-        failureReason: null
-      };
-      const currentPayments = DatabaseEngine.getPayments();
-      DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
+      // Complete relational DatabaseEngine integration (avoid duplicate record if deduplicated key already exists)
+      try {
+        const currentRegs = DatabaseEngine.getServiceRegistrations();
+        const alreadyInLocalDb = currentRegs.some(
+          r => r.uniqueKey?.trim().toUpperCase() === generatedKey.toUpperCase()
+        );
+        if (!alreadyInLocalDb) {
+          const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
+          const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
+          const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
+          const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
 
-      // Save Chat Conversation with deterministic key linkage
-      const dbChat: ChatConversation = {
-        id: mockChatId,
-        clientName: regName,
-        clientEmail: regEmail,
-        registrationId: regId,
-        reference: registeringService.title,
-        serviceId: registeringService.id,
-        uniqueAccessKey: generatedKey,
-        messages: [
-          { id: 'msg-init-1', sender: 'team', content: `Welcome ${regName} to S-CODERS! We have created a separate database and conversation workspace for your project '${registeringService.title}'. Our team has reviewed your requirements: "${regRequirements}". Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) will reach out shortly.`, timestamp: new Date().toISOString() }
-        ],
-        lastUpdated: new Date().toISOString()
-      };
-      const currentChats = DatabaseEngine.getChats();
-      DatabaseEngine.saveChats([dbChat, ...currentChats]);
+          const dbServiceReg: ServiceRegistration = {
+            id: regId,
+            clientProfile: {
+              name: cleanName,
+              email: cleanEmail,
+              phone: '+91 99999 00000',
+              company: 'Independent Client'
+            },
+            serviceId: registeringService.id,
+            selectedServiceTitle: registeringService.title,
+            uniqueKey: generatedKey,
+            projectRequirements: regRequirements,
+            budget: regBudget || 'TBD',
+            timeline: regTimeline || 'TBD',
+            projectStatus: 'Pending',
+            registrationDate: new Date().toISOString().split('T')[0],
+            projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            sourceCodeFileId: mockSrcFileId,
+            pdfFileId: mockPdfFileId,
+            chatId: mockChatId,
+            feedbackId: null,
+            invoiceId: mockInvoiceId
+          };
 
-      // Save separate File Records
-      const dbSrcFile: FileRecord = {
-        id: mockSrcFileId,
-        name: `${registeringService.id.replace('srv-', '')}_template_v1.zip`,
-        type: 'project_source_code',
-        url: '#download-source-zip',
-        size: '2.5 MB',
-        clientId: regEmail,
-        registrationId: regId,
-        uploadDate: new Date().toISOString().split('T')[0]
-      };
-      const dbPdfFile: FileRecord = {
-        id: mockPdfFileId,
-        name: `${registeringService.id.replace('srv-', '')}_specifications.pdf`,
-        type: 'project_pdf',
-        url: '#download-spec-pdf',
-        size: '1.2 MB',
-        clientId: regEmail,
-        registrationId: regId,
-        uploadDate: new Date().toISOString().split('T')[0]
-      };
-      const currentFiles = DatabaseEngine.getFiles();
-      DatabaseEngine.saveFiles([dbSrcFile, dbPdfFile, ...currentFiles]);
-    } catch (dbErr) {
-      console.error("Database Engine Service Registration Error:", dbErr);
+          DatabaseEngine.saveServiceRegistrations([dbServiceReg, ...currentRegs]);
+
+          const dbPayment: PaymentTransaction = {
+            id: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
+            clientId: cleanEmail,
+            clientName: cleanName,
+            clientEmail: cleanEmail,
+            amount: 10000,
+            paymentMethod: 'UPI (PhonePe)',
+            status: 'Successful',
+            timestamp: new Date().toISOString(),
+            reference: `Deposit payment for S-CODERS ${registeringService.title}`,
+            interrupted: false,
+            failureReason: null
+          };
+          const currentPayments = DatabaseEngine.getPayments();
+          DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
+
+          const dbChat: ChatConversation = {
+            id: mockChatId,
+            clientName: cleanName,
+            clientEmail: cleanEmail,
+            registrationId: regId,
+            reference: registeringService.title,
+            serviceId: registeringService.id,
+            uniqueAccessKey: generatedKey,
+            messages: [
+              { id: 'msg-init-1', sender: 'team', content: `Welcome ${cleanName} to S-CODERS! We have created a separate database and conversation workspace for your project '${registeringService.title}'. Our team has reviewed your requirements: "${regRequirements}". Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) will reach out shortly.`, timestamp: new Date().toISOString() }
+            ],
+            lastUpdated: new Date().toISOString()
+          };
+          const currentChats = DatabaseEngine.getChats();
+          DatabaseEngine.saveChats([dbChat, ...currentChats]);
+
+          const dbSrcFile: FileRecord = {
+            id: mockSrcFileId,
+            name: `${registeringService.id.replace('srv-', '')}_template_v1.zip`,
+            type: 'project_source_code',
+            url: '#download-source-zip',
+            size: '2.5 MB',
+            clientId: cleanEmail,
+            registrationId: regId,
+            uploadDate: new Date().toISOString().split('T')[0]
+          };
+          const dbPdfFile: FileRecord = {
+            id: mockPdfFileId,
+            name: `${registeringService.id.replace('srv-', '')}_specifications.pdf`,
+            type: 'project_pdf',
+            url: '#download-spec-pdf',
+            size: '1.2 MB',
+            clientId: cleanEmail,
+            registrationId: regId,
+            uploadDate: new Date().toISOString().split('T')[0]
+          };
+          const currentFiles = DatabaseEngine.getFiles();
+          DatabaseEngine.saveFiles([dbSrcFile, dbPdfFile, ...currentFiles]);
+        }
+      } catch (dbErr) {
+        console.error("Database Engine Service Registration Error:", dbErr);
+      }
+
+      // Only hit legacy endpoint if unified endpoint didn't already dispatch email
+      if (!dispatchedViaUnified) {
+        try {
+          fetch('/api/email/service-accepted', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: cleanEmail,
+              clientName: cleanName,
+              serviceTitle: registeringService.title,
+              uniqueKey: generatedKey,
+              actionUrl: `${window.location.origin}/?view=services&key=${generatedKey}`
+            })
+          }).catch(err => console.warn("Service email send notice:", err));
+        } catch (emailErr) {
+          console.warn("Service email trigger error:", emailErr);
+        }
+      }
+
+      setRegSuccessMeta({
+        email: cleanEmail,
+        validUntil,
+        deduplicated: isDeduplicated,
+        emailFrom: 'escoders@gmail.com',
+      });
+      setRegSuccessKey(generatedKey);
+    } finally {
+      setServiceSubmitting(false);
     }
-
-    // Trigger automated email dispatch to user's registered email
-    try {
-      fetch('/api/email/service-accepted', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: regEmail,
-          clientName: regName,
-          serviceTitle: registeringService.title,
-          uniqueKey: generatedKey,
-          actionUrl: `${window.location.origin}/?view=services&key=${generatedKey}`
-        })
-      }).catch(err => console.warn("Service email send notice:", err));
-    } catch (emailErr) {
-      console.warn("Service email trigger error:", emailErr);
-    }
-
-    setRegSuccessKey(generatedKey);
   };
 
-  const handleVerifyKey = (e: React.FormEvent) => {
+  const handleVerifyKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registeringService || !inputtedKey.trim()) return;
+    if (!registeringService || !inputtedKey.trim() || verifyingKey) return;
 
     const trimmed = inputtedKey.trim().toUpperCase();
     const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
-    
-    // Key validation criteria: BTD-SERV-SERVCODE-XXXX-XXXX
     const expectedPrefix = `BTD-SERV-${serviceCode}-`;
-    if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
-      // Look up existing registration in DatabaseEngine
+
+    setVerifyingKey(true);
+    setKeyError(null);
+
+    try {
+      const verifyRes = await fetch('/api/registrations/verify-uid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: trimmed, section: 'service' }),
+      });
+      const verifyData = await verifyRes.json();
+
+      if (verifyRes.ok && verifyData?.valid && verifyData?.record) {
+        const rec = verifyData.record;
+        const serviceRegs = DatabaseEngine.getServiceRegistrations();
+        const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
+        const allChats = DatabaseEngine.getChats();
+        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+        const restoredName = rec.clientName || existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
+        const restoredEmail = rec.clientEmail || existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
+        const restoredReq = rec.metadata?.requirements || existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
+        const restoredBudget = rec.metadata?.budget || existingReg?.budget || 'TBD';
+        const restoredTimeline = rec.metadata?.timeline || existingReg?.timeline || 'TBD';
+        const restoredChatId = rec.chatId || existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+
+        const targetServiceId = rec.itemId && services.some(s => s.id === rec.itemId) ? rec.itemId : registeringService.id;
+
+        const newKeys = {
+          ...registeredKeys,
+          [targetServiceId]: {
+            key: trimmed,
+            name: restoredName,
+            email: restoredEmail,
+            role: restoredReq,
+            requirements: restoredReq,
+            budget: restoredBudget,
+            timeline: restoredTimeline,
+            chatId: restoredChatId,
+            purpose: 'Unlocked via verified license key',
+            timestamp: new Date().toLocaleString(),
+          }
+        };
+        setRegisteredKeys(newKeys);
+        localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+        setRegisteringService(null);
+        setInputtedKey('');
+        setKeyError(null);
+        return;
+      }
+
+      if (verifyRes.status === 403 || verifyRes.status === 410) {
+        setKeyError(verifyData?.error || 'This registration code is no longer active.');
+        return;
+      }
+
+      // Check local database before rejecting (handles offline / legacy format compatibility)
       const serviceRegs = DatabaseEngine.getServiceRegistrations();
       const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
       const allChats = DatabaseEngine.getChats();
       const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
 
-      const restoredName = existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
-      const restoredEmail = existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
-      const restoredRole = existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
-      const restoredBudget = existingReg?.budget || 'TBD';
-      const restoredTimeline = existingReg?.timeline || 'TBD';
-      const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+      if (existingReg || existingChat) {
+        const restoredName = existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
+        const restoredEmail = existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
+        const restoredRole = existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
+        const restoredBudget = existingReg?.budget || 'TBD';
+        const restoredTimeline = existingReg?.timeline || 'TBD';
+        const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
 
-      const newKeys = {
-        ...registeredKeys,
-        [registeringService.id]: {
-          key: trimmed,
-          name: restoredName,
-          email: restoredEmail,
-          role: restoredRole,
-          budget: restoredBudget,
-          timeline: restoredTimeline,
-          chatId: restoredChatId,
-          purpose: 'Unlocked via verified license key',
-          timestamp: new Date().toLocaleString(),
-        }
-      };
-      setRegisteredKeys(newKeys);
-      localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
-      setRegisteringService(null);
-      setInputtedKey('');
-      setKeyError(null);
-    } else {
-      setKeyError(`Invalid key format. Key for this service must follow format: ${expectedPrefix}XXXX-XXXX`);
+        const newKeys = {
+          ...registeredKeys,
+          [registeringService.id]: {
+            key: trimmed,
+            name: restoredName,
+            email: restoredEmail,
+            role: restoredRole,
+            budget: restoredBudget,
+            timeline: restoredTimeline,
+            chatId: restoredChatId,
+            purpose: 'Unlocked via verified license key',
+            timestamp: new Date().toLocaleString(),
+          }
+        };
+        setRegisteredKeys(newKeys);
+        localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+        setRegisteringService(null);
+        setInputtedKey('');
+        setKeyError(null);
+        return;
+      }
+
+      setKeyError(
+        verifyData?.error ||
+          `No active service registration found for code "${trimmed}". Expected format like ${expectedPrefix}XXXX-XXXX or recover via email.`
+      );
+    } catch {
+      // Offline fallback: check local DatabaseEngine / expected key prefix
+      if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
+        const serviceRegs = DatabaseEngine.getServiceRegistrations();
+        const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
+        const allChats = DatabaseEngine.getChats();
+        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+
+        const restoredName = existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
+        const restoredEmail = existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
+        const restoredRole = existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
+        const restoredBudget = existingReg?.budget || 'TBD';
+        const restoredTimeline = existingReg?.timeline || 'TBD';
+        const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+
+        const newKeys = {
+          ...registeredKeys,
+          [registeringService.id]: {
+            key: trimmed,
+            name: restoredName,
+            email: restoredEmail,
+            role: restoredRole,
+            budget: restoredBudget,
+            timeline: restoredTimeline,
+            chatId: restoredChatId,
+            purpose: 'Unlocked via verified license key',
+            timestamp: new Date().toLocaleString(),
+          }
+        };
+        setRegisteredKeys(newKeys);
+        localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+        setRegisteringService(null);
+        setInputtedKey('');
+        setKeyError(null);
+      } else {
+        setKeyError(`Invalid key format. Key for this service must follow format: ${expectedPrefix}XXXX-XXXX`);
+      }
+    } finally {
+      setVerifyingKey(false);
     }
   };
 
@@ -578,16 +763,53 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     }
 
     const payerName = regName.trim() || currentUser?.name || 'Verified Client';
-    const payerEmail = regEmail.trim() || currentUser?.email || 'scoders82@gmail.com';
+    const payerEmail = (regEmail.trim() || currentUser?.email || '').trim().toLowerCase();
+    if (!payerEmail || !payerEmail.includes('@')) {
+      setQrPayError('Please enter a valid email address in the form before confirming payment.');
+      return;
+    }
 
     setQrPayError(null);
     setQrPayVerifying(true);
 
     try {
-      await new Promise(r => setTimeout(r, 1400));
+      await new Promise(r => setTimeout(r, 1000));
 
       const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
-      const generatedKey = `BTD-SERV-${serviceCode}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      let generatedKey = `BTD-SERV-${serviceCode}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      let validUntil: string | undefined;
+      let dispatchedViaUnified = false;
+
+      try {
+        const regRes = await fetch('/api/registrations/register-and-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            section: 'service',
+            itemId: registeringService.id,
+            itemTitle: registeringService.title,
+            clientName: payerName,
+            clientEmail: payerEmail,
+            clientRole: regRole || 'Client Developer',
+            amount: qrPayAmount,
+            paymentStatus: 'VERIFIED',
+            paymentId: `UPI_UTR_${cleanUtr}`,
+            metadata: {
+              requirements: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
+              budget: `Paid ₹${qrPayAmount.toLocaleString()}`,
+              timeline: regTimeline || 'Active Workflow',
+            },
+          })
+        });
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          if (regData?.success && regData?.uid) {
+            generatedKey = regData.uid;
+            validUntil = regData.validUntil || regData.record?.validUntil;
+            dispatchedViaUnified = true;
+          }
+        }
+      } catch {}
 
       const mockChatId = `chat-svc-${generatedKey}`;
       const newKeys = {
@@ -683,22 +905,28 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         DatabaseEngine.saveChats([dbChat, ...currentChats]);
       } catch (e) {}
 
-      // Trigger Email Notification
-      try {
-        fetch('/api/email/service-accepted', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: payerEmail,
-            clientName: payerName,
-            serviceTitle: registeringService.title,
-            uniqueKey: generatedKey,
-            actionUrl: `${window.location.origin}/?view=services`
-          })
-        }).catch(() => {});
-      } catch (e) {}
+      if (!dispatchedViaUnified) {
+        try {
+          fetch('/api/email/service-accepted', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: payerEmail,
+              clientName: payerName,
+              serviceTitle: registeringService.title,
+              uniqueKey: generatedKey,
+              actionUrl: `${window.location.origin}/?view=services&key=${generatedKey}`
+            })
+          }).catch(() => {});
+        } catch {}
+      }
 
       setQrPayVerifying(false);
+      setRegSuccessMeta({
+        email: payerEmail,
+        validUntil,
+        emailFrom: 'escoders@gmail.com',
+      });
       setRegSuccessKey(generatedKey);
     } catch (err) {
       setQrPayVerifying(false);
@@ -1338,22 +1566,36 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       Your exclusive developer dispatch key for <strong className="text-white font-semibold">{registeringService.title}</strong> has been generated and activated.
                     </p>
 
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 mb-4 max-w-xl mx-auto text-left flex items-start gap-3">
+                      <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                      <div className="text-xs space-y-1">
+                        <p className="text-blue-200 font-semibold">
+                          Confirmation Emailed from <span className="font-mono text-brand-teal">escoders@gmail.com</span>
+                        </p>
+                        <p className="text-gray-300 leading-relaxed">
+                          Dispatched to <strong className="text-white">{regSuccessMeta?.email || regEmail}</strong> with your service name (<strong className="text-white">{registeringService.title}</strong>) and unique registration UID.
+                          {regSuccessMeta?.validUntil && (
+                            <span className="block text-[10px] font-mono text-emerald-300 mt-1">
+                              Valid until: {new Date(regSuccessMeta.validUntil).toLocaleDateString()}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
                     {/* Exact Notice Above Unique License Key */}
                     <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 sm:p-6 mb-6 text-left max-w-xl mx-auto space-y-3.5 shadow-lg">
                       <div className="flex items-center gap-2.5 text-amber-300 font-display font-extrabold text-sm sm:text-base">
                         <span className="text-lg">⚠️</span>
-                        <span>IMPORTANT: Please Copy and Save Your Unique License Key</span>
+                        <span>IMPORTANT: Keep Your Unique Registration Code Safe</span>
                       </div>
                       <p className="text-gray-200 text-xs sm:text-sm font-sans leading-relaxed">
-                        Please copy and securely save your unique License Key. You will need this key the next time you want to access or view your project updates.
-                      </p>
-                      <p className="text-gray-300 text-xs sm:text-sm font-sans leading-relaxed">
-                        By entering your License Key, you can directly access your project without filling out the registration form again.
+                        Please save your unique code safely — it is required for future website access and reopening your dedicated service workspace without re-registering.
                       </p>
                       <div className="pt-2 text-amber-200 text-xs sm:text-sm font-sans flex items-start gap-2.5 bg-amber-500/15 p-3.5 rounded-xl border border-amber-500/25">
                         <span className="text-base shrink-0">🔐</span>
                         <span className="leading-relaxed">
-                          <strong>Caution:</strong> Keep your License Key safe and do not share it with anyone. It is required to securely access your project and its updates in the future.
+                          <strong>Client Responsibility Notice:</strong> Keeping this UID confidential and secure is your responsibility. If you lose it, recovering access will require additional email OTP verification.
                         </span>
                       </div>
                     </div>
@@ -1434,11 +1676,11 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                   // FORM STATE
                   <div>
                     {/* Toggle Modes */}
-                    <div className="grid grid-cols-2 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20">
+                    <div className="grid grid-cols-3 bg-brand-dark/50 p-1 rounded-xl mb-4 border border-white/5 relative z-20 gap-1">
                       <button
                         type="button"
                         onClick={() => { setModalMode('register'); setKeyError(null); setInputtedKey(''); }}
-                        className={`py-2 text-[11px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
+                        className={`py-2 text-[10px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
                           modalMode === 'register' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
                       >
@@ -1447,11 +1689,20 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       <button
                         type="button"
                         onClick={() => { setModalMode('enterKey'); setKeyError(null); setInputtedKey(''); }}
-                        className={`py-2 text-[11px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
+                        className={`py-2 text-[10px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
                           modalMode === 'enterKey' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
                         }`}
                       >
                         Enter Key
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setModalMode('recover'); setKeyError(null); }}
+                        className={`py-2 text-[10px] sm:text-xs font-mono rounded-lg transition-all uppercase cursor-pointer relative z-20 ${
+                          modalMode === 'recover' ? 'bg-brand-teal text-brand-dark font-bold shadow' : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Recover UID
                       </button>
                     </div>
 
@@ -1542,14 +1793,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                         <div className="pt-2">
                           <button
                             type="submit"
-                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-brand-teal/10"
+                            disabled={serviceSubmitting}
+                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-brand-teal/10 disabled:opacity-50"
                           >
                             <Sparkles className="w-3.5 h-3.5 fill-current animate-pulse" />
-                            Generate Custom Access Key
+                            {serviceSubmitting ? 'Generating UID & Sending Email...' : 'Generate Custom Access Key'}
                           </button>
                         </div>
                       </form>
-                    ) : (
+                    ) : modalMode === 'enterKey' ? (
                       <form onSubmit={handleVerifyKey} className="space-y-4 font-sans">
                         <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Enter Dispatch Key *</label>
@@ -1570,16 +1822,34 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           <p className="text-red-400 text-xs font-mono">{keyError}</p>
                         )}
 
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-2.5">
                           <button
                             type="submit"
-                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            disabled={verifyingKey}
+                            className="w-full py-3 bg-brand-teal text-brand-dark font-display font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-white transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <Key className="w-3.5 h-3.5" />
-                            Verify & Sync Keychain
+                            {verifyingKey ? 'Verifying Code...' : 'Verify & Sync Keychain'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setModalMode('recover'); setKeyError(null); }}
+                            className="w-full text-center text-[11px] font-mono text-brand-teal hover:underline cursor-pointer"
+                          >
+                            Lost your unique registration code? Recover via email verification →
                           </button>
                         </div>
                       </form>
+                    ) : (
+                      <UidRecoveryPanel
+                        section="service"
+                        defaultEmail={regEmail || currentUser?.email || ''}
+                        onRecoveredKeySelect={(uid) => {
+                          setInputtedKey(uid);
+                          setModalMode('enterKey');
+                          setKeyError(null);
+                        }}
+                      />
                     )}
                   </div>
                 )}

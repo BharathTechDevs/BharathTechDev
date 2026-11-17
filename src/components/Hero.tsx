@@ -95,52 +95,102 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
             <Sparkles className="w-3 h-3 text-brand-teal animate-spin-slow" />
           </motion.div>
 
-          {/* Animated Main Brand Name: S-CODERS (Letter-by-letter reveal inspired by Chill Guy / Chillchai reference) */}
-          <div className="flex items-center justify-center gap-1 sm:gap-2 text-4xl sm:text-6xl md:text-7xl font-display font-black tracking-tight select-none">
+          {/* Animated Main Brand Name: S-CODERS (Matches original Logo.tsx identity & proportions) */}
+          <div className="relative flex items-center justify-center text-4xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-none select-none">
             {/* "S" */}
             <motion.span
               initial={{ opacity: 0, y: 25, rotateX: 60 }}
               animate={{ opacity: 1, y: 0, rotateX: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="text-[#4361EE] drop-shadow-[0_0_24px_rgba(67,97,238,0.85)] inline-block"
+              className="text-[#4361EE] font-black leading-none drop-shadow-[0_0_24px_rgba(67,97,238,0.85)] inline-block"
             >
               S
             </motion.span>
 
-            {/* Glowing Link Symbol */}
-            <motion.div
-              initial={{ scaleX: 0, opacity: 0 }}
-              animate={{ scaleX: 1, opacity: 1 }}
-              transition={{ duration: 0.45, delay: 0.35, ease: "easeOut" }}
-              className="w-7 sm:w-12 h-1.5 sm:h-2.5 bg-gradient-to-r from-[#4361EE] via-[#00D2FF] to-[#0284C7] rounded-full mx-1 shadow-[0_0_14px_rgba(0,210,255,0.9)] origin-left"
-            />
-
-            {/* "CODERS" letters */}
-            {"CODERS".split('').map((char, index) => (
-              <motion.span
-                key={index}
-                initial={{ opacity: 0, y: 25, scale: 0.8 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{
-                  duration: 0.5,
-                  delay: 0.4 + index * 0.06,
-                  ease: [0.16, 1, 0.3, 1]
-                }}
-                className="text-[#00D2FF] drop-shadow-[0_0_20px_rgba(0,210,255,0.7)] inline-block"
-              >
-                {char}
-              </motion.span>
-            ))}
-
-            {/* Sparkling 4-point star accent */}
-            <motion.span
-              initial={{ scale: 0, rotate: -45 }}
-              animate={{ scale: [0, 1.3, 1], rotate: [0, 90, 0] }}
-              transition={{ duration: 0.6, delay: 0.85, ease: "easeOut" }}
-              className="text-[#E0F2FE] drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] inline-block ml-1"
+            {/* Symmetrical Chain Link Icon matching Logo.tsx */}
+            <motion.svg
+              viewBox="0 0 42 22"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.45, delay: 0.32, ease: "easeOut" }}
+              className="w-12 h-6 mx-1.5 sm:w-16 sm:h-8 sm:mx-2 md:w-24 md:h-12 md:mx-2.5 shrink-0 drop-shadow-[0_0_10px_rgba(0,210,255,0.75)]"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
             >
-              ✦
-            </motion.span>
+              {/* Left Link Capsule */}
+              <motion.path
+                d="M18 5H10C6.13401 5 3 8.13401 3 12C3 15.866 6.13401 19 10 19H18"
+                stroke="#00D2FF"
+                strokeWidth="3.6"
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
+              />
+              {/* Right Link Capsule */}
+              <motion.path
+                d="M24 5H32C37.866 5 41 8.13401 41 12C41 15.866 37.866 19 32 19H24"
+                stroke="#00D2FF"
+                strokeWidth="3.6"
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.42, ease: "easeOut" }}
+              />
+              {/* Connecting bridge */}
+              <motion.path
+                d="M13 12H29"
+                stroke="#00D2FF"
+                strokeWidth="3.6"
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.35, delay: 0.48, ease: "easeOut" }}
+              />
+            </motion.svg>
+
+            {/* "CODERS" with upper-right proportional sparkle star */}
+            <div className="relative flex items-center">
+              <div className="flex items-center">
+                {"CODERS".split('').map((char, index) => (
+                  <motion.span
+                    key={index}
+                    initial={{ opacity: 0, y: 25, scale: 0.8 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.5,
+                      delay: 0.4 + index * 0.06,
+                      ease: [0.16, 1, 0.3, 1]
+                    }}
+                    className="text-[#00D2FF] font-black leading-none drop-shadow-[0_0_20px_rgba(0,210,255,0.7)] inline-block"
+                  >
+                    {char}
+                  </motion.span>
+                ))}
+              </div>
+
+              {/* Sparkle Star positioned neatly in upper-right corner matching Logo.tsx */}
+              <motion.div
+                initial={{ scale: 0, rotate: -45, opacity: 0 }}
+                animate={{ scale: [0, 1.2, 1], rotate: [0, 90, 0], opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.85, ease: "easeOut" }}
+                className="absolute -top-1.5 -right-3.5 sm:-top-2 sm:-right-5 md:-top-2.5 md:-right-6 text-[#E0F2FE] drop-shadow-[0_0_10px_rgba(255,255,255,0.85)] pointer-events-none"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 shrink-0 animate-pulse"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z"
+                    fill="currentColor"
+                    stroke="#ffffff"
+                    strokeWidth="1"
+                  />
+                </svg>
+              </motion.div>
+            </div>
           </div>
 
           {/* Expanding Neon Accent Rule */}
