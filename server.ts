@@ -3744,28 +3744,33 @@ Return ONLY valid JSON with this structure:
     }
   });
 
-  // Helper to dynamically resolve the accurate live website URL for email links
+  const normalizePublicUrl = (url: string): string => {
+    return url.includes("://ais-dev-") ? url.replace("://ais-dev-", "://ais-pre-") : url;
+  };
+
+  // Helper to dynamically resolve the accurate live public website URL for email links
   const resolveAppUrl = (req: express.Request, fallbackPath: string = ""): string => {
-    const envUrl = process.env.APP_URL?.trim();
+    const suffix = fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`;
+    const envUrl = (process.env.PUBLIC_APP_URL || process.env.APP_URL)?.trim();
     if (envUrl && envUrl.startsWith("http")) {
-      const base = envUrl.replace(/\/$/, "");
-      return `${base}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+      const base = normalizePublicUrl(envUrl.replace(/\/$/, ""));
+      return `${base}${suffix}`;
     }
     const origin = req.headers.origin;
     if (origin && typeof origin === "string" && origin.startsWith("http")) {
-      const base = origin.replace(/\/$/, "");
-      return `${base}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+      const base = normalizePublicUrl(origin.replace(/\/$/, ""));
+      return `${base}${suffix}`;
     }
     const fwdHost = req.headers["x-forwarded-host"];
     if (fwdHost && typeof fwdHost === "string") {
       const proto = req.headers["x-forwarded-proto"] || "https";
-      return `${proto}://${fwdHost}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+      return normalizePublicUrl(`${proto}://${fwdHost}${suffix}`);
     }
     const host = req.headers.host;
     if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
-      return `https://${host}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+      return normalizePublicUrl(`https://${host}${suffix}`);
     }
-    return `http://${host || "localhost:3000"}${fallbackPath.startsWith("/") ? fallbackPath : `/${fallbackPath}`}`;
+    return `http://${host || "localhost:3000"}${suffix}`;
   };
 
   // ============================================================================
@@ -6409,7 +6414,7 @@ RESPONSE GUIDELINES:
   });
 
   // Vite Integration & Fallback Handling
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true, allowedHosts: true, hmr: false },
       appType: "spa",
@@ -6436,7 +6441,8 @@ RESPONSE GUIDELINES:
     }
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
-      app.get("*", (req, res) => {
+      app.get("*", (req, res, next) => {
+        if (req.originalUrl.startsWith("/api")) return next();
         res.sendFile(path.join(distPath, "index.html"));
       });
     } else {

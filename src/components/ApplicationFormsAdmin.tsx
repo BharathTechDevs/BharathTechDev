@@ -13,6 +13,7 @@ import {
   removeSavedCandidateApplication 
 } from '../utils/dynamicData';
 import UpiQrCanvas from './UpiQrCanvas';
+import { buildPublicShareUrl } from '../utils/shareUrl';
 
 interface ApplicationFormsAdminProps {
   onRefreshParent?: () => void;
@@ -496,7 +497,7 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
 
                     {/* QR Code Canvas */}
                     <div className="bg-white p-2 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-md text-black">
-                      <UpiQrCanvas upiString={`${window.location.origin}/careers?appId=${app.id}`} size={64} />
+                      <UpiQrCanvas upiString={buildPublicShareUrl(`/careers?appId=${encodeURIComponent(app.id)}`)} size={64} />
                       <span className="text-[7px] font-mono text-gray-700 font-bold mt-0.5 uppercase tracking-tighter">
                         Scan Dossier
                       </span>
@@ -532,7 +533,7 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
                   <button
                     type="button"
                     onClick={() => {
-                      const directLink = `${window.location.origin}/careers?appId=${encodeURIComponent(app.id)}`;
+                      const directLink = buildPublicShareUrl(`/careers?appId=${encodeURIComponent(app.id)}`);
                       navigator.clipboard.writeText(directLink);
                       setActionNotice(`✓ Direct link for Application #${app.id} copied to clipboard!`);
                       setTimeout(() => setActionNotice(null), 3000);
@@ -550,7 +551,7 @@ export default function ApplicationFormsAdmin({ onRefreshParent }: ApplicationFo
                       `*Role:* ${app.roleTitle || app.sector}\n` +
                       `*Application ID:* ${app.id}\n` +
                       `*Status:* ${app.status}\n\n` +
-                      `*Direct Access Link:* ${window.location.origin}/careers?appId=${app.id}\n\n` +
+                      `*Direct Access Link:* ${buildPublicShareUrl(`/careers?appId=${encodeURIComponent(app.id)}`)}\n\n` +
                       `Official HR: scoders82@gmail.com`
                     )}`}
                     target="_blank"

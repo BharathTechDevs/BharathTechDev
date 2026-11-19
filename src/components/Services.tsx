@@ -20,6 +20,7 @@ import { getLeaderPhoto } from '../utils/leaderPhotos';
 import { downloadServiceSpecPdf, triggerFileDownload } from '../utils/workshopAssetGenerator';
 import ServiceChatRoom from './ServiceChatRoom';
 import UidRecoveryPanel from './UidRecoveryPanel';
+import { buildPublicShareUrl } from '../utils/shareUrl';
 
 interface ServicesProps {
   onPayDeposit?: (details: { clientName: string; email: string; category: string; amount: number }) => void;
@@ -312,7 +313,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             budget: budget || 'Not Specified',
             timeline: timeline || 'Not Specified'
           },
-          actionUrl: `${window.location.origin}/?view=services`
+          actionUrl: buildPublicShareUrl('/?view=services')
         })
       });
       if (apiRes.ok) {
@@ -332,7 +333,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             clientName: clientName.trim(),
             serviceTitle: projectTitle,
             uniqueKey: finalProjectUid,
-            actionUrl: `${window.location.origin}/?view=services`
+            actionUrl: buildPublicShareUrl('/?view=services')
           })
         }).catch(() => {});
       } catch {}
@@ -587,7 +588,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               clientName: cleanName,
               serviceTitle: registeringService.title,
               uniqueKey: generatedKey,
-              actionUrl: `${window.location.origin}/?view=services&key=${generatedKey}`
+              actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
             })
           }).catch(err => console.warn("Service email send notice:", err));
         } catch (emailErr) {
@@ -915,7 +916,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               clientName: payerName,
               serviceTitle: registeringService.title,
               uniqueKey: generatedKey,
-              actionUrl: `${window.location.origin}/?view=services&key=${generatedKey}`
+              actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
             })
           }).catch(() => {});
         } catch {}

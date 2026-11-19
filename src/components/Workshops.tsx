@@ -27,6 +27,7 @@ import {
 import WorkshopChatRoom from './WorkshopChatRoom';
 import { OnlineCodePlayground } from './OnlineCodePlayground';
 import UidRecoveryPanel from './UidRecoveryPanel';
+import { buildPublicShareUrl } from '../utils/shareUrl';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -379,7 +380,7 @@ export default function TenantDashboard() {
             time: (activeWorkshop as any).time || (activeWorkshop as any).startTime || '10:00 AM IST',
             location: activeWorkshop.location,
           },
-          actionUrl: `${window.location.origin}/?view=workshops`,
+          actionUrl: buildPublicShareUrl('/?view=workshops'),
         }),
       });
       if (regRes.ok) {
@@ -527,7 +528,7 @@ export default function TenantDashboard() {
             amount: totalAmount,
             uniqueKey: generatedKey,
             paymentId: txnId,
-            actionUrl: `${window.location.origin}/?view=workshops&key=${generatedKey}`
+            actionUrl: buildPublicShareUrl(`/?view=workshops&key=${generatedKey}`)
           })
         }).catch(err => console.warn("Workshop email dispatch warning:", err));
       } catch (emailErr) {
@@ -649,7 +650,7 @@ export default function TenantDashboard() {
           workshopTitle: activeWorkshop.title,
           amount: (activeWorkshop.price ?? 1499) * payTicketsCount,
           reason: reason,
-          actionUrl: `${window.location.origin}/?view=workshops`
+          actionUrl: buildPublicShareUrl('/?view=workshops')
         })
       }).catch(err => console.warn("Workshop failure email warning:", err));
     } catch (emailErr) {

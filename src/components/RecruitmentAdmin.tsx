@@ -20,6 +20,7 @@ import {
 } from '../utils/departmentData';
 import DepartmentVerificationsAdmin from './admin/DepartmentVerificationsAdmin';
 import DepartmentMeetingsAdmin from './admin/DepartmentMeetingsAdmin';
+import { buildPublicShareUrl } from '../utils/shareUrl';
 
 interface RecruitmentAdminProps {
   applications: CandidateApplication[];
@@ -941,14 +942,14 @@ export default function RecruitmentAdmin({
                             <div className="min-w-0">
                               <span className="text-[10px] font-mono text-gray-400 block">DIRECT ONBOARDING LINK</span>
                               <span className="font-mono text-xs text-brand-teal truncate block">
-                                {window.location.origin}/careers?stage=onboarding&appId={selectedApp.id}&token={selectedApp.onboardingToken}
+                                {buildPublicShareUrl(`/careers?stage=onboarding&appId=${selectedApp.id}&token=${selectedApp.onboardingToken}`)}
                               </span>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const link = `${window.location.origin}/careers?stage=onboarding&appId=${selectedApp.id}&token=${selectedApp.onboardingToken}`;
+                                  const link = buildPublicShareUrl(`/careers?stage=onboarding&appId=${selectedApp.id}&token=${selectedApp.onboardingToken}`);
                                   navigator.clipboard.writeText(link);
                                   setCopiedOnboardingLink(true);
                                   setTimeout(() => setCopiedOnboardingLink(false), 2000);

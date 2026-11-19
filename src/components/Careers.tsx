@@ -20,6 +20,7 @@ import {
 } from '../utils/dynamicData';
 import CareersSection3ReferenceIds from './careers/CareersSection3ReferenceIds';
 import CareersSection4DepartmentWork from './careers/CareersSection4DepartmentWork';
+import { buildPublicShareUrl } from '../utils/shareUrl';
 
 interface CareersProps {
   onNavigate?: (view: string) => void;
@@ -447,10 +448,8 @@ export default function Careers({ onNavigate }: CareersProps) {
     };
   }, []);
 
-  // Compute the live active cloud server URL (running right now on Google Cloud Run)
-  const liveActiveCloudUrl = typeof window !== 'undefined' && window.location.origin
-    ? `${window.location.origin}/careers`
-    : 'https://ais-pre-4pr6x2ldsz6wlrzuhtwvkl-289165168867.asia-southeast1.run.app/careers';
+  // Compute the live shareable public cloud server URL (normalizes private ais-dev preview URLs to shareable ais-pre URLs)
+  const liveActiveCloudUrl = buildPublicShareUrl('/careers');
 
   // State for custom domain if user connects one
   const [customDomainInput, setCustomDomainInput] = useState<string>('');
@@ -3390,13 +3389,13 @@ export default function Careers({ onNavigate }: CareersProps) {
 
                 <div className="p-3 bg-black/60 border border-white/10 rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   <div className="min-w-0 font-mono text-xs text-brand-teal truncate select-all bg-black/40 px-3 py-2 rounded-lg border border-white/5 flex-1">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/careers?appId=${encodeURIComponent(successApp.id)}&key=${encodeURIComponent(successApp.agreementReferenceId || successApp.id)}` : `https://scoders.dev/careers?appId=${successApp.id}`}
+                    {buildPublicShareUrl(`/careers?appId=${encodeURIComponent(successApp.id)}&key=${encodeURIComponent(successApp.agreementReferenceId || successApp.id)}`)}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => {
-                        const linkToCopy = typeof window !== 'undefined' ? `${window.location.origin}/careers?appId=${encodeURIComponent(successApp.id)}&key=${encodeURIComponent(successApp.agreementReferenceId || successApp.id)}` : `https://scoders.dev/careers?appId=${successApp.id}`;
+                        const linkToCopy = buildPublicShareUrl(`/careers?appId=${encodeURIComponent(successApp.id)}&key=${encodeURIComponent(successApp.agreementReferenceId || successApp.id)}`);
                         copyToClipboard(linkToCopy, 'dossierLink');
                       }}
                       className="flex-1 sm:flex-initial px-4 py-2 bg-brand-teal hover:bg-white text-brand-dark rounded-lg font-mono text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
@@ -3415,7 +3414,7 @@ export default function Careers({ onNavigate }: CareersProps) {
                     </button>
 
                     <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`My S-CODERS Application Form & Induction Dossier Link (ID: ${successApp.id}): ${typeof window !== 'undefined' ? `${window.location.origin}/careers?appId=${encodeURIComponent(successApp.id)}&key=${encodeURIComponent(successApp.agreementReferenceId || successApp.id)}` : ''}`)}`}
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`My S-CODERS Application Form & Induction Dossier Link (ID: ${successApp.id}): ${buildPublicShareUrl(`/careers?appId=${encodeURIComponent(successApp.id)}&key=${encodeURIComponent(successApp.agreementReferenceId || successApp.id)}`)}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-2 bg-[#25D366]/20 hover:bg-[#25D366] text-[#25D366] hover:text-black border border-[#25D366]/40 rounded-lg font-mono text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"

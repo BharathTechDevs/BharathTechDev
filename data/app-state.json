@@ -757,5 +757,87 @@
       "lastError": "Signature verification failed",
       "updatedAt": "2026-10-04T16:09:06.261Z"
     }
+  ],
+  "db_registration_uids": [
+    {
+      "uid": "SC-EVT-90326C51",
+      "section": "event",
+      "itemId": "evt-1",
+      "itemTitle": "S-CODERS Hackathon 2026",
+      "clientName": "Aarav Verma",
+      "clientEmail": "test.scoders.verify@example.com",
+      "amount": 299,
+      "currency": "INR",
+      "paymentStatus": "VERIFIED",
+      "paymentId": "pay_evt_verified_1794938930981",
+      "dedupeKey": "event:pay:pay_evt_verified_1794938930981",
+      "metadata": {
+        "date": "Dec 12, 2026",
+        "day": "Saturday",
+        "time": "09:00 AM - 06:00 PM IST",
+        "location": "Koramangala Campus, Bengaluru",
+        "description": "24-Hour AI & Full-Stack Buildathon"
+      },
+      "issuedAt": "2026-11-17T18:08:50.986Z",
+      "validFrom": "2026-11-17T18:08:50.986Z",
+      "validUntil": "2026-12-19T00:00:00.000Z",
+      "status": "ACTIVE",
+      "confirmationEmailSent": true,
+      "confirmationEmailSentAt": "2026-11-17T18:08:55.917Z",
+      "emailFrom": "escoders@gmail.com",
+      "emailMessageId": "<a0675edf-2132-ceb4-3938-28e718d6f244@gmail.com>"
+    },
+    {
+      "uid": "BTD-WKSP-WKSP-A-C9EE-7420",
+      "section": "workshop",
+      "itemId": "wksp-ai",
+      "itemTitle": "AI Agent Bootcamp",
+      "clientName": "Aarav Verma",
+      "clientEmail": "test.scoders.verify@example.com",
+      "amount": 1499,
+      "currency": "INR",
+      "paymentStatus": "VERIFIED",
+      "paymentId": "pay_wksp_verified_1794938925998",
+      "dedupeKey": "workshop:pay:pay_wksp_verified_1794938925998",
+      "metadata": {
+        "date": "Nov 30, 2026",
+        "time": "10:00 AM IST",
+        "location": "Online Live Sandbox"
+      },
+      "issuedAt": "2026-11-17T18:08:46.002Z",
+      "validFrom": "2026-11-17T18:08:46.002Z",
+      "validUntil": "2026-12-30T00:00:00.000Z",
+      "status": "ACTIVE",
+      "confirmationEmailSent": true,
+      "confirmationEmailSentAt": "2026-11-17T18:08:50.962Z",
+      "emailFrom": "escoders@gmail.com",
+      "emailMessageId": "<d9ef8fff-9093-28ef-256c-e1fbd6235f64@gmail.com>"
+    },
+    {
+      "uid": "BTD-SERV-SRV--3464-A070",
+      "section": "service",
+      "itemId": "srv-web",
+      "itemTitle": "Web Development",
+      "clientName": "Aarav Verma",
+      "clientEmail": "test.scoders.verify@example.com",
+      "clientRole": "Founder",
+      "amount": 0,
+      "currency": "INR",
+      "paymentStatus": "NOT_REQUIRED",
+      "dedupeKey": "service:reg:test.scoders.verify@example.com:srv-web",
+      "metadata": {
+        "requirements": "Next.js SaaS Portal",
+        "budget": "₹60,000",
+        "timeline": "3 Weeks"
+      },
+      "issuedAt": "2026-11-17T18:08:39.958Z",
+      "validFrom": "2026-11-17T18:08:39.958Z",
+      "validUntil": "2027-05-16T18:08:39.958Z",
+      "status": "ACTIVE",
+      "confirmationEmailSent": true,
+      "confirmationEmailSentAt": "2026-11-17T18:08:45.971Z",
+      "emailFrom": "escoders@gmail.com",
+      "emailMessageId": "<beafeb0a-2ece-6246-c9f3-edbfce634580@gmail.com>"
+    }
   ]
 }

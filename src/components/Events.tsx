@@ -23,6 +23,7 @@ import {
   getBankingNameForUpi, 
   getPhoneNumberForUpi 
 } from '../utils/paymentLinks';
+import { buildPublicShareUrl } from '../utils/shareUrl';
 
 export default function Events() {
   const [events, setEvents] = useState<SCODERSEvent[]>([]);
@@ -477,7 +478,7 @@ export default function Events() {
                 location: selectedEvent.location,
                 description: selectedEvent.description,
               },
-              actionUrl: `${window.location.origin}/?view=events`,
+              actionUrl: buildPublicShareUrl('/?view=events'),
             }),
           });
           if (regRes.ok) {
@@ -537,7 +538,7 @@ export default function Events() {
                 amount: 0,
                 ticketCode: ticketCode,
                 paymentId: freePayId,
-                actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+                actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
               })
             }).catch(err => console.warn("Free event pass email error:", err));
           } catch {}
@@ -681,7 +682,7 @@ export default function Events() {
             location: eventLocation,
             description: eventRef?.description,
           },
-          actionUrl: `${window.location.origin}/?view=events`,
+          actionUrl: buildPublicShareUrl('/?view=events'),
         }),
       });
       if (regRes.ok) {
@@ -736,7 +737,7 @@ export default function Events() {
             amount: data.amount,
             ticketCode: ticketCode,
             paymentId: data.razorpay_payment_id,
-            actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+            actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
           })
         }).catch(err => console.warn("Event payment email dispatch notice:", err));
       } catch {}
@@ -813,7 +814,7 @@ export default function Events() {
             location: selectedEvent.location,
             description: selectedEvent.description,
           },
-          actionUrl: `${window.location.origin}/?view=events`,
+          actionUrl: buildPublicShareUrl('/?view=events'),
         }),
       });
       if (regRes.ok) {
@@ -872,7 +873,7 @@ export default function Events() {
             amount: paidAmount,
             ticketCode: ticketCode,
             paymentId: upiPayId,
-            actionUrl: `${window.location.origin}/?view=events&ticket=${ticketCode}`
+            actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
           })
         }).catch(err => console.warn("UPI event pass email error:", err));
       } catch {}
@@ -2674,7 +2675,7 @@ export default function Events() {
                 amount: razorpayPaymentDetails?.amount || selectedEvent?.ticketPrice || 999,
                 currency: 'INR',
                 reason: reason || 'Payment was declined, interrupted, or cancelled by user.',
-                actionUrl: `${window.location.origin}/?view=events`
+                actionUrl: buildPublicShareUrl('/?view=events')
               })
             }).catch(e => console.warn('Event failure email dispatch error:', e));
           }}
