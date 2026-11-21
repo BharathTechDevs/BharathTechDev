@@ -657,13 +657,244 @@ export class DatabaseEngine {
         key: reg.uniqueKey,
         name: reg.clientProfile.name,
         email: reg.clientProfile.email,
-        role: 'Client Partner',
+        role: reg.clientProfile.company || 'Client Partner',
+        requirements: reg.projectRequirements,
         budget: reg.budget,
         timeline: reg.timeline,
+        chatId: reg.chatId || `chat-svc-${reg.uniqueKey}`,
         timestamp: reg.registrationDate
       };
     });
-    localStorage.setItem('scoders_registered_services', JSON.stringify(scodersReg));
+    this.setStored('scoders_registered_services', scodersReg);
+  }
+
+  public static updateServiceClientProfile(params: {
+    serviceId: string;
+    uniqueKey?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    budget?: string;
+    timeline?: string;
+    requirements?: string;
+  }): void {
+    const cleanKey = (params.uniqueKey || '').trim().toUpperCase();
+    const cleanEmail = (params.email || '').trim().toLowerCase();
+    const cleanName = (params.name || '').trim();
+    const cleanRole = (params.role || '').trim();
+
+    try {
+      const currentRegs = this.getServiceRegistrations();
+      let touchedRegs = false;
+      const updatedRegs = currentRegs.map((reg) => {
+        const keyMatch = cleanKey && cleanKey !== 'ENTER-KEY-TO-VERIFY' && reg.uniqueKey?.trim().toUpperCase() === cleanKey;
+        const svcMatch = reg.serviceId === params.serviceId && (!cleanKey || !reg.uniqueKey);
+        if (keyMatch || svcMatch) {
+          touchedRegs = true;
+          return {
+            ...reg,
+            clientProfile: {
+              ...reg.clientProfile,
+              name: cleanName || reg.clientProfile.name,
+              email: cleanEmail || reg.clientProfile.email,
+              company: cleanRole || reg.clientProfile.company,
+            },
+            budget: params.budget || reg.budget,
+            timeline: params.timeline || reg.timeline,
+            projectRequirements: params.requirements || reg.projectRequirements,
+          };
+        }
+        return reg;
+      });
+      if (touchedRegs) {
+        this.setStored('db_service_registrations', updatedRegs);
+      }
+
+      const regServicesRaw = localStorage.getItem('scoders_registered_services');
+      const regServices = regServicesRaw ? JSON.parse(regServicesRaw) : {};
+      if (regServices && typeof regServices === 'object' && regServices[params.serviceId]) {
+        regServices[params.serviceId] = {
+          ...regServices[params.serviceId],
+          name: cleanName || regServices[params.serviceId].name,
+          email: cleanEmail || regServices[params.serviceId].email,
+          role: cleanRole || regServices[params.serviceId].role,
+          budget: params.budget || regServices[params.serviceId].budget,
+          timeline: params.timeline || regServices[params.serviceId].timeline,
+          requirements: params.requirements || regServices[params.serviceId].requirements,
+          autoSavedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('scoders_registered_services', JSON.stringify(regServices));
+      }
+
+      const chats = this.getChats();
+      let touchedChats = false;
+      const updatedChats = chats.map((c) => {
+        if (cleanKey && c.uniqueAccessKey?.trim().toUpperCase() === cleanKey) {
+          touchedChats = true;
+          return {
+            ...c,
+            clientName: cleanName || c.clientName,
+            clientEmail: cleanEmail || c.clientEmail,
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+        return c;
+      });
+      if (touchedChats) {
+        localStorage.setItem('db_chats', JSON.stringify(updatedChats));
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('scoders_sessions_change'));
+        window.dispatchEvent(new Event('scoders_db_change'));
+      }
+
+      fetch('/api/services/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: params.serviceId,
+          uniqueKey: cleanKey || undefined,
+          name: cleanName || undefined,
+          email: cleanEmail || undefined,
+          role: cleanRole || undefined,
+          budget: params.budget || undefined,
+          timeline: params.timeline || undefined,
+          requirements: params.requirements || undefined,
+        }),
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('Auto-save service profile warning:', err);
+    }
+  }
+
+  public static async cancelServiceOrder(params: {
+    serviceId: string;
+    uniqueKey?: string;
+    clientEmail?: string;
+    chatId?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    const cleanKey = (params.uniqueKey || '').trim().toUpperCase();
+    const cleanEmail = (params.clientEmail || '').trim().toLowerCase();
+    const validKey = cleanKey && cleanKey !== 'ENTER-KEY-TO-VERIFY' ? cleanKey : '';
+
+    // 1. Permanently delete from authoritative server database first
+    try {
+      const res = await fetch('/api/services/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: params.serviceId,
+          uniqueKey: validKey || undefined,
+          clientEmail: cleanEmail || undefined,
+          chatId: params.chatId || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.warn('Backend service cancel returned error:', errData);
+      }
+    } catch (netErr) {
+      console.warn('Offline fallback for service cancellation:', netErr);
+    }
+
+    // 2. Permanently purge all associated client records locally so they cannot reappear
+    try {
+      const matchedRegIds = new Set<string>();
+      const matchedFileIds = new Set<string>();
+      const matchedChatIds = new Set<string>();
+      const matchedKeys = new Set<string>();
+      if (validKey) matchedKeys.add(validKey);
+      if (params.chatId) matchedChatIds.add(params.chatId);
+
+      const currentRegs = this.getServiceRegistrations();
+      const remainingRegs = currentRegs.filter((reg) => {
+        const regKey = (reg.uniqueKey || '').trim().toUpperCase();
+        const regEmail = (reg.clientProfile?.email || '').trim().toLowerCase();
+        const matchesKey = Boolean(validKey && regKey === validKey);
+        const matchesSvc = Boolean(!validKey && reg.serviceId === params.serviceId && (!cleanEmail || !regEmail || regEmail === cleanEmail));
+        if (matchesKey || matchesSvc) {
+          if (reg.id) matchedRegIds.add(reg.id);
+          if (regKey) matchedKeys.add(regKey);
+          if (reg.chatId) matchedChatIds.add(reg.chatId);
+          if (reg.sourceCodeFileId) matchedFileIds.add(reg.sourceCodeFileId);
+          if (reg.pdfFileId) matchedFileIds.add(reg.pdfFileId);
+          return false;
+        }
+        return true;
+      });
+      localStorage.setItem('db_service_registrations', JSON.stringify(remainingRegs));
+
+      const regServicesRaw = localStorage.getItem('scoders_registered_services');
+      const regServices = regServicesRaw ? JSON.parse(regServicesRaw) : {};
+      if (regServices && typeof regServices === 'object') {
+        if (params.serviceId && regServices[params.serviceId]) {
+          const entryKey = String(regServices[params.serviceId]?.key || '').trim().toUpperCase();
+          if (entryKey) matchedKeys.add(entryKey);
+          if (regServices[params.serviceId]?.chatId) matchedChatIds.add(String(regServices[params.serviceId].chatId));
+          delete regServices[params.serviceId];
+        }
+        Object.keys(regServices).forEach((k) => {
+          const entryKey = String(regServices[k]?.key || '').trim().toUpperCase();
+          if (entryKey && matchedKeys.has(entryKey)) {
+            delete regServices[k];
+          }
+        });
+        localStorage.setItem('scoders_registered_services', JSON.stringify(regServices));
+      }
+
+      const uidsRaw = localStorage.getItem('db_registration_uids');
+      if (uidsRaw) {
+        const uids = JSON.parse(uidsRaw);
+        if (Array.isArray(uids)) {
+          const filteredUids = uids.filter((u: any) => {
+            if (u?.section !== 'service') return true;
+            const recUid = String(u?.uid || '').trim().toUpperCase();
+            return !(recUid && matchedKeys.has(recUid));
+          });
+          localStorage.setItem('db_registration_uids', JSON.stringify(filteredUids));
+        }
+      }
+
+      const remainingChats = this.getChats().filter((c) => {
+        const cKey = (c.uniqueAccessKey || '').trim().toUpperCase();
+        const cEmail = (c.clientEmail || '').trim().toLowerCase();
+        if (c.id && matchedChatIds.has(c.id)) return false;
+        if (cKey && matchedKeys.has(cKey)) return false;
+        if (c.registrationId && matchedRegIds.has(c.registrationId)) return false;
+        if (params.serviceId && c.serviceId === params.serviceId && cleanEmail && cEmail === cleanEmail) return false;
+        return true;
+      });
+      localStorage.setItem('db_chats', JSON.stringify(remainingChats));
+
+      const remainingFiles = this.getFiles().filter(
+        (f) => !matchedFileIds.has(f.id) && !matchedRegIds.has(f.registrationId)
+      );
+      localStorage.setItem('db_files', JSON.stringify(remainingFiles));
+
+      const remainingFeedbacks = this.getFeedbacks().filter(
+        (fb) => fb.type !== 'service' || !matchedRegIds.has(fb.registrationId)
+      );
+      localStorage.setItem('db_feedbacks', JSON.stringify(remainingFeedbacks));
+
+      // Remove any auto-save draft for this cancelled service
+      try {
+        localStorage.removeItem(`scoders_service_draft_${params.serviceId}_${validKey || 'active'}`);
+        localStorage.removeItem(`scoders_service_draft_${params.serviceId}_active`);
+      } catch {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('scoders_db_change'));
+        window.dispatchEvent(new Event('scoders_data_change'));
+        window.dispatchEvent(new Event('scoders_sessions_change'));
+        window.dispatchEvent(new Event('storage'));
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Local service cancellation cleanup error:', err);
+      return { success: false, error: err?.message || 'Failed to delete local service data.' };
+    }
   }
 
   // --- Collection 2: Workshop Registrations ---
@@ -688,7 +919,243 @@ export class DatabaseEngine {
         };
       }
     });
-    localStorage.setItem('scoders_registered_workshops', JSON.stringify(scodersReg));
+    this.setStored('scoders_registered_workshops', scodersReg);
+  }
+
+  public static async updateWorkshopClientProfile(params: {
+    workshopId: string;
+    uniqueKey?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+  }): Promise<void> {
+    const cleanKey = (params.uniqueKey || '').trim().toUpperCase();
+    const cleanName = (params.name || '').trim();
+    const cleanEmail = (params.email || '').trim().toLowerCase();
+    const cleanRole = (params.role || '').trim();
+    const validKey = cleanKey && cleanKey !== 'PASS-KEY' ? cleanKey : '';
+
+    try {
+      const currentRegs = this.getWorkshopRegistrations();
+      let touchedRegs = false;
+      const updatedRegs = currentRegs.map((reg) => {
+        const regKey = (reg.uniqueAccessKey || '').trim().toUpperCase();
+        const regEmail = (reg.participantProfile?.email || '').trim().toLowerCase();
+        const keyMatch = Boolean(validKey && regKey === validKey);
+        const wkspMatch = Boolean(!validKey && reg.workshopId === params.workshopId && (!cleanEmail || !regEmail || regEmail === cleanEmail));
+        if (keyMatch || wkspMatch) {
+          touchedRegs = true;
+          return {
+            ...reg,
+            participantProfile: {
+              ...reg.participantProfile,
+              name: cleanName || reg.participantProfile?.name,
+              email: cleanEmail || reg.participantProfile?.email,
+              role: cleanRole || reg.participantProfile?.role,
+            },
+          };
+        }
+        return reg;
+      });
+      if (touchedRegs) {
+        localStorage.setItem('db_workshop_registrations', JSON.stringify(updatedRegs));
+      }
+
+      const savedWkspsRaw = localStorage.getItem('scoders_registered_workshops');
+      const savedWksps = savedWkspsRaw ? JSON.parse(savedWkspsRaw) : {};
+      if (savedWksps && params.workshopId && savedWksps[params.workshopId]) {
+        savedWksps[params.workshopId] = {
+          ...savedWksps[params.workshopId],
+          name: cleanName || savedWksps[params.workshopId].name,
+          email: cleanEmail || savedWksps[params.workshopId].email,
+          role: cleanRole || savedWksps[params.workshopId].role,
+          autoSavedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('scoders_registered_workshops', JSON.stringify(savedWksps));
+      }
+
+      const chats = this.getChats();
+      let touchedChats = false;
+      const updatedChats = chats.map((c) => {
+        if (validKey && c.uniqueAccessKey?.trim().toUpperCase() === validKey) {
+          touchedChats = true;
+          return {
+            ...c,
+            clientName: cleanName || c.clientName,
+            clientEmail: cleanEmail || c.clientEmail,
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+        return c;
+      });
+      if (touchedChats) {
+        localStorage.setItem('db_chats', JSON.stringify(updatedChats));
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+        window.dispatchEvent(new Event('scoders_sessions_change'));
+        window.dispatchEvent(new Event('scoders_db_change'));
+      }
+
+      fetch('/api/workshops/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workshopId: params.workshopId,
+          uniqueKey: validKey || undefined,
+          name: cleanName || undefined,
+          email: cleanEmail || undefined,
+          role: cleanRole || undefined,
+        }),
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('Auto-save workshop profile warning:', err);
+    }
+  }
+
+  public static async cancelWorkshopOrder(params: {
+    workshopId: string;
+    uniqueKey?: string;
+    clientEmail?: string;
+    chatId?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    const cleanKey = (params.uniqueKey || '').trim().toUpperCase();
+    const cleanEmail = (params.clientEmail || '').trim().toLowerCase();
+    const validKey = cleanKey && cleanKey !== 'PASS-KEY' ? cleanKey : '';
+
+    // 1. Permanently delete from authoritative server database first
+    try {
+      const res = await fetch('/api/workshops/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workshopId: params.workshopId,
+          uniqueKey: validKey || undefined,
+          clientEmail: cleanEmail || undefined,
+          chatId: params.chatId || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.warn('Backend workshop cancel returned error:', errData);
+      }
+    } catch (netErr) {
+      console.warn('Offline fallback for workshop cancellation:', netErr);
+    }
+
+    // 2. Permanently purge all associated workshop registration records locally
+    try {
+      const matchedRegIds = new Set<string>();
+      const matchedFileIds = new Set<string>();
+      const matchedChatIds = new Set<string>();
+      const matchedKeys = new Set<string>();
+      if (validKey) matchedKeys.add(validKey);
+      if (params.chatId) matchedChatIds.add(params.chatId);
+
+      const currentRegs = this.getWorkshopRegistrations();
+      const remainingRegs = currentRegs.filter((reg) => {
+        const regKey = (reg.uniqueAccessKey || '').trim().toUpperCase();
+        const regEmail = (reg.participantProfile?.email || '').trim().toLowerCase();
+        const matchesKey = Boolean(validKey && regKey === validKey);
+        const matchesWksp = Boolean(!validKey && reg.workshopId === params.workshopId && (!cleanEmail || !regEmail || regEmail === cleanEmail));
+        if (matchesKey || matchesWksp) {
+          if (reg.id) matchedRegIds.add(reg.id);
+          if (regKey) matchedKeys.add(regKey);
+          if (reg.chatId) matchedChatIds.add(reg.chatId);
+          if (Array.isArray(reg.materialsFileIds)) {
+            reg.materialsFileIds.forEach((fid) => {
+              if (fid) matchedFileIds.add(fid);
+            });
+          }
+          return false;
+        }
+        return true;
+      });
+      localStorage.setItem('db_workshop_registrations', JSON.stringify(remainingRegs));
+
+      const regWkspsRaw = localStorage.getItem('scoders_registered_workshops');
+      const regWksps = regWkspsRaw ? JSON.parse(regWkspsRaw) : {};
+      if (regWksps && typeof regWksps === 'object') {
+        if (params.workshopId && regWksps[params.workshopId]) {
+          const entryKey = String(regWksps[params.workshopId]?.key || '').trim().toUpperCase();
+          if (entryKey) matchedKeys.add(entryKey);
+          if (regWksps[params.workshopId]?.chatId) matchedChatIds.add(String(regWksps[params.workshopId].chatId));
+          delete regWksps[params.workshopId];
+        }
+        Object.keys(regWksps).forEach((k) => {
+          const entryKey = String(regWksps[k]?.key || '').trim().toUpperCase();
+          if (entryKey && matchedKeys.has(entryKey)) {
+            delete regWksps[k];
+          }
+        });
+        localStorage.setItem('scoders_registered_workshops', JSON.stringify(regWksps));
+      }
+
+      const uidsRaw = localStorage.getItem('db_registration_uids');
+      if (uidsRaw) {
+        const uids = JSON.parse(uidsRaw);
+        if (Array.isArray(uids)) {
+          const filteredUids = uids.filter((u: any) => {
+            if (u?.section !== 'workshop') return true;
+            const recUid = String(u?.uid || '').trim().toUpperCase();
+            return !(recUid && matchedKeys.has(recUid));
+          });
+          localStorage.setItem('db_registration_uids', JSON.stringify(filteredUids));
+        }
+      }
+
+      const remainingChats = this.getChats().filter((c) => {
+        const cKey = (c.uniqueAccessKey || '').trim().toUpperCase();
+        const cEmail = (c.clientEmail || '').trim().toLowerCase();
+        if (c.id && matchedChatIds.has(c.id)) return false;
+        if (cKey && matchedKeys.has(cKey)) return false;
+        if (c.registrationId && matchedRegIds.has(c.registrationId)) return false;
+        if (params.workshopId && c.workshopId === params.workshopId && cleanEmail && cEmail === cleanEmail) return false;
+        return true;
+      });
+      localStorage.setItem('db_chats', JSON.stringify(remainingChats));
+
+      const remainingFiles = this.getFiles().filter(
+        (f) => !matchedFileIds.has(f.id) && !matchedRegIds.has(f.registrationId)
+      );
+      localStorage.setItem('db_files', JSON.stringify(remainingFiles));
+
+      const remainingFeedbacks = this.getFeedbacks().filter(
+        (fb) => fb.type !== 'workshop' || !matchedRegIds.has(fb.registrationId)
+      );
+      localStorage.setItem('db_feedbacks', JSON.stringify(remainingFeedbacks));
+
+      const revokedMap = this.getRevokedPasses();
+      let touchedRevoked = false;
+      matchedKeys.forEach((mk) => {
+        if (revokedMap[mk]) {
+          delete revokedMap[mk];
+          touchedRevoked = true;
+        }
+      });
+      if (touchedRevoked) {
+        localStorage.setItem('scoders_revoked_passes', JSON.stringify(revokedMap));
+      }
+
+      try {
+        localStorage.removeItem(`scoders_workshop_draft_${params.workshopId}_${validKey || 'active'}`);
+        localStorage.removeItem(`scoders_workshop_draft_${params.workshopId}`);
+      } catch {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+        window.dispatchEvent(new Event('scoders_db_change'));
+        window.dispatchEvent(new Event('scoders_data_change'));
+        window.dispatchEvent(new Event('scoders_sessions_change'));
+        window.dispatchEvent(new Event('storage'));
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Local workshop cancellation cleanup error:', err);
+      return { success: false, error: err?.message || 'Failed to delete local workshop registration data.' };
+    }
   }
 
   // --- Workshop Pass Revocation / Restoration (Admin Controlled) ---

@@ -839,5 +839,37 @@
       "emailFrom": "escoders@gmail.com",
       "emailMessageId": "<beafeb0a-2ece-6246-c9f3-edbfce634580@gmail.com>"
     }
+  ],
+  "db_email_logs": [
+    {
+      "id": "EML-1795283869975-4F8EEE",
+      "section": "service",
+      "to": "autotest-cancel@example.com",
+      "from": "escoders@gmail.com",
+      "subject": "✅ Service Registered - Your Unique S-CODERS Code (BTD-SERV-WEB-7D61-AEE7)",
+      "uid": "BTD-SERV-WEB-7D61-AEE7",
+      "dedupeKey": "service:reg:autotest-cancel@example.com:web",
+      "itemTitle": "Web Engineering",
+      "status": "SENT",
+      "messageId": "<b5da97d1-a03f-25b7-0afb-17b1b653e4c7@gmail.com>",
+      "previewUrl": "https://ethereal.email/message/awHbduiVxZpKWlVKawHbnXM3WywC7laEAAAAAv85kJRjkreC8AxiIyP0prg",
+      "detailsSummary": "Service: Web Engineering | Safe-keeping & recovery notice included",
+      "timestamp": "2026-11-21T17:57:49.975Z"
+    },
+    {
+      "id": "EML-1795283836380-42F023",
+      "section": "service",
+      "to": "autotest-cancel@example.com",
+      "from": "escoders@gmail.com",
+      "subject": "✅ Service Registered - Your Unique S-CODERS Code (BTD-SERV-WEB-1278-80AC)",
+      "uid": "BTD-SERV-WEB-1278-80AC",
+      "dedupeKey": "service:reg:autotest-cancel@example.com:web",
+      "itemTitle": "Web Engineering",
+      "status": "SENT",
+      "messageId": "<f104cc5e-1d1d-832c-eb3a-75fde44511a3@gmail.com>",
+      "previewUrl": "https://ethereal.email/message/awHbduiVxZpKWlVKawHbfHxXAa9ZatmwAAAAAe6NSgllgRyTNZQka3Mqpik",
+      "detailsSummary": "Service: Web Engineering | Safe-keeping & recovery notice included",
+      "timestamp": "2026-11-21T17:57:16.380Z"
+    }
   ]
 }

@@ -18,6 +18,8 @@ export interface EmailNotificationData {
   validUntil?: string;
   actionText: string;
   onAction?: () => void;
+  deliveryMode?: string;
+  previewUrl?: string;
 }
 
 interface EmailNotificationModalProps {
@@ -204,6 +206,19 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                         UID Valid Until: {new Date(data.validUntil).toLocaleDateString()}
                       </span>
                     )}
+                    {data.deliveryMode === 'ethereal' && data.previewUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={data.previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-[11px] font-mono text-brand-teal hover:text-white underline"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Open Test Email Preview (SMTP sandbox)</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -288,7 +303,7 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
             <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-400 font-mono relative z-10">
               <div className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-brand-teal" />
-                <span>Official dispatch confirmation emailed from <strong className="text-brand-teal font-bold">escoders@gmail.com</strong></span>
+                <span>Official dispatch confirmation emailed from <strong className="text-brand-teal font-bold">scoders82@gmail.com</strong></span>
               </div>
               <span className="text-gray-500">© 2026 S-CODERS</span>
             </div>

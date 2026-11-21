@@ -6,7 +6,7 @@ import {
   Settings, Database, AppWindow, Eye, Check, ChevronRight, Layout,
   Laptop, Server, Clock, Calendar, Shield, HelpCircle, Star, Download,
   Phone, Mail, MessageSquare, FileText, QrCode, MessageCircle, ExternalLink, ShieldCheck,
-  Github, Linkedin, CheckCircle2, Code
+  Github, Linkedin, CheckCircle2, Code, Trash2, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -108,6 +108,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     validUntil?: string;
     deduplicated?: boolean;
     emailFrom?: string;
+    deliveryMode?: string;
+    previewUrl?: string;
   } | null>(null);
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
   const [verifyingKey, setVerifyingKey] = useState(false);
@@ -121,6 +123,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   const [qrPayUtr, setQrPayUtr] = useState('');
   const [qrPayVerifying, setQrPayVerifying] = useState(false);
   const [qrPayError, setQrPayError] = useState<string | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null);
 
   // Sync current user state
   const [currentUser, setCurrentUser] = useState(() => {
@@ -164,10 +167,19 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     }
   }, [currentUser, registeringService]);
 
-  // Listen to external data changes
+  // Listen to external data changes & sync registeredKeys
   useEffect(() => {
     const reloadServices = () => {
       setServices(getDynamicServices());
+      try {
+        const saved = localStorage.getItem('scoders_registered_services');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            setRegisteredKeys(parsed);
+          }
+        }
+      } catch {}
     };
     window.addEventListener('scoders_data_change', reloadServices);
     window.addEventListener('scoders_db_change', reloadServices);
@@ -428,8 +440,10 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       let validUntil: string | undefined;
       let isDeduplicated = false;
       let dispatchedViaUnified = false;
+      let emailDeliveryMode: string | undefined;
+      let emailPreviewUrl: string | undefined;
 
-      // Authoritative backend registration: mints collision-free UID, deduplicates, persists, & sends email from escoders@gmail.com
+      // Authoritative backend registration: mints collision-free UID, deduplicates, persists, & sends email from scoders82@gmail.com
       try {
         const regRes = await fetch('/api/registrations/register-and-notify', {
           method: 'POST',
@@ -454,6 +468,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             generatedKey = regData.uid;
             validUntil = regData.validUntil || regData.record?.validUntil;
             isDeduplicated = Boolean(regData.deduplicated);
+            emailDeliveryMode = regData.deliveryMode;
+            emailPreviewUrl = regData.previewUrl;
             dispatchedViaUnified = true;
           }
         }
@@ -600,7 +616,9 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         email: cleanEmail,
         validUntil,
         deduplicated: isDeduplicated,
-        emailFrom: 'escoders@gmail.com',
+        emailFrom: 'scoders82@gmail.com',
+        deliveryMode: emailDeliveryMode,
+        previewUrl: emailPreviewUrl,
       });
       setRegSuccessKey(generatedKey);
     } finally {
@@ -780,6 +798,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       let generatedKey = `BTD-SERV-${serviceCode}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
       let validUntil: string | undefined;
       let dispatchedViaUnified = false;
+      let emailDeliveryMode: string | undefined;
+      let emailPreviewUrl: string | undefined;
 
       try {
         const regRes = await fetch('/api/registrations/register-and-notify', {
@@ -807,6 +827,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           if (regData?.success && regData?.uid) {
             generatedKey = regData.uid;
             validUntil = regData.validUntil || regData.record?.validUntil;
+            emailDeliveryMode = regData.deliveryMode;
+            emailPreviewUrl = regData.previewUrl;
             dispatchedViaUnified = true;
           }
         }
@@ -926,7 +948,9 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       setRegSuccessMeta({
         email: payerEmail,
         validUntil,
-        emailFrom: 'escoders@gmail.com',
+        emailFrom: 'scoders82@gmail.com',
+        deliveryMode: emailDeliveryMode,
+        previewUrl: emailPreviewUrl,
       });
       setRegSuccessKey(generatedKey);
     } catch (err) {
@@ -981,6 +1005,23 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             S-CODERS • Bharat Tech Developers translates complex software architectures and agent logic into elegant commercial assets. Explore our solutions.
           </p>
         </div>
+
+        {cancelNotice && (
+          <div className="max-w-3xl mx-auto mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs sm:text-sm font-mono flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{cancelNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCancelNotice(null)}
+              className="p-1 text-red-300 hover:text-white cursor-pointer"
+              title="Dismiss notice"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* OFFICIAL S-CODERS SERVICE WHATSAPP COMMUNITY & SUPPORT HUB */}
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-brand-teal/30 bg-[#060a16]/90 shadow-2xl mb-16 relative overflow-hidden">
@@ -1571,7 +1612,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                       <div className="text-xs space-y-1">
                         <p className="text-blue-200 font-semibold">
-                          Confirmation Emailed from <span className="font-mono text-brand-teal">escoders@gmail.com</span>
+                          Confirmation Emailed from <span className="font-mono text-brand-teal">scoders82@gmail.com</span>
                         </p>
                         <p className="text-gray-300 leading-relaxed">
                           Dispatched to <strong className="text-white">{regSuccessMeta?.email || regEmail}</strong> with your service name (<strong className="text-white">{registeringService.title}</strong>) and unique registration UID.
@@ -1579,6 +1620,17 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                             <span className="block text-[10px] font-mono text-emerald-300 mt-1">
                               Valid until: {new Date(regSuccessMeta.validUntil).toLocaleDateString()}
                             </span>
+                          )}
+                          {regSuccessMeta?.deliveryMode === 'ethereal' && regSuccessMeta?.previewUrl && (
+                            <a
+                              href={regSuccessMeta.previewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-brand-teal hover:text-white underline mt-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Open Test Email Preview (SMTP sandbox)</span>
+                            </a>
                           )}
                         </p>
                       </div>
@@ -1930,6 +1982,44 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                     regInfo={regInfo} 
                     isAdmin={isAdmin}
                     currentUser={currentUser}
+                    onUpdateRegInfo={(updatedFields) => {
+                      const svcId = activeWorkspaceService.id;
+                      setRegisteredKeys((prev) => {
+                        const existingEntry = prev[svcId];
+                        if (!existingEntry) return prev;
+                        const next = {
+                          ...prev,
+                          [svcId]: {
+                            ...existingEntry,
+                            ...updatedFields,
+                          },
+                        };
+                        try {
+                          localStorage.setItem('scoders_registered_services', JSON.stringify(next));
+                        } catch {}
+                        return next;
+                      });
+                      DatabaseEngine.updateServiceClientProfile({
+                        serviceId: svcId,
+                        uniqueKey: regInfo.key,
+                        name: updatedFields.name,
+                        email: updatedFields.email,
+                        role: updatedFields.role,
+                        budget: updatedFields.budget,
+                        timeline: updatedFields.timeline,
+                        requirements: updatedFields.requirements,
+                      });
+                    }}
+                    onServiceCancelled={(cancelledSvcId, cancelledTitle) => {
+                      setRegisteredKeys((prev) => {
+                        const next = { ...prev };
+                        delete next[cancelledSvcId];
+                        return next;
+                      });
+                      setActiveWorkspaceService(null);
+                      setCancelNotice(`"${cancelledTitle}" service order has been permanently cancelled and all associated client records have been deleted from the database.`);
+                      setTimeout(() => setCancelNotice(null), 10000);
+                    }}
                     onClose={() => setActiveWorkspaceService(null)} 
                   />
                 </div>
@@ -3038,24 +3128,135 @@ export function ServiceProjectSpaceDashboard({
   regInfo, 
   isAdmin = false,
   currentUser = null,
+  onUpdateRegInfo,
+  onServiceCancelled,
   onClose 
 }: { 
   service: any; 
   regInfo: any; 
   isAdmin?: boolean;
   currentUser?: AppUser | null;
+  onUpdateRegInfo?: (updated: {
+    name?: string;
+    email?: string;
+    role?: string;
+    budget?: string;
+    timeline?: string;
+    requirements?: string;
+  }) => void;
+  onServiceCancelled?: (serviceId: string, serviceTitle: string) => void;
   onClose: () => void; 
 }) {
   // Tab controller matching Workshop section layout (5 clean tabs)
   const [activeTab, setActiveTab] = useState<'discussion' | 'sandbox' | 'resources' | 'developers' | 'feedback'>('discussion');
 
-  // Feedback Form State
-  const [feedName, setFeedName] = useState(regInfo.name || '');
-  const [feedEmail, setFeedEmail] = useState(regInfo.email || '');
-  const [feedRole, setFeedRole] = useState(regInfo.role || '');
-  const [feedRating, setFeedRating] = useState(5);
-  const [feedExperience, setFeedExperience] = useState('');
+  const draftStorageKey = `scoders_service_draft_${service.id}_${regInfo?.key || 'active'}`;
+
+  const loadInitialDraft = () => {
+    try {
+      const saved = localStorage.getItem(draftStorageKey);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  };
+  const initialDraft = loadInitialDraft();
+
+  // Client Details & Feedback Form State (with Auto-Save)
+  const [feedName, setFeedName] = useState(initialDraft?.name ?? regInfo.name ?? '');
+  const [feedEmail, setFeedEmail] = useState(initialDraft?.email ?? regInfo.email ?? '');
+  const [feedRole, setFeedRole] = useState(initialDraft?.role ?? regInfo.role ?? '');
+  const [feedRating, setFeedRating] = useState<number>(initialDraft?.rating ?? 5);
+  const [feedExperience, setFeedExperience] = useState(initialDraft?.experience ?? '');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  // Auto-save & Manual Save feedback states
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const [manualSaveFlash, setManualSaveFlash] = useState(false);
+  const isFirstRenderRef = React.useRef(true);
+
+  // Cancel Service Confirmation Pop-up states
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const persistClientInformation = (syncBackend: boolean = true) => {
+    try {
+      localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          name: feedName,
+          email: feedEmail,
+          role: feedRole,
+          rating: feedRating,
+          experience: feedExperience,
+          updatedAt: new Date().toISOString(),
+        })
+      );
+    } catch {}
+
+    if (syncBackend && onUpdateRegInfo) {
+      onUpdateRegInfo({
+        name: feedName,
+        email: feedEmail,
+        role: feedRole,
+      });
+    }
+  };
+
+  // Automatic Auto-Save whenever client information or form fields change
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
+    setAutoSaveStatus('saving');
+    const timer = setTimeout(() => {
+      persistClientInformation(true);
+      setAutoSaveStatus('saved');
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [feedName, feedEmail, feedRole, feedRating, feedExperience]);
+
+  const handleManualSave = () => {
+    persistClientInformation(true);
+    setAutoSaveStatus('saved');
+    setManualSaveFlash(true);
+    setTimeout(() => setManualSaveFlash(false), 2000);
+  };
+
+  const handleCloseWorkspace = () => {
+    persistClientInformation(true);
+    onClose();
+  };
+
+  const handleConfirmCancelService = async () => {
+    if (isCancelling) return;
+    setIsCancelling(true);
+    setCancelError(null);
+    try {
+      const result = await DatabaseEngine.cancelServiceOrder({
+        serviceId: service.id,
+        uniqueKey: regInfo?.key,
+        clientEmail: feedEmail || regInfo?.email,
+        chatId: regInfo?.chatId,
+      });
+      if (!result.success) {
+        setCancelError(result.error || 'Could not complete cancellation. Please try again.');
+        setIsCancelling(false);
+        return;
+      }
+      setShowCancelConfirm(false);
+      setIsCancelling(false);
+      if (onServiceCancelled) {
+        onServiceCancelled(service.id, service.title);
+      } else {
+        onClose();
+      }
+    } catch (err: any) {
+      setCancelError(err?.message || 'An unexpected error occurred while cancelling the service.');
+      setIsCancelling(false);
+    }
+  };
 
   // Playground resolver for active service
   const renderServicePlayground = () => {
@@ -3681,7 +3882,7 @@ export function ServiceProjectSpaceDashboard({
       {/* 4. FULL WIDTH BOTTOM SECTION: FEEDBACK FORM (SPACIOUS & PROMINENT) */}
       <div className="border-t border-white/10 pt-8 mt-4">
         <div className="bg-[#121422] border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl">
-          <div className="text-center max-w-xl mx-auto mb-8">
+          <div className="flex flex-col items-center text-center max-w-xl mx-auto mb-8">
             <h4 className="text-xs sm:text-sm font-mono text-brand-teal uppercase tracking-widest font-bold mb-1.5">
               WE VALUE YOUR EXPERIENCE
             </h4>
@@ -3691,6 +3892,10 @@ export function ServiceProjectSpaceDashboard({
             <p className="text-gray-300 text-sm mt-2 leading-relaxed">
               Please share your honest ratings and suggestions with us. We utilize this loop to constantly optimize our Custom Engineering workflows!
             </p>
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-mono text-emerald-300">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{autoSaveStatus === 'saving' ? 'Auto-saving client details...' : 'Auto-Save Active: All client details saved automatically'}</span>
+            </div>
           </div>
 
           <form onSubmit={handleFeedbackSubmit} className="space-y-5 font-sans text-left max-w-4xl mx-auto">
@@ -3784,33 +3989,142 @@ export function ServiceProjectSpaceDashboard({
         </div>
       </div>
 
-      {/* 5. Mobile-Friendly Bottom Action Bar (Inline at bottom of scroll, never blocks chat input or keyboard!) */}
-      <div className="block sm:hidden p-4 bg-brand-dark/90 border border-white/10 rounded-2xl space-y-3">
-        <p className="text-xs text-gray-400 font-sans flex items-center gap-2">
-          <span>💡</span>
-          <span>Live sandboxed prototype for {service.title}.</span>
-        </p>
-        <div className="flex gap-2.5">
+      {/* 5. Bottom Action Bar: Auto-Save Status, Cancel Service, Save, and Close */}
+      <div className="p-4 sm:p-5 bg-brand-dark/90 border border-white/10 rounded-2xl space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-gray-400 font-sans flex items-center gap-2">
+            <span>💡</span>
+            <span>Live sandboxed prototype for {service.title}.</span>
+          </p>
+          <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span>{autoSaveStatus === 'saving' ? 'Saving...' : 'Auto-saved'}</span>
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2.5">
           <button
             type="button"
             onClick={() => {
-              navigator.clipboard.writeText(regInfo.key);
-              alert('License key copied to clipboard!');
+              setCancelError(null);
+              setShowCancelConfirm(true);
             }}
-            className="flex-1 py-3 px-3 bg-white/5 border border-white/10 text-gray-200 text-xs font-mono font-bold rounded-xl flex items-center justify-center gap-1.5"
+            className="flex-1 py-3 px-4 bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/35 hover:border-red-500 text-xs font-mono font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
-            <Copy className="w-3.5 h-3.5 text-brand-teal" />
-            Copy Key
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Cancel Service</span>
           </button>
+
           <button
             type="button"
-            onClick={onClose}
-            className="flex-1 py-3 px-3 bg-brand-teal text-brand-dark text-xs font-display font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-brand-teal/20"
+            onClick={handleManualSave}
+            className="flex-1 py-3 px-4 bg-white/10 hover:bg-white/20 text-white border border-white/15 text-xs font-mono font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
-            Save & Close
+            {manualSaveFlash ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-300">Saved!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5 text-brand-teal" />
+                <span>Save</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCloseWorkspace}
+            className="flex-1 py-3 px-4 bg-brand-teal hover:bg-white text-brand-dark text-xs font-display font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-brand-teal/20 transition-all cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Close</span>
           </button>
         </div>
       </div>
+
+      {/* Confirmation Pop-Up Modal for Permanent Service Cancellation */}
+      <AnimatePresence>
+        {showCancelConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!isCancelling) setShowCancelConfirm(false); }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              className="relative z-10 w-full max-w-lg bg-[#121422] border border-red-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 text-left"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 shrink-0">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest font-bold block">
+                      Permanent Service Cancellation
+                    </span>
+                    <h3 className="text-lg sm:text-xl font-display font-extrabold text-white leading-tight">
+                      Cancel "{service.title}"?
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isCancelling}
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                  title="Close warning"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/25 rounded-2xl p-4 space-y-3 text-xs sm:text-sm text-gray-200 leading-relaxed">
+                <p className="text-gray-100 leading-relaxed">
+                  Are you sure you want to cancel this order/registration? Once you confirm the cancellation, your order/registration and associated information will be permanently deleted from our database. Please note that if you cancel by mistake or intentionally, you will be solely responsible for your decision. S-CODERS and its team will not be held responsible for cancellations made by you. Do you wish to proceed?
+                </p>
+                <p className="text-[11px] font-mono text-red-300 pt-1 border-t border-red-500/20">
+                  Order Key: <span className="text-white font-bold">{regInfo.key}</span> • Permanent database removal cannot be undone.
+                </p>
+              </div>
+
+              {cancelError && (
+                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-200 text-xs font-mono">
+                  {cancelError}
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={isCancelling}
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Go Back
+                </button>
+                <button
+                  type="button"
+                  disabled={isCancelling}
+                  onClick={handleConfirmCancelService}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-display font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-600/25 cursor-pointer disabled:opacity-60"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isCancelling ? 'Deleting Order...' : 'Confirm Cancellation'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

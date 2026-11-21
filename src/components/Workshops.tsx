@@ -4,7 +4,7 @@ import {
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
-  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle, CheckCircle2
+  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle, CheckCircle2, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -137,6 +137,22 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [showEmailNotice, setShowEmailNotice] = useState(false);
   const [emailNoticeData, setEmailNoticeData] = useState<EmailNotificationData | null>(null);
 
+  // Cancel Workshop Confirmation Pop-Up & Auto-Save States
+  const [showCancelWorkshopConfirm, setShowCancelWorkshopConfirm] = useState(false);
+  const [isCancellingWorkshop, setIsCancellingWorkshop] = useState(false);
+  const [cancelWorkshopError, setCancelWorkshopError] = useState<string | null>(null);
+  const [cancelWorkshopNotice, setCancelWorkshopNotice] = useState<string | null>(null);
+  const [cancelTargetWorkshop, setCancelTargetWorkshop] = useState<{
+    workshopId: string;
+    workshopTitle: string;
+    key?: string;
+    email?: string;
+    chatId?: string;
+  } | null>(null);
+  const [wkspAutoSaveStatus, setWkspAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const [wkspManualSaveFlash, setWkspManualSaveFlash] = useState(false);
+  const wkspDraftFirstRenderRef = useRef(true);
+
   // Active Workshop Classroom States
   const [activeTab, setActiveTab] = useState<'sandbox' | 'resources' | 'discussion'>('sandbox');
   const [activeWorkspaceWorkshop, setActiveWorkspaceWorkshop] = useState<WorkshopEvent | null>(null);
@@ -212,6 +228,10 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   useEffect(() => {
     const reloadWorkshops = () => {
       setWorkshops(getDynamicWorkshops());
+      try {
+        const saved = localStorage.getItem('scoders_registered_workshops');
+        setRegisteredKeys(saved ? JSON.parse(saved) : {});
+      } catch {}
     };
     const updatePhotos = () => {
       setLeaderPhotos({
@@ -351,13 +371,15 @@ export default function TenantDashboard() {
       window.dispatchEvent(new Event('scoders_auth_change'));
     }
 
-    // 2. Mint collision-free UID & dispatch escoders@gmail.com confirmation email via unified backend
+    // 2. Mint collision-free UID & dispatch scoders82@gmail.com confirmation email via unified backend
     const code = activeWorkshop.id.toUpperCase();
     const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
     const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
     let generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
     let validUntil: string | undefined;
     let dispatchedViaUnified = false;
+    let emailDeliveryMode: string | undefined;
+    let emailPreviewUrl: string | undefined;
 
     try {
       const regRes = await fetch('/api/registrations/register-and-notify', {
@@ -388,6 +410,8 @@ export default function TenantDashboard() {
         if (regData?.success && regData?.uid) {
           generatedKey = regData.uid;
           validUntil = regData.validUntil || regData.record?.validUntil;
+          emailDeliveryMode = regData.deliveryMode;
+          emailPreviewUrl = regData.previewUrl;
           dispatchedViaUnified = true;
         }
       }
@@ -548,7 +572,9 @@ export default function TenantDashboard() {
       title: activeWorkshop.title,
       uniqueKey: generatedKey,
       validUntil,
-      messageText: `Your payment has been verified and an official email from escoders@gmail.com has been dispatched to ${safeEmail} with your workshop details and Unique Registration Code (${generatedKey}). Keep it safe to rejoin seamlessly anytime.`,
+      deliveryMode: emailDeliveryMode,
+      previewUrl: emailPreviewUrl,
+      messageText: `Your payment has been verified and an official email from scoders82@gmail.com has been dispatched to ${safeEmail} with your workshop details and Unique Registration Code (${generatedKey}). Keep it safe to rejoin seamlessly anytime.`,
       amount: totalAmount,
       actionText: "Enter Workshop & Sandbox",
       onAction: () => {
@@ -666,7 +692,7 @@ export default function TenantDashboard() {
 
     // Check if pass has been revoked by admin
     if (DatabaseEngine.isPassRevoked(trimmed)) {
-      setManualKeyError(`⛔ Pass Revoked: Pass key ${trimmed} has been revoked by an administrator. Access is restricted. Please contact escoders@gmail.com for assistance.`);
+      setManualKeyError(`⛔ Pass Revoked: Pass key ${trimmed} has been revoked by an administrator. Access is restricted. Please contact scoders82@gmail.com for assistance.`);
       return;
     }
 
@@ -1000,6 +1026,123 @@ export default function TenantDashboard() {
     return null;
   }, [activeRegInfo, registeredKeys, currentUser]);
 
+  // Hydrate Auto-Save draft per workshop
+  useEffect(() => {
+    wkspDraftFirstRenderRef.current = true;
+    try {
+      const savedDraftRaw = localStorage.getItem(`scoders_workshop_draft_${selectedWorkshopId}`);
+      if (savedDraftRaw) {
+        const draft = JSON.parse(savedDraftRaw);
+        if (typeof draft.authorName === 'string') setAuthorName(draft.authorName);
+        if (typeof draft.role === 'string') setRole(draft.role);
+        if (typeof draft.content === 'string') setContent(draft.content);
+        if (typeof draft.rating === 'number') setRating(draft.rating);
+        return;
+      }
+    } catch {}
+    if (activeRegInfo) {
+      setAuthorName(activeRegInfo.name || '');
+      setRole(activeRegInfo.role || 'Attendee');
+    }
+  }, [selectedWorkshopId]);
+
+  const persistWorkshopClientDraft = (syncProfile: boolean = true) => {
+    try {
+      localStorage.setItem(
+        `scoders_workshop_draft_${selectedWorkshopId}`,
+        JSON.stringify({
+          authorName,
+          role,
+          content,
+          rating,
+          updatedAt: new Date().toISOString(),
+        })
+      );
+    } catch {}
+
+    if (syncProfile && isRegistered && activeRegInfo && (authorName.trim() || role.trim())) {
+      DatabaseEngine.updateWorkshopClientProfile({
+        workshopId: activeWorkshop.id,
+        uniqueKey: activeRegInfo.key,
+        name: authorName.trim() || activeRegInfo.name,
+        email: activeRegInfo.email,
+        role: role.trim() || activeRegInfo.role,
+      });
+    }
+  };
+
+  // Automatic Auto-Save (400ms debounce) for workshop attendee form/details
+  useEffect(() => {
+    if (wkspDraftFirstRenderRef.current) {
+      wkspDraftFirstRenderRef.current = false;
+      return;
+    }
+    setWkspAutoSaveStatus('saving');
+    const timer = setTimeout(() => {
+      persistWorkshopClientDraft(true);
+      setWkspAutoSaveStatus('saved');
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [authorName, role, content, rating, selectedWorkshopId]);
+
+  const handleManualSaveWorkshop = () => {
+    persistWorkshopClientDraft(true);
+    setWkspAutoSaveStatus('saved');
+    setWkspManualSaveFlash(true);
+    setTimeout(() => setWkspManualSaveFlash(false), 2000);
+  };
+
+  const openCancelWorkshopModal = (workshopObj: WorkshopEvent, regObj: any) => {
+    setCancelWorkshopError(null);
+    setCancelTargetWorkshop({
+      workshopId: workshopObj.id,
+      workshopTitle: workshopObj.title,
+      key: regObj?.key,
+      email: regObj?.email || currentUser?.email,
+      chatId: regObj?.chatId,
+    });
+    setShowCancelWorkshopConfirm(true);
+  };
+
+  const handleConfirmCancelWorkshop = async () => {
+    if (!cancelTargetWorkshop || isCancellingWorkshop) return;
+    setIsCancellingWorkshop(true);
+    setCancelWorkshopError(null);
+    try {
+      const result = await DatabaseEngine.cancelWorkshopOrder({
+        workshopId: cancelTargetWorkshop.workshopId,
+        uniqueKey: cancelTargetWorkshop.key,
+        clientEmail: cancelTargetWorkshop.email,
+        chatId: cancelTargetWorkshop.chatId,
+      });
+      if (!result.success) {
+        setCancelWorkshopError(result.error || 'Could not cancel workshop registration. Please try again.');
+        setIsCancellingWorkshop(false);
+        return;
+      }
+
+      try {
+        const saved = localStorage.getItem('scoders_registered_workshops');
+        setRegisteredKeys(saved ? JSON.parse(saved) : {});
+      } catch {
+        setRegisteredKeys({});
+      }
+
+      setRegSuccessKey(null);
+      setActiveWorkspaceWorkshop(null);
+      setShowCancelWorkshopConfirm(false);
+      setIsCancellingWorkshop(false);
+      setCancelWorkshopNotice(
+        `Workshop registration for "${cancelTargetWorkshop.workshopTitle}" has been permanently cancelled and deleted from our database.`
+      );
+      setCancelTargetWorkshop(null);
+      setTimeout(() => setCancelWorkshopNotice(null), 9000);
+    } catch (err: any) {
+      setCancelWorkshopError(err?.message || 'Unexpected error while cancelling workshop registration.');
+      setIsCancellingWorkshop(false);
+    }
+  };
+
   // Shared spacious classroom tabbed workspace (matches Service Workspace width & padding)
   const renderWorkshopClassroomTabs = (targetWorkshop: WorkshopEvent, regInfo: any) => (
     <div className="bg-brand-dark/60 border border-white/10 rounded-3xl overflow-hidden shadow-xl">
@@ -1189,6 +1332,57 @@ export default function TenantDashboard() {
           />
         )}
       </div>
+
+      {/* Bottom Action Bar: Auto-Save Status, Cancel Workshop, Save, and Close */}
+      <div className="px-4 py-3.5 sm:px-6 sm:py-4 bg-brand-dark/90 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-400">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          <span>{wkspAutoSaveStatus === 'saving' ? 'Auto-saving details...' : 'Auto-Save Active: Workshop notes & profile saved'}</span>
+        </div>
+
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => openCancelWorkshopModal(targetWorkshop, regInfo)}
+            className="flex-1 sm:flex-none py-2.5 px-4 bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/35 hover:border-red-500 text-xs font-mono font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Cancel Workshop</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleManualSaveWorkshop}
+            className="flex-1 sm:flex-none py-2.5 px-4 bg-white/10 hover:bg-white/20 text-white border border-white/15 text-xs font-mono font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            {wkspManualSaveFlash ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-300">Saved!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5 text-brand-teal" />
+                <span>Save</span>
+              </>
+            )}
+          </button>
+
+          {activeWorkspaceWorkshop && (
+            <button
+              type="button"
+              onClick={() => {
+                persistWorkshopClientDraft(true);
+                setActiveWorkspaceWorkshop(null);
+              }}
+              className="flex-1 sm:flex-none py-2.5 px-4 bg-brand-teal hover:bg-white text-brand-dark text-xs font-display font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-brand-teal/20 transition-all cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Close</span>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 
@@ -1272,6 +1466,23 @@ export default function TenantDashboard() {
         <div className="mb-12">
           <MarqueeTicker badgeText="EXPLORE WORKSHOP TOPICS & MODULES" />
         </div>
+
+        {cancelWorkshopNotice && (
+          <div className="mb-8 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-amber-200 text-xs sm:text-sm font-mono flex items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{cancelWorkshopNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCancelWorkshopNotice(null)}
+              className="p-1 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer"
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Selected Workshop Visual Showcase Billboard */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16 items-start">
@@ -1482,7 +1693,7 @@ export default function TenantDashboard() {
                           </div>
                         </div>
                         <div className="text-[11px] text-gray-400">
-                          For questions regarding revocation, contact <span className="text-white font-bold">escoders@gmail.com</span>
+                          For questions regarding revocation, contact <span className="text-white font-bold">scoders82@gmail.com</span>
                         </div>
                       </div>
                     </div>
@@ -1517,6 +1728,15 @@ export default function TenantDashboard() {
                             <ShieldCheck className="w-3.5 h-3.5" />
                             Pass Active
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => openCancelWorkshopModal(activeWorkshop, activeRegInfo)}
+                            className="px-3 py-2 bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/35 hover:border-red-500 rounded-xl font-mono text-[10px] uppercase font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                            title="Cancel Workshop Registration"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Cancel Workshop</span>
+                          </button>
                           {/* Revoke Pass is strictly controlled by Admin, not by client */}
                           {isAdmin && (
                             <button
@@ -1618,48 +1838,6 @@ export default function TenantDashboard() {
         </div>
 
       </div>
-
-      {/* FULL-WIDTH UNLOCKED WORKSHOP WORKSPACE (Matches Service Workspace 1440px dimensions & spacing) */}
-      {isRegistered && activeRegInfo && !activeWorkspaceWorkshop && (
-        <div className="max-w-[1440px] mx-auto px-2 sm:px-5 lg:px-6 relative z-10 mb-16">
-          <div className="bg-[#020516]/90 border border-white/10 rounded-3xl p-2.5 sm:p-5 md:p-6 shadow-2xl space-y-4 sm:space-y-5">
-            {/* Top Lifecycle Status Banner matching Service Workspace */}
-            <div className="bg-[#25d366]/10 border border-[#25d366]/30 px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse shrink-0" />
-                <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">
-                  WORKSHOP CLASSROOM ACTIVE
-                </span>
-                <span className="text-gray-500 text-xs hidden md:inline">•</span>
-                <span className="text-xs text-gray-300 hidden md:inline truncate">
-                  {activeWorkshop.title} • Key: <strong className="text-white font-mono">{activeRegInfo.key}</strong>
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <a
-                  href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3.5 py-1.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-[#25D366]/20 cursor-pointer active:scale-95"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 text-black" />
-                  <span>Join WhatsApp Group</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setActiveWorkspaceWorkshop(activeWorkshop)}
-                  className="px-3.5 py-1.5 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Open Fullscreen Console</span>
-                </button>
-              </div>
-            </div>
-
-            {renderWorkshopClassroomTabs(activeWorkshop, activeRegInfo)}
-          </div>
-        </div>
-      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-16">
 
@@ -2032,14 +2210,38 @@ export default function TenantDashboard() {
                   />
                 </div>
 
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark font-bold rounded-lg transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
-                  >
-                    Send Testimonial
-                    <Send className="w-4 h-4" />
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-mono text-emerald-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{wkspAutoSaveStatus === 'saving' ? 'Auto-saving...' : 'Auto-Save Active'}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 ml-auto">
+                    <button
+                      type="button"
+                      onClick={handleManualSaveWorkshop}
+                      className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white border border-white/15 font-mono font-bold rounded-lg transition-colors text-xs uppercase flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {wkspManualSaveFlash ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-300">Saved!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5 text-brand-teal" />
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-3 bg-brand-teal hover:bg-white text-brand-dark font-bold rounded-lg transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
+                    >
+                      Send Testimonial
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </form>
 
@@ -2309,7 +2511,7 @@ export default function TenantDashboard() {
                     ) : regMode === 'enterKey' ? (
                       <form onSubmit={handleVerifyManualKey} className="space-y-3.5 font-sans">
                         <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-3 text-[11px] text-blue-200 leading-relaxed">
-                          Lost connection, refreshed, or exited mid-session? Enter the Unique Registration Code emailed to you from <strong className="font-mono text-brand-teal">escoders@gmail.com</strong> to rejoin immediately.
+                          Lost connection, refreshed, or exited mid-session? Enter the Unique Registration Code emailed to you from <strong className="font-mono text-brand-teal">scoders82@gmail.com</strong> to rejoin immediately.
                         </div>
                         <div>
                           <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Enter Session Pass Key *</label>
@@ -2499,6 +2701,90 @@ export default function TenantDashboard() {
           paymentDetails={razorpayPaymentDetails}
         />
       )}
+
+      {/* Confirmation Pop-Up Modal for Permanent Workshop Cancellation */}
+      <AnimatePresence>
+        {showCancelWorkshopConfirm && cancelTargetWorkshop && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!isCancellingWorkshop) setShowCancelWorkshopConfirm(false); }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              className="relative z-10 w-full max-w-lg bg-[#121422] border border-red-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 text-left"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 shrink-0">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest font-bold block">
+                      Permanent Workshop Cancellation
+                    </span>
+                    <h3 className="text-lg sm:text-xl font-display font-extrabold text-white leading-tight">
+                      Cancel "{cancelTargetWorkshop.workshopTitle}"?
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isCancellingWorkshop}
+                  onClick={() => setShowCancelWorkshopConfirm(false)}
+                  className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                  title="Close warning"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/25 rounded-2xl p-4 space-y-3 text-xs sm:text-sm text-gray-200 leading-relaxed">
+                <p className="text-gray-100 leading-relaxed">
+                  Are you sure you want to cancel this order/registration? Once you confirm the cancellation, your order/registration and associated information will be permanently deleted from our database. Please note that if you cancel by mistake or intentionally, you will be solely responsible for your decision. S-CODERS and its team will not be held responsible for cancellations made by you. Do you wish to proceed?
+                </p>
+                {cancelTargetWorkshop.key && (
+                  <p className="text-[11px] font-mono text-red-300 pt-1 border-t border-red-500/20">
+                    Registration Pass: <span className="text-white font-bold">{cancelTargetWorkshop.key}</span> • Permanent database removal cannot be undone.
+                  </p>
+                )}
+              </div>
+
+              {cancelWorkshopError && (
+                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-200 text-xs font-mono">
+                  {cancelWorkshopError}
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={isCancellingWorkshop}
+                  onClick={() => setShowCancelWorkshopConfirm(false)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Go Back
+                </button>
+                <button
+                  type="button"
+                  disabled={isCancellingWorkshop}
+                  onClick={handleConfirmCancelWorkshop}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-display font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-600/25 cursor-pointer disabled:opacity-60"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isCancellingWorkshop ? 'Deleting Registration...' : 'Confirm Cancellation'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

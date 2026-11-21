@@ -564,6 +564,33 @@ export default function Policies({ initialTab = 'terms' }: PoliciesProps) {
                       Please ensure you review your selection, course topics, or project scope carefully before completing payment. For pre-purchase clarifications, reach out to <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.
                     </p>
                   </div>
+
+                  <div className="space-y-3 pt-2 border-t border-white/10">
+                    <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                      <span className="text-brand-teal font-mono text-sm">5.</span> Client-Initiated Service & Workshop Cancellations
+                    </h4>
+                    <div className="pl-6 space-y-2.5 text-gray-300">
+                      <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/25 space-y-2">
+                        <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm text-gray-300">
+                          <li>
+                            Clients are responsible for cancelling their own <strong className="text-white">Service orders</strong> or <strong className="text-white">Workshop registrations</strong> directly through their active workspace or registration controls.
+                          </li>
+                          <li>
+                            If a client <strong className="text-white">accidentally or intentionally cancels</strong> a Service order or Workshop registration, the responsibility will lie <strong className="text-red-300">entirely with the client</strong>.
+                          </li>
+                          <li>
+                            <strong className="text-white">S-CODERS and its team</strong> will not be responsible for cancellations initiated or confirmed by clients.
+                          </li>
+                          <li>
+                            Once a cancellation is confirmed via the confirmation pop-up, the associated order or registration information will be <strong className="text-red-300">permanently deleted from our database</strong> and cannot be restored.
+                          </li>
+                          <li>
+                            Clients should carefully review the <strong className="text-amber-300">cancellation confirmation warning message</strong> before proceeding with permanent cancellation.
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}

@@ -143,7 +143,7 @@ function getServiceAcceptanceEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">scoders82@gmail.com</strong></p>
                   <p style="font-size: 10px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
@@ -298,7 +298,7 @@ function getWorkshopEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">scoders82@gmail.com</strong></p>
                   <p style="font-size: 10px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
@@ -456,7 +456,7 @@ function getEventEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 20px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0 0 4px 0;">Official Automated Dispatch from <strong style="color: #22D3EE;">scoders82@gmail.com</strong></p>
                   <p style="font-size: 10px; color: #64748B; margin: 0;">© 2026 S-CODERS (Bharat Tech Developers). All rights reserved.</p>
                 </td>
               </tr>
@@ -514,7 +514,7 @@ function getUidRecoveryOtpEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 18px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #94A3B8; margin: 0;">Official Security Verification from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0;">Official Security Verification from <strong style="color: #22D3EE;">scoders82@gmail.com</strong></p>
                 </td>
               </tr>
             </table>
@@ -587,7 +587,7 @@ function getUidRecoverySummaryEmailHtml({
               </tr>
               <tr>
                 <td style="padding: 18px 32px; text-align: center; border-top: 1px solid #1E293B; background-color: #0F172A;">
-                  <p style="font-size: 11px; color: #94A3B8; margin: 0;">Official Automated Recovery Dispatch from <strong style="color: #22D3EE;">escoders@gmail.com</strong></p>
+                  <p style="font-size: 11px; color: #94A3B8; margin: 0;">Official Automated Recovery Dispatch from <strong style="color: #22D3EE;">scoders82@gmail.com</strong></p>
                 </td>
               </tr>
             </table>
@@ -735,9 +735,9 @@ function getPaymentEmailHtml({
 }
 
 // Official S-CODERS email sender constant
-const OFFICIAL_SCODERS_EMAIL = "escoders@gmail.com";
+const OFFICIAL_SCODERS_EMAIL = "scoders82@gmail.com";
 
-// Helper to send email via SMTP or Ethereal / console fallback
+// Helper to send email via Gmail/Custom SMTP, or Ethereal / console fallback
 async function sendEmailNotification({
   to,
   subject,
@@ -751,15 +751,29 @@ async function sendEmailNotification({
   from?: string;
   replyTo?: string;
 }) {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const from = fromOverride || process.env.SMTP_FROM || `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`;
+  const pass = (
+    process.env.SMTP_PASS ||
+    process.env.GMAIL_APP_PASSWORD ||
+    process.env.SCODERS_GMAIL_APP_PASSWORD ||
+    process.env.EMAIL_PASS ||
+    ""
+  ).trim();
+  const user = (
+    process.env.SMTP_USER ||
+    process.env.EMAIL_USER ||
+    (pass ? OFFICIAL_SCODERS_EMAIL : "")
+  ).trim();
+  const host = (process.env.SMTP_HOST || (pass ? "smtp.gmail.com" : "")).trim();
+  const port = Number(process.env.SMTP_PORT) || (host === "smtp.gmail.com" ? 465 : 587);
+  const from =
+    fromOverride ||
+    process.env.SMTP_FROM ||
+    `"S-CODERS (Bharat Tech Developers)" <${user || OFFICIAL_SCODERS_EMAIL}>`;
   const effectiveReplyTo = replyTo || OFFICIAL_SCODERS_EMAIL;
 
   let transporter;
-  let isTestTransport = false;
+  let deliveryMode: "smtp" | "ethereal" | "simulated" | "failed" = "smtp";
+
   if (host && user && pass) {
     transporter = nodemailer.createTransport({
       host,
@@ -768,7 +782,7 @@ async function sendEmailNotification({
       auth: { user, pass },
     });
   } else {
-    // Graceful fallback to Ethereal / console logging if no custom SMTP host is set up
+    // Graceful fallback to Ethereal / console logging if no SMTP / Gmail App Password is set up
     try {
       const testAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
@@ -780,11 +794,20 @@ async function sendEmailNotification({
           pass: testAccount.pass,
         },
       });
-      isTestTransport = true;
-    } catch (err) {
+      deliveryMode = "ethereal";
+    } catch {
       const simId = `sim_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
       console.log(`[SIMULATED EMAIL DISPATCH] From: ${from} | To: ${to} | Subject: ${subject}`);
-      return { success: true, simulated: true, from, replyTo: effectiveReplyTo, messageId: simId };
+      return {
+        success: true,
+        simulated: true,
+        isTestTransport: true,
+        deliveryMode: "simulated" as const,
+        realEmailDelivered: false,
+        from,
+        replyTo: effectiveReplyTo,
+        messageId: simId,
+      };
     }
   }
 
@@ -796,12 +819,36 @@ async function sendEmailNotification({
       subject,
       html,
     });
-    const previewUrl = isTestTransport ? nodemailer.getTestMessageUrl(info) || undefined : undefined;
-    console.log(`[Email Sent Successfully] From: ${from} | To: ${to} | MessageId: ${info.messageId}${previewUrl ? ` | Preview: ${previewUrl}` : ""}`);
-    return { success: true, from, replyTo: effectiveReplyTo, messageId: info.messageId, previewUrl };
+    const previewUrl =
+      deliveryMode === "ethereal" ? nodemailer.getTestMessageUrl(info) || undefined : undefined;
+    console.log(
+      `[Email Dispatched (${deliveryMode})] From: ${from} | To: ${to} | MessageId: ${info.messageId}${
+        previewUrl ? ` | Preview: ${previewUrl}` : ""
+      }`
+    );
+    return {
+      success: true,
+      simulated: deliveryMode !== "smtp",
+      isTestTransport: deliveryMode !== "smtp",
+      deliveryMode,
+      realEmailDelivered: deliveryMode === "smtp",
+      from,
+      replyTo: effectiveReplyTo,
+      messageId: info.messageId,
+      previewUrl,
+    };
   } catch (err: any) {
     console.error("Failed to send email via SMTP:", err.message);
-    return { success: false, from, replyTo: effectiveReplyTo, error: err.message };
+    return {
+      success: false,
+      simulated: false,
+      isTestTransport: false,
+      deliveryMode: "failed" as const,
+      realEmailDelivered: false,
+      from,
+      replyTo: effectiveReplyTo,
+      error: err.message,
+    };
   }
 }
 
@@ -2602,6 +2649,567 @@ Return ONLY valid JSON with this structure:
     }
   });
 
+  // Auto-save / update client personal details for an active service registration
+  app.post("/api/services/update-profile", (req, res) => {
+    try {
+      const body = req.body || {};
+      const serviceId = typeof body.serviceId === "string" ? body.serviceId.trim() : "";
+      const uniqueKey = typeof body.uniqueKey === "string" ? body.uniqueKey.trim().toUpperCase() : "";
+      const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
+      const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 180) : "";
+      const role = typeof body.role === "string" ? body.role.trim().slice(0, 180) : "";
+      const budget = typeof body.budget === "string" ? body.budget.trim().slice(0, 100) : "";
+      const timeline = typeof body.timeline === "string" ? body.timeline.trim().slice(0, 100) : "";
+      const requirements = typeof body.requirements === "string" ? body.requirements.trim().slice(0, 2000) : "";
+
+      if (!serviceId && !uniqueKey) {
+        return res.status(400).json({ success: false, error: "serviceId or uniqueKey is required." });
+      }
+
+      const current = getStoredAppState();
+      let updated = false;
+
+      if (Array.isArray(current["db_service_registrations"])) {
+        current["db_service_registrations"] = current["db_service_registrations"].map((reg: any) => {
+          const regKey = String(reg?.uniqueKey || "").trim().toUpperCase();
+          const regEmail = String(reg?.clientProfile?.email || "").trim().toLowerCase();
+          const hasValidKey = Boolean(uniqueKey && uniqueKey !== "ENTER-KEY-TO-VERIFY");
+          const keyMatch = hasValidKey && regKey === uniqueKey;
+          const svcMatch = Boolean(
+            !hasValidKey &&
+              serviceId &&
+              reg?.serviceId === serviceId &&
+              ((email && (!regEmail || regEmail === email)) || (!email && !regKey && !regEmail))
+          );
+          if (keyMatch || svcMatch) {
+            updated = true;
+            return {
+              ...reg,
+              clientProfile: {
+                ...(reg.clientProfile || {}),
+                name: name || reg.clientProfile?.name,
+                email: email || reg.clientProfile?.email,
+                company: role || reg.clientProfile?.company,
+              },
+              budget: budget || reg.budget,
+              timeline: timeline || reg.timeline,
+              projectRequirements: requirements || reg.projectRequirements,
+            };
+          }
+          return reg;
+        });
+      }
+
+      if (current["scoders_registered_services"] && typeof current["scoders_registered_services"] === "object") {
+        const regMap = { ...current["scoders_registered_services"] };
+        const hasValidKey = Boolean(uniqueKey && uniqueKey !== "ENTER-KEY-TO-VERIFY");
+        for (const [k, entry] of Object.entries<any>(regMap)) {
+          const entryKey = String(entry?.key || "").trim().toUpperCase();
+          const entryEmail = String(entry?.email || "").trim().toLowerCase();
+          const keyMatch = hasValidKey && entryKey === uniqueKey;
+          const svcMatch =
+            !hasValidKey &&
+            k === serviceId &&
+            ((email && (!entryEmail || entryEmail === email)) || (!email && !entryKey && !entryEmail));
+          if (keyMatch || svcMatch) {
+            regMap[k] = {
+              ...entry,
+              name: name || entry?.name,
+              email: email || entry?.email,
+              role: role || entry?.role,
+              budget: budget || entry?.budget,
+              timeline: timeline || entry?.timeline,
+              requirements: requirements || entry?.requirements,
+              autoSavedAt: new Date().toISOString(),
+            };
+            updated = true;
+          }
+        }
+        current["scoders_registered_services"] = regMap;
+      }
+
+      if (Array.isArray(current["db_registration_uids"])) {
+        current["db_registration_uids"] = current["db_registration_uids"].map((uidRec: any) => {
+          if (uidRec?.section === "service" && uniqueKey && String(uidRec?.uid || "").trim().toUpperCase() === uniqueKey) {
+            updated = true;
+            return {
+              ...uidRec,
+              clientName: name || uidRec.clientName,
+              clientEmail: email || uidRec.clientEmail,
+              clientRole: role || uidRec.clientRole,
+              metadata: {
+                ...(uidRec.metadata || {}),
+                budget: budget || uidRec.metadata?.budget,
+                timeline: timeline || uidRec.metadata?.timeline,
+                requirements: requirements || uidRec.metadata?.requirements,
+              },
+            };
+          }
+          return uidRec;
+        });
+      }
+
+      if (Array.isArray(current["db_chats"])) {
+        current["db_chats"] = current["db_chats"].map((chat: any) => {
+          if (uniqueKey && String(chat?.uniqueAccessKey || "").trim().toUpperCase() === uniqueKey) {
+            updated = true;
+            return {
+              ...chat,
+              clientName: name || chat.clientName,
+              clientEmail: email || chat.clientEmail,
+              lastUpdated: new Date().toISOString(),
+            };
+          }
+          return chat;
+        });
+      }
+
+      if (updated) {
+        saveStoredAppState(current);
+      }
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({ success: true, updated, savedAt: new Date().toISOString() });
+    } catch (err: any) {
+      console.error("Service Profile Auto-Save Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to auto-save service profile." });
+    }
+  });
+
+  // Permanently cancel a client service order & delete all associated database records
+  app.post(["/api/services/cancel", "/api/services/registrations/cancel"], (req, res) => {
+    try {
+      const body = req.body || {};
+      const serviceId = typeof body.serviceId === "string" ? body.serviceId.trim() : "";
+      const uniqueKey = typeof body.uniqueKey === "string" ? body.uniqueKey.trim().toUpperCase() : "";
+      const clientEmail = typeof body.clientEmail === "string" ? body.clientEmail.trim().toLowerCase() : "";
+      const chatId = typeof body.chatId === "string" ? body.chatId.trim() : "";
+
+      const validKey = uniqueKey && uniqueKey !== "ENTER-KEY-TO-VERIFY" ? uniqueKey : "";
+      if (!validKey && !(serviceId && clientEmail)) {
+        return res.status(400).json({
+          success: false,
+          error: "A valid registration key or serviceId with clientEmail is required to cancel a service order.",
+        });
+      }
+
+      const current = getStoredAppState();
+      const matchedRegIds = new Set<string>();
+      const matchedFileIds = new Set<string>();
+      const matchedChatIds = new Set<string>();
+      const matchedKeys = new Set<string>();
+      if (validKey) {
+        matchedKeys.add(validKey);
+      }
+      if (chatId) {
+        matchedChatIds.add(chatId);
+      }
+
+      let deletedCount = 0;
+
+      // 1. Remove matching entries from db_service_registrations and collect linked IDs
+      if (Array.isArray(current["db_service_registrations"])) {
+        const remaining: any[] = [];
+        for (const reg of current["db_service_registrations"]) {
+          const regKey = String(reg?.uniqueKey || "").trim().toUpperCase();
+          const regEmail = String(reg?.clientProfile?.email || "").trim().toLowerCase();
+          const matchesKey = Boolean(validKey && regKey === validKey);
+          const matchesSvcAndEmail = Boolean(
+            !validKey &&
+              serviceId &&
+              reg?.serviceId === serviceId &&
+              clientEmail &&
+              regEmail === clientEmail
+          );
+          if (matchesKey || matchesSvcAndEmail) {
+            deletedCount++;
+            if (reg?.id) matchedRegIds.add(String(reg.id));
+            if (regKey) matchedKeys.add(regKey);
+            if (reg?.chatId) matchedChatIds.add(String(reg.chatId));
+            if (reg?.sourceCodeFileId) matchedFileIds.add(String(reg.sourceCodeFileId));
+            if (reg?.pdfFileId) matchedFileIds.add(String(reg.pdfFileId));
+          } else {
+            remaining.push(reg);
+          }
+        }
+        current["db_service_registrations"] = remaining;
+      }
+
+      // 2. Remove matching entries from scoders_registered_services
+      if (current["scoders_registered_services"] && typeof current["scoders_registered_services"] === "object") {
+        const regMap = { ...current["scoders_registered_services"] };
+        if (serviceId && regMap[serviceId]) {
+          const entryKey = String(regMap[serviceId]?.key || "").trim().toUpperCase();
+          const entryEmail = String(regMap[serviceId]?.email || "").trim().toLowerCase();
+          const keyMatches = Boolean(validKey && (entryKey === validKey || matchedKeys.has(entryKey)));
+          const emailMatches = Boolean(!validKey && clientEmail && (!entryEmail || entryEmail === clientEmail));
+          if (keyMatches || emailMatches || (!entryKey && !entryEmail)) {
+            if (entryKey) matchedKeys.add(entryKey);
+            if (regMap[serviceId]?.chatId) matchedChatIds.add(String(regMap[serviceId].chatId));
+            delete regMap[serviceId];
+            deletedCount++;
+          }
+        }
+        for (const [k, v] of Object.entries<any>(regMap)) {
+          const entryKey = String(v?.key || "").trim().toUpperCase();
+          if (entryKey && matchedKeys.has(entryKey)) {
+            delete regMap[k];
+            deletedCount++;
+          }
+        }
+        current["scoders_registered_services"] = regMap;
+      }
+
+      // 3. Remove matching service UID record from db_registration_uids
+      if (Array.isArray(current["db_registration_uids"])) {
+        const before = current["db_registration_uids"].length;
+        current["db_registration_uids"] = current["db_registration_uids"].filter((uidRec: any) => {
+          if (uidRec?.section !== "service") return true;
+          const recUid = String(uidRec?.uid || "").trim().toUpperCase();
+          const recEmail = String(uidRec?.clientEmail || "").trim().toLowerCase();
+          if (recUid && matchedKeys.has(recUid)) return false;
+          if (serviceId && uidRec?.itemId === serviceId && clientEmail && recEmail === clientEmail) return false;
+          return true;
+        });
+        deletedCount += before - current["db_registration_uids"].length;
+      }
+
+      // 4. Remove associated chats from db_chats
+      if (Array.isArray(current["db_chats"])) {
+        const before = current["db_chats"].length;
+        current["db_chats"] = current["db_chats"].filter((c: any) => {
+          const cKey = String(c?.uniqueAccessKey || "").trim().toUpperCase();
+          const cEmail = String(c?.clientEmail || "").trim().toLowerCase();
+          if (c?.id && matchedChatIds.has(String(c.id))) return false;
+          if (cKey && matchedKeys.has(cKey)) return false;
+          if (c?.registrationId && matchedRegIds.has(String(c.registrationId))) return false;
+          if (serviceId && c?.serviceId === serviceId && clientEmail && cEmail === clientEmail) return false;
+          return true;
+        });
+        deletedCount += before - current["db_chats"].length;
+      }
+
+      // 5. Remove associated files from db_files
+      if (Array.isArray(current["db_files"])) {
+        const before = current["db_files"].length;
+        current["db_files"] = current["db_files"].filter((f: any) => {
+          if (f?.id && matchedFileIds.has(String(f.id))) return false;
+          if (f?.registrationId && matchedRegIds.has(String(f.registrationId))) return false;
+          return true;
+        });
+        deletedCount += before - current["db_files"].length;
+      }
+
+      // 6. Remove associated feedbacks from db_feedbacks
+      if (Array.isArray(current["db_feedbacks"])) {
+        const before = current["db_feedbacks"].length;
+        current["db_feedbacks"] = current["db_feedbacks"].filter((fb: any) => {
+          if (fb?.type !== "service") return true;
+          if (fb?.registrationId && matchedRegIds.has(String(fb.registrationId))) return false;
+          const fbEmail = String(fb?.clientEmail || "").trim().toLowerCase();
+          if (clientEmail && fbEmail === clientEmail && fb?.registrationId && matchedKeys.has(String(fb.registrationId).toUpperCase())) return false;
+          return true;
+        });
+        deletedCount += before - current["db_feedbacks"].length;
+      }
+
+      // 7. Remove matching project enquiry if its id is one of the cancelled UIDs
+      if (Array.isArray(current["db_enquiries"])) {
+        const before = current["db_enquiries"].length;
+        current["db_enquiries"] = current["db_enquiries"].filter((enq: any) => {
+          const enqId = String(enq?.id || "").trim().toUpperCase();
+          return !(enqId && matchedKeys.has(enqId));
+        });
+        deletedCount += before - current["db_enquiries"].length;
+      }
+
+      saveStoredAppState(current);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({
+        success: true,
+        serviceId,
+        cancelledKey: uniqueKey || null,
+        deletedCount,
+        message: "Service order and all associated database records deleted permanently.",
+      });
+    } catch (err: any) {
+      console.error("Service Cancellation Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to permanently cancel service order." });
+    }
+  });
+
+  // Auto-save / update attendee details for an active workshop registration
+  app.post("/api/workshops/update-profile", (req, res) => {
+    try {
+      const body = req.body || {};
+      const workshopId = typeof body.workshopId === "string" ? body.workshopId.trim() : "";
+      const uniqueKey = typeof body.uniqueKey === "string" ? body.uniqueKey.trim().toUpperCase() : "";
+      const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
+      const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 180) : "";
+      const role = typeof body.role === "string" ? body.role.trim().slice(0, 180) : "";
+
+      if (!workshopId && !uniqueKey) {
+        return res.status(400).json({ success: false, error: "workshopId or uniqueKey is required." });
+      }
+
+      const current = getStoredAppState();
+      const hasValidKey = Boolean(uniqueKey && uniqueKey !== "PASS-KEY");
+      let updated = false;
+
+      if (Array.isArray(current["db_workshop_registrations"])) {
+        current["db_workshop_registrations"] = current["db_workshop_registrations"].map((reg: any) => {
+          const regKey = String(reg?.uniqueAccessKey || "").trim().toUpperCase();
+          const regEmail = String(reg?.participantProfile?.email || "").trim().toLowerCase();
+          const keyMatch = hasValidKey && regKey === uniqueKey;
+          const wkspMatch = Boolean(
+            !hasValidKey &&
+              workshopId &&
+              reg?.workshopId === workshopId &&
+              ((email && (!regEmail || regEmail === email)) || (!email && !regKey && !regEmail))
+          );
+          if (keyMatch || wkspMatch) {
+            updated = true;
+            return {
+              ...reg,
+              participantProfile: {
+                ...(reg.participantProfile || {}),
+                name: name || reg.participantProfile?.name,
+                email: email || reg.participantProfile?.email,
+                role: role || reg.participantProfile?.role,
+              },
+            };
+          }
+          return reg;
+        });
+      }
+
+      if (current["scoders_registered_workshops"] && typeof current["scoders_registered_workshops"] === "object") {
+        const regMap = { ...current["scoders_registered_workshops"] };
+        for (const [k, entry] of Object.entries<any>(regMap)) {
+          const entryKey = String(entry?.key || "").trim().toUpperCase();
+          const entryEmail = String(entry?.email || "").trim().toLowerCase();
+          const keyMatch = hasValidKey && entryKey === uniqueKey;
+          const wkspMatch =
+            !hasValidKey &&
+            k === workshopId &&
+            ((email && (!entryEmail || entryEmail === email)) || (!email && !entryKey && !entryEmail));
+          if (keyMatch || wkspMatch) {
+            regMap[k] = {
+              ...entry,
+              name: name || entry?.name,
+              email: email || entry?.email,
+              role: role || entry?.role,
+              autoSavedAt: new Date().toISOString(),
+            };
+            updated = true;
+          }
+        }
+        current["scoders_registered_workshops"] = regMap;
+      }
+
+      if (Array.isArray(current["db_registration_uids"])) {
+        current["db_registration_uids"] = current["db_registration_uids"].map((uidRec: any) => {
+          if (uidRec?.section === "workshop" && hasValidKey && String(uidRec?.uid || "").trim().toUpperCase() === uniqueKey) {
+            updated = true;
+            return {
+              ...uidRec,
+              clientName: name || uidRec.clientName,
+              clientEmail: email || uidRec.clientEmail,
+              clientRole: role || uidRec.clientRole,
+            };
+          }
+          return uidRec;
+        });
+      }
+
+      if (Array.isArray(current["db_chats"])) {
+        current["db_chats"] = current["db_chats"].map((chat: any) => {
+          if (hasValidKey && String(chat?.uniqueAccessKey || "").trim().toUpperCase() === uniqueKey) {
+            updated = true;
+            return {
+              ...chat,
+              clientName: name || chat.clientName,
+              clientEmail: email || chat.clientEmail,
+              lastUpdated: new Date().toISOString(),
+            };
+          }
+          return chat;
+        });
+      }
+
+      if (updated) {
+        saveStoredAppState(current);
+      }
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({ success: true, updated, savedAt: new Date().toISOString() });
+    } catch (err: any) {
+      console.error("Workshop Profile Auto-Save Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to auto-save workshop profile." });
+    }
+  });
+
+  // Permanently cancel a client workshop registration & delete all associated database records
+  app.post(["/api/workshops/cancel", "/api/workshops/registrations/cancel"], (req, res) => {
+    try {
+      const body = req.body || {};
+      const workshopId = typeof body.workshopId === "string" ? body.workshopId.trim() : "";
+      const uniqueKey = typeof body.uniqueKey === "string" ? body.uniqueKey.trim().toUpperCase() : "";
+      const clientEmail = typeof body.clientEmail === "string" ? body.clientEmail.trim().toLowerCase() : "";
+      const chatId = typeof body.chatId === "string" ? body.chatId.trim() : "";
+
+      const validKey = uniqueKey && uniqueKey !== "PASS-KEY" ? uniqueKey : "";
+      if (!validKey && !(workshopId && clientEmail)) {
+        return res.status(400).json({
+          success: false,
+          error: "A valid workshop pass key or workshopId with clientEmail is required to cancel a workshop registration.",
+        });
+      }
+
+      const current = getStoredAppState();
+      const matchedRegIds = new Set<string>();
+      const matchedFileIds = new Set<string>();
+      const matchedChatIds = new Set<string>();
+      const matchedKeys = new Set<string>();
+      if (validKey) matchedKeys.add(validKey);
+      if (chatId) matchedChatIds.add(chatId);
+
+      let deletedCount = 0;
+
+      // 1. Remove matching entries from db_workshop_registrations
+      if (Array.isArray(current["db_workshop_registrations"])) {
+        const remaining: any[] = [];
+        for (const reg of current["db_workshop_registrations"]) {
+          const regKey = String(reg?.uniqueAccessKey || "").trim().toUpperCase();
+          const regEmail = String(reg?.participantProfile?.email || "").trim().toLowerCase();
+          const matchesKey = Boolean(validKey && regKey === validKey);
+          const matchesWkspAndEmail = Boolean(
+            !validKey &&
+              workshopId &&
+              reg?.workshopId === workshopId &&
+              clientEmail &&
+              regEmail === clientEmail
+          );
+          if (matchesKey || matchesWkspAndEmail) {
+            deletedCount++;
+            if (reg?.id) matchedRegIds.add(String(reg.id));
+            if (regKey) matchedKeys.add(regKey);
+            if (reg?.chatId) matchedChatIds.add(String(reg.chatId));
+            if (Array.isArray(reg?.materialsFileIds)) {
+              for (const fid of reg.materialsFileIds) {
+                if (fid) matchedFileIds.add(String(fid));
+              }
+            }
+          } else {
+            remaining.push(reg);
+          }
+        }
+        current["db_workshop_registrations"] = remaining;
+      }
+
+      // 2. Remove matching entries from scoders_registered_workshops
+      if (current["scoders_registered_workshops"] && typeof current["scoders_registered_workshops"] === "object") {
+        const regMap = { ...current["scoders_registered_workshops"] };
+        if (workshopId && regMap[workshopId]) {
+          const entryKey = String(regMap[workshopId]?.key || "").trim().toUpperCase();
+          const entryEmail = String(regMap[workshopId]?.email || "").trim().toLowerCase();
+          const keyMatches = Boolean(validKey && (entryKey === validKey || matchedKeys.has(entryKey)));
+          const emailMatches = Boolean(!validKey && clientEmail && (!entryEmail || entryEmail === clientEmail));
+          if (keyMatches || emailMatches || (!entryKey && !entryEmail)) {
+            if (entryKey) matchedKeys.add(entryKey);
+            if (regMap[workshopId]?.chatId) matchedChatIds.add(String(regMap[workshopId].chatId));
+            delete regMap[workshopId];
+            deletedCount++;
+          }
+        }
+        for (const [k, v] of Object.entries<any>(regMap)) {
+          const entryKey = String(v?.key || "").trim().toUpperCase();
+          if (entryKey && matchedKeys.has(entryKey)) {
+            delete regMap[k];
+            deletedCount++;
+          }
+        }
+        current["scoders_registered_workshops"] = regMap;
+      }
+
+      // 3. Remove matching workshop UID record from db_registration_uids
+      if (Array.isArray(current["db_registration_uids"])) {
+        const before = current["db_registration_uids"].length;
+        current["db_registration_uids"] = current["db_registration_uids"].filter((uidRec: any) => {
+          if (uidRec?.section !== "workshop") return true;
+          const recUid = String(uidRec?.uid || "").trim().toUpperCase();
+          const recEmail = String(uidRec?.clientEmail || "").trim().toLowerCase();
+          if (recUid && matchedKeys.has(recUid)) return false;
+          if (workshopId && uidRec?.itemId === workshopId && clientEmail && recEmail === clientEmail) return false;
+          return true;
+        });
+        deletedCount += before - current["db_registration_uids"].length;
+      }
+
+      // 4. Remove associated chats from db_chats
+      if (Array.isArray(current["db_chats"])) {
+        const before = current["db_chats"].length;
+        current["db_chats"] = current["db_chats"].filter((c: any) => {
+          const cKey = String(c?.uniqueAccessKey || "").trim().toUpperCase();
+          const cEmail = String(c?.clientEmail || "").trim().toLowerCase();
+          if (c?.id && matchedChatIds.has(String(c.id))) return false;
+          if (cKey && matchedKeys.has(cKey)) return false;
+          if (c?.registrationId && matchedRegIds.has(String(c.registrationId))) return false;
+          if (workshopId && c?.workshopId === workshopId && clientEmail && cEmail === clientEmail) return false;
+          return true;
+        });
+        deletedCount += before - current["db_chats"].length;
+      }
+
+      // 5. Remove associated files from db_files
+      if (Array.isArray(current["db_files"])) {
+        const before = current["db_files"].length;
+        current["db_files"] = current["db_files"].filter((f: any) => {
+          if (f?.id && matchedFileIds.has(String(f.id))) return false;
+          if (f?.registrationId && matchedRegIds.has(String(f.registrationId))) return false;
+          return true;
+        });
+        deletedCount += before - current["db_files"].length;
+      }
+
+      // 6. Remove associated feedbacks from db_feedbacks
+      if (Array.isArray(current["db_feedbacks"])) {
+        const before = current["db_feedbacks"].length;
+        current["db_feedbacks"] = current["db_feedbacks"].filter((fb: any) => {
+          if (fb?.type !== "workshop") return true;
+          if (fb?.registrationId && matchedRegIds.has(String(fb.registrationId))) return false;
+          return true;
+        });
+        deletedCount += before - current["db_feedbacks"].length;
+      }
+
+      // 7. Remove any revoked pass markers for cancelled UIDs
+      if (current["scoders_revoked_passes"] && typeof current["scoders_revoked_passes"] === "object") {
+        const revokedMap = { ...current["scoders_revoked_passes"] };
+        for (const mk of matchedKeys) {
+          if (revokedMap[mk]) {
+            delete revokedMap[mk];
+            deletedCount++;
+          }
+        }
+        current["scoders_revoked_passes"] = revokedMap;
+      }
+
+      saveStoredAppState(current);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({
+        success: true,
+        workshopId,
+        cancelledKey: validKey || null,
+        deletedCount,
+        message: "Workshop registration and all associated database records deleted permanently.",
+      });
+    } catch (err: any) {
+      console.error("Workshop Cancellation Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to permanently cancel workshop registration." });
+    }
+  });
+
   // ==========================================
   // UNIFIED 1-ON-1 CLIENT CHAT API (Workshop & Services WhatsApp-Style Endpoints)
   // ==========================================
@@ -4129,7 +4737,7 @@ Return ONLY valid JSON with this structure:
     return {};
   }
 
-  // Unified Registration + Unique UID Generation + Automatic Email Notification (escoders@gmail.com)
+  // Unified Registration + Unique UID Generation + Automatic Email Notification (scoders82@gmail.com)
   app.post("/api/registrations/register-and-notify", async (req, res) => {
     try {
       const {
@@ -4267,7 +4875,7 @@ Return ONLY valid JSON with this structure:
                 : `/?view=events&ticket=${finalUid}`
             );
 
-      // 4. Build section-specific automated email & dispatch from escoders@gmail.com
+      // 4. Build section-specific automated email & dispatch from scoders82@gmail.com
       let subject = "";
       let html = "";
       if (section === "service") {
@@ -4385,8 +4993,11 @@ Return ONLY valid JSON with this structure:
         validFrom,
         validUntil,
         emailSent: Boolean(emailRes.success),
+        realEmailDelivered: Boolean(emailRes.realEmailDelivered),
+        deliveryMode: emailRes.deliveryMode,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         previewUrl: emailRes.previewUrl,
+        emailError: emailRes.error,
         record: newRecord,
       });
     } catch (err: any) {
@@ -4456,7 +5067,7 @@ Return ONLY valid JSON with this structure:
     }
   });
 
-  // Step 1 of UID Recovery: Send 6-digit OTP verification code from escoders@gmail.com
+  // Step 1 of UID Recovery: Send 6-digit OTP verification code from scoders82@gmail.com
   app.post("/api/registrations/recovery/request", async (req, res) => {
     try {
       const { email, section: rawSection } = req.body || {};
@@ -4873,8 +5484,11 @@ Return ONLY valid JSON with this structure:
         uid: finalKey,
         validUntil,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
-        message: "Service acceptance email sent successfully.",
+        message: "Service acceptance email dispatched.",
         emailSent: result.success,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
+        previewUrl: result.previewUrl,
       });
     } catch (err: any) {
       console.error("Service Accepted Email Error:", err);
@@ -5007,6 +5621,9 @@ Return ONLY valid JSON with this structure:
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         message: "Workshop payment success email dispatched.",
         emailSent: result.success,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
+        previewUrl: result.previewUrl,
       });
     } catch (err: any) {
       console.error("Workshop Verified Email Error:", err);
@@ -5178,6 +5795,9 @@ Return ONLY valid JSON with this structure:
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         message: "Event payment success email dispatched with ticket link.",
         emailSent: result.success,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
+        previewUrl: result.previewUrl,
       });
     } catch (err: any) {
       console.error("Event Verified Email Error:", err);

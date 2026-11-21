@@ -72,7 +72,7 @@ export default function UidRecoveryPanel({
         setError(data.error || `No ${sectionLabel.toLowerCase()} registrations found for ${cleanEmail}.`);
       } else {
         setInfoMessage(
-          data.message || `A 6-digit verification code was sent to ${cleanEmail} from escoders@gmail.com.`
+          data.message || `A 6-digit verification code was sent to ${cleanEmail} from scoders82@gmail.com.`
         );
         setStep('otp');
       }
@@ -111,7 +111,7 @@ export default function UidRecoveryPanel({
       } else {
         setRecords(Array.isArray(data.registrations) ? data.registrations : []);
         setInfoMessage(
-          data.message || 'Verification complete! A copy of your active codes has also been emailed from escoders@gmail.com.'
+          data.message || 'Verification complete! A copy of your active codes has also been emailed from scoders82@gmail.com.'
         );
         setStep('results');
       }
@@ -162,7 +162,7 @@ export default function UidRecoveryPanel({
 
       <p className="text-[11px] text-gray-400 leading-relaxed">
         Lost your unique registration code? Verify ownership with a one-time 6-digit code dispatched from{' '}
-        <strong className="text-brand-teal font-mono">escoders@gmail.com</strong>.
+        <strong className="text-brand-teal font-mono">scoders82@gmail.com</strong>.
       </p>
 
       {error && (

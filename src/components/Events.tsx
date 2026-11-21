@@ -454,6 +454,8 @@ export default function Events() {
         let ticketCode = generateUniqueTicketCode();
         let validUntil: string | undefined;
         let dispatchedViaUnified = false;
+        let emailDeliveryMode: string | undefined;
+        let emailPreviewUrl: string | undefined;
 
         try {
           const regRes = await fetch('/api/registrations/register-and-notify', {
@@ -486,6 +488,8 @@ export default function Events() {
             if (regData?.success && regData?.uid) {
               ticketCode = regData.uid;
               validUntil = regData.validUntil || regData.record?.validUntil;
+              emailDeliveryMode = regData.deliveryMode;
+              emailPreviewUrl = regData.previewUrl;
               dispatchedViaUnified = true;
             }
           }
@@ -558,7 +562,9 @@ export default function Events() {
           title: evtName,
           uniqueKey: ticketCode,
           validUntil,
-          messageText: `Your event pass is confirmed! An official email from escoders@gmail.com with event location, timing, details, and your Unique Registration Code (${ticketCode}) has been dispatched to ${regEmail.trim()}.`,
+          deliveryMode: emailDeliveryMode,
+          previewUrl: emailPreviewUrl,
+          messageText: `Your event pass is confirmed! An official email from scoders82@gmail.com with event location, timing, details, and your Unique Registration Code (${ticketCode}) has been dispatched to ${regEmail.trim()}.`,
           amount: 0,
           actionText: "View & Download Event Ticket Pass",
           onAction: () => setViewingTicket(newTicket)
@@ -658,6 +664,8 @@ export default function Events() {
     let ticketCode = generateUniqueTicketCode();
     let validUntil: string | undefined;
     let dispatchedViaUnified = false;
+    let emailDeliveryMode: string | undefined;
+    let emailPreviewUrl: string | undefined;
 
     try {
       const regRes = await fetch('/api/registrations/register-and-notify', {
@@ -690,6 +698,8 @@ export default function Events() {
         if (regData?.success && regData?.uid) {
           ticketCode = regData.uid;
           validUntil = regData.validUntil || regData.record?.validUntil;
+          emailDeliveryMode = regData.deliveryMode;
+          emailPreviewUrl = regData.previewUrl;
           dispatchedViaUnified = true;
         }
       }
@@ -757,7 +767,9 @@ export default function Events() {
       title: eventName,
       uniqueKey: ticketCode,
       validUntil,
-      messageText: `Your payment has been confirmed and an official email from escoders@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${data.email}.`,
+      deliveryMode: emailDeliveryMode,
+      previewUrl: emailPreviewUrl,
+      messageText: `Your payment has been confirmed and an official email from scoders82@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${data.email}.`,
       amount: data.amount,
       actionText: "View & Download Event Ticket Pass",
       onAction: () => setViewingTicket(verifiedTicket)
@@ -790,6 +802,8 @@ export default function Events() {
     let ticketCode = generateUniqueTicketCode();
     let validUntil: string | undefined;
     let dispatchedViaUnified = false;
+    let emailDeliveryMode: string | undefined;
+    let emailPreviewUrl: string | undefined;
 
     try {
       const regRes = await fetch('/api/registrations/register-and-notify', {
@@ -822,6 +836,8 @@ export default function Events() {
         if (regData?.success && regData?.uid) {
           ticketCode = regData.uid;
           validUntil = regData.validUntil || regData.record?.validUntil;
+          emailDeliveryMode = regData.deliveryMode;
+          emailPreviewUrl = regData.previewUrl;
           dispatchedViaUnified = true;
         }
       }
@@ -893,7 +909,9 @@ export default function Events() {
       title: eventName,
       uniqueKey: ticketCode,
       validUntil,
-      messageText: `Your payment has been confirmed and an official email from escoders@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${recipientEmail}.`,
+      deliveryMode: emailDeliveryMode,
+      previewUrl: emailPreviewUrl,
+      messageText: `Your payment has been confirmed and an official email from scoders82@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${recipientEmail}.`,
       amount: paidAmount,
       actionText: "View & Download Event Ticket Pass",
       onAction: () => setViewingTicket(verifiedTicket)
@@ -2466,7 +2484,7 @@ export default function Events() {
                       Enter Event Ticket Key
                     </h3>
                     <p className="text-gray-300 text-xs font-sans">
-                      Enter your unique S-CODERS ticket UID (e.g., <code className="text-brand-teal font-bold font-mono">SC-EVT-9A2X4B</code>) emailed from <span className="font-mono text-brand-teal">escoders@gmail.com</span> to unlock your verified event pass.
+                      Enter your unique S-CODERS ticket UID (e.g., <code className="text-brand-teal font-bold font-mono">SC-EVT-9A2X4B</code>) emailed from <span className="font-mono text-brand-teal">scoders82@gmail.com</span> to unlock your verified event pass.
                     </p>
                   </div>
 
