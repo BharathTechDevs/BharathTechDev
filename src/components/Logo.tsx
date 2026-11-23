@@ -61,17 +61,17 @@ export default function Logo({
 
   const currentSize = sizeClasses[size];
 
-  // Color selections optimized for crisp contrast and vibrant identity across OLED & LCD screens (matches Page 4)
+  // Color selections matching user spec: S = Indigo Blue, Link = Dark Royal Blue, CODERS = Bright Sky/Cyan Blue
   const sColor = lightBg 
-    ? 'text-[#1D4ED8] font-black drop-shadow-sm' 
-    : 'text-[#4361EE] font-black drop-shadow-[0_0_16px_rgba(67,97,238,0.9)]'; // Vibrant electric royal blue for "S"
+    ? 'text-[#24189E] font-black drop-shadow-sm' 
+    : 'text-[#4F46E5] font-black drop-shadow-[0_0_16px_rgba(79,70,229,0.85)]'; // Indigo Blue for "S"
   
-  const linkColor = lightBg ? '#2563EB' : '#00D2FF'; // Bright Electric Cyan for chain link (-)
-  const bridgeColor = lightBg ? '#2563EB' : '#00D2FF'; // Matching bright Electric Cyan bridge
+  const linkColor = lightBg ? '#0D4FA8' : '#1D4ED8'; // Dark Royal Blue for chain link
+  const bridgeColor = lightBg ? '#0D4FA8' : '#1D4ED8'; // Matching Dark Royal Blue bridge
   
   const codersColor = lightBg 
-    ? 'text-[#0284C7] font-black drop-shadow-sm' 
-    : 'text-[#00D2FF] font-black drop-shadow-[0_0_14px_rgba(0,210,255,0.7)]'; // Electric Cyan for "CODERS"
+    ? 'text-[#2DB5F5] font-black drop-shadow-sm' 
+    : 'text-[#38BDF8] font-black drop-shadow-[0_0_14px_rgba(56,189,248,0.7)]'; // Bright Sky/Cyan Blue for "CODERS"
     
   const subtitleColor = lightBg 
     ? 'text-[#1E293B] font-semibold' 
@@ -99,7 +99,7 @@ export default function Logo({
     >
       {/* Background soft glow (only on dark mode) */}
       {!lightBg && (
-        <div className={`absolute -inset-4 bg-gradient-to-r from-indigo-500/10 via-sky-500/5 to-transparent rounded-full ${currentSize.glowRadius} pointer-events-none opacity-80`} />
+        <div className={`absolute -inset-4 bg-gradient-to-r from-[#4F46E5]/10 via-[#1D4ED8]/10 to-[#38BDF8]/10 rounded-full ${currentSize.glowRadius} pointer-events-none opacity-80`} />
       )}
 
       {/* S 🔗 CODERS Top Row */}
@@ -113,7 +113,7 @@ export default function Logo({
         <svg
           viewBox="0 0 42 22"
           className={`${currentSize.linkSvg} shrink-0 transition-transform duration-300 group-hover:scale-110 ${
-            !lightBg ? 'drop-shadow-[0_0_8px_rgba(37,99,235,0.6)]' : ''
+            !lightBg ? 'drop-shadow-[0_0_8px_rgba(29,78,216,0.75)]' : ''
           }`}
           fill="none"
           xmlns="http://www.w3.org/2000/svg"

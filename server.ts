@@ -20,6 +20,14 @@ import {
   sanitizeSourceCode,
   detectLanguage,
 } from "./compiler-service.ts";
+import {
+  DEFAULT_EVENT_WINDOWS,
+  DEFAULT_WORKSHOP_WINDOWS,
+  evaluateRegistrationWindow,
+  resolveDefaultDatesForItem,
+  type RegistrationSection as RegistrationWindowSection,
+  type RegistrationWindowEvaluation,
+} from "./src/utils/registrationWindow.ts";
 
 dotenv.config();
 
@@ -127,7 +135,22 @@ function getServiceAcceptanceEmailHtml({
                     <tr>
                       <td style="padding-top: 14px;">
                         <div style="background-color: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 10px; padding: 12px 14px; text-align: left; font-size: 12px; color: #FDE68A; line-height: 1.6;">
-                          <strong>Security & Recovery Notice:</strong> You are responsible for keeping your unique registration code (UID) secure. If you lose or misplace your UID, recovering access to your service workspace will require additional email verification through our recovery portal.
+                          <strong>Security &amp; Recovery Notice:</strong> You are responsible for keeping your unique registration code (UID) secure. If you lose or misplace your UID, recovering access to your service workspace will require 6-digit email OTP verification through our recovery portal.
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top: 14px;">
+                        <div style="background-color: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 10px; padding: 14px 16px; text-align: left; font-size: 12px; color: #CBD5E1; line-height: 1.65;">
+                          <div style="font-size: 11px; font-weight: 800; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;">
+                            S-CODERS Rules, Regulations &amp; Cancellation Policy (Service)
+                          </div>
+                          <ul style="margin: 0; padding-left: 18px; color: #CBD5E1;">
+                            <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Strict No-Refund Rule:</strong> Custom software, website, app, AI, and automation bookings allocate immediate developer resources and are strictly non-refundable once confirmed.</li>
+                            <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Self-Service Cancellation Responsibility:</strong> If you choose to cancel an active service via "Cancel Service" in your workspace and confirm cancellation, all order and workspace records are permanently deleted from our database and cannot be restored. Clients bear sole responsibility for accidental or intentional cancellations.</li>
+                            <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Workspace &amp; Intellectual Property:</strong> Delivered blueprints and project files are licensed strictly per your agreed project scope and S-CODERS Terms &amp; Privacy Policy.</li>
+                            <li><strong style="color: #F8FAFC;">Official Communication:</strong> All verified UID dispatches and support originate from <strong style="color: #22D3EE;">scoders82@gmail.com</strong>.</li>
+                          </ul>
                         </div>
                       </td>
                     </tr>
@@ -275,8 +298,23 @@ function getWorkshopEmailHtml({
                       <tr>
                         <td colspan="2" style="padding-top: 14px;">
                           <div style="background-color: rgba(34, 211, 238, 0.08); border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 10px; padding: 14px; font-size: 12px; color: #E2E8F0; line-height: 1.65;">
-                            <strong style="color: #22D3EE;">Safe-Keeping & Mid-Session Rejoin Instructions:</strong><br/>
-                            Please keep your unique registration code (<strong>${safeKey}</strong>) safe. If you lose internet connection, refresh, or accidentally exit the website during the workshop session, simply return to the Workshop section on our website and select <em>"Enter Existing Pass"</em> with your UID to immediately rejoin your classroom and workspace. Recovering a lost UID requires email verification.
+                            <strong style="color: #22D3EE;">Safe-Keeping &amp; Mid-Session Rejoin Instructions:</strong><br/>
+                            Please keep your unique registration code (<strong>${safeKey}</strong>) safe. If you lose internet connection, refresh, or accidentally exit the website during the workshop session, return to the Workshop section on our website and select <em>"Enter Existing Pass"</em> with your UID to immediately rejoin your classroom and workspace. Recovering a lost UID requires email OTP verification.
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 14px;">
+                          <div style="background-color: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 10px; padding: 14px; text-align: left; font-size: 12px; color: #CBD5E1; line-height: 1.65;">
+                            <div style="font-size: 11px; font-weight: 800; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;">
+                              S-CODERS Rules, Regulations &amp; Cancellation Policy (Workshop)
+                            </div>
+                            <ul style="margin: 0; padding-left: 18px; color: #CBD5E1;">
+                              <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">3-Day (72-Hour) Refund Notice:</strong> Workshop fees are refundable only if requested at least 72 hours prior to the scheduled workshop start time. Requests received under 72 hours are non-refundable (seat transfers may be requested before kick-off via <strong style="color: #22D3EE;">scoders82@gmail.com</strong>).</li>
+                              <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Self-Service Cancellation &amp; Permanent Deletion:</strong> Confirming "Cancel Workshop" permanently deletes your workshop registration and classroom records from our database. Clients take full responsibility for any accidental or intentional cancellation.</li>
+                              <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Classroom Conduct &amp; Licensing:</strong> Workshop codebases, guides, and live sessions are licensed strictly for personal learning and may not be redistributed or resold.</li>
+                              <li><strong style="color: #F8FAFC;">Support &amp; Recovery:</strong> Keep your UID private; use our email OTP recovery portal or write to <strong style="color: #22D3EE;">scoders82@gmail.com</strong> for assistance.</li>
+                            </ul>
                           </div>
                         </td>
                       </tr>
@@ -432,9 +470,24 @@ function getEventEmailHtml({
                       <tr>
                         <td colspan="2" style="padding-top: 14px;">
                           <div style="background-color: rgba(15, 23, 42, 0.9); border: 1px solid #334155; border-radius: 10px; padding: 14px; font-size: 12px; color: #CBD5E1; line-height: 1.6;">
-                            <strong style="color: #38BDF8;">Important Event Details:</strong><br/>
+                            <strong style="color: #38BDF8;">Important Event Details &amp; Instructions:</strong><br/>
                             ${safeDesc}<br/><br/>
-                            <strong style="color: #FDE68A;">Keep Your UID Safe:</strong> Please store your unique event registration code (<strong>${safeCode}</strong>) safely for check-in verification and future event pass access on our website.
+                            <strong style="color: #FDE68A;">Keep Your UID Safe:</strong> Store your unique event registration code (<strong>${safeCode}</strong>) safely for check-in verification, QR pass download, and portal access on our website.
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 14px;">
+                          <div style="background-color: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 10px; padding: 14px; text-align: left; font-size: 12px; color: #CBD5E1; line-height: 1.65;">
+                            <div style="font-size: 11px; font-weight: 800; color: #38BDF8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;">
+                              S-CODERS Rules, Regulations &amp; Pass Policies (Events)
+                            </div>
+                            <ul style="margin: 0; padding-left: 18px; color: #CBD5E1;">
+                              <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Check-In Verification:</strong> Present your Unique Event Registration Code (UID) at venue entry or enter it on the Events portal to access/download your official digital pass.</li>
+                              <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Pass Deletion Responsibility Clause:</strong> If a participant deletes their event ticket/pass purposefully or mistakenly through self-service controls, the validation record is permanently removed and S-CODERS bears zero liability for deleted passes.</li>
+                              <li style="margin-bottom: 6px;"><strong style="color: #F8FAFC;">Duplicate Payments &amp; Conduct:</strong> Report duplicate transactions within 24 hours to <strong style="color: #22D3EE;">scoders82@gmail.com</strong>. All attendees must follow event timings and S-CODERS code of conduct.</li>
+                              <li><strong style="color: #F8FAFC;">Lost UID Recovery:</strong> Lost UIDs can be recovered only via 6-digit email OTP verification linked to your registered email address.</li>
+                            </ul>
                           </div>
                         </td>
                       </tr>
@@ -717,7 +770,7 @@ function getPaymentEmailHtml({
                     If you have any questions regarding this invoice or workshop registration, feel free to contact our engineering team directly at:
                   </p>
                   <p style="font-size: 13px; font-weight: 600; color: #38BDF8; margin: 0;">
-                    bhuvanmbhuvanm15@gmail.com • Bengaluru, Karnataka, India
+                    scoders82@gmail.com • Bengaluru, Karnataka, India
                   </p>
                   <p style="font-size: 10px; color: #475569; margin-top: 16px;">
                     © 2026 S-CODERS (Bharat Tech Developers). All rights reserved.
@@ -737,117 +790,313 @@ function getPaymentEmailHtml({
 // Official S-CODERS email sender constant
 const OFFICIAL_SCODERS_EMAIL = "scoders82@gmail.com";
 
-// Helper to send email via Gmail/Custom SMTP, or Ethereal / console fallback
+type EmailDeliveryMode = "smtp" | "resend" | "sendgrid" | "ethereal" | "simulated" | "failed";
+
+function htmlToPlainText(html: string): string {
+  return String(html || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<\/(tr|p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function getEmailProviderConfig() {
+  const rawGmailPass = (
+    process.env.GMAIL_APP_PASSWORD ||
+    process.env.SCODERS_GMAIL_APP_PASSWORD ||
+    ""
+  ).trim();
+  const rawSmtpPass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || "").trim();
+  const smtpPass = rawSmtpPass || rawGmailPass;
+  const smtpUser = (
+    process.env.SMTP_USER ||
+    process.env.EMAIL_USER ||
+    (smtpPass ? OFFICIAL_SCODERS_EMAIL : "")
+  ).trim();
+  const smtpHost = (process.env.SMTP_HOST || (smtpPass ? "smtp.gmail.com" : "")).trim();
+  // Google displays 16-char App Passwords in groups of 4 separated by spaces; strip spaces cleanly for Gmail auth
+  const normalizedPass =
+    smtpHost.toLowerCase().includes("gmail.com") ? smtpPass.replace(/\s+/g, "") : smtpPass;
+  const smtpPort = Number(process.env.SMTP_PORT) || (smtpHost === "smtp.gmail.com" ? 465 : 587);
+  const resendApiKey = (process.env.RESEND_API_KEY || "").trim();
+  const sendgridApiKey = (process.env.SENDGRID_API_KEY || "").trim();
+
+  const hasSmtp = Boolean(smtpHost && smtpUser && normalizedPass);
+  const hasResend = Boolean(resendApiKey);
+  const hasSendgrid = Boolean(sendgridApiKey);
+
+  return {
+    hasSmtp,
+    hasResend,
+    hasSendgrid,
+    anyRealProviderConfigured: hasSmtp || hasResend || hasSendgrid,
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPass: normalizedPass,
+    resendApiKey,
+    resendFrom: (process.env.RESEND_FROM || process.env.SMTP_FROM || `"S-CODERS (Bharat Tech Developers)" <onboarding@resend.dev>`).trim(),
+    sendgridApiKey,
+    defaultFrom: (
+      process.env.SMTP_FROM ||
+      `"S-CODERS (Bharat Tech Developers)" <${smtpUser || OFFICIAL_SCODERS_EMAIL}>`
+    ).trim(),
+  };
+}
+
+// Helper to send email via Gmail/Custom SMTP (with automatic 465 -> 587 failover), Resend/SendGrid API, or Ethereal sandbox fallback
 async function sendEmailNotification({
   to,
   subject,
   html,
+  text,
   from: fromOverride,
   replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  text?: string;
   from?: string;
   replyTo?: string;
-}) {
-  const pass = (
-    process.env.SMTP_PASS ||
-    process.env.GMAIL_APP_PASSWORD ||
-    process.env.SCODERS_GMAIL_APP_PASSWORD ||
-    process.env.EMAIL_PASS ||
-    ""
-  ).trim();
-  const user = (
-    process.env.SMTP_USER ||
-    process.env.EMAIL_USER ||
-    (pass ? OFFICIAL_SCODERS_EMAIL : "")
-  ).trim();
-  const host = (process.env.SMTP_HOST || (pass ? "smtp.gmail.com" : "")).trim();
-  const port = Number(process.env.SMTP_PORT) || (host === "smtp.gmail.com" ? 465 : 587);
-  const from =
-    fromOverride ||
-    process.env.SMTP_FROM ||
-    `"S-CODERS (Bharat Tech Developers)" <${user || OFFICIAL_SCODERS_EMAIL}>`;
+}): Promise<{
+  success: boolean;
+  simulated: boolean;
+  isTestTransport: boolean;
+  deliveryMode: EmailDeliveryMode;
+  realEmailDelivered: boolean;
+  from: string;
+  replyTo: string;
+  messageId?: string;
+  previewUrl?: string;
+  error?: string;
+}> {
+  const cfg = getEmailProviderConfig();
+  const from = fromOverride || cfg.defaultFrom;
   const effectiveReplyTo = replyTo || OFFICIAL_SCODERS_EMAIL;
+  const plainText = text?.trim() || htmlToPlainText(html);
 
-  let transporter;
-  let deliveryMode: "smtp" | "ethereal" | "simulated" | "failed" = "smtp";
-
-  if (host && user && pass) {
-    transporter = nodemailer.createTransport({
+  const attemptSmtpSend = async (host: string, port: number, user: string, pass: string) => {
+    const transporter = nodemailer.createTransport({
       host,
       port,
       secure: port === 465,
+      requireTLS: port === 587,
       auth: { user, pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
-  } else {
-    // Graceful fallback to Ethereal / console logging if no SMTP / Gmail App Password is set up
-    try {
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-      deliveryMode = "ethereal";
-    } catch {
-      const simId = `sim_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-      console.log(`[SIMULATED EMAIL DISPATCH] From: ${from} | To: ${to} | Subject: ${subject}`);
-      return {
-        success: true,
-        simulated: true,
-        isTestTransport: true,
-        deliveryMode: "simulated" as const,
-        realEmailDelivered: false,
-        from,
-        replyTo: effectiveReplyTo,
-        messageId: simId,
-      };
-    }
-  }
-
-  try {
     const info = await transporter.sendMail({
       from,
       replyTo: effectiveReplyTo,
       to,
       subject,
+      text: plainText,
       html,
     });
-    const previewUrl =
-      deliveryMode === "ethereal" ? nodemailer.getTestMessageUrl(info) || undefined : undefined;
+    return info;
+  };
+
+  let lastError = "";
+
+  // 1. Real SMTP Delivery (Gmail App Password / Custom SMTP) with 465 -> 587 STARTTLS failover
+  if (cfg.hasSmtp) {
+    try {
+      const info = await attemptSmtpSend(cfg.smtpHost, cfg.smtpPort, cfg.smtpUser, cfg.smtpPass);
+      console.log(`[Email Dispatched (smtp:${cfg.smtpPort})] From: ${from} | To: ${to} | MessageId: ${info.messageId}`);
+      return {
+        success: true,
+        simulated: false,
+        isTestTransport: false,
+        deliveryMode: "smtp",
+        realEmailDelivered: true,
+        from,
+        replyTo: effectiveReplyTo,
+        messageId: info.messageId,
+      };
+    } catch (primaryErr: any) {
+      lastError = primaryErr?.message || "Primary SMTP delivery failed.";
+      console.warn(`[Email SMTP Primary ${cfg.smtpHost}:${cfg.smtpPort} Error]:`, lastError);
+
+      // Failover to port 587 STARTTLS if primary Gmail port 465 timed out / refused
+      if (cfg.smtpHost.toLowerCase().includes("gmail.com") && cfg.smtpPort === 465) {
+        try {
+          const info587 = await attemptSmtpSend(cfg.smtpHost, 587, cfg.smtpUser, cfg.smtpPass);
+          console.log(`[Email Dispatched (smtp:587 failover)] From: ${from} | To: ${to} | MessageId: ${info587.messageId}`);
+          return {
+            success: true,
+            simulated: false,
+            isTestTransport: false,
+            deliveryMode: "smtp",
+            realEmailDelivered: true,
+            from,
+            replyTo: effectiveReplyTo,
+            messageId: info587.messageId,
+          };
+        } catch (fallbackErr: any) {
+          lastError = fallbackErr?.message || lastError;
+          console.warn("[Email SMTP 587 Failover Error]:", lastError);
+        }
+      }
+    }
+  }
+
+  // 2. Resend HTTPS API Delivery (Primary if no SMTP, or failover if SMTP failed)
+  if (cfg.hasResend) {
+    try {
+      const rRes = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cfg.resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: cfg.resendFrom,
+          reply_to: effectiveReplyTo,
+          to: [to],
+          subject,
+          text: plainText,
+          html,
+        }),
+      });
+      const rJson: any = await rRes.json().catch(() => ({}));
+      if (rRes.ok && rJson?.id) {
+        console.log(`[Email Dispatched (resend)] From: ${cfg.resendFrom} | To: ${to} | ID: ${rJson.id}`);
+        return {
+          success: true,
+          simulated: false,
+          isTestTransport: false,
+          deliveryMode: "resend",
+          realEmailDelivered: true,
+          from: cfg.resendFrom,
+          replyTo: effectiveReplyTo,
+          messageId: rJson.id,
+        };
+      }
+      lastError = rJson?.message || rJson?.error || `Resend returned ${rRes.status}`;
+    } catch (rErr: any) {
+      lastError = rErr?.message || "Resend request failed.";
+    }
+  }
+
+  // 3. SendGrid HTTPS API Delivery
+  if (cfg.hasSendgrid) {
+    try {
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cfg.sendgridApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: OFFICIAL_SCODERS_EMAIL, name: "S-CODERS (Bharat Tech Developers)" },
+          reply_to: { email: effectiveReplyTo, name: "S-CODERS Support" },
+          subject,
+          content: [
+            { type: "text/plain", value: plainText },
+            { type: "text/html", value: html },
+          ],
+        }),
+      });
+      if (sgRes.ok) {
+        const msgId = sgRes.headers.get("x-message-id") || `sg_${Date.now()}`;
+        console.log(`[Email Dispatched (sendgrid)] From: ${OFFICIAL_SCODERS_EMAIL} | To: ${to} | ID: ${msgId}`);
+        return {
+          success: true,
+          simulated: false,
+          isTestTransport: false,
+          deliveryMode: "sendgrid",
+          realEmailDelivered: true,
+          from,
+          replyTo: effectiveReplyTo,
+          messageId: msgId,
+        };
+      }
+      const sgErrText = await sgRes.text().catch(() => "");
+      lastError = sgErrText || `SendGrid returned ${sgRes.status}`;
+    } catch (sgErr: any) {
+      lastError = sgErr?.message || "SendGrid request failed.";
+    }
+  }
+
+  // If real credentials WERE configured but delivery failed, report failure honestly (do not pretend it succeeded in sandbox)
+  if (cfg.anyRealProviderConfigured) {
+    console.error(`[Email Real Delivery Failed] To: ${to} | Error: ${lastError}`);
+    return {
+      success: false,
+      simulated: false,
+      isTestTransport: false,
+      deliveryMode: "failed",
+      realEmailDelivered: false,
+      from,
+      replyTo: effectiveReplyTo,
+      error: lastError || "Configured mail provider rejected the message.",
+    };
+  }
+
+  // 4. Sandbox Fallback ONLY when no SMTP / Email API secret is configured on the server yet
+  try {
+    const testAccount = await nodemailer.createTestAccount();
+    const ethTransporter = nodemailer.createTransport({
+      host: "smtp.ethereal.email",
+      port: 587,
+      secure: false,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
+      connectionTimeout: 10000,
+    });
+    const info = await ethTransporter.sendMail({
+      from,
+      replyTo: effectiveReplyTo,
+      to,
+      subject,
+      text: plainText,
+      html,
+    });
+    const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
     console.log(
-      `[Email Dispatched (${deliveryMode})] From: ${from} | To: ${to} | MessageId: ${info.messageId}${
+      `[Email Sandbox (ethereal - GMAIL_APP_PASSWORD not set)] From: ${from} | To: ${to} | MessageId: ${info.messageId}${
         previewUrl ? ` | Preview: ${previewUrl}` : ""
       }`
     );
     return {
       success: true,
-      simulated: deliveryMode !== "smtp",
-      isTestTransport: deliveryMode !== "smtp",
-      deliveryMode,
-      realEmailDelivered: deliveryMode === "smtp",
+      simulated: true,
+      isTestTransport: true,
+      deliveryMode: "ethereal",
+      realEmailDelivered: false,
       from,
       replyTo: effectiveReplyTo,
       messageId: info.messageId,
       previewUrl,
     };
-  } catch (err: any) {
-    console.error("Failed to send email via SMTP:", err.message);
+  } catch {
+    const simId = `sim_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    console.log(`[SIMULATED EMAIL DISPATCH - GMAIL_APP_PASSWORD not set] From: ${from} | To: ${to} | Subject: ${subject}`);
     return {
-      success: false,
-      simulated: false,
-      isTestTransport: false,
-      deliveryMode: "failed" as const,
+      success: true,
+      simulated: true,
+      isTestTransport: true,
+      deliveryMode: "simulated",
       realEmailDelivered: false,
       from,
       replyTo: effectiveReplyTo,
-      error: err.message,
+      messageId: simId,
     };
   }
 }
@@ -2565,6 +2814,52 @@ Return ONLY valid JSON with this structure:
     }
   }
 
+  function resolveAuthoritativeItemWindow(
+    appState: Record<string, any>,
+    section: RegistrationWindowSection,
+    itemId?: string,
+    itemTitle?: string,
+    fallbackStartDate?: string,
+    fallbackEndDate?: string,
+    fallbackStatus?: string
+  ): RegistrationWindowEvaluation {
+    const cleanId = String(itemId || "").trim();
+    const cleanTitle = String(itemTitle || "").trim();
+    const collectionKey = section === "workshop" ? "scoders_dynamic_workshops" : "scoders_dynamic_events";
+    const list: any[] = Array.isArray(appState?.[collectionKey]) ? appState[collectionKey] : [];
+
+    let matched: any = null;
+    if (cleanId) {
+      matched = list.find((item: any) => String(item?.id || "").trim() === cleanId);
+    }
+    if (!matched && cleanTitle) {
+      const lowerTitle = cleanTitle.toLowerCase();
+      matched = list.find(
+        (item: any) => String(item?.title || item?.name || "").trim().toLowerCase() === lowerTitle
+      );
+    }
+
+    const resolvedId = String(matched?.id || cleanId || "").trim();
+    const resolvedTitle = String(
+      matched?.title || matched?.name || cleanTitle || (section === "workshop" ? "Workshop" : "Event")
+    );
+    const statusOverride = matched?.status ?? fallbackStatus;
+
+    const rawStart = matched ? matched.registrationStartDate : fallbackStartDate;
+    const rawEnd = matched ? matched.registrationEndDate : fallbackEndDate;
+    const { startDate, endDate } = resolveDefaultDatesForItem(section, resolvedId, rawStart, rawEnd);
+
+    return evaluateRegistrationWindow({
+      section,
+      itemId: resolvedId,
+      itemTitle: resolvedTitle,
+      startDate,
+      endDate,
+      statusOverride,
+      nowMs: Date.now(),
+    });
+  }
+
   // 1. Shared Leader Photos Endpoints (Available to all visitors & admin sync)
   app.get("/api/leader-photos", (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -3701,6 +3996,58 @@ Return ONLY valid JSON with this structure:
 
       // Check existing orders in server state for duplicate payment protection & valid order reuse
       const appState = getStoredAppState();
+
+      // Server-side Registration Deadline Gate for Workshops & Events
+      const rawOrderSection = String(req.body?.section || notes?.section || "").trim().toLowerCase();
+      const receiptStr = String(receipt || "").trim();
+      const detectedSection: RegistrationWindowSection | null =
+        rawOrderSection === "workshop" ||
+        workshopId ||
+        notes?.workshopTitle ||
+        receiptStr.startsWith("wksp_") ||
+        cleanPurpose.toLowerCase().startsWith("workshop pass:")
+          ? "workshop"
+          : rawOrderSection === "event" ||
+            notes?.eventId ||
+            notes?.eventName ||
+            receiptStr.startsWith("evt_") ||
+            cleanPurpose.toLowerCase().startsWith("event pass:")
+          ? "event"
+          : null;
+
+      let detectedItemId = String(
+        req.body?.itemId || notes?.itemId || workshopId || notes?.workshopId || notes?.eventId || ""
+      ).trim();
+      if (!detectedItemId && (receiptStr.startsWith("wksp_") || receiptStr.startsWith("evt_"))) {
+        const parts = receiptStr.split("_");
+        if (parts.length >= 3) {
+          detectedItemId = parts.slice(1, -1).join("_");
+        } else if (parts.length === 2) {
+          detectedItemId = parts[1];
+        }
+      }
+      const detectedItemTitle = String(notes?.workshopTitle || notes?.eventName || cleanPurpose || "").trim();
+
+      if (detectedSection) {
+        const winEval = resolveAuthoritativeItemWindow(
+          appState,
+          detectedSection,
+          detectedItemId,
+          detectedItemTitle,
+          notes?.registrationStartDate,
+          notes?.registrationEndDate
+        );
+        if (!winEval.allowed) {
+          return res.status(403).json({
+            success: false,
+            registrationClosed: true,
+            windowStatus: winEval,
+            serverNowIso: new Date().toISOString(),
+            error: winEval.message,
+          });
+        }
+      }
+
       const ordersList: any[] = Array.isArray(appState["db_razorpay_orders"])
         ? [...appState["db_razorpay_orders"]]
         : [];
@@ -3811,6 +4158,9 @@ Return ONLY valid JSON with this structure:
           clientName,
           email: clientEmail,
           purpose: cleanPurpose,
+          section: detectedSection || undefined,
+          itemId: detectedItemId || undefined,
+          itemTitle: detectedItemTitle || undefined,
           status: "CREATED",
           isLive: isLiveOrder,
           createdAt: new Date(nowMs).toISOString(),
@@ -3898,6 +4248,40 @@ Return ONLY valid JSON with this structure:
           orderId: razorpay_order_id || alreadyPaidTxn?.razorpayOrderId,
           merchantUpiId: merchantUpiId || "6363905989@ybl",
         });
+      }
+
+      // Enforce Registration Deadline on Payment Verification for non-paid Workshop/Event orders
+      const matchedLocalOrder = razorpay_order_id
+        ? ordersList.find((o) => o.orderId === razorpay_order_id)
+        : null;
+      const verifySectionRaw = String(
+        req.body?.section ||
+          matchedLocalOrder?.section ||
+          (String(purpose || "").toLowerCase().startsWith("workshop pass:")
+            ? "workshop"
+            : String(purpose || "").toLowerCase().startsWith("event pass:")
+            ? "event"
+            : "")
+      )
+        .trim()
+        .toLowerCase();
+      if (verifySectionRaw === "workshop" || verifySectionRaw === "event") {
+        const winEval = resolveAuthoritativeItemWindow(
+          appState,
+          verifySectionRaw,
+          String(req.body?.itemId || matchedLocalOrder?.itemId || ""),
+          String(req.body?.itemTitle || matchedLocalOrder?.itemTitle || purpose || "")
+        );
+        if (!winEval.allowed) {
+          return res.status(403).json({
+            success: false,
+            verified: false,
+            registrationClosed: true,
+            windowStatus: winEval,
+            serverNowIso: new Date().toISOString(),
+            error: winEval.message,
+          });
+        }
       }
 
       const activeMerchantUpi = merchantUpiId || "6363905989@ybl";
@@ -4737,6 +5121,89 @@ Return ONLY valid JSON with this structure:
     return {};
   }
 
+  // Registration Window Status & Server Clock Authority Endpoints
+  app.get("/api/registrations/window-status", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      const appState = getStoredAppState();
+      const rawSection = String(req.query?.section || "").trim().toLowerCase();
+      const itemId = String(req.query?.itemId || "").trim();
+      const itemTitle = String(req.query?.itemTitle || "").trim();
+
+      let windowStatus: RegistrationWindowEvaluation | null = null;
+      if (rawSection === "workshop" || rawSection === "event") {
+        windowStatus = resolveAuthoritativeItemWindow(appState, rawSection, itemId, itemTitle);
+      }
+
+      const workshopsList: any[] = Array.isArray(appState["scoders_dynamic_workshops"])
+        ? appState["scoders_dynamic_workshops"]
+        : [];
+      const eventsList: any[] = Array.isArray(appState["scoders_dynamic_events"])
+        ? appState["scoders_dynamic_events"]
+        : [];
+
+      const workshopWindows: Record<string, RegistrationWindowEvaluation> = {};
+      for (const defaultId of Object.keys(DEFAULT_WORKSHOP_WINDOWS)) {
+        workshopWindows[defaultId] = resolveAuthoritativeItemWindow(appState, "workshop", defaultId);
+      }
+      for (const w of workshopsList) {
+        if (w?.id) {
+          workshopWindows[w.id] = resolveAuthoritativeItemWindow(appState, "workshop", w.id, w.title);
+        }
+      }
+
+      const eventWindows: Record<string, RegistrationWindowEvaluation> = {};
+      for (const defaultId of Object.keys(DEFAULT_EVENT_WINDOWS)) {
+        eventWindows[defaultId] = resolveAuthoritativeItemWindow(appState, "event", defaultId);
+      }
+      for (const evt of eventsList) {
+        if (evt?.id) {
+          eventWindows[evt.id] = resolveAuthoritativeItemWindow(appState, "event", evt.id, evt.name);
+        }
+      }
+
+      return res.json({
+        success: true,
+        serverNowIso: new Date().toISOString(),
+        windowStatus,
+        workshopWindows,
+        eventWindows,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Failed to evaluate window status." });
+    }
+  });
+
+  app.post("/api/registrations/check-window", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      const { section: rawSection, itemId, itemTitle, startDate, endDate, statusOverride } = req.body || {};
+      const section = normalizeSectionName(rawSection);
+      if (section !== "workshop" && section !== "event") {
+        return res.status(400).json({ success: false, error: "section must be workshop or event." });
+      }
+      const appState = getStoredAppState();
+      const windowStatus = resolveAuthoritativeItemWindow(
+        appState,
+        section,
+        itemId,
+        itemTitle,
+        startDate,
+        endDate,
+        statusOverride
+      );
+      return res.status(windowStatus.allowed ? 200 : 403).json({
+        success: windowStatus.allowed,
+        registrationClosed: !windowStatus.allowed,
+        serverNowIso: new Date().toISOString(),
+        windowStatus,
+        error: windowStatus.allowed ? undefined : windowStatus.message,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Failed to check registration window." });
+    }
+  });
+
   // Unified Registration + Unique UID Generation + Automatic Email Notification (scoders82@gmail.com)
   app.post("/api/registrations/register-and-notify", async (req, res) => {
     try {
@@ -4775,6 +5242,28 @@ Return ONLY valid JSON with this structure:
       }
 
       const appState = getStoredAppState();
+
+      // 0. Server-authoritative registration window check for Workshops & Events
+      if (section === "workshop" || section === "event") {
+        const winEval = resolveAuthoritativeItemWindow(
+          appState,
+          section,
+          cleanItemId,
+          cleanItemTitle,
+          metadata?.registrationStartDate,
+          metadata?.registrationEndDate,
+          metadata?.status
+        );
+        if (!winEval.allowed) {
+          return res.status(403).json({
+            success: false,
+            registrationClosed: true,
+            windowStatus: winEval,
+            serverNowIso: new Date().toISOString(),
+            error: winEval.message,
+          });
+        }
+      }
 
       // 1. Gate check: Workshop & paid Events MUST have verified payment confirmation
       const payCheck = isPaymentVerifiedForRegistration(
@@ -5382,6 +5871,29 @@ Return ONLY valid JSON with this structure:
     }
   });
 
+  // Safe diagnostic endpoint exposing email transport readiness (NO secrets exposed)
+  app.get("/api/email/config-status", (_req, res) => {
+    const cfg = getEmailProviderConfig();
+    const provider = cfg.hasSmtp
+      ? cfg.smtpHost.toLowerCase().includes("gmail.com")
+        ? "gmail_smtp"
+        : "custom_smtp"
+      : cfg.hasResend
+      ? "resend"
+      : cfg.hasSendgrid
+      ? "sendgrid"
+      : "ethereal_sandbox";
+    return res.json({
+      success: true,
+      configured: cfg.anyRealProviderConfigured,
+      provider,
+      officialSender: OFFICIAL_SCODERS_EMAIL,
+      message: cfg.anyRealProviderConfigured
+        ? `Live inbox email delivery active via ${provider} (${OFFICIAL_SCODERS_EMAIL}).`
+        : `Server SMTP/API secret (GMAIL_APP_PASSWORD) is not set yet. Registrations currently generate preview emails in sandbox mode until GMAIL_APP_PASSWORD is configured in Environment Secrets.`,
+    });
+  });
+
   // Read sanitized email dispatch audit logs & UID records (excludes OTP codes)
   app.get("/api/registrations/email-logs", (req, res) => {
     try {
@@ -5518,6 +6030,17 @@ Return ONLY valid JSON with this structure:
 
       const cleanEmail = String(email || "client@example.com").trim().toLowerCase();
       const appState = getStoredAppState();
+
+      const workshopWinEval = resolveAuthoritativeItemWindow(appState, "workshop", workshopId, workshopTitle);
+      if (!workshopWinEval.allowed) {
+        return res.status(403).json({
+          success: false,
+          registrationClosed: true,
+          windowStatus: workshopWinEval,
+          serverNowIso: new Date().toISOString(),
+          error: workshopWinEval.message,
+        });
+      }
 
       // Strict payment verification gate
       const payCheck = isPaymentVerifiedForRegistration("workshop", Number(amount) || 0, paymentId, orderId, paymentStatus, appState);
@@ -5691,6 +6214,17 @@ Return ONLY valid JSON with this structure:
       const cleanEmail = String(email || "client@example.com").trim().toLowerCase();
       const appState = getStoredAppState();
 
+      const eventWinEval = resolveAuthoritativeItemWindow(appState, "event", eventId, eventTitle);
+      if (!eventWinEval.allowed) {
+        return res.status(403).json({
+          success: false,
+          registrationClosed: true,
+          windowStatus: eventWinEval,
+          serverNowIso: new Date().toISOString(),
+          error: eventWinEval.message,
+        });
+      }
+
       // Strict payment verification gate (free events ticketPrice===0 allowed; paid events must be verified)
       const payCheck = isPaymentVerifiedForRegistration("event", Number(amount) || 0, paymentId, orderId, paymentStatus, appState);
       if (!payCheck.ok) {
@@ -5825,12 +6359,16 @@ Return ONLY valid JSON with this structure:
           actionUrl: targetUrl,
           reason: reason || "Payment was declined, interrupted, or cancelled by user.",
         }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
       });
 
       res.json({
         success: true,
         message: "Event payment failure email dispatched.",
         emailSent: result.success,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
       });
     } catch (err: any) {
       console.error("Event Failed Email Error:", err);

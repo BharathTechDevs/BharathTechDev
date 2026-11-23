@@ -109,6 +109,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     deduplicated?: boolean;
     emailFrom?: string;
     deliveryMode?: string;
+    realEmailDelivered?: boolean;
+    emailError?: string;
     previewUrl?: string;
   } | null>(null);
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
@@ -441,6 +443,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       let isDeduplicated = false;
       let dispatchedViaUnified = false;
       let emailDeliveryMode: string | undefined;
+      let emailRealDelivered: boolean | undefined;
+      let emailDeliveryError: string | undefined;
       let emailPreviewUrl: string | undefined;
 
       // Authoritative backend registration: mints collision-free UID, deduplicates, persists, & sends email from scoders82@gmail.com
@@ -469,6 +473,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             validUntil = regData.validUntil || regData.record?.validUntil;
             isDeduplicated = Boolean(regData.deduplicated);
             emailDeliveryMode = regData.deliveryMode;
+            emailRealDelivered = Boolean(regData.realEmailDelivered);
+            emailDeliveryError = regData.emailError;
             emailPreviewUrl = regData.previewUrl;
             dispatchedViaUnified = true;
           }
@@ -618,6 +624,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         deduplicated: isDeduplicated,
         emailFrom: 'scoders82@gmail.com',
         deliveryMode: emailDeliveryMode,
+        realEmailDelivered: emailRealDelivered,
+        emailError: emailDeliveryError,
         previewUrl: emailPreviewUrl,
       });
       setRegSuccessKey(generatedKey);
@@ -799,6 +807,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       let validUntil: string | undefined;
       let dispatchedViaUnified = false;
       let emailDeliveryMode: string | undefined;
+      let emailRealDelivered: boolean | undefined;
+      let emailDeliveryError: string | undefined;
       let emailPreviewUrl: string | undefined;
 
       try {
@@ -828,6 +838,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             generatedKey = regData.uid;
             validUntil = regData.validUntil || regData.record?.validUntil;
             emailDeliveryMode = regData.deliveryMode;
+            emailRealDelivered = Boolean(regData.realEmailDelivered);
+            emailDeliveryError = regData.emailError;
             emailPreviewUrl = regData.previewUrl;
             dispatchedViaUnified = true;
           }
@@ -950,6 +962,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         validUntil,
         emailFrom: 'scoders82@gmail.com',
         deliveryMode: emailDeliveryMode,
+        realEmailDelivered: emailRealDelivered,
+        emailError: emailDeliveryError,
         previewUrl: emailPreviewUrl,
       });
       setRegSuccessKey(generatedKey);
@@ -1608,14 +1622,54 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                       Your exclusive developer dispatch key for <strong className="text-white font-semibold">{registeringService.title}</strong> has been generated and activated.
                     </p>
 
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 mb-4 max-w-xl mx-auto text-left flex items-start gap-3">
-                      <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                    <div
+                      className={`rounded-2xl p-4 mb-4 max-w-xl mx-auto text-left flex items-start gap-3 border ${
+                        regSuccessMeta?.realEmailDelivered
+                          ? 'bg-emerald-500/10 border-emerald-500/30'
+                          : regSuccessMeta?.deliveryMode === 'failed'
+                          ? 'bg-red-500/10 border-red-500/30'
+                          : 'bg-blue-500/10 border-blue-500/30'
+                      }`}
+                    >
+                      <Mail
+                        className={`w-5 h-5 shrink-0 mt-0.5 ${
+                          regSuccessMeta?.realEmailDelivered
+                            ? 'text-emerald-400'
+                            : regSuccessMeta?.deliveryMode === 'failed'
+                            ? 'text-red-400'
+                            : 'text-blue-400'
+                        }`}
+                      />
                       <div className="text-xs space-y-1">
-                        <p className="text-blue-200 font-semibold">
-                          Confirmation Emailed from <span className="font-mono text-brand-teal">scoders82@gmail.com</span>
+                        <p
+                          className={`font-semibold ${
+                            regSuccessMeta?.realEmailDelivered
+                              ? 'text-emerald-200'
+                              : regSuccessMeta?.deliveryMode === 'failed'
+                              ? 'text-red-200'
+                              : 'text-blue-200'
+                          }`}
+                        >
+                          {regSuccessMeta?.realEmailDelivered
+                            ? '✓ Sent Directly to Your Email Inbox via scoders82@gmail.com'
+                            : regSuccessMeta?.deliveryMode === 'ethereal' || regSuccessMeta?.deliveryMode === 'simulated'
+                            ? 'Email Prepared in SMTP Sandbox Mode (scoders82@gmail.com)'
+                            : regSuccessMeta?.deliveryMode === 'failed'
+                            ? 'Email Delivery Pending — Registered UID Saved'
+                            : 'Confirmation Emailed from scoders82@gmail.com'}
                         </p>
                         <p className="text-gray-300 leading-relaxed">
-                          Dispatched to <strong className="text-white">{regSuccessMeta?.email || regEmail}</strong> with your service name (<strong className="text-white">{registeringService.title}</strong>) and unique registration UID.
+                          Target inbox: <strong className="text-white">{regSuccessMeta?.email || regEmail}</strong> with your service name (<strong className="text-white">{registeringService.title}</strong>), Unique Registration Code (UID), and S-CODERS rules &amp; regulations.
+                          {!regSuccessMeta?.realEmailDelivered && (regSuccessMeta?.deliveryMode === 'ethereal' || regSuccessMeta?.deliveryMode === 'simulated') && (
+                            <span className="block text-[11px] text-amber-300 mt-1.5 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2.5 py-1.5">
+                              Live Gmail inbox delivery activates automatically once GMAIL_APP_PASSWORD is set in server Environment Secrets. Use the preview link below to inspect your email.
+                            </span>
+                          )}
+                          {regSuccessMeta?.deliveryMode === 'failed' && regSuccessMeta?.emailError && (
+                            <span className="block text-[11px] text-red-300 mt-1">
+                              Mail delivery error: {regSuccessMeta.emailError}
+                            </span>
+                          )}
                           {regSuccessMeta?.validUntil && (
                             <span className="block text-[10px] font-mono text-emerald-300 mt-1">
                               Valid until: {new Date(regSuccessMeta.validUntil).toLocaleDateString()}

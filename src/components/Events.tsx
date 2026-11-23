@@ -3,7 +3,8 @@ import {
   Calendar, MapPin, Clock, Ticket, Check, ShieldCheck, Sparkles, 
   ArrowRight, X, User, Mail, Phone, Building, QrCode, Download, 
   Printer, Image as ImageIcon, Plus, Filter, AlertCircle, RefreshCw, 
-  Lock, IndianRupee, Eye, CheckCircle2, Copy, Upload, Trash2, ExternalLink
+  Lock, IndianRupee, Eye, CheckCircle2, Copy, Upload, Trash2, ExternalLink,
+  CalendarX2, Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -14,6 +15,16 @@ import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
 import UpiQrCanvas from './UpiQrCanvas';
 import PhonePeScannerCard from './PhonePeScannerCard';
 import UidRecoveryPanel from './UidRecoveryPanel';
+import RegistrationClosedModal from './RegistrationClosedModal';
+import {
+  evaluateRegistrationWindow,
+  checkServerRegistrationWindow,
+  syncServerClock,
+  getTodayIsoDateIst,
+  normalizeIsoDateOnly,
+  getAuthoritativeNowMs,
+  RegistrationWindowEvaluation,
+} from '../utils/registrationWindow';
 import { 
   openUpiApp, 
   getActiveMerchantUpi, 
@@ -136,6 +147,18 @@ export default function Events() {
   const [newEventDesc, setNewEventDesc] = useState('');
   const [newEventCategory, setNewEventCategory] = useState<SCODERSEvent['category']>('hackathon');
   const [newEventPrice, setNewEventPrice] = useState<number>(299);
+  const [newEventRegStart, setNewEventRegStart] = useState<string>(() => getTodayIsoDateIst());
+  const [newEventRegEnd, setNewEventRegEnd] = useState<string>('');
+  const [newEventDateError, setNewEventDateError] = useState<string | null>(null);
+
+  // Registration Window Deadline Pop-Up & Admin Date Edit States
+  const [windowTickNowMs, setWindowTickNowMs] = useState<number>(() => getAuthoritativeNowMs());
+  const [closedModalEval, setClosedModalEval] = useState<RegistrationWindowEvaluation | null>(null);
+  const [showClosedModal, setShowClosedModal] = useState(false);
+  const [editingDatesEvent, setEditingDatesEvent] = useState<SCODERSEvent | null>(null);
+  const [editRegStart, setEditRegStart] = useState('');
+  const [editRegEnd, setEditRegEnd] = useState('');
+  const [editDateError, setEditDateError] = useState<string | null>(null);
 
   // Photo upload state for selected event (supports up to 6 pictures)
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
@@ -411,6 +434,48 @@ export default function Events() {
     };
   }, []);
 
+  useEffect(() => {
+    syncServerClock(true).then((ms) => setWindowTickNowMs(ms)).catch(() => {});
+    const interval = setInterval(() => {
+      setWindowTickNowMs(getAuthoritativeNowMs());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleOpenEventDetails = async (evt: SCODERSEvent) => {
+    setSelectedEvent(evt);
+    setPaymentError(null);
+    setPaymentStatusNotice(null);
+
+    const localEval = evaluateRegistrationWindow({
+      section: 'event',
+      itemId: evt.id,
+      itemTitle: evt.name,
+      startDate: evt.registrationStartDate,
+      endDate: evt.registrationEndDate,
+      statusOverride: evt.status,
+      nowMs: windowTickNowMs,
+    });
+    if (!localEval.allowed) {
+      setClosedModalEval(localEval);
+      setShowClosedModal(true);
+    }
+
+    const serverEval = await checkServerRegistrationWindow({
+      section: 'event',
+      itemId: evt.id,
+      itemTitle: evt.name,
+      startDate: evt.registrationStartDate,
+      endDate: evt.registrationEndDate,
+      statusOverride: evt.status,
+    });
+    setWindowTickNowMs(getAuthoritativeNowMs());
+    if (!serverEval.allowed) {
+      setClosedModalEval(serverEval);
+      setShowClosedModal(true);
+    }
+  };
+
   // Filtered events based on active category
   const filteredEvents = events.filter(e => {
     if (activeCategory === 'all') return true;
@@ -441,10 +506,28 @@ export default function Events() {
     setPaymentError(null);
     setPaymentStatusNotice({
       type: 'PENDING',
-      message: 'Initializing Razorpay encrypted gateway session...'
+      message: 'Verifying registration window & initializing payment gateway...'
     });
 
     try {
+      const serverWin = await checkServerRegistrationWindow({
+        section: 'event',
+        itemId: selectedEvent.id,
+        itemTitle: selectedEvent.name,
+        startDate: selectedEvent.registrationStartDate,
+        endDate: selectedEvent.registrationEndDate,
+        statusOverride: selectedEvent.status,
+      });
+      setWindowTickNowMs(getAuthoritativeNowMs());
+      if (!serverWin.allowed) {
+        setIsProcessing(false);
+        setPaymentStatusNotice(null);
+        setPaymentError(serverWin.message);
+        setClosedModalEval(serverWin);
+        setShowClosedModal(true);
+        return;
+      }
+
       const isFreeEvent = selectedEvent.ticketPrice === 0;
 
       // Handle Free event registration directly
@@ -455,6 +538,8 @@ export default function Events() {
         let validUntil: string | undefined;
         let dispatchedViaUnified = false;
         let emailDeliveryMode: string | undefined;
+        let emailRealDelivered: boolean | undefined;
+        let emailDeliveryError: string | undefined;
         let emailPreviewUrl: string | undefined;
 
         try {
@@ -479,16 +564,32 @@ export default function Events() {
                 time: selectedEvent.time,
                 location: selectedEvent.location,
                 description: selectedEvent.description,
+                registrationStartDate: selectedEvent.registrationStartDate,
+                registrationEndDate: selectedEvent.registrationEndDate,
+                status: selectedEvent.status,
               },
               actionUrl: buildPublicShareUrl('/?view=events'),
             }),
           });
+          if (regRes.status === 403) {
+            const errData = await regRes.json().catch(() => ({}));
+            if (errData?.registrationClosed) {
+              setIsProcessing(false);
+              setPaymentStatusNotice(null);
+              setPaymentError(errData.error || serverWin.message);
+              setClosedModalEval(errData.windowStatus || serverWin);
+              setShowClosedModal(true);
+              return;
+            }
+          }
           if (regRes.ok) {
             const regData = await regRes.json();
             if (regData?.success && regData?.uid) {
               ticketCode = regData.uid;
               validUntil = regData.validUntil || regData.record?.validUntil;
               emailDeliveryMode = regData.deliveryMode;
+              emailRealDelivered = Boolean(regData.realEmailDelivered);
+              emailDeliveryError = regData.emailError;
               emailPreviewUrl = regData.previewUrl;
               dispatchedViaUnified = true;
             }
@@ -563,8 +664,10 @@ export default function Events() {
           uniqueKey: ticketCode,
           validUntil,
           deliveryMode: emailDeliveryMode,
+          realEmailDelivered: emailRealDelivered,
+          emailError: emailDeliveryError,
           previewUrl: emailPreviewUrl,
-          messageText: `Your event pass is confirmed! An official email from scoders82@gmail.com with event location, timing, details, and your Unique Registration Code (${ticketCode}) has been dispatched to ${regEmail.trim()}.`,
+          messageText: `Your event pass is confirmed! Your official email from scoders82@gmail.com contains event location, timing, rules & regulations, and your Unique Registration Code (${ticketCode}) for ${regEmail.trim()}.`,
           amount: 0,
           actionText: "View & Download Event Ticket Pass",
           onAction: () => setViewingTicket(newTicket)
@@ -580,16 +683,35 @@ export default function Events() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            section: 'event',
+            itemId: selectedEvent.id,
             amount: selectedEvent.ticketPrice,
             currency: 'INR',
             receipt: `evt_${selectedEvent.id}_${Date.now()}`,
             notes: {
+              section: 'event',
+              itemId: selectedEvent.id,
+              eventId: selectedEvent.id,
               eventName: selectedEvent.name,
               participantName: regName.trim(),
-              email: regEmail.trim()
+              email: regEmail.trim(),
+              registrationStartDate: selectedEvent.registrationStartDate,
+              registrationEndDate: selectedEvent.registrationEndDate,
             }
           })
         });
+
+        if (orderRes.status === 403) {
+          const orderErr = await orderRes.json().catch(() => ({}));
+          if (orderErr?.registrationClosed) {
+            setIsProcessing(false);
+            setPaymentStatusNotice(null);
+            setPaymentError(orderErr.error || 'Registration closed.');
+            setClosedModalEval(orderErr.windowStatus || serverWin);
+            setShowClosedModal(true);
+            return;
+          }
+        }
 
         if (!orderRes.ok) {
           throw new Error(`Order creation returned ${orderRes.status}`);
@@ -665,6 +787,8 @@ export default function Events() {
     let validUntil: string | undefined;
     let dispatchedViaUnified = false;
     let emailDeliveryMode: string | undefined;
+    let emailRealDelivered: boolean | undefined;
+    let emailDeliveryError: string | undefined;
     let emailPreviewUrl: string | undefined;
 
     try {
@@ -699,6 +823,8 @@ export default function Events() {
           ticketCode = regData.uid;
           validUntil = regData.validUntil || regData.record?.validUntil;
           emailDeliveryMode = regData.deliveryMode;
+          emailRealDelivered = Boolean(regData.realEmailDelivered);
+          emailDeliveryError = regData.emailError;
           emailPreviewUrl = regData.previewUrl;
           dispatchedViaUnified = true;
         }
@@ -768,8 +894,10 @@ export default function Events() {
       uniqueKey: ticketCode,
       validUntil,
       deliveryMode: emailDeliveryMode,
+      realEmailDelivered: emailRealDelivered,
+      emailError: emailDeliveryError,
       previewUrl: emailPreviewUrl,
-      messageText: `Your payment has been confirmed and an official email from scoders82@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${data.email}.`,
+      messageText: `Your payment has been confirmed and your official email from scoders82@gmail.com contains event location, date, timing, rules & regulations, and your Unique Registration Code (${ticketCode}) for ${data.email}.`,
       amount: data.amount,
       actionText: "View & Download Event Ticket Pass",
       onAction: () => setViewingTicket(verifiedTicket)
@@ -793,6 +921,23 @@ export default function Events() {
     setIsProcessing(true);
     setPaymentError(null);
 
+    const serverWin = await checkServerRegistrationWindow({
+      section: 'event',
+      itemId: selectedEvent.id,
+      itemTitle: selectedEvent.name,
+      startDate: selectedEvent.registrationStartDate,
+      endDate: selectedEvent.registrationEndDate,
+      statusOverride: selectedEvent.status,
+    });
+    setWindowTickNowMs(getAuthoritativeNowMs());
+    if (!serverWin.allowed) {
+      setIsProcessing(false);
+      setPaymentError(serverWin.message);
+      setClosedModalEval(serverWin);
+      setShowClosedModal(true);
+      return;
+    }
+
     const now = new Date();
     const utrCode = manualUpiRef.trim();
     const eventName = selectedEvent.name;
@@ -803,6 +948,8 @@ export default function Events() {
     let validUntil: string | undefined;
     let dispatchedViaUnified = false;
     let emailDeliveryMode: string | undefined;
+    let emailRealDelivered: boolean | undefined;
+    let emailDeliveryError: string | undefined;
     let emailPreviewUrl: string | undefined;
 
     try {
@@ -827,16 +974,31 @@ export default function Events() {
             time: selectedEvent.time,
             location: selectedEvent.location,
             description: selectedEvent.description,
+            registrationStartDate: selectedEvent.registrationStartDate,
+            registrationEndDate: selectedEvent.registrationEndDate,
+            status: selectedEvent.status,
           },
           actionUrl: buildPublicShareUrl('/?view=events'),
         }),
       });
+      if (regRes.status === 403) {
+        const errData = await regRes.json().catch(() => ({}));
+        if (errData?.registrationClosed) {
+          setIsProcessing(false);
+          setPaymentError(errData.error || serverWin.message);
+          setClosedModalEval(errData.windowStatus || serverWin);
+          setShowClosedModal(true);
+          return;
+        }
+      }
       if (regRes.ok) {
         const regData = await regRes.json();
         if (regData?.success && regData?.uid) {
           ticketCode = regData.uid;
           validUntil = regData.validUntil || regData.record?.validUntil;
           emailDeliveryMode = regData.deliveryMode;
+          emailRealDelivered = Boolean(regData.realEmailDelivered);
+          emailDeliveryError = regData.emailError;
           emailPreviewUrl = regData.previewUrl;
           dispatchedViaUnified = true;
         }
@@ -910,8 +1072,10 @@ export default function Events() {
       uniqueKey: ticketCode,
       validUntil,
       deliveryMode: emailDeliveryMode,
+      realEmailDelivered: emailRealDelivered,
+      emailError: emailDeliveryError,
       previewUrl: emailPreviewUrl,
-      messageText: `Your payment has been confirmed and an official email from scoders82@gmail.com containing your event location, date, timing, and Unique Registration Code (${ticketCode}) has been dispatched to ${recipientEmail}.`,
+      messageText: `Your payment has been confirmed and your official email from scoders82@gmail.com contains event location, date, timing, rules & regulations, and your Unique Registration Code (${ticketCode}) for ${recipientEmail}.`,
       amount: paidAmount,
       actionText: "View & Download Event Ticket Pass",
       onAction: () => setViewingTicket(verifiedTicket)
@@ -924,6 +1088,14 @@ export default function Events() {
   const handleCreateEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEventName || !newEventDate || !newEventLocation) return;
+
+    const normStart = normalizeIsoDateOnly(newEventRegStart);
+    const normEnd = normalizeIsoDateOnly(newEventRegEnd);
+    if (normStart && normEnd && normEnd < normStart) {
+      setNewEventDateError('Registration Closing Date must be on or after the Registration Start Date.');
+      return;
+    }
+    setNewEventDateError(null);
 
     const newEvt: SCODERSEvent = {
       id: `evt-${Date.now()}`,
@@ -938,6 +1110,8 @@ export default function Events() {
       ticketPrice: Number(newEventPrice) || 0,
       status: 'upcoming',
       featured: true,
+      registrationStartDate: normStart || undefined,
+      registrationEndDate: normEnd || undefined,
       eventPhotos: []
     };
 
@@ -954,6 +1128,41 @@ export default function Events() {
     setNewEventTime('');
     setNewEventLocation('');
     setNewEventDesc('');
+    setNewEventRegStart(getTodayIsoDateIst());
+    setNewEventRegEnd('');
+    setNewEventDateError(null);
+  };
+
+  const handleSaveEditedEventDates = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDatesEvent) return;
+    const normStart = normalizeIsoDateOnly(editRegStart);
+    const normEnd = normalizeIsoDateOnly(editRegEnd);
+    if (normStart && normEnd && normEnd < normStart) {
+      setEditDateError('Registration Closing Date must be on or after the Registration Start Date.');
+      return;
+    }
+    const updated = events.map((evt) =>
+      evt.id === editingDatesEvent.id
+        ? {
+            ...evt,
+            registrationStartDate: normStart || undefined,
+            registrationEndDate: normEnd || undefined,
+            status:
+              normEnd && normalizeIsoDateOnly(getTodayIsoDateIst()) <= normEnd
+                ? ('upcoming' as const)
+                : evt.status,
+          }
+        : evt
+    );
+    setEvents(updated);
+    saveDynamicEvents(updated);
+    if (selectedEvent?.id === editingDatesEvent.id) {
+      const refreshed = updated.find((u) => u.id === editingDatesEvent.id) || null;
+      setSelectedEvent(refreshed);
+    }
+    setEditingDatesEvent(null);
+    setEditDateError(null);
   };
 
   // Multi-photo upload for specific event (up to 6 photos)
@@ -1251,100 +1460,161 @@ export default function Events() {
       ) : (
         /* EVENTS GRID */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredEvents.map((evt, idx) => (
-            <motion.div
-              key={evt.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: (idx % 4) * 0.1 }}
-              className="bg-brand-card/60 border border-white/10 hover:border-brand-teal/40 rounded-3xl overflow-hidden transition-all duration-300 flex flex-col group shadow-xl hover:shadow-[0_0_30px_rgba(34,211,238,0.15)]"
-            >
-              {/* Event Banner - Large and High-Resolution matching Networking & Achievements */}
-              <div 
-                onClick={() => {
-                  setSelectedEvent(evt);
-                  setPaymentError(null);
-                  setPaymentStatusNotice(null);
-                }}
-                className="relative aspect-[16/10] sm:h-72 w-full overflow-hidden bg-black cursor-pointer"
+          {filteredEvents.map((evt, idx) => {
+            const win = evaluateRegistrationWindow({
+              section: 'event',
+              itemId: evt.id,
+              itemTitle: evt.name,
+              startDate: evt.registrationStartDate,
+              endDate: evt.registrationEndDate,
+              statusOverride: evt.status,
+              nowMs: windowTickNowMs,
+            });
+            return (
+              <motion.div
+                key={evt.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: (idx % 4) * 0.1 }}
+                className="bg-brand-card/60 border border-white/10 hover:border-brand-teal/40 rounded-3xl overflow-hidden transition-all duration-300 flex flex-col group shadow-xl hover:shadow-[0_0_30px_rgba(34,211,238,0.15)]"
               >
-                <img 
-                  src={evt.bannerImage} 
-                  alt={evt.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#011425] via-transparent to-black/30" />
-                
-                {/* Status Badges */}
-                <div className="absolute top-4 left-4 flex gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider backdrop-blur-md border ${
-                    evt.status === 'upcoming' 
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                      : 'bg-gray-500/20 text-gray-300 border-gray-500/30'
-                  }`}>
-                    {evt.status === 'upcoming' ? 'Registration Open' : 'Completed Event'}
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-brand-teal/20 text-brand-teal border border-brand-teal/30 text-[10px] font-mono font-bold uppercase tracking-wider backdrop-blur-md">
-                    {evt.category}
-                  </span>
-                </div>
-
-                {/* Price Tag */}
-                <div className="absolute bottom-4 right-4 px-3.5 py-1.5 rounded-xl bg-brand-dark/90 border border-brand-teal/40 text-brand-teal font-mono font-bold text-sm shadow-lg">
-                  {evt.ticketPrice === 0 ? 'FREE ENTRY' : `₹${evt.ticketPrice}`}
-                </div>
-              </div>
-
-              {/* Event Body */}
-              <div className="p-6 flex-1 flex flex-col justify-between">
+                {/* Event Banner - Large and High-Resolution matching Networking & Achievements */}
                 <div 
-                  onClick={() => {
-                    setSelectedEvent(evt);
-                    setPaymentError(null);
-                    setPaymentStatusNotice(null);
-                  }}
-                  className="cursor-pointer"
+                  onClick={() => handleOpenEventDetails(evt)}
+                  className="relative aspect-[16/10] sm:h-72 w-full overflow-hidden bg-black cursor-pointer"
                 >
-                  <h3 className="text-xl font-display font-extrabold text-white mb-3 group-hover:text-brand-teal transition-colors">
-                    {evt.name}
-                  </h3>
-
-                  <div className="space-y-2 mb-4 text-xs font-mono text-gray-300">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-brand-teal shrink-0" />
-                      <span>{evt.date} ({evt.day})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-brand-teal shrink-0" />
-                      <span>{evt.time}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-brand-teal shrink-0" />
-                      <span className="truncate">{evt.location}</span>
-                    </div>
+                  <img 
+                    src={evt.bannerImage} 
+                    alt={evt.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#011425] via-transparent to-black/30" />
+                  
+                  {/* Status Badges */}
+                  <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider backdrop-blur-md border ${
+                      win.status === 'OPEN'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        : win.status === 'NOT_STARTED'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : 'bg-red-500/20 text-red-300 border-red-500/30'
+                    }`}>
+                      {win.status === 'OPEN'
+                        ? 'Registration Open'
+                        : win.status === 'NOT_STARTED'
+                        ? `Opens ${win.startDateShort}`
+                        : evt.status === 'completed'
+                        ? 'Completed • Registration Closed'
+                        : 'Registration Closed'}
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-brand-teal/20 text-brand-teal border border-brand-teal/30 text-[10px] font-mono font-bold uppercase tracking-wider backdrop-blur-md">
+                      {evt.category}
+                    </span>
                   </div>
 
-                  <p className="text-gray-400 text-xs font-sans font-light leading-relaxed line-clamp-3 mb-6">
-                    {evt.description}
-                  </p>
+                  {/* Admin Quick Edit Dates */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingDatesEvent(evt);
+                        setEditRegStart(normalizeIsoDateOnly(evt.registrationStartDate) || getTodayIsoDateIst());
+                        setEditRegEnd(normalizeIsoDateOnly(evt.registrationEndDate) || '');
+                        setEditDateError(null);
+                      }}
+                      className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-black/75 hover:bg-brand-teal text-gray-200 hover:text-brand-dark border border-white/20 text-[10px] font-mono font-bold flex items-center gap-1 cursor-pointer transition-all"
+                      title="Edit Registration Start & Closing Dates"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Edit Reg Dates</span>
+                    </button>
+                  )}
+
+                  {/* Price Tag */}
+                  <div className="absolute bottom-4 right-4 px-3.5 py-1.5 rounded-xl bg-brand-dark/90 border border-brand-teal/40 text-brand-teal font-mono font-bold text-sm shadow-lg">
+                    {evt.ticketPrice === 0 ? 'FREE ENTRY' : `₹${evt.ticketPrice}`}
+                  </div>
                 </div>
 
-                {/* Action button */}
-                <button
-                  onClick={() => {
-                    setSelectedEvent(evt);
-                    setPaymentError(null);
-                    setPaymentStatusNotice(null);
-                  }}
-                  className="w-full py-3 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-teal/10"
-                >
-                  <span>View Event Details & Register</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
-          ))}
+                {/* Event Body */}
+                <div className="p-6 flex-1 flex flex-col justify-between">
+                  <div 
+                    onClick={() => handleOpenEventDetails(evt)}
+                    className="cursor-pointer"
+                  >
+                    <h3 className="text-xl font-display font-extrabold text-white mb-3 group-hover:text-brand-teal transition-colors">
+                      {evt.name}
+                    </h3>
+
+                    <div className="space-y-2 mb-4 text-xs font-mono text-gray-300">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-brand-teal shrink-0" />
+                        <span>{evt.date} ({evt.day})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-brand-teal shrink-0" />
+                        <span>{evt.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-brand-teal shrink-0" />
+                        <span className="truncate">{evt.location}</span>
+                      </div>
+                      {(win.startDate || win.endDate) && (
+                        <div className={`flex items-center gap-2 pt-1 text-[11px] font-bold ${
+                          win.status === 'OPEN'
+                            ? 'text-emerald-300'
+                            : win.status === 'NOT_STARTED'
+                            ? 'text-amber-300'
+                            : 'text-red-300'
+                        }`}>
+                          {win.status === 'CLOSED' ? (
+                            <CalendarX2 className="w-4 h-4 text-red-400 shrink-0" />
+                          ) : (
+                            <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                          )}
+                          <span>
+                            Registration: {win.startDateShort} – {win.endDateShort}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-gray-400 text-xs font-sans font-light leading-relaxed line-clamp-3 mb-6">
+                      {evt.description}
+                    </p>
+                  </div>
+
+                  {/* Action button */}
+                  <button
+                    onClick={() => handleOpenEventDetails(evt)}
+                    className={`w-full py-3 font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg ${
+                      win.allowed
+                        ? 'bg-brand-teal hover:bg-white text-brand-dark shadow-brand-teal/10'
+                        : 'bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/35 shadow-black/20'
+                    }`}
+                  >
+                    {win.allowed ? (
+                      <>
+                        <span>View Event Details & Register</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    ) : (
+                      <>
+                        <CalendarX2 className="w-4 h-4" />
+                        <span>
+                          {win.status === 'NOT_STARTED'
+                            ? `Registration Opens ${win.startDateShort}`
+                            : 'Registration Closed • View Details'}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
@@ -1457,6 +1727,70 @@ export default function Events() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Registration Timeline Banner (Visible before proceeding with registration/payment) */}
+                  {(() => {
+                    const selectedWin = evaluateRegistrationWindow({
+                      section: 'event',
+                      itemId: selectedEvent.id,
+                      itemTitle: selectedEvent.name,
+                      startDate: selectedEvent.registrationStartDate,
+                      endDate: selectedEvent.registrationEndDate,
+                      statusOverride: selectedEvent.status,
+                      nowMs: windowTickNowMs,
+                    });
+                    return (
+                      <div className={`rounded-2xl p-4 sm:p-5 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        selectedWin.status === 'OPEN'
+                          ? 'bg-emerald-500/10 border-emerald-500/30'
+                          : selectedWin.status === 'NOT_STARTED'
+                          ? 'bg-amber-500/10 border-amber-500/30'
+                          : 'bg-red-500/10 border-red-500/35'
+                      }`}>
+                        <div className="space-y-1 font-mono text-xs">
+                          <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-[11px]">
+                            {selectedWin.status === 'CLOSED' ? (
+                              <CalendarX2 className="w-4 h-4 text-red-400" />
+                            ) : (
+                              <Calendar className="w-4 h-4 text-emerald-400" />
+                            )}
+                            <span className={
+                              selectedWin.status === 'OPEN'
+                                ? 'text-emerald-300'
+                                : selectedWin.status === 'NOT_STARTED'
+                                ? 'text-amber-300'
+                                : 'text-red-300'
+                            }>
+                              {selectedWin.headline}
+                            </span>
+                          </div>
+                          <p className="text-gray-200 text-xs">
+                            Registration Period: <strong className="text-white">{selectedWin.startDateDisplay}</strong> to <strong className="text-white">{selectedWin.endDateDisplay}</strong>
+                          </p>
+                          {!selectedWin.allowed && (
+                            <p className="text-[11px] font-sans text-red-200/90 leading-relaxed pt-0.5">
+                              {selectedWin.message}
+                            </p>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDatesEvent(selectedEvent);
+                              setEditRegStart(normalizeIsoDateOnly(selectedEvent.registrationStartDate) || getTodayIsoDateIst());
+                              setEditRegEnd(normalizeIsoDateOnly(selectedEvent.registrationEndDate) || '');
+                              setEditDateError(null);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-brand-teal hover:text-brand-dark text-white font-mono text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-all"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit Dates</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* 4. Event Description */}
                   <div>
@@ -2182,12 +2516,12 @@ export default function Events() {
       {/* ADMIN ADD EVENT MODAL */}
       <AnimatePresence>
         {showAddEventModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-card border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl"
+              className="bg-brand-card border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto my-auto"
             >
               <button
                 onClick={() => setShowAddEventModal(false)}
@@ -2224,13 +2558,13 @@ export default function Events() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-gray-400 mb-1">Date *</label>
+                    <label className="block text-gray-400 mb-1">Event Date *</label>
                     <input
                       type="text"
                       required
                       value={newEventDate}
                       onChange={e => setNewEventDate(e.target.value)}
-                      placeholder="e.g. Oct 15, 2026"
+                      placeholder="e.g. Nov 29, 2026"
                       className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none"
                     />
                   </div>
@@ -2244,6 +2578,43 @@ export default function Events() {
                       className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl bg-brand-teal/5 border border-brand-teal/20">
+                  <div>
+                    <label className="block text-brand-teal font-bold mb-1 text-[10px] uppercase tracking-wider">
+                      Registration Start Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={newEventRegStart}
+                      onChange={e => {
+                        setNewEventRegStart(e.target.value);
+                        setNewEventDateError(null);
+                      }}
+                      className="w-full p-2 bg-black/50 border border-white/15 rounded-xl text-white focus:border-brand-teal focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-amber-300 font-bold mb-1 text-[10px] uppercase tracking-wider">
+                      Registration Closing Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      min={newEventRegStart || undefined}
+                      value={newEventRegEnd}
+                      onChange={e => {
+                        setNewEventRegEnd(e.target.value);
+                        setNewEventDateError(null);
+                      }}
+                      className="w-full p-2 bg-black/50 border border-white/15 rounded-xl text-white focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  {newEventDateError && (
+                    <p className="sm:col-span-2 text-red-400 text-[11px]">{newEventDateError}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -2267,6 +2638,23 @@ export default function Events() {
                       className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-400 mb-1">Category</label>
+                  <select
+                    value={newEventCategory}
+                    onChange={e => setNewEventCategory(e.target.value as SCODERSEvent['category'])}
+                    className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-white focus:border-brand-teal focus:outline-none"
+                  >
+                    <option value="hackathon">Hackathon</option>
+                    <option value="founder">Founder Meetup</option>
+                    <option value="developer">Developer Summit</option>
+                    <option value="community">Community & Awards</option>
+                    <option value="ai">AI</option>
+                    <option value="networking">Networking</option>
+                    <option value="workshop">Workshop</option>
+                  </select>
                 </div>
 
                 <div>
@@ -2298,6 +2686,92 @@ export default function Events() {
                 >
                   Publish New Event
                 </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ADMIN EDIT EVENT REGISTRATION DATES MODAL */}
+      <AnimatePresence>
+        {editingDatesEvent && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-brand-card border border-brand-teal/40 rounded-3xl max-w-md w-full p-6 space-y-4 relative shadow-2xl"
+            >
+              <button
+                type="button"
+                onClick={() => setEditingDatesEvent(null)}
+                className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black text-gray-300 hover:text-white rounded-full border border-white/10 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div>
+                <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold block">
+                  Admin Schedule Control
+                </span>
+                <h3 className="text-lg font-display font-bold text-white mt-0.5">
+                  Edit Registration Dates
+                </h3>
+                <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-1">
+                  {editingDatesEvent.name}
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveEditedEventDates} className="space-y-3 font-mono text-xs">
+                <div>
+                  <label className="block text-brand-teal font-bold mb-1 uppercase text-[10px] tracking-wider">
+                    Registration Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editRegStart}
+                    onChange={e => {
+                      setEditRegStart(e.target.value);
+                      setEditDateError(null);
+                    }}
+                    className="w-full p-2.5 bg-black/50 border border-white/15 rounded-xl text-white focus:border-brand-teal focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-amber-300 font-bold mb-1 uppercase text-[10px] tracking-wider">
+                    Registration Closing Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={editRegStart || undefined}
+                    value={editRegEnd}
+                    onChange={e => {
+                      setEditRegEnd(e.target.value);
+                      setEditDateError(null);
+                    }}
+                    className="w-full p-2.5 bg-black/50 border border-white/15 rounded-xl text-white focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+                {editDateError && (
+                  <p className="text-red-400 text-[11px]">{editDateError}</p>
+                )}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDatesEvent(null)}
+                    className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold uppercase cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-brand-teal hover:bg-white text-brand-dark rounded-xl font-bold uppercase cursor-pointer"
+                  >
+                    Save Dates
+                  </button>
+                </div>
               </form>
             </motion.div>
           </div>
@@ -2677,8 +3151,29 @@ export default function Events() {
               message: 'Payment cancelled or not completed. No event pass was generated.'
             });
           }}
-          onFailure={(reason) => {
+          onFailure={(reason, details) => {
             setShowRazorpayModal(false);
+            if (details?.registrationClosed) {
+              const ev =
+                details.windowStatus ||
+                (selectedEvent
+                  ? evaluateRegistrationWindow({
+                      section: 'event',
+                      itemId: selectedEvent.id,
+                      itemTitle: selectedEvent.name,
+                      startDate: selectedEvent.registrationStartDate,
+                      endDate: selectedEvent.registrationEndDate,
+                      statusOverride: selectedEvent.status,
+                      nowMs: getAuthoritativeNowMs(),
+                    })
+                  : null);
+              if (ev) {
+                setClosedModalEval(ev);
+                setShowClosedModal(true);
+              }
+              setSelectedEvent(null);
+              return;
+            }
             setPaymentStatusNotice({
               type: 'FAILED',
               message: reason || 'Payment incomplete or cancelled. No ticket pass generated.'
@@ -2702,6 +3197,12 @@ export default function Events() {
           paymentDetails={razorpayPaymentDetails}
         />
       )}
+      {/* Registration Closed / Not Started Modal */}
+      <RegistrationClosedModal
+        isOpen={showClosedModal}
+        onClose={() => setShowClosedModal(false)}
+        evaluation={closedModalEval}
+      />
     </div>
   );
 }

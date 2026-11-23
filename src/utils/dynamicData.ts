@@ -1,5 +1,6 @@
 import { Service, WorkshopEvent, NetworkingAchievement, SCODERSEvent, EventTicket, CandidateApplication } from '../types';
 import { SERVICES, WORKSHOP_EVENTS } from '../data';
+import { DEFAULT_EVENT_WINDOWS, DEFAULT_WORKSHOP_WINDOWS } from './registrationWindow';
 
 const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
   {
@@ -15,6 +16,8 @@ const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
     ticketPrice: 499,
     status: 'upcoming',
     featured: true,
+    registrationStartDate: '2026-11-01',
+    registrationEndDate: '2026-12-31',
     eventPhotos: [
       {
         id: 'p-1',
@@ -55,6 +58,8 @@ const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
     ticketPrice: 299,
     status: 'upcoming',
     featured: true,
+    registrationStartDate: '2026-11-01',
+    registrationEndDate: '2026-12-31',
     eventPhotos: [
       {
         id: 'pf-1',
@@ -83,6 +88,8 @@ const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
     ticketPrice: 199,
     status: 'upcoming',
     featured: false,
+    registrationStartDate: '2026-11-01',
+    registrationEndDate: '2026-12-31',
     eventPhotos: [
       {
         id: 'pd-1',
@@ -105,6 +112,8 @@ const DEFAULT_SCODERS_EVENTS: SCODERSEvent[] = [
     ticketPrice: 0,
     status: 'completed',
     featured: false,
+    registrationStartDate: '2026-06-15',
+    registrationEndDate: '2026-07-14',
     eventPhotos: [
       {
         id: 'pa-1',
@@ -136,7 +145,17 @@ export function getDynamicEvents(): SCODERSEvent[] {
   try {
     const saved = localStorage.getItem('scoders_dynamic_events');
     if (saved) {
-      return JSON.parse(saved);
+      const parsed: SCODERSEvent[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.map((evt) => {
+          const defWin = DEFAULT_EVENT_WINDOWS[evt.id];
+          return {
+            ...evt,
+            registrationStartDate: evt.registrationStartDate || (!evt.registrationEndDate && defWin ? defWin.start : evt.registrationStartDate),
+            registrationEndDate: evt.registrationEndDate || (!evt.registrationStartDate && defWin ? defWin.end : evt.registrationEndDate),
+          };
+        });
+      }
     }
   } catch (e) {
     console.error('Error loading dynamic events:', e);
@@ -244,7 +263,24 @@ export function getDynamicWorkshops(): WorkshopEvent[] {
   try {
     const saved = localStorage.getItem('scoders_dynamic_workshops');
     if (saved) {
-      return JSON.parse(saved);
+      const parsed: WorkshopEvent[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.map((w) => {
+          const def = WORKSHOP_EVENTS.find((d) => d.id === w.id);
+          const defWin = DEFAULT_WORKSHOP_WINDOWS[w.id];
+          const hydratedLink =
+            w.id === 'w-1' && w.whatsappGroupLink === 'https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F'
+              ? def?.whatsappGroupLink
+              : w.whatsappGroupLink || def?.whatsappGroupLink;
+          return {
+            ...w,
+            whatsappGroupName: w.whatsappGroupName || def?.whatsappGroupName,
+            whatsappGroupLink: hydratedLink,
+            registrationStartDate: w.registrationStartDate || (!w.registrationEndDate && defWin ? defWin.start : w.registrationStartDate),
+            registrationEndDate: w.registrationEndDate || (!w.registrationStartDate && defWin ? defWin.end : w.registrationEndDate),
+          };
+        });
+      }
     }
   } catch (e) {
     console.error('Error loading dynamic workshops:', e);

@@ -20,6 +20,12 @@ import {
   DynamicInvoice
 } from '../utils/dynamicData';
 import { Service, WorkshopEvent, ServiceEnquiry, GeneralMessage, NetworkingAchievement, CandidateApplication } from '../types';
+import { sanitizeWhatsappUrl } from '../utils/workshopWhatsapp';
+import {
+  evaluateRegistrationWindow,
+  getTodayIsoDateIst,
+  normalizeIsoDateOnly,
+} from '../utils/registrationWindow';
 import { 
   DatabaseEngine, ServiceRegistration, WorkshopRegistration, 
   PaymentTransaction, FeedbackItem, ChatConversation, 
@@ -250,6 +256,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
   const [workshopAch1, setWorkshopAch1] = useState('');
   const [workshopAch2, setWorkshopAch2] = useState('');
   const [workshopAch3, setWorkshopAch3] = useState('');
+  const [workshopWaGroupName, setWorkshopWaGroupName] = useState('');
+  const [workshopWaGroupLink, setWorkshopWaGroupLink] = useState('');
+  const [workshopRegStartDate, setWorkshopRegStartDate] = useState<string>(() => getTodayIsoDateIst());
+  const [workshopRegEndDate, setWorkshopRegEndDate] = useState<string>('');
+  const [workshopDateError, setWorkshopDateError] = useState<string | null>(null);
 
   // Form fields for Invoices
   const [invoiceId, setInvoiceId] = useState('');
@@ -470,6 +481,14 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     e.preventDefault();
     if (!workshopTitle || !workshopDate || !workshopLocation) return;
 
+    const normStart = normalizeIsoDateOnly(workshopRegStartDate);
+    const normEnd = normalizeIsoDateOnly(workshopRegEndDate);
+    if (normStart && normEnd && normEnd < normStart) {
+      setWorkshopDateError('Registration Closing Date must be on or after the Registration Start Date.');
+      return;
+    }
+    setWorkshopDateError(null);
+
     const achievements = [workshopAch1, workshopAch2, workshopAch3].map(a => a.trim()).filter(Boolean);
     const parsedTools = workshopTools.split(',').map(t => t.trim()).filter(Boolean);
     const parsedUsefulness = workshopUsefulness.split('\n').map(u => u.trim()).filter(Boolean);
@@ -491,7 +510,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         toolsUsed: parsedTools.length > 0 ? parsedTools : ['React', 'TypeScript', 'Node.js'],
         usefulness: parsedUsefulness.length > 0 ? parsedUsefulness : ['Master core developer concepts', 'Receive S-CODERS Verified Certification'],
         prerequisites: workshopPrerequisites || 'Basic programming knowledge & laptop with Node.js',
-        achievements: achievements.length > 0 ? achievements : ['Completed workshop successfully', 'High engagement rated', 'Built practical code logs']
+        achievements: achievements.length > 0 ? achievements : ['Completed workshop successfully', 'High engagement rated', 'Built practical code logs'],
+        whatsappGroupName: workshopWaGroupName.trim() || `${workshopTitle} Group`,
+        whatsappGroupLink: sanitizeWhatsappUrl(workshopWaGroupLink) || undefined,
+        registrationStartDate: normStart || undefined,
+        registrationEndDate: normEnd || undefined
       } : w);
     } else {
       const newWorkshop: WorkshopEvent = {
@@ -509,7 +532,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
         toolsUsed: parsedTools.length > 0 ? parsedTools : ['React', 'TypeScript', 'Node.js'],
         usefulness: parsedUsefulness.length > 0 ? parsedUsefulness : ['Master core developer concepts', 'Receive S-CODERS Verified Certification'],
         prerequisites: workshopPrerequisites || 'Basic programming knowledge & laptop with Node.js',
-        achievements: achievements.length > 0 ? achievements : ['S-CODERS live certified bootcamp', 'Built dynamic stack prototypes', 'Awarded outstanding contribution tags']
+        achievements: achievements.length > 0 ? achievements : ['S-CODERS live certified bootcamp', 'Built dynamic stack prototypes', 'Awarded outstanding contribution tags'],
+        whatsappGroupName: workshopWaGroupName.trim() || `${workshopTitle} Group`,
+        whatsappGroupLink: sanitizeWhatsappUrl(workshopWaGroupLink) || undefined,
+        registrationStartDate: normStart || undefined,
+        registrationEndDate: normEnd || undefined
       };
       updatedWorkshops = [...workshops, newWorkshop];
     }
@@ -538,6 +565,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setWorkshopAch1(w.achievements[0] || '');
     setWorkshopAch2(w.achievements[1] || '');
     setWorkshopAch3(w.achievements[2] || '');
+    setWorkshopWaGroupName(w.whatsappGroupName || '');
+    setWorkshopWaGroupLink(w.whatsappGroupLink || '');
+    setWorkshopRegStartDate(normalizeIsoDateOnly(w.registrationStartDate) || getTodayIsoDateIst());
+    setWorkshopRegEndDate(normalizeIsoDateOnly(w.registrationEndDate) || '');
+    setWorkshopDateError(null);
   };
 
   const handleDeleteWorkshop = (id: string) => {
@@ -567,6 +599,11 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     setWorkshopAch1('');
     setWorkshopAch2('');
     setWorkshopAch3('');
+    setWorkshopWaGroupName('');
+    setWorkshopWaGroupLink('');
+    setWorkshopRegStartDate(getTodayIsoDateIst());
+    setWorkshopRegEndDate('');
+    setWorkshopDateError(null);
   };
 
   // INVOICE CRUD
@@ -2152,6 +2189,45 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-brand-teal/5 border border-brand-teal/20">
+                        <div>
+                          <label className="block text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold mb-1">
+                            Registration Start Date *
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={workshopRegStartDate}
+                            onChange={(e) => {
+                              setWorkshopRegStartDate(e.target.value);
+                              setWorkshopDateError(null);
+                            }}
+                            className="w-full bg-brand-dark/90 border border-white/15 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-brand-teal transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-amber-400 uppercase tracking-widest font-bold mb-1">
+                            Registration Closing Date *
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            min={workshopRegStartDate || undefined}
+                            value={workshopRegEndDate}
+                            onChange={(e) => {
+                              setWorkshopRegEndDate(e.target.value);
+                              setWorkshopDateError(null);
+                            }}
+                            className="w-full bg-brand-dark/90 border border-white/15 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-400 transition-colors"
+                          />
+                        </div>
+                        {workshopDateError && (
+                          <p className="sm:col-span-2 text-[11px] font-mono text-red-400">
+                            {workshopDateError}
+                          </p>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-3 gap-3">
                         <div>
                           <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">Category / Tag</label>
@@ -2279,6 +2355,26 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                         />
                       </div>
 
+                      <div className="space-y-2 pt-1 border-t border-white/10">
+                        <label className="block text-[10px] font-mono text-[#25D366] uppercase tracking-widest font-bold">
+                          Dedicated Workshop WhatsApp Group (Inside Workspace)
+                        </label>
+                        <input
+                          type="text"
+                          value={workshopWaGroupName}
+                          onChange={(e) => setWorkshopWaGroupName(e.target.value)}
+                          placeholder="Group Name (e.g. AI Agents Workshop Group)"
+                          className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#25D366] transition-colors"
+                        />
+                        <input
+                          type="url"
+                          value={workshopWaGroupLink}
+                          onChange={(e) => setWorkshopWaGroupLink(e.target.value)}
+                          placeholder="Dedicated Invite URL: https://chat.whatsapp.com/..."
+                          className="w-full bg-brand-dark/80 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-[#25D366] transition-colors"
+                        />
+                      </div>
+
                       <div className="flex gap-2 pt-1">
                         <button
                           type="submit"
@@ -2319,6 +2415,33 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                             <h4 className="text-sm font-display font-bold text-white leading-tight">{w.title}</h4>
                             <p className="text-gray-500 text-[10px] font-mono">{w.date} {w.startTime ? `• ${w.startTime}` : ''} • {w.location}</p>
                             <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mt-1">{w.summary}</p>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366]">
+                                WhatsApp: {w.whatsappGroupName || `${w.title} Group`} {w.whatsappGroupLink ? '• Direct Invite Set' : '• Batch Join'}
+                              </span>
+                              {(() => {
+                                const win = evaluateRegistrationWindow({
+                                  section: 'workshop',
+                                  itemId: w.id,
+                                  itemTitle: w.title,
+                                  startDate: w.registrationStartDate,
+                                  endDate: w.registrationEndDate,
+                                });
+                                return (
+                                  <span
+                                    className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
+                                      win.status === 'OPEN'
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                                        : win.status === 'NOT_STARTED'
+                                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                                        : 'bg-red-500/10 border-red-500/30 text-red-300'
+                                    }`}
+                                  >
+                                    Reg: {win.startDateShort} → {win.endDateShort} ({win.status === 'OPEN' ? 'Open' : win.status === 'NOT_STARTED' ? 'Opens Soon' : 'Closed'})
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             {w.toolsUsed && w.toolsUsed.length > 0 && (
                               <div className="flex flex-wrap gap-1 pt-1">
                                 {w.toolsUsed.slice(0, 4).map((tool, idx) => (

@@ -584,7 +584,7 @@ export default function RazorpayModal({
     method: string
   ) => {
     try {
-      await verifyRazorpayPayment({
+      const verifyRes = await verifyRazorpayPayment({
         razorpay_order_id: ordId,
         razorpay_payment_id: paymentId,
         razorpay_signature: signature,
@@ -596,6 +596,12 @@ export default function RazorpayModal({
         paymentMethodLabel: method,
         merchantUpiId: activeMerchantVpa,
       });
+
+      if (verifyRes?.registrationClosed) {
+        onFailure?.(verifyRes.error || 'Registration window has closed.', verifyRes);
+        onClose();
+        return;
+      }
     } catch (err) {
       console.warn('Verification log warning:', err);
     }

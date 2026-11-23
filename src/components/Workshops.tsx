@@ -4,7 +4,7 @@ import {
   Send, User, Star, CheckCircle, ArrowRight, Edit2, Save, X, Plus, Minus,
   Lock, Key, Copy, Code, Terminal, Download, Play, MessageCircle, Eye, Shield, Check, RefreshCw,
   ShieldCheck, CreditCard, Wallet, Upload, Clock, Wrench, BookOpen, Cpu, CheckSquare, HelpCircle,
-  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle, CheckCircle2, Trash2
+  ExternalLink, Linkedin, Github, Phone, Mail, AlertTriangle, CheckCircle2, Trash2, CalendarX2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
@@ -27,7 +27,18 @@ import {
 import WorkshopChatRoom from './WorkshopChatRoom';
 import { OnlineCodePlayground } from './OnlineCodePlayground';
 import UidRecoveryPanel from './UidRecoveryPanel';
+import RegistrationClosedModal from './RegistrationClosedModal';
+import {
+  evaluateRegistrationWindow,
+  checkServerRegistrationWindow,
+  syncServerClock,
+  getAuthoritativeNowMs,
+  getTodayIsoDateIst,
+  normalizeIsoDateOnly,
+  RegistrationWindowEvaluation,
+} from '../utils/registrationWindow';
 import { buildPublicShareUrl } from '../utils/shareUrl';
+import { getWorkshopWhatsappGroup, sanitizeWhatsappUrl } from '../utils/workshopWhatsapp';
 
 interface WorkshopsProps {
   onBookWorkshop?: (details: { workshopId: string; title: string; seats: number; totalAmount: number }) => void;
@@ -57,6 +68,10 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   // Admin and Dynamic Sync States
   const [editingWorkshopId, setEditingWorkshopId] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<number>(0);
+  const [editingWaGroup, setEditingWaGroup] = useState(false);
+  const [waGroupNameDraft, setWaGroupNameDraft] = useState('');
+  const [waGroupLinkDraft, setWaGroupLinkDraft] = useState('');
+  const [waGroupSavedToast, setWaGroupSavedToast] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem('scoders_admin_auth') === 'true';
   });
@@ -152,6 +167,15 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [wkspAutoSaveStatus, setWkspAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
   const [wkspManualSaveFlash, setWkspManualSaveFlash] = useState(false);
   const wkspDraftFirstRenderRef = useRef(true);
+
+  // Registration Window Deadline & Admin Date Edit States
+  const [windowTickNowMs, setWindowTickNowMs] = useState<number>(() => getAuthoritativeNowMs());
+  const [closedModalEval, setClosedModalEval] = useState<RegistrationWindowEvaluation | null>(null);
+  const [showClosedModal, setShowClosedModal] = useState(false);
+  const [editingWkspDates, setEditingWkspDates] = useState(false);
+  const [wkspRegStartDraft, setWkspRegStartDraft] = useState('');
+  const [wkspRegEndDraft, setWkspRegEndDraft] = useState('');
+  const [wkspDateDraftError, setWkspDateDraftError] = useState<string | null>(null);
 
   // Active Workshop Classroom States
   const [activeTab, setActiveTab] = useState<'sandbox' | 'resources' | 'discussion'>('sandbox');
@@ -252,6 +276,14 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     };
   }, []);
 
+  useEffect(() => {
+    syncServerClock(true).then((ms) => setWindowTickNowMs(ms)).catch(() => {});
+    const interval = setInterval(() => {
+      setWindowTickNowMs(getAuthoritativeNowMs());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleSavePrice = (id: string) => {
     const updated = workshops.map(w => w.id === id ? { ...w, price: tempPrice } : w);
     setWorkshops(updated);
@@ -280,6 +312,38 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const activeRegInfo = registeredKeys[activeWorkshop.id];
   const isPassRevoked = activeRegInfo ? DatabaseEngine.isPassRevoked(activeRegInfo.key) : false;
   const isRegistered = !!activeRegInfo && !isPassRevoked;
+
+  const activeWorkshopWindow = evaluateRegistrationWindow({
+    section: 'workshop',
+    itemId: activeWorkshop.id,
+    itemTitle: activeWorkshop.title,
+    startDate: activeWorkshop.registrationStartDate,
+    endDate: activeWorkshop.registrationEndDate,
+    nowMs: windowTickNowMs,
+  });
+
+  const handleSaveInlineWorkshopDates = (e: React.FormEvent) => {
+    e.preventDefault();
+    const normStart = normalizeIsoDateOnly(wkspRegStartDraft);
+    const normEnd = normalizeIsoDateOnly(wkspRegEndDraft);
+    if (normStart && normEnd && normEnd < normStart) {
+      setWkspDateDraftError('Registration Closing Date must be on or after the Registration Start Date.');
+      return;
+    }
+    const updated = workshops.map((w) =>
+      w.id === activeWorkshop.id
+        ? {
+            ...w,
+            registrationStartDate: normStart || undefined,
+            registrationEndDate: normEnd || undefined,
+          }
+        : w
+    );
+    setWorkshops(updated);
+    saveDynamicWorkshops(updated);
+    setEditingWkspDates(false);
+    setWkspDateDraftError(null);
+  };
 
   // Load sandbox initial code template based on selected workshop
   useEffect(() => {
@@ -379,6 +443,8 @@ export default function TenantDashboard() {
     let validUntil: string | undefined;
     let dispatchedViaUnified = false;
     let emailDeliveryMode: string | undefined;
+    let emailRealDelivered: boolean | undefined;
+    let emailDeliveryError: string | undefined;
     let emailPreviewUrl: string | undefined;
 
     try {
@@ -401,16 +467,30 @@ export default function TenantDashboard() {
             date: activeWorkshop.date,
             time: (activeWorkshop as any).time || (activeWorkshop as any).startTime || '10:00 AM IST',
             location: activeWorkshop.location,
+            registrationStartDate: activeWorkshop.registrationStartDate,
+            registrationEndDate: activeWorkshop.registrationEndDate,
           },
           actionUrl: buildPublicShareUrl('/?view=workshops'),
         }),
       });
+      if (regRes.status === 403) {
+        const errData = await regRes.json().catch(() => ({}));
+        if (errData?.registrationClosed) {
+          setShowRegModal(false);
+          setPaymentError(errData.error || 'Workshop registration deadline has expired.');
+          setClosedModalEval(errData.windowStatus || activeWorkshopWindow);
+          setShowClosedModal(true);
+          return;
+        }
+      }
       if (regRes.ok) {
         const regData = await regRes.json();
         if (regData?.success && regData?.uid) {
           generatedKey = regData.uid;
           validUntil = regData.validUntil || regData.record?.validUntil;
           emailDeliveryMode = regData.deliveryMode;
+          emailRealDelivered = Boolean(regData.realEmailDelivered);
+          emailDeliveryError = regData.emailError;
           emailPreviewUrl = regData.previewUrl;
           dispatchedViaUnified = true;
         }
@@ -563,7 +643,8 @@ export default function TenantDashboard() {
     // 6. Close the drawer modal immediately
     setShowRegModal(false);
 
-    // 7. Pop up the official Email Notification Confirmation Modal
+    // 7. Pop up the official Email Notification Confirmation Modal with this workshop's dedicated WhatsApp group
+    const activeWaGroup = getWorkshopWhatsappGroup(activeWorkshop, generatedKey);
     setEmailNoticeData({
       type: 'workshop',
       recipientEmail: safeEmail,
@@ -573,8 +654,14 @@ export default function TenantDashboard() {
       uniqueKey: generatedKey,
       validUntil,
       deliveryMode: emailDeliveryMode,
+      realEmailDelivered: emailRealDelivered,
+      emailError: emailDeliveryError,
       previewUrl: emailPreviewUrl,
-      messageText: `Your payment has been verified and an official email from scoders82@gmail.com has been dispatched to ${safeEmail} with your workshop details and Unique Registration Code (${generatedKey}). Keep it safe to rejoin seamlessly anytime.`,
+      whatsappGroupLink: activeWaGroup.href,
+      whatsappGroupName: activeWaGroup.groupName,
+      messageText: emailRealDelivered
+        ? `Your payment has been verified and an official email from scoders82@gmail.com has been delivered directly to ${safeEmail} containing your workshop details, rules & regulations, and Unique Registration Code (${generatedKey}).`
+        : `Your payment has been verified and your registration email from scoders82@gmail.com with workshop details, rules & regulations, and Unique Registration Code (${generatedKey}) is ready for ${safeEmail}.`,
       amount: totalAmount,
       actionText: "Enter Workshop & Sandbox",
       onAction: () => {
@@ -588,6 +675,24 @@ export default function TenantDashboard() {
   const handleInitiateRazorpayWorkshop = async () => {
     setIsProcessing(true);
     setPaymentError(null);
+
+    const serverWin = await checkServerRegistrationWindow({
+      section: 'workshop',
+      itemId: activeWorkshop.id,
+      itemTitle: activeWorkshop.title,
+      startDate: activeWorkshop.registrationStartDate,
+      endDate: activeWorkshop.registrationEndDate,
+    });
+    setWindowTickNowMs(getAuthoritativeNowMs());
+    if (!serverWin.allowed) {
+      setIsProcessing(false);
+      setShowRegModal(false);
+      setPaymentError(serverWin.message);
+      setClosedModalEval(serverWin);
+      setShowClosedModal(true);
+      return;
+    }
+
     const totalAmount = (activeWorkshop.price ?? 1499) * payTicketsCount;
     const participantName = (regName.trim() || (currentUser?.name && currentUser.name !== 'Attendee' ? currentUser.name : '')).trim();
     const participantEmail = (regEmail.trim() || (currentUser?.email && currentUser.email !== 'attendee@scoders.com' ? currentUser.email : '')).trim();
@@ -597,17 +702,37 @@ export default function TenantDashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          section: 'workshop',
+          itemId: activeWorkshop.id,
+          workshopId: activeWorkshop.id,
           amount: totalAmount,
           currency: 'INR',
           receipt: `wksp_${activeWorkshop.id}_${Date.now()}`,
           notes: {
+            section: 'workshop',
+            itemId: activeWorkshop.id,
+            workshopId: activeWorkshop.id,
             workshopTitle: activeWorkshop.title,
             participantName: participantName,
             email: participantEmail,
-            tickets: payTicketsCount
+            tickets: payTicketsCount,
+            registrationStartDate: activeWorkshop.registrationStartDate,
+            registrationEndDate: activeWorkshop.registrationEndDate,
           }
         })
       });
+
+      if (orderRes.status === 403) {
+        const errData = await orderRes.json().catch(() => ({}));
+        if (errData?.registrationClosed) {
+          setIsProcessing(false);
+          setShowRegModal(false);
+          setPaymentError(errData.error || serverWin.message);
+          setClosedModalEval(errData.windowStatus || serverWin);
+          setShowClosedModal(true);
+          return;
+        }
+      }
 
       const orderData = await orderRes.json();
 
@@ -632,6 +757,22 @@ export default function TenantDashboard() {
       setShowRazorpayModal(true);
     } catch (err) {
       console.warn("Offline fallback for workshop razorpay order:", err);
+      const offlineWin = evaluateRegistrationWindow({
+        section: 'workshop',
+        itemId: activeWorkshop.id,
+        itemTitle: activeWorkshop.title,
+        startDate: activeWorkshop.registrationStartDate,
+        endDate: activeWorkshop.registrationEndDate,
+        nowMs: getAuthoritativeNowMs(),
+      });
+      if (!offlineWin.allowed) {
+        setIsProcessing(false);
+        setShowRegModal(false);
+        setClosedModalEval(offlineWin);
+        setShowClosedModal(true);
+        return;
+      }
+
       setRazorpayOrderData({
         orderId: `ord_${Date.now()}`,
         amount: totalAmount,
@@ -1492,6 +1633,14 @@ export default function TenantDashboard() {
             <div className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2 pl-2">Select Workshop Event Option</div>
             {workshops.map((w) => {
               const isSelected = selectedWorkshopId === w.id;
+              const wWin = evaluateRegistrationWindow({
+                section: 'workshop',
+                itemId: w.id,
+                itemTitle: w.title,
+                startDate: w.registrationStartDate,
+                endDate: w.registrationEndDate,
+                nowMs: windowTickNowMs,
+              });
               return (
                 <button
                   key={w.id}
@@ -1509,14 +1658,22 @@ export default function TenantDashboard() {
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     />
                   )}
-                  <div className="flex items-center justify-between mb-1 z-10">
+                  <div className="flex items-center justify-between mb-1 z-10 gap-2">
                     <span className="text-[10px] font-mono text-brand-teal uppercase tracking-widest font-bold">{w.category}</span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30">
                         ₹{(w.price ?? 1499).toLocaleString()}
                       </span>
                       {registeredKeys[w.id] ? (
                         <span className="text-[8px] font-mono px-2 py-0.5 bg-brand-teal/10 border border-brand-teal/30 text-brand-teal rounded-full font-bold uppercase animate-pulse">Unlocked</span>
+                      ) : !wWin.allowed ? (
+                        <span className={`text-[8px] font-mono px-2 py-0.5 rounded-full font-bold uppercase border ${
+                          wWin.status === 'NOT_STARTED'
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                            : 'bg-red-500/15 border-red-500/35 text-red-300'
+                        }`}>
+                          {wWin.status === 'NOT_STARTED' ? 'Opens Soon' : 'Reg Closed'}
+                        </span>
                       ) : (
                         <span className="text-[8px] font-mono px-2 py-0.5 bg-amber-400/10 border border-amber-400/30 text-amber-400 rounded-full font-bold uppercase">Locked</span>
                       )}
@@ -1535,6 +1692,20 @@ export default function TenantDashboard() {
                       {w.startTime || '10:00 AM IST'} • {w.duration || '2 Days'}
                     </span>
                   </div>
+                  {(wWin.startDate || wWin.endDate) && (
+                    <div className={`mt-2 pt-2 border-t border-white/5 text-[10px] font-mono flex items-center justify-between z-10 ${
+                      wWin.status === 'OPEN'
+                        ? 'text-emerald-300'
+                        : wWin.status === 'NOT_STARTED'
+                        ? 'text-amber-300'
+                        : 'text-red-300'
+                    }`}>
+                      <span>Reg: {wWin.startDateShort} – {wWin.endDateShort}</span>
+                      <span className="uppercase font-bold">
+                        {wWin.status === 'OPEN' ? 'Open' : wWin.status === 'NOT_STARTED' ? 'Soon' : 'Closed'}
+                      </span>
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -1764,14 +1935,128 @@ export default function TenantDashboard() {
                     </div>
                   ) : (
                     <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
-                      <div className="bg-amber-400/5 border border-amber-400/20 rounded-2xl p-6 text-center space-y-3">
-                        <div className="w-10 h-10 bg-amber-400/10 rounded-full flex items-center justify-center mx-auto text-amber-400 border border-amber-400/20">
-                          <Lock className="w-5 h-5" />
+                      <div className={`border rounded-2xl p-6 text-center space-y-3 ${
+                        activeWorkshopWindow.allowed
+                          ? 'bg-amber-400/5 border-amber-400/20'
+                          : 'bg-red-500/5 border-red-500/25'
+                      }`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto border ${
+                          activeWorkshopWindow.allowed
+                            ? 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+                            : 'bg-red-500/15 text-red-400 border-red-500/30'
+                        }`}>
+                          {activeWorkshopWindow.allowed ? <Lock className="w-5 h-5" /> : <CalendarX2 className="w-5 h-5" />}
                         </div>
-                        <h4 className="font-display font-bold text-white text-base">Classroom & Deliverables Locked</h4>
+                        <h4 className="font-display font-bold text-white text-base">
+                          {activeWorkshopWindow.allowed
+                            ? 'Classroom & Deliverables Locked'
+                            : activeWorkshopWindow.headline}
+                        </h4>
                         <p className="text-gray-400 text-xs font-sans max-w-md mx-auto leading-relaxed">
-                          Developer sandboxes, session codes, slides, and simulated attendee discussion streams are restricted. Please register to obtain your session key.
+                          {activeWorkshopWindow.allowed
+                            ? 'Developer sandboxes, session codes, slides, and simulated attendee discussion streams are restricted. Please register to obtain your session key.'
+                            : activeWorkshopWindow.message}
                         </p>
+
+                        {/* Registration Timeline Box (Always Visible Before Registration / Payment) */}
+                        <div className={`max-w-md mx-auto rounded-xl p-3 border text-left font-mono text-[11px] flex flex-col gap-1.5 ${
+                          activeWorkshopWindow.status === 'OPEN'
+                            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200'
+                            : activeWorkshopWindow.status === 'NOT_STARTED'
+                            ? 'bg-amber-500/10 border-amber-500/25 text-amber-200'
+                            : 'bg-red-500/10 border-red-500/30 text-red-200'
+                        }`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold uppercase tracking-wider text-[10px]">
+                              Registration Schedule
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                activeWorkshopWindow.status === 'OPEN'
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : activeWorkshopWindow.status === 'NOT_STARTED'
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-red-500/20 text-red-300'
+                              }`}>
+                                {activeWorkshopWindow.status === 'OPEN'
+                                  ? 'Open'
+                                  : activeWorkshopWindow.status === 'NOT_STARTED'
+                                  ? 'Opens Soon'
+                                  : 'Closed'}
+                              </span>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setWkspRegStartDraft(normalizeIsoDateOnly(activeWorkshop.registrationStartDate) || getTodayIsoDateIst());
+                                    setWkspRegEndDraft(normalizeIsoDateOnly(activeWorkshop.registrationEndDate) || '');
+                                    setWkspDateDraftError(null);
+                                    setEditingWkspDates(!editingWkspDates);
+                                  }}
+                                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-brand-teal hover:text-brand-dark text-white text-[9px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <Edit2 className="w-2.5 h-2.5" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-[9px] text-gray-400 uppercase block">Starts</span>
+                              <span className="text-white font-bold">{activeWorkshopWindow.startDateDisplay}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-gray-400 uppercase block">Closes</span>
+                              <span className="text-white font-bold">{activeWorkshopWindow.endDateDisplay}</span>
+                            </div>
+                          </div>
+                          {isAdmin && editingWkspDates && (
+                            <form onSubmit={handleSaveInlineWorkshopDates} className="pt-2 mt-1 border-t border-white/10 space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[9px] text-gray-300 uppercase mb-0.5">Start Date</label>
+                                  <input
+                                    type="date"
+                                    required
+                                    value={wkspRegStartDraft}
+                                    onChange={(e) => { setWkspRegStartDraft(e.target.value); setWkspDateDraftError(null); }}
+                                    className="w-full px-2 py-1.5 rounded-lg bg-black/50 border border-white/15 text-white text-[11px]"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] text-gray-300 uppercase mb-0.5">Closing Date</label>
+                                  <input
+                                    type="date"
+                                    required
+                                    min={wkspRegStartDraft || undefined}
+                                    value={wkspRegEndDraft}
+                                    onChange={(e) => { setWkspRegEndDraft(e.target.value); setWkspDateDraftError(null); }}
+                                    className="w-full px-2 py-1.5 rounded-lg bg-black/50 border border-white/15 text-white text-[11px]"
+                                  />
+                                </div>
+                              </div>
+                              {wkspDateDraftError && (
+                                <p className="text-[10px] text-red-400">{wkspDateDraftError}</p>
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  type="submit"
+                                  className="flex-1 py-1.5 bg-brand-teal text-brand-dark rounded-lg font-bold text-[10px] uppercase cursor-pointer"
+                                >
+                                  Save Schedule
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingWkspDates(false)}
+                                  className="px-3 py-1.5 bg-white/10 text-gray-300 rounded-lg font-bold text-[10px] uppercase cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
 
                         {/* Workshop Amount Callout Box */}
                         <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-2xl p-3 max-w-sm mx-auto flex items-center justify-between my-2">
@@ -1788,10 +2073,27 @@ export default function TenantDashboard() {
                               setPayTicketsCount(seatCount);
                               handleInitiateRazorpayWorkshop();
                             }}
-                            className="px-6 py-3 bg-[#521714] hover:bg-[#681e1a] active:bg-[#401210] text-[#ffded9] font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-black/40"
+                            className={`px-6 py-3 font-display font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-black/40 ${
+                              activeWorkshopWindow.allowed
+                                ? 'bg-[#521714] hover:bg-[#681e1a] active:bg-[#401210] text-[#ffded9]'
+                                : 'bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40'
+                            }`}
                           >
-                            <Key className="w-4 h-4" />
-                            Register & Pay ₹{(activeWorkshop.price ?? 1499).toLocaleString()}
+                            {activeWorkshopWindow.allowed ? (
+                              <>
+                                <Key className="w-4 h-4" />
+                                <span>Register & Pay ₹{(activeWorkshop.price ?? 1499).toLocaleString()}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CalendarX2 className="w-4 h-4" />
+                                <span>
+                                  {activeWorkshopWindow.status === 'NOT_STARTED'
+                                    ? `Registration Opens ${activeWorkshopWindow.startDateShort}`
+                                    : 'Registration Closed'}
+                                </span>
+                              </>
+                            )}
                           </button>
                           <button
                             onClick={() => {
@@ -2323,26 +2625,34 @@ export default function TenantDashboard() {
                       </p>
                     </div>
 
-                    {/* WhatsApp Group Link Section */}
-                    <div className="bg-brand-teal/10 border border-brand-teal/30 p-6 rounded-3xl flex flex-col items-center gap-4 text-center shadow-lg">
-                      <div className="p-3 bg-[#25D366]/20 rounded-full text-[#25D366] border border-[#25D366]/30">
-                        <Users className="w-7 h-7" />
-                      </div>
-                      <div>
-                        <h4 className="text-base sm:text-lg font-bold text-white">Join Workshop WhatsApp Group</h4>
-                        <p className="text-gray-300 text-xs sm:text-sm mt-1.5 leading-relaxed max-w-lg">
-                          Click below to join the official S-CODERS Workshop WhatsApp group. Live Zoom meeting links, schedules, and code files will be shared there.
-                        </p>
-                      </div>
-                      <a 
-                        href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-full sm:w-auto px-8 py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-xs sm:text-sm uppercase font-extrabold tracking-wider rounded-2xl transition-all block text-center shadow-lg shadow-[#25D366]/25 cursor-pointer active:scale-95"
-                      >
-                        Join Workshop WhatsApp Group
-                      </a>
-                    </div>
+                    {/* Dedicated Per-Workshop WhatsApp Group Link Section */}
+                    {(() => {
+                      const regWaGroup = getWorkshopWhatsappGroup(activeWorkshop, regSuccessKey || undefined);
+                      return (
+                        <div className="bg-brand-teal/10 border border-brand-teal/30 p-6 rounded-3xl flex flex-col items-center gap-4 text-center shadow-lg">
+                          <div className="p-3 bg-[#25D366]/20 rounded-full text-[#25D366] border border-[#25D366]/30">
+                            <Users className="w-7 h-7" />
+                          </div>
+                          <div>
+                            <span className="inline-block text-[10px] font-mono uppercase tracking-widest text-[#25D366] font-bold mb-1">
+                              {regWaGroup.groupCode} • Dedicated Workshop Group
+                            </span>
+                            <h4 className="text-base sm:text-lg font-bold text-white">Join {regWaGroup.groupName}</h4>
+                            <p className="text-gray-300 text-xs sm:text-sm mt-1.5 leading-relaxed max-w-lg">
+                              Click below to join the dedicated WhatsApp group created specifically for <strong className="text-white">{activeWorkshop.title}</strong>. Session links, schedules, and code files are shared inside this batch group.
+                            </p>
+                          </div>
+                          <a 
+                            href={regWaGroup.href}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto px-8 py-3.5 bg-[#25D366] hover:bg-emerald-400 text-[#0c0d14] font-mono text-xs sm:text-sm uppercase font-extrabold tracking-wider rounded-2xl transition-all block text-center shadow-lg shadow-[#25D366]/25 cursor-pointer active:scale-95"
+                          >
+                            Join WhatsApp Group
+                          </a>
+                        </div>
+                      );
+                    })()}
 
                     {/* Unique Attendance Key Display Box - Non-overlapping Responsive Card */}
                     <div className="bg-brand-dark/95 border border-brand-teal/30 rounded-2xl p-5 sm:p-6 text-left space-y-3.5 shadow-inner">
@@ -2436,6 +2746,18 @@ export default function TenantDashboard() {
                           </div>
                           <span className="text-[10px] font-mono text-emerald-300 bg-emerald-400/20 px-2 py-1 rounded font-bold">Verified Rate</span>
                         </div>
+
+                        {(activeWorkshopWindow.startDate || activeWorkshopWindow.endDate) && (
+                          <div className={`rounded-xl p-2.5 border text-[11px] font-mono ${
+                            activeWorkshopWindow.allowed
+                              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200'
+                              : 'bg-red-500/10 border-red-500/30 text-red-200'
+                          }`}>
+                            <span className="font-bold block">
+                              {activeWorkshopWindow.headline}: {activeWorkshopWindow.startDateDisplay} – {activeWorkshopWindow.endDateDisplay}
+                            </span>
+                          </div>
+                        )}
 
                         {paymentError && (
                           <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl text-red-400 text-xs font-mono">
@@ -2640,30 +2962,133 @@ export default function TenantDashboard() {
                 {/* Main Content Area - Spacious scrolling matching Service Workspace */}
                 <div className="flex-1 overflow-y-auto p-2 sm:p-5 md:p-6 bg-brand-dark/40 scrollbar-thin scrollbar-thumb-brand-teal/20 scrollbar-track-transparent">
                   <div className="space-y-4 sm:space-y-6 text-white font-sans w-full max-w-[1380px] mx-auto pb-6">
-                    {/* Top Status Banner */}
-                    <div className="bg-[#25d366]/10 border border-[#25d366]/30 px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse shrink-0" />
-                        <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">
-                          WORKSHOP SESSION ACTIVE
-                        </span>
-                        <span className="text-gray-500 text-xs hidden md:inline">•</span>
-                        <span className="text-xs text-gray-300 hidden md:inline truncate">
-                          Schedule: <strong className="text-white">{activeWorkspaceWorkshop.date}</strong> ({activeWorkspaceWorkshop.startTime || '10:00 AM IST'}) • Location: <strong className="text-white">{activeWorkspaceWorkshop.location}</strong>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <a
-                          href="https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3.5 py-1.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-[#25D366]/20 cursor-pointer active:scale-95"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5 text-black" />
-                          <span>Join WhatsApp Group</span>
-                        </a>
-                      </div>
-                    </div>
+                    {/* Top Status Banner with Individual Per-Workshop WhatsApp Group */}
+                    {(() => {
+                      const workspaceWaGroup = getWorkshopWhatsappGroup(activeWorkspaceWorkshop, wkspRegInfo.key);
+                      const handleSaveWorkspaceWaGroup = (e: React.FormEvent) => {
+                        e.preventDefault();
+                        const cleanName = waGroupNameDraft.trim();
+                        const cleanUrl = sanitizeWhatsappUrl(waGroupLinkDraft);
+                        const updatedList = workshops.map((w) =>
+                          w.id === activeWorkspaceWorkshop.id
+                            ? {
+                                ...w,
+                                whatsappGroupName: cleanName || w.whatsappGroupName,
+                                whatsappGroupLink: cleanUrl || undefined,
+                              }
+                            : w
+                        );
+                        setWorkshops(updatedList);
+                        saveDynamicWorkshops(updatedList);
+                        const updatedActive = updatedList.find((w) => w.id === activeWorkspaceWorkshop.id) || activeWorkspaceWorkshop;
+                        setActiveWorkspaceWorkshop(updatedActive);
+                        setEditingWaGroup(false);
+                        setWaGroupSavedToast('Dedicated WhatsApp group saved for this workshop!');
+                        setTimeout(() => setWaGroupSavedToast(null), 3000);
+                      };
+
+                      return (
+                        <div className="space-y-3">
+                          <div className="bg-[#25d366]/10 border border-[#25d366]/30 px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#25d366] animate-pulse shrink-0" />
+                                <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#25d366]">
+                                  WORKSHOP SESSION ACTIVE
+                                </span>
+                              </div>
+                              <span className="text-gray-500 text-xs hidden sm:inline">•</span>
+                              <span className="text-[11px] font-mono text-emerald-200/90 truncate">
+                                Group: <strong className="text-white">{workspaceWaGroup.groupName}</strong> ({workspaceWaGroup.groupCode})
+                              </span>
+                              <span className="text-gray-500 text-xs hidden lg:inline">•</span>
+                              <span className="text-xs text-gray-300 hidden lg:inline truncate">
+                                Schedule: <strong className="text-white">{activeWorkspaceWorkshop.date}</strong> ({activeWorkspaceWorkshop.startTime || '10:00 AM IST'}) • Location: <strong className="text-white">{activeWorkspaceWorkshop.location}</strong>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <a
+                                href={workspaceWaGroup.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Open ${workspaceWaGroup.groupName}`}
+                                className="px-3.5 py-1.5 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-[#25D366]/20 cursor-pointer active:scale-95"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-black" />
+                                <span>Join WhatsApp Group</span>
+                              </a>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setWaGroupNameDraft(workspaceWaGroup.groupName);
+                                    setWaGroupLinkDraft(activeWorkspaceWorkshop.whatsappGroupLink || '');
+                                    setEditingWaGroup((prev) => !prev);
+                                  }}
+                                  className="p-2 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl text-gray-200 hover:text-white transition-colors cursor-pointer"
+                                  title="Admin: Configure dedicated WhatsApp invite link for this workshop"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {waGroupSavedToast && (
+                            <div className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 text-xs font-mono">
+                              ✓ {waGroupSavedToast}
+                            </div>
+                          )}
+
+                          {isAdmin && editingWaGroup && (
+                            <form
+                              onSubmit={handleSaveWorkspaceWaGroup}
+                              className="bg-brand-dark/90 border border-[#25D366]/35 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"
+                            >
+                              <div className="sm:col-span-4">
+                                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                                  Workshop Group Name ({activeWorkspaceWorkshop.id})
+                                </label>
+                                <input
+                                  type="text"
+                                  value={waGroupNameDraft}
+                                  onChange={(e) => setWaGroupNameDraft(e.target.value)}
+                                  placeholder="e.g. React Native Batch Group"
+                                  className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#25D366]"
+                                />
+                              </div>
+                              <div className="sm:col-span-6">
+                                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                                  Dedicated WhatsApp Invite Link (https://chat.whatsapp.com/...)
+                                </label>
+                                <input
+                                  type="url"
+                                  value={waGroupLinkDraft}
+                                  onChange={(e) => setWaGroupLinkDraft(e.target.value)}
+                                  placeholder="https://chat.whatsapp.com/..."
+                                  className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#25D366]"
+                                />
+                              </div>
+                              <div className="sm:col-span-2 flex gap-2">
+                                <button
+                                  type="submit"
+                                  className="flex-1 py-2 px-3 bg-[#25D366] hover:bg-emerald-400 text-black font-mono font-bold text-xs uppercase rounded-xl cursor-pointer"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingWaGroup(false)}
+                                  className="py-2 px-2.5 bg-white/10 hover:bg-white/20 text-gray-300 font-mono text-xs rounded-xl cursor-pointer"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {renderWorkshopClassroomTabs(activeWorkspaceWorkshop, wkspRegInfo)}
                   </div>
@@ -2690,9 +3115,29 @@ export default function TenantDashboard() {
             setShowRazorpayModal(false);
             setIsProcessing(false);
           }}
-          onFailure={(reason) => {
+          onFailure={(reason, details) => {
             setShowRazorpayModal(false);
             setIsProcessing(false);
+            if (details?.registrationClosed) {
+              const ev =
+                details.windowStatus ||
+                (activeWorkshop
+                  ? evaluateRegistrationWindow({
+                      section: 'workshop',
+                      itemId: activeWorkshop.id,
+                      itemTitle: activeWorkshop.title,
+                      startDate: activeWorkshop.registrationStartDate,
+                      endDate: activeWorkshop.registrationEndDate,
+                      nowMs: getAuthoritativeNowMs(),
+                    })
+                  : null);
+              if (ev) {
+                setClosedModalEval(ev);
+                setShowClosedModal(true);
+              }
+              setShowRegModal(false);
+              return;
+            }
             setPaymentError(reason || 'Payment incomplete or cancelled. No workshop pass was issued.');
             handleSimulatePaymentFailure(reason || 'Payment cancelled or declined by user');
           }}
@@ -2785,6 +3230,12 @@ export default function TenantDashboard() {
           </div>
         )}
       </AnimatePresence>
+      {/* Registration Closed / Not Started Modal */}
+      <RegistrationClosedModal
+        isOpen={showClosedModal}
+        onClose={() => setShowClosedModal(false)}
+        evaluation={closedModalEval}
+      />
     </section>
   );
 }

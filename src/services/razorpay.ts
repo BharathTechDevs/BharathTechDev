@@ -78,6 +78,8 @@ export interface RazorpayOrderResponse {
   status?: string;
   message?: string;
   error?: string;
+  registrationClosed?: boolean;
+  windowStatus?: any;
 }
 
 export interface RazorpayPaymentSuccessData {
@@ -116,6 +118,8 @@ export interface VerifyPaymentResponse {
   status?: 'PAID' | 'FAILED' | 'PENDING' | 'CANCELLED' | 'UNKNOWN';
   emailSent?: boolean;
   error?: string;
+  registrationClosed?: boolean;
+  windowStatus?: any;
 }
 
 export interface OrderStatusCheckResponse {
@@ -461,6 +465,8 @@ export async function verifyRazorpayPayment(params: VerifyPaymentParams): Promis
         isUncertain: false,
         status: 'FAILED',
         error: data.error || 'Payment verification could not be confirmed.',
+        registrationClosed: Boolean(data.registrationClosed),
+        windowStatus: data.windowStatus,
       };
     }
 

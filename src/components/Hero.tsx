@@ -77,7 +77,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: [1, 1.15, 1], opacity: [0.35, 0.65, 0.35] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -inset-8 bg-gradient-to-r from-[#4361EE]/20 via-[#00D2FF]/25 to-[#22D3EE]/20 rounded-full blur-3xl pointer-events-none"
+            className="absolute -inset-8 bg-gradient-to-r from-[#4F46E5]/20 via-[#1D4ED8]/20 to-[#38BDF8]/25 rounded-full blur-3xl pointer-events-none"
           />
 
           {/* Badge Indicator */}
@@ -97,23 +97,23 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
 
           {/* Animated Main Brand Name: S-CODERS (Matches original Logo.tsx identity & proportions) */}
           <div className="relative flex items-center justify-center text-4xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-none select-none">
-            {/* "S" */}
+            {/* "S" — Indigo Blue */}
             <motion.span
               initial={{ opacity: 0, y: 25, rotateX: 60 }}
               animate={{ opacity: 1, y: 0, rotateX: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="text-[#4361EE] font-black leading-none drop-shadow-[0_0_24px_rgba(67,97,238,0.85)] inline-block"
+              className="text-[#4F46E5] font-black leading-none drop-shadow-[0_0_24px_rgba(79,70,229,0.85)] inline-block"
             >
               S
             </motion.span>
 
-            {/* Symmetrical Chain Link Icon matching Logo.tsx */}
+            {/* Symmetrical Chain Link Icon — Dark Royal Blue */}
             <motion.svg
               viewBox="0 0 42 22"
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.45, delay: 0.32, ease: "easeOut" }}
-              className="w-12 h-6 mx-1.5 sm:w-16 sm:h-8 sm:mx-2 md:w-24 md:h-12 md:mx-2.5 shrink-0 drop-shadow-[0_0_10px_rgba(0,210,255,0.75)]"
+              className="w-12 h-6 mx-1.5 sm:w-16 sm:h-8 sm:mx-2 md:w-24 md:h-12 md:mx-2.5 shrink-0 drop-shadow-[0_0_10px_rgba(29,78,216,0.75)]"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               aria-hidden="true"
@@ -121,7 +121,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
               {/* Left Link Capsule */}
               <motion.path
                 d="M18 5H10C6.13401 5 3 8.13401 3 12C3 15.866 6.13401 19 10 19H18"
-                stroke="#00D2FF"
+                stroke="#1D4ED8"
                 strokeWidth="3.6"
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
@@ -131,7 +131,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
               {/* Right Link Capsule */}
               <motion.path
                 d="M24 5H32C37.866 5 41 8.13401 41 12C41 15.866 37.866 19 32 19H24"
-                stroke="#00D2FF"
+                stroke="#1D4ED8"
                 strokeWidth="3.6"
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
@@ -141,7 +141,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
               {/* Connecting bridge */}
               <motion.path
                 d="M13 12H29"
-                stroke="#00D2FF"
+                stroke="#1D4ED8"
                 strokeWidth="3.6"
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
@@ -150,7 +150,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
               />
             </motion.svg>
 
-            {/* "CODERS" with upper-right proportional sparkle star */}
+            {/* "CODERS" — Bright Sky Blue / Cyan Blue with upper-right proportional sparkle star */}
             <div className="relative flex items-center">
               <div className="flex items-center">
                 {"CODERS".split('').map((char, index) => (
@@ -163,7 +163,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
                       delay: 0.4 + index * 0.06,
                       ease: [0.16, 1, 0.3, 1]
                     }}
-                    className="text-[#00D2FF] font-black leading-none drop-shadow-[0_0_20px_rgba(0,210,255,0.7)] inline-block"
+                    className="text-[#38BDF8] font-black leading-none drop-shadow-[0_0_20px_rgba(56,189,248,0.7)] inline-block"
                   >
                     {char}
                   </motion.span>
@@ -198,7 +198,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: '80%', opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.9, ease: "easeOut" }}
-            className="h-[1.5px] bg-gradient-to-r from-transparent via-[#00D2FF]/60 to-transparent mt-3 mb-2.5 max-w-sm"
+            className="h-[1.5px] bg-gradient-to-r from-transparent via-[#38BDF8]/60 to-transparent mt-3 mb-2.5 max-w-sm"
           />
 
           {/* Animated Tagline: "BHARAT TECH DEVELOPERS" */}

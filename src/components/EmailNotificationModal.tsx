@@ -19,7 +19,11 @@ export interface EmailNotificationData {
   actionText: string;
   onAction?: () => void;
   deliveryMode?: string;
+  realEmailDelivered?: boolean;
+  emailError?: string;
   previewUrl?: string;
+  whatsappGroupLink?: string;
+  whatsappGroupName?: string;
 }
 
 interface EmailNotificationModalProps {
@@ -42,17 +46,17 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
   const isService = data?.type === 'service';
   const isWorkshop = data?.type === 'workshop';
 
-  // Dynamic routing: Service WhatsApp Group vs Workshop Group vs Customer Care/Event Group
+  // Dynamic routing: Service WhatsApp Group vs Per-Workshop Group vs Customer Care/Event Group
   const WHATSAPP_GROUP_LINK = isService
     ? "https://chat.whatsapp.com/CgksCDeW7LnINcEvGwn7kK"
     : isWorkshop
-    ? "https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F"
+    ? (data?.whatsappGroupLink || "https://chat.whatsapp.com/Dn2rD4GVvJw9DtKUIcBs1F")
     : "https://chat.whatsapp.com/Dp1kVXukz0B3KXQq3FTuId?s=cl&p=a&mlu=4&ilr=4";
 
   const groupTitle = isService
     ? "Join S-CODERS Service WhatsApp Group"
     : isWorkshop
-    ? "Join Workshop Community WhatsApp"
+    ? (data?.whatsappGroupName ? `Join ${data.whatsappGroupName}` : "Join Workshop Community WhatsApp")
     : "Join S-CODERS WhatsApp Community";
 
   const groupDesc = isService
@@ -185,15 +189,55 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                 </div>
 
                 {/* Email Dispatch Notice banner */}
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                <div
+                  className={`rounded-2xl p-4 flex items-start gap-3 border ${
+                    data.realEmailDelivered
+                      ? 'bg-emerald-500/10 border-emerald-500/30'
+                      : data.deliveryMode === 'failed'
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : 'bg-blue-500/10 border-blue-500/30'
+                  }`}
+                >
+                  <Mail
+                    className={`w-5 h-5 shrink-0 mt-0.5 ${
+                      data.realEmailDelivered
+                        ? 'text-emerald-400'
+                        : data.deliveryMode === 'failed'
+                        ? 'text-red-400'
+                        : 'text-blue-400'
+                    }`}
+                  />
                   <div className="text-xs space-y-1.5">
-                    <p className="font-semibold text-blue-200">
-                      Confirmation Dispatched to {data.recipientEmail}
+                    <p
+                      className={`font-semibold ${
+                        data.realEmailDelivered
+                          ? 'text-emerald-200'
+                          : data.deliveryMode === 'failed'
+                          ? 'text-red-200'
+                          : 'text-blue-200'
+                      }`}
+                    >
+                      {data.realEmailDelivered
+                        ? `✓ Delivered Directly to ${data.recipientEmail} Inbox (via scoders82@gmail.com)`
+                        : data.deliveryMode === 'failed'
+                        ? `Email Dispatch Pending (${data.recipientEmail})`
+                        : data.deliveryMode === 'ethereal' || data.deliveryMode === 'simulated'
+                        ? `Sandbox Email Generated for ${data.recipientEmail}`
+                        : `Confirmation Dispatched to ${data.recipientEmail}`}
                     </p>
-                    <p className="text-gray-400 leading-relaxed text-[11px]">
+                    <p className="text-gray-300 leading-relaxed text-[11px]">
                       {data.messageText}
                     </p>
+                    {!data.realEmailDelivered && (data.deliveryMode === 'ethereal' || data.deliveryMode === 'simulated') && (
+                      <p className="text-amber-300/95 leading-relaxed text-[11px] bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-2">
+                        Inbox delivery is currently in SMTP sandbox preview mode because the server Gmail App Password secret (GMAIL_APP_PASSWORD) has not been configured yet. Open the preview link below to inspect the exact formatted email (UID, rules, regulations &amp; instructions).
+                      </p>
+                    )}
+                    {data.deliveryMode === 'failed' && data.emailError && (
+                      <p className="text-red-300 leading-relaxed text-[11px]">
+                        Mail delivery error: {data.emailError}
+                      </p>
+                    )}
                     <p className="text-amber-300/90 leading-relaxed text-[11px]">
                       {isWorkshop
                         ? 'Tip: Keep this UID safe — if you lose connection, refresh, or exit mid-session, enter it under "Enter Existing Pass" to rejoin immediately.'

@@ -48,6 +48,10 @@ export interface WorkshopEvent {
   toolsUsed?: string[];
   usefulness?: string[];
   prerequisites?: string;
+  whatsappGroupName?: string;
+  whatsappGroupLink?: string;
+  registrationStartDate?: string;
+  registrationEndDate?: string;
 }
 
 export interface StartupCommunity {
@@ -130,6 +134,8 @@ export interface SCODERSEvent {
   ticketPrice: number;
   status: 'upcoming' | 'ongoing' | 'completed';
   featured?: boolean;
+  registrationStartDate?: string;
+  registrationEndDate?: string;
   eventPhotos: {
     id: string;
     caption: string;

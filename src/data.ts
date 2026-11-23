@@ -204,7 +204,11 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
       'Automate lead triage, customer dispatch, and automated email/slack notifications',
       'Receive the S-CODERS Certified AI Developer Badge and source code blueprints'
     ],
-    prerequisites: 'Basic understanding of API concepts, JavaScript/TypeScript fundamentals, and a laptop with Node.js & Git installed.'
+    prerequisites: 'Basic understanding of API concepts, JavaScript/TypeScript fundamentals, and a laptop with Node.js & Git installed.',
+    whatsappGroupName: 'AI Agents & n8n Workshop Group',
+    whatsappGroupLink: 'https://chat.whatsapp.com/GBlr54MzWPq4gn8BOJSbGZ?s=cl&p=a&iam=2',
+    registrationStartDate: '2026-11-01',
+    registrationEndDate: '2026-12-31'
   },
   {
     id: 'w-2',
@@ -230,7 +234,11 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
       'Create silky-smooth 60fps animations and gesture handlers',
       'Publish active mobile prototypes directly to GitHub and app store sandboxes'
     ],
-    prerequisites: 'Familiarity with React components, state hooks, and standard JavaScript syntax.'
+    prerequisites: 'Familiarity with React components, state hooks, and standard JavaScript syntax.',
+    whatsappGroupName: 'React Native Masterclass Group',
+    whatsappGroupLink: 'https://chat.whatsapp.com/KmQJHfuw0YQIFb24JCh0C0?s=cl&p=a&iam=2',
+    registrationStartDate: '2026-11-01',
+    registrationEndDate: '2026-12-31'
   },
   {
     id: 'w-3',
@@ -256,7 +264,11 @@ export const WORKSHOP_EVENTS: WorkshopEvent[] = [
       'Integrate payment gateways for immediate product monetisation and billing',
       'Pitch live to Bengaluru angel investors, mentors, and technical advisors'
     ],
-    prerequisites: 'Full-stack web development interest and willingness to collaborate in a high-speed sprint team.'
+    prerequisites: 'Full-stack web development interest and willingness to collaborate in a high-speed sprint team.',
+    whatsappGroupName: 'SaaS 48h MVP Hackathon Group',
+    whatsappGroupLink: 'https://chat.whatsapp.com/EyMgYulqGs1BY3KhAm3PaM?s=cl&p=a&iam=2',
+    registrationStartDate: '2026-11-01',
+    registrationEndDate: '2026-12-31'
   }
 ];
 
