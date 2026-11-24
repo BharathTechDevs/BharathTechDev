@@ -77,7 +77,7 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: [1, 1.15, 1], opacity: [0.35, 0.65, 0.35] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -inset-8 bg-gradient-to-r from-[#4F46E5]/20 via-[#1D4ED8]/20 to-[#38BDF8]/25 rounded-full blur-3xl pointer-events-none"
+            className="absolute -inset-8 bg-gradient-to-r from-[#1D35A3]/20 via-[#1D4ED8]/20 to-[#38BDF8]/25 rounded-full blur-3xl pointer-events-none"
           />
 
           {/* Badge Indicator */}
@@ -97,12 +97,12 @@ export default function Hero({ onOpenAssistant, onExploreServices }: HeroProps) 
 
           {/* Animated Main Brand Name: S-CODERS (Matches original Logo.tsx identity & proportions) */}
           <div className="relative flex items-center justify-center text-4xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-none select-none">
-            {/* "S" — Indigo Blue */}
+            {/* "S" — Dark Indigo Blue */}
             <motion.span
               initial={{ opacity: 0, y: 25, rotateX: 60 }}
               animate={{ opacity: 1, y: 0, rotateX: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="text-[#4F46E5] font-black leading-none drop-shadow-[0_0_24px_rgba(79,70,229,0.85)] inline-block"
+              className="text-[#1D35A3] font-black leading-none drop-shadow-[0_0_10px_rgba(29,53,163,0.5)] inline-block"
             >
               S
             </motion.span>

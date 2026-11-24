@@ -846,7 +846,13 @@ function getEmailProviderConfig() {
     smtpUser,
     smtpPass: normalizedPass,
     resendApiKey,
-    resendFrom: (process.env.RESEND_FROM || process.env.SMTP_FROM || `"S-CODERS (Bharat Tech Developers)" <onboarding@resend.dev>`).trim(),
+    resendFrom: (
+      process.env.RESEND_FROM ||
+      (process.env.SMTP_FROM && !process.env.SMTP_FROM.toLowerCase().includes("@gmail.com")
+        ? process.env.SMTP_FROM
+        : "") ||
+      `"S-CODERS (Bharat Tech Developers)" <onboarding@resend.dev>`
+    ).trim(),
     sendgridApiKey,
     defaultFrom: (
       process.env.SMTP_FROM ||
@@ -5662,6 +5668,9 @@ Return ONLY valid JSON with this structure:
         message: `A 6-digit verification code has been sent to ${cleanEmail} from ${OFFICIAL_SCODERS_EMAIL}.`,
         expiresAt,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
+        realEmailDelivered: Boolean(emailRes.realEmailDelivered),
+        deliveryMode: emailRes.deliveryMode,
+        emailError: emailRes.error,
         previewUrl: emailRes.previewUrl,
       });
     } catch (err: any) {
@@ -5822,6 +5831,9 @@ Return ONLY valid JSON with this structure:
       const activeRecovered = allRecovered.filter((r) => r.status === "ACTIVE");
 
       let resentEmail = false;
+      let resentRealDelivered = false;
+      let resentDeliveryMode: EmailDeliveryMode | undefined;
+      let resentPreviewUrl: string | undefined;
       if (resendEmail && activeRecovered.length > 0) {
         const summaryRes = await sendEmailNotification({
           to: cleanEmail,
@@ -5840,6 +5852,9 @@ Return ONLY valid JSON with this structure:
           replyTo: OFFICIAL_SCODERS_EMAIL,
         });
         resentEmail = Boolean(summaryRes.success);
+        resentRealDelivered = Boolean(summaryRes.realEmailDelivered);
+        resentDeliveryMode = summaryRes.deliveryMode;
+        resentPreviewUrl = summaryRes.previewUrl;
         appendEmailDispatchLog(appState, {
           section: sectionFilter || "recovery",
           to: cleanEmail,
@@ -5861,6 +5876,9 @@ Return ONLY valid JSON with this structure:
         verified: true,
         email: cleanEmail,
         resentEmail,
+        realEmailDelivered: resentRealDelivered,
+        deliveryMode: resentDeliveryMode,
+        previewUrl: resentPreviewUrl,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         registrations: allRecovered,
         activeCount: activeRecovered.length,

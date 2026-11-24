@@ -622,7 +622,7 @@ export default function TenantDashboard() {
     // 5. Fallback email trigger ONLY if unified backend endpoint failed on network
     if (!dispatchedViaUnified) {
       try {
-        fetch('/api/email/workshop-payment-verified', {
+        const fbRes = await fetch('/api/email/workshop-payment-verified', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -634,7 +634,15 @@ export default function TenantDashboard() {
             paymentId: txnId,
             actionUrl: buildPublicShareUrl(`/?view=workshops&key=${generatedKey}`)
           })
-        }).catch(err => console.warn("Workshop email dispatch warning:", err));
+        });
+        if (fbRes.ok) {
+          const fbData = await fbRes.json().catch(() => null);
+          if (fbData) {
+            emailDeliveryMode = fbData.deliveryMode;
+            emailRealDelivered = Boolean(fbData.realEmailDelivered);
+            emailPreviewUrl = fbData.previewUrl;
+          }
+        }
       } catch (emailErr) {
         console.warn("Workshop email dispatch error:", emailErr);
       }

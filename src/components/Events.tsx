@@ -633,7 +633,7 @@ export default function Events() {
 
         if (!dispatchedViaUnified) {
           try {
-            fetch('/api/email/event-payment-verified', {
+            const fbRes = await fetch('/api/email/event-payment-verified', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -645,7 +645,15 @@ export default function Events() {
                 paymentId: freePayId,
                 actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
               })
-            }).catch(err => console.warn("Free event pass email error:", err));
+            });
+            if (fbRes.ok) {
+              const fbData = await fbRes.json().catch(() => null);
+              if (fbData) {
+                emailDeliveryMode = fbData.deliveryMode;
+                emailRealDelivered = Boolean(fbData.realEmailDelivered);
+                emailPreviewUrl = fbData.previewUrl;
+              }
+            }
           } catch {}
         }
 
@@ -863,7 +871,7 @@ export default function Events() {
 
     if (!dispatchedViaUnified) {
       try {
-        fetch('/api/email/event-payment-verified', {
+        const fbRes = await fetch('/api/email/event-payment-verified', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -875,7 +883,15 @@ export default function Events() {
             paymentId: data.razorpay_payment_id,
             actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
           })
-        }).catch(err => console.warn("Event payment email dispatch notice:", err));
+        });
+        if (fbRes.ok) {
+          const fbData = await fbRes.json().catch(() => null);
+          if (fbData) {
+            emailDeliveryMode = fbData.deliveryMode;
+            emailRealDelivered = Boolean(fbData.realEmailDelivered);
+            emailPreviewUrl = fbData.previewUrl;
+          }
+        }
       } catch {}
     }
 
@@ -1041,7 +1057,7 @@ export default function Events() {
 
     if (!dispatchedViaUnified) {
       try {
-        fetch('/api/email/event-payment-verified', {
+        const fbRes = await fetch('/api/email/event-payment-verified', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1053,7 +1069,15 @@ export default function Events() {
             paymentId: upiPayId,
             actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
           })
-        }).catch(err => console.warn("UPI event pass email error:", err));
+        });
+        if (fbRes.ok) {
+          const fbData = await fbRes.json().catch(() => null);
+          if (fbData) {
+            emailDeliveryMode = fbData.deliveryMode;
+            emailRealDelivered = Boolean(fbData.realEmailDelivered);
+            emailPreviewUrl = fbData.previewUrl;
+          }
+        }
       } catch {}
     }
 

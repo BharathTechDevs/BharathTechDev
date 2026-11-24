@@ -602,7 +602,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       // Only hit legacy endpoint if unified endpoint didn't already dispatch email
       if (!dispatchedViaUnified) {
         try {
-          fetch('/api/email/service-accepted', {
+          const fbRes = await fetch('/api/email/service-accepted', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -612,7 +612,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               uniqueKey: generatedKey,
               actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
             })
-          }).catch(err => console.warn("Service email send notice:", err));
+          });
+          if (fbRes.ok) {
+            const fbData = await fbRes.json().catch(() => null);
+            if (fbData) {
+              emailDeliveryMode = fbData.deliveryMode;
+              emailRealDelivered = Boolean(fbData.realEmailDelivered);
+              emailPreviewUrl = fbData.previewUrl;
+            }
+          }
         } catch (emailErr) {
           console.warn("Service email trigger error:", emailErr);
         }
@@ -942,7 +950,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
 
       if (!dispatchedViaUnified) {
         try {
-          fetch('/api/email/service-accepted', {
+          const fbRes = await fetch('/api/email/service-accepted', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -952,7 +960,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
               uniqueKey: generatedKey,
               actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
             })
-          }).catch(() => {});
+          });
+          if (fbRes.ok) {
+            const fbData = await fbRes.json().catch(() => null);
+            if (fbData) {
+              emailDeliveryMode = fbData.deliveryMode;
+              emailRealDelivered = Boolean(fbData.realEmailDelivered);
+              emailPreviewUrl = fbData.previewUrl;
+            }
+          }
         } catch {}
       }
 

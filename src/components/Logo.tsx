@@ -61,10 +61,10 @@ export default function Logo({
 
   const currentSize = sizeClasses[size];
 
-  // Color selections matching user spec: S = Indigo Blue, Link = Dark Royal Blue, CODERS = Bright Sky/Cyan Blue
+  // Color selections matching user spec: S = Dark Indigo Blue, Link = Dark Royal Blue, CODERS = Bright Sky/Cyan Blue
   const sColor = lightBg 
-    ? 'text-[#24189E] font-black drop-shadow-sm' 
-    : 'text-[#4F46E5] font-black drop-shadow-[0_0_16px_rgba(79,70,229,0.85)]'; // Indigo Blue for "S"
+    ? 'text-[#192887] font-black drop-shadow-sm' 
+    : 'text-[#1D35A3] font-black drop-shadow-[0_0_8px_rgba(29,53,163,0.45)]'; // Dark Indigo Blue for "S"
   
   const linkColor = lightBg ? '#0D4FA8' : '#1D4ED8'; // Dark Royal Blue for chain link
   const bridgeColor = lightBg ? '#0D4FA8' : '#1D4ED8'; // Matching Dark Royal Blue bridge
@@ -99,7 +99,7 @@ export default function Logo({
     >
       {/* Background soft glow (only on dark mode) */}
       {!lightBg && (
-        <div className={`absolute -inset-4 bg-gradient-to-r from-[#4F46E5]/10 via-[#1D4ED8]/10 to-[#38BDF8]/10 rounded-full ${currentSize.glowRadius} pointer-events-none opacity-80`} />
+        <div className={`absolute -inset-4 bg-gradient-to-r from-[#1D35A3]/10 via-[#1D4ED8]/10 to-[#38BDF8]/10 rounded-full ${currentSize.glowRadius} pointer-events-none opacity-80`} />
       )}
 
       {/* S 🔗 CODERS Top Row */}
