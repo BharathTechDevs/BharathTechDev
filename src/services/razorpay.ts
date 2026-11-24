@@ -105,6 +105,8 @@ export interface VerifyPaymentParams {
   purpose?: string;
   merchantUpiId?: string;
   paymentMethodLabel?: string;
+  section?: string;
+  skipReceiptEmail?: boolean;
 }
 
 export interface VerifyPaymentResponse {

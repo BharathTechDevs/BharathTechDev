@@ -61,6 +61,10 @@ function getServiceAcceptanceEmailHtml({
   actionUrl,
   validFrom,
   validUntil,
+  amount = 0,
+  currency = "INR",
+  paymentStatus,
+  paymentId,
 }: {
   clientName: string;
   serviceTitle: string;
@@ -68,11 +72,21 @@ function getServiceAcceptanceEmailHtml({
   actionUrl: string;
   validFrom?: string;
   validUntil?: string;
+  amount?: number;
+  currency?: string;
+  paymentStatus?: string;
+  paymentId?: string;
 }) {
   const safeName = escapeEmailHtml(clientName || "Valued Client");
   const safeService = escapeEmailHtml(serviceTitle || "Custom Software Development");
   const safeKey = escapeEmailHtml(uniqueKey);
   const safeUrl = escapeEmailHtml(actionUrl);
+  const safeCurrency = escapeEmailHtml(currency || "INR");
+  const numericAmount = Number(amount) || 0;
+  const isPaid = numericAmount > 0 || String(paymentStatus || "").toUpperCase() === "VERIFIED";
+  const formattedAmount = numericAmount > 0 ? `₹${numericAmount.toLocaleString("en-IN")} ${safeCurrency}` : "Confirmed (Custom Scope)";
+  const paymentStatusDisplay = isPaid ? "✓ Verified & Paid" : "✓ Confirmed";
+  const safePayId = paymentId ? escapeEmailHtml(paymentId) : "";
   const validUntilDisplay = validUntil
     ? new Date(validUntil).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
     : "6 Months from Issue";
@@ -108,12 +122,36 @@ function getServiceAcceptanceEmailHtml({
                 <td style="padding: 0 32px 20px 32px;">
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${safeName}</strong>,</p>
                   <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                    Thank you for registering with S-CODERS (Bharat Tech Developers)! Your service request for <strong>${safeService}</strong> has been confirmed and your dedicated workspace is ready.
+                    Your registration for the <strong>${safeService}</strong> service has been successfully completed. Thank you for choosing S-CODERS. Your unique registration code is: <strong>${safeKey}</strong>.
                   </p>
-                  <p style="font-size: 13px; color: #CBD5E1; margin: 0; line-height: 1.6;">
-                    <strong>Selected Service:</strong> ${safeService}<br/>
-                    <strong>Code Validity Window:</strong> Active through <strong>${validUntilDisplay}</strong>
-                  </p>
+                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0F172A; border-radius: 10px; border: 1px solid #1E293B; padding: 14px 16px; font-size: 13px; color: #CBD5E1;">
+                    <tr>
+                      <td style="padding: 4px 0; color: #94A3B8;">Client Name:</td>
+                      <td align="right" style="padding: 4px 0; font-weight: 700; color: #FFFFFF;">${safeName}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 4px 0; color: #94A3B8;">Registered Service:</td>
+                      <td align="right" style="padding: 4px 0; font-weight: 700; color: #FFFFFF;">${safeService}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 4px 0; color: #94A3B8;">Payment Amount:</td>
+                      <td align="right" style="padding: 4px 0; font-weight: 700; color: #10B981;">${formattedAmount}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 4px 0; color: #94A3B8;">Payment Status:</td>
+                      <td align="right" style="padding: 4px 0; font-weight: 700; color: #22D3EE;">${paymentStatusDisplay}</td>
+                    </tr>
+                    ${safePayId ? `
+                    <tr>
+                      <td style="padding: 4px 0; color: #94A3B8;">Transaction / Payment ID:</td>
+                      <td align="right" style="padding: 4px 0; font-family: monospace; color: #CBD5E1;">${safePayId}</td>
+                    </tr>
+                    ` : ""}
+                    <tr>
+                      <td style="padding: 4px 0; color: #94A3B8;">Code Validity Window:</td>
+                      <td align="right" style="padding: 4px 0; color: #FDE68A;">Active through <strong>${validUntilDisplay}</strong></td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
               <tr>
@@ -254,7 +292,10 @@ function getWorkshopEmailHtml({
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${safeName}</strong>,</p>
                   ${isSuccess ? `
                     <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                      Thank you for registering for the S-CODERS workshop! Your payment has been verified and your seat in <strong>${safeTitle}</strong> is officially confirmed.
+                      ${amount > 0
+                        ? `Your registration for the workshop has been successfully completed. We have successfully received your payment of <strong>₹${amount.toLocaleString('en-IN')}</strong>. Thank you for registering with S-CODERS. Your unique registration code is: <strong>${safeKey}</strong>.`
+                        : `Your registration for the workshop has been successfully completed. Thank you for registering with S-CODERS. Your unique registration code is: <strong>${safeKey}</strong>.`
+                      }
                     </p>
                   ` : `
                     <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
@@ -272,6 +313,10 @@ function getWorkshopEmailHtml({
                         <td align="right" style="padding-bottom: 10px; font-size: 17px; font-weight: 900; color: #22D3EE; font-family: monospace;">${safeKey}</td>
                       </tr>
                       <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Participant Name:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${safeName}</td>
+                      </tr>
+                      <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Workshop Name:</td>
                         <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${safeTitle}</td>
                       </tr>
@@ -284,8 +329,12 @@ function getWorkshopEmailHtml({
                         <td align="right" style="padding: 6px 0; font-size: 13px; color: #CBD5E1;">${safeLocation}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Amount Paid:</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Payment Amount:</td>
                         <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #10B981;">${formattedAmount}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Payment Status:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #22D3EE;">${amount === 0 ? '✓ Confirmed (Free Pass)' : '✓ Verified & Paid'}</td>
                       </tr>
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Verified Payment ID:</td>
@@ -430,7 +479,10 @@ function getEventEmailHtml({
                   <p style="font-size: 16px; color: #F8FAFC; margin: 0 0 12px 0;">Hello <strong>${safeName}</strong>,</p>
                   ${isSuccess ? `
                     <p style="font-size: 15px; color: #38BDF8; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #22D3EE;">
-                      Thank you for registering for <strong>${safeTitle}</strong>! Your registration and payment confirmation are complete, and your official event pass code is below.
+                      ${amount > 0
+                        ? `Your registration for the event has been successfully completed. We have successfully received your payment of <strong>₹${amount.toLocaleString('en-IN')}</strong>. Thank you for registering with S-CODERS. Your unique registration code is: <strong>${safeCode}</strong>.`
+                        : `Your registration for the event has been successfully completed. Thank you for registering with S-CODERS. Your unique registration code is: <strong>${safeCode}</strong>.`
+                      }
                     </p>
                   ` : `
                     <p style="font-size: 15px; color: #FCA5A5; font-weight: 700; line-height: 1.6; margin: 0 0 16px 0; background-color: #0F172A; padding: 16px; border-radius: 12px; border-left: 4px solid #EF4444;">
@@ -448,6 +500,10 @@ function getEventEmailHtml({
                         <td align="right" style="padding-bottom: 10px; font-size: 18px; font-weight: 900; color: #22D3EE; font-family: monospace;">${safeCode}</td>
                       </tr>
                       <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Attendee Name:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${safeName}</td>
+                      </tr>
+                      <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Complete Event Name:</td>
                         <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #FFFFFF;">${safeTitle}</td>
                       </tr>
@@ -460,8 +516,16 @@ function getEventEmailHtml({
                         <td align="right" style="padding: 6px 0; font-size: 13px; color: #CBD5E1;">${safeDate}${safeDay ? ` (${safeDay})` : ''} • ${safeTime}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Pass Fee / Payment ID:</td>
-                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #10B981;">${formattedAmount} • ${safePayId}</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Payment Amount:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #10B981;">${formattedAmount}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Payment Status:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #22D3EE;">${amount === 0 ? '✓ Confirmed (Free Pass)' : '✓ Verified & Paid'}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Verified Payment ID:</td>
+                        <td align="right" style="padding: 6px 0; font-size: 13px; font-family: monospace; color: #CBD5E1;">${safePayId}</td>
                       </tr>
                       <tr>
                         <td style="padding: 6px 0; font-size: 13px; color: #94A3B8;">Pass Valid Until:</td>
@@ -4424,22 +4488,46 @@ Return ONLY valid JSON with this structure:
         console.warn("Could not write payment to app-state.json:", dbErr);
       }
 
-      // Success email dispatch
+      // Success email dispatch (deferred for Workshop/Event passes since register-and-notify immediately dispatches the full confirmation + UID email once per transaction, and deduplicated for standalone invoice payments)
+      const explicitSection = String(req.body?.section || matchedLocalOrder?.section || "").trim().toLowerCase();
+      const shouldDeferToRegistrationEmail =
+        explicitSection === "workshop" ||
+        explicitSection === "event" ||
+        req.body?.skipReceiptEmail === true;
       let emailResult: { success: boolean; messageId?: string; simulated?: boolean; error?: any } = { success: false };
-      if (email) {
-        emailResult = await sendEmailNotification({
-          to: email,
-          subject: `✅ Payment Confirmation & Receipt - S-CODERS (Txn: ${finalPaymentId})`,
-          html: getPaymentEmailHtml({
-            status: "SUCCESS",
-            clientName: clientName || "Valued Client",
-            purpose: `${purpose || 'Service Payment'}`,
-            amount: Number(amount) || 0,
-            currency,
-            paymentId: finalPaymentId,
-            orderId: finalOrderId,
-          }),
-        });
+      if (email && !shouldDeferToRegistrationEmail) {
+        const receiptDedupeKey = `payment:receipt:${finalPaymentId}`;
+        const existingEmailLogs: any[] = Array.isArray(appState["db_email_logs"]) ? appState["db_email_logs"] : [];
+        const alreadySentReceipt = existingEmailLogs.some(
+          (l) => l?.status === "SENT" && l?.dedupeKey === receiptDedupeKey
+        );
+        if (!alreadySentReceipt) {
+          emailResult = await sendEmailNotification({
+            to: email,
+            subject: `✅ Payment Confirmation & Receipt - S-CODERS (Txn: ${finalPaymentId})`,
+            html: getPaymentEmailHtml({
+              status: "SUCCESS",
+              clientName: clientName || "Valued Client",
+              purpose: `${purpose || 'Service Payment'}`,
+              amount: Number(amount) || 0,
+              currency,
+              paymentId: finalPaymentId,
+              orderId: finalOrderId,
+            }),
+          });
+          appendEmailDispatchLog(appState, {
+            section: verifySectionRaw || "payment",
+            to: String(email).trim().toLowerCase(),
+            from: OFFICIAL_SCODERS_EMAIL,
+            subject: `✅ Payment Confirmation & Receipt - S-CODERS (Txn: ${finalPaymentId})`,
+            dedupeKey: receiptDedupeKey,
+            itemTitle: purpose || "Service Payment",
+            status: emailResult.success ? "SENT" : "FAILED",
+            messageId: emailResult.messageId,
+            simulated: emailResult.simulated,
+          });
+          saveStoredAppState(appState);
+        }
       }
 
       res.json({
@@ -4448,6 +4536,7 @@ Return ONLY valid JSON with this structure:
         status: "PAID",
         message: "Payment verified successfully and receipt generated.",
         emailSent: emailResult.success,
+        emailDeferredToRegistration: shouldDeferToRegistrationEmail,
         paymentId: finalPaymentId,
         orderId: finalOrderId,
         merchantUpiId: activeMerchantUpi,
@@ -4929,15 +5018,30 @@ Return ONLY valid JSON with this structure:
     paymentStatusRaw: string | undefined,
     appState: Record<string, any>
   ): { ok: boolean; reason?: string; status: "NOT_REQUIRED" | "VERIFIED" | "FAILED" | "PENDING" } {
-    if (section === "service") {
-      return { ok: true, status: "NOT_REQUIRED" };
-    }
     const cleanStatus = String(paymentStatusRaw || "").trim().toUpperCase();
     if (["FAILED", "CANCELLED", "DECLINED", "ERROR"].includes(cleanStatus)) {
       return { ok: false, status: "FAILED", reason: "Payment failed or was cancelled. Email and UID cannot be issued." };
     }
     if (["PENDING", "CREATED", "INITIATED", "UNKNOWN"].includes(cleanStatus)) {
       return { ok: false, status: "PENDING", reason: "Payment is still pending confirmation. Confirmation email triggers only after payment verification." };
+    }
+
+    if (section === "service") {
+      // Standard consultation/quote service requests without direct payment are allowed with NOT_REQUIRED
+      if (Number(amount) <= 0 && !paymentId && !cleanStatus) {
+        return { ok: true, status: "NOT_REQUIRED" };
+      }
+      // Paid service bookings (e.g. UPI QR advance / Razorpay) verify transaction status
+      if (
+        cleanStatus === "VERIFIED" ||
+        cleanStatus === "PAID" ||
+        cleanStatus === "SUCCESS" ||
+        cleanStatus === "SUCCESSFUL" ||
+        (paymentId && (String(paymentId).startsWith("UPI_UTR_") || String(paymentId).startsWith("pay_")))
+      ) {
+        return { ok: true, status: "VERIFIED" };
+      }
+      return { ok: false, status: "PENDING", reason: "Service payment confirmation is pending verification." };
     }
 
     // Free events or complimentary 0-amount passes
@@ -5303,6 +5407,7 @@ Return ONLY valid JSON with this structure:
       );
 
       // 2. Strict Deduplication: Prevent duplicate UIDs & duplicate confirmation emails
+      const emailLogsList: any[] = Array.isArray(appState["db_email_logs"]) ? appState["db_email_logs"] : [];
       const existingRecordIdx = uidRecords.findIndex((r) => {
         if (!r || r.section !== section) return false;
         if (r.status === "REVOKED") return false;
@@ -5311,9 +5416,9 @@ Return ONLY valid JSON with this structure:
         if (r.dedupeKey && r.dedupeKey === computedDedupeKey) return true;
         if (paymentId && r.paymentId && r.paymentId === String(paymentId).trim()) return true;
         if (orderId && r.orderId && r.orderId === String(orderId).trim()) return true;
-        // For service or free event, also deduplicate active identical email+item registration
+        // For service (unpaid consultation) or free event, also deduplicate active identical email+item registration
         if (
-          (section === "service" || (section === "event" && Number(amount) === 0)) &&
+          ((section === "service" && !paymentId && Number(amount) === 0) || (section === "event" && Number(amount) === 0)) &&
           r.clientEmail?.toLowerCase() === cleanEmail &&
           r.itemId?.toLowerCase() === cleanItemId.toLowerCase() &&
           r.status === "ACTIVE"
@@ -5323,18 +5428,23 @@ Return ONLY valid JSON with this structure:
         return false;
       });
 
-      if (existingRecordIdx >= 0) {
-        const existingRecord = uidRecords[existingRecordIdx];
+      const alreadySentLog = emailLogsList.find(
+        (l) => l && l.section === section && l.status === "SENT" && l.dedupeKey && l.dedupeKey === computedDedupeKey
+      );
+
+      if (existingRecordIdx >= 0 || alreadySentLog) {
+        const existingRecord = existingRecordIdx >= 0 ? uidRecords[existingRecordIdx] : undefined;
+        const resolvedUid = existingRecord?.uid || alreadySentLog?.uid || requestedUid || "EXISTING-UID";
         appendEmailDispatchLog(appState, {
           section,
           to: cleanEmail,
           from: OFFICIAL_SCODERS_EMAIL,
-          subject: `Deduplicated ${section} registration (${existingRecord.uid})`,
-          uid: existingRecord.uid,
+          subject: `Deduplicated ${section} registration (${resolvedUid})`,
+          uid: resolvedUid,
           dedupeKey: computedDedupeKey,
           itemTitle: cleanItemTitle,
           status: "SKIPPED_DUPLICATE",
-          detailsSummary: "Existing active UID returned; duplicate email prevented.",
+          detailsSummary: "Existing active UID / sent log matched; duplicate email prevented.",
         });
         saveStoredAppState(appState);
 
@@ -5342,7 +5452,7 @@ Return ONLY valid JSON with this structure:
           success: true,
           deduplicated: true,
           alreadyRegistered: true,
-          uid: existingRecord.uid,
+          uid: resolvedUid,
           emailSent: false,
           emailSkippedDuplicate: true,
           emailFrom: OFFICIAL_SCODERS_EMAIL,
@@ -5382,6 +5492,10 @@ Return ONLY valid JSON with this structure:
           actionUrl: targetUrl,
           validFrom,
           validUntil,
+          amount: Number(amount) || 0,
+          currency,
+          paymentStatus: payCheck.status,
+          paymentId: paymentId ? String(paymentId).trim() : undefined,
         });
       } else if (section === "workshop") {
         subject = `🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (${finalUid})`;
@@ -5890,7 +6004,7 @@ Return ONLY valid JSON with this structure:
   });
 
   // Safe diagnostic endpoint exposing email transport readiness (NO secrets exposed)
-  app.get("/api/email/config-status", (_req, res) => {
+  app.get("/api/email/config-status", async (req, res) => {
     const cfg = getEmailProviderConfig();
     const provider = cfg.hasSmtp
       ? cfg.smtpHost.toLowerCase().includes("gmail.com")
@@ -5901,11 +6015,55 @@ Return ONLY valid JSON with this structure:
       : cfg.hasSendgrid
       ? "sendgrid"
       : "ethereal_sandbox";
+
+    let smtpVerified: boolean | undefined;
+    let smtpVerifyPort: number | undefined;
+    let verifyError: string | undefined;
+
+    if (String(req.query?.verify || "") === "1" && cfg.hasSmtp) {
+      const tryVerify = async (port: number) => {
+        const transporter = nodemailer.createTransport({
+          host: cfg.smtpHost,
+          port,
+          secure: port === 465,
+          requireTLS: port === 587,
+          auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
+        });
+        await transporter.verify();
+        return port;
+      };
+
+      try {
+        smtpVerifyPort = await tryVerify(cfg.smtpPort);
+        smtpVerified = true;
+      } catch (err: any) {
+        if (cfg.smtpHost.toLowerCase().includes("gmail.com") && cfg.smtpPort === 465) {
+          try {
+            smtpVerifyPort = await tryVerify(587);
+            smtpVerified = true;
+          } catch (err587: any) {
+            smtpVerified = false;
+            verifyError = err587?.response || err587?.message || err?.message || "SMTP authentication failed.";
+          }
+        } else {
+          smtpVerified = false;
+          verifyError = err?.response || err?.message || "SMTP authentication failed.";
+        }
+      }
+    }
+
     return res.json({
       success: true,
       configured: cfg.anyRealProviderConfigured,
       provider,
       officialSender: OFFICIAL_SCODERS_EMAIL,
+      smtpUser: cfg.hasSmtp ? cfg.smtpUser : undefined,
+      smtpVerified,
+      smtpVerifyPort,
+      verifyError,
       message: cfg.anyRealProviderConfigured
         ? `Live inbox email delivery active via ${provider} (${OFFICIAL_SCODERS_EMAIL}).`
         : `Server SMTP/API secret (GMAIL_APP_PASSWORD) is not set yet. Registrations currently generate preview emails in sandbox mode until GMAIL_APP_PASSWORD is configured in Environment Secrets.`,
@@ -5934,23 +6092,54 @@ Return ONLY valid JSON with this structure:
   // 1. Service Registration Accepted Email Endpoint (Deduplicated & Persisted)
   app.post("/api/email/service-accepted", async (req, res) => {
     try {
-      const { email, clientName, serviceTitle, uniqueKey, actionUrl, serviceId } = req.body || {};
+      const {
+        email,
+        clientName,
+        serviceTitle,
+        uniqueKey,
+        actionUrl,
+        serviceId,
+        amount = 0,
+        currency = "INR",
+        paymentStatus,
+        paymentId,
+        orderId,
+      } = req.body || {};
       const cleanEmail = String(email || "client@example.com").trim().toLowerCase();
       const appState = getStoredAppState();
+      const payCheck = isPaymentVerifiedForRegistration("service", Number(amount) || 0, paymentId, orderId, paymentStatus, appState);
+      if (!payCheck.ok) {
+        return res.status(402).json({
+          success: false,
+          paymentRequired: true,
+          error: payCheck.reason || "Service payment confirmation failed.",
+        });
+      }
+
       const finalKey = String(uniqueKey || "").trim().toUpperCase() || generateCollisionFreeUid("service", serviceId || serviceTitle || "service", appState);
       const targetUrl = actionUrl && String(actionUrl).startsWith("http")
         ? String(actionUrl)
         : resolveAppUrl(req, `/?view=services&key=${finalKey}`);
 
-      // Deduplicate: check if email already sent for this exact UID
+      // Deduplicate: check if email already sent for this exact UID or payment/order ID
       const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
-      const existing = uidRecords.find((r) => r.section === "service" && r.uid?.toUpperCase() === finalKey && r.confirmationEmailSent);
+      const cleanPayId = paymentId ? String(paymentId).trim() : "";
+      const cleanOrderId = orderId ? String(orderId).trim() : "";
+      const existing = uidRecords.find(
+        (r) =>
+          r.section === "service" &&
+          r.confirmationEmailSent &&
+          (r.uid?.toUpperCase() === finalKey ||
+            (cleanPayId && r.paymentId === cleanPayId) ||
+            (cleanOrderId && r.orderId === cleanOrderId))
+      );
       if (existing) {
         return res.json({
           success: true,
           deduplicated: true,
           uid: existing.uid,
           emailSent: false,
+          emailSkippedDuplicate: true,
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           message: "Confirmation email already dispatched for this service UID.",
         });
@@ -5968,10 +6157,20 @@ Return ONLY valid JSON with this structure:
           actionUrl: targetUrl,
           validFrom,
           validUntil,
+          amount: Number(amount) || 0,
+          currency,
+          paymentStatus: payCheck.status,
+          paymentId: cleanPayId || undefined,
         }),
         from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
         replyTo: OFFICIAL_SCODERS_EMAIL,
       });
+
+      const dedupeKey = cleanPayId
+        ? `service:pay:${cleanPayId}`
+        : cleanOrderId
+        ? `service:ord:${cleanOrderId}`
+        : `service:key:${finalKey}`;
 
       const record: RegistrationUidRecord = {
         uid: finalKey,
@@ -5980,10 +6179,12 @@ Return ONLY valid JSON with this structure:
         itemTitle: String(serviceTitle || "Custom Software Development"),
         clientName: String(clientName || "Valued Client"),
         clientEmail: cleanEmail,
-        amount: 0,
-        currency: "INR",
-        paymentStatus: "NOT_REQUIRED",
-        dedupeKey: `service:key:${finalKey}`,
+        amount: Number(amount) || 0,
+        currency,
+        paymentStatus: payCheck.status,
+        paymentId: cleanPayId || undefined,
+        orderId: cleanOrderId || undefined,
+        dedupeKey,
         issuedAt: validFrom,
         validFrom,
         validUntil,
@@ -6001,6 +6202,7 @@ Return ONLY valid JSON with this structure:
         from: OFFICIAL_SCODERS_EMAIL,
         subject,
         uid: finalKey,
+        dedupeKey,
         itemTitle: serviceTitle,
         status: result.success ? "SENT" : "FAILED",
         messageId: result.messageId,
@@ -6076,11 +6278,15 @@ Return ONLY valid JSON with this structure:
         : resolveAppUrl(req, `/?view=workshops&key=${finalKey}`);
 
       const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
+      const cleanPayId = paymentId ? String(paymentId).trim() : "";
+      const cleanOrderId = orderId ? String(orderId).trim() : "";
       const existing = uidRecords.find(
         (r) =>
           r.section === "workshop" &&
           r.confirmationEmailSent &&
-          (r.uid?.toUpperCase() === finalKey || (paymentId && r.paymentId === String(paymentId).trim()))
+          (r.uid?.toUpperCase() === finalKey ||
+            (cleanPayId && r.paymentId === cleanPayId) ||
+            (cleanOrderId && r.orderId === cleanOrderId))
       );
       if (existing) {
         return res.json({
@@ -6088,6 +6294,7 @@ Return ONLY valid JSON with this structure:
           deduplicated: true,
           uid: existing.uid,
           emailSent: false,
+          emailSkippedDuplicate: true,
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           message: "Workshop confirmation email already dispatched.",
         });
@@ -6259,11 +6466,15 @@ Return ONLY valid JSON with this structure:
         : resolveAppUrl(req, `/?view=events&ticket=${finalCode}`);
 
       const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
+      const cleanPayId = paymentId ? String(paymentId).trim() : "";
+      const cleanOrderId = orderId ? String(orderId).trim() : "";
       const existing = uidRecords.find(
         (r) =>
           r.section === "event" &&
           r.confirmationEmailSent &&
-          (r.uid?.toUpperCase() === finalCode || (paymentId && r.paymentId === String(paymentId).trim()))
+          (r.uid?.toUpperCase() === finalCode ||
+            (cleanPayId && r.paymentId === cleanPayId) ||
+            (cleanOrderId && r.orderId === cleanOrderId))
       );
       if (existing) {
         return res.json({
@@ -6271,6 +6482,7 @@ Return ONLY valid JSON with this structure:
           deduplicated: true,
           uid: existing.uid,
           emailSent: false,
+          emailSkippedDuplicate: true,
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           message: "Event confirmation email already dispatched.",
         });

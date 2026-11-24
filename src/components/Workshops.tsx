@@ -146,6 +146,8 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     phone?: string;
     purpose: string;
     merchantUpiId: string;
+    section?: string;
+    skipReceiptEmail?: boolean;
   } | null>(null);
 
   // Email Notification Modal State (scoders82@gmail.com)
@@ -758,7 +760,9 @@ export default function TenantDashboard() {
         email: participantEmail,
         phone: regPhone.trim(),
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
-        merchantUpiId: getActiveMerchantUpi()
+        merchantUpiId: getActiveMerchantUpi(),
+        section: 'workshop',
+        skipReceiptEmail: true,
       });
 
       setIsProcessing(false);
@@ -794,7 +798,9 @@ export default function TenantDashboard() {
         email: participantEmail,
         phone: regPhone.trim(),
         purpose: `Workshop Pass: ${activeWorkshop.title}`,
-        merchantUpiId: getActiveMerchantUpi()
+        merchantUpiId: getActiveMerchantUpi(),
+        section: 'workshop',
+        skipReceiptEmail: true,
       });
       setIsProcessing(false);
       setShowRazorpayModal(true);

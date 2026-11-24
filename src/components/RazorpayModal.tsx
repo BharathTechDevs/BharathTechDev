@@ -51,6 +51,8 @@ interface RazorpayModalProps {
     phone?: string;
     purpose: string;
     merchantUpiId?: string;
+    section?: string;
+    skipReceiptEmail?: boolean;
   };
   initialStep?: 'checkout' | 'razorpay_main' | 'all_options';
 }
@@ -595,6 +597,8 @@ export default function RazorpayModal({
         purpose: paymentDetails.purpose,
         paymentMethodLabel: method,
         merchantUpiId: activeMerchantVpa,
+        section: paymentDetails.section,
+        skipReceiptEmail: paymentDetails.skipReceiptEmail,
       });
 
       if (verifyRes?.registrationClosed) {

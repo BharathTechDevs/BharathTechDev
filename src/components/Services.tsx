@@ -956,8 +956,12 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             body: JSON.stringify({
               email: payerEmail,
               clientName: payerName,
+              serviceId: registeringService.id,
               serviceTitle: registeringService.title,
               uniqueKey: generatedKey,
+              amount: qrPayAmount,
+              paymentStatus: 'VERIFIED',
+              paymentId: `UPI_UTR_${cleanUtr}`,
               actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
             })
           });

@@ -65,6 +65,8 @@ export default function Events() {
     phone?: string;
     purpose: string;
     merchantUpiId: string;
+    section?: string;
+    skipReceiptEmail?: boolean;
   } | null>(null);
 
   // Form registration state
@@ -741,7 +743,9 @@ export default function Events() {
           email: regEmail.trim(),
           phone: regPhone.trim(),
           purpose: `Event Pass: ${selectedEvent.name}`,
-          merchantUpiId: getActiveMerchantUpi()
+          merchantUpiId: getActiveMerchantUpi(),
+          section: 'event',
+          skipReceiptEmail: true,
         });
 
         setShowRazorpayModal(true);
@@ -761,7 +765,9 @@ export default function Events() {
           email: regEmail.trim(),
           phone: regPhone.trim(),
           purpose: `Event Pass: ${selectedEvent.name}`,
-          merchantUpiId: getActiveMerchantUpi()
+          merchantUpiId: getActiveMerchantUpi(),
+          section: 'event',
+          skipReceiptEmail: true,
         });
         setShowRazorpayModal(true);
         setIsProcessing(false);
@@ -877,10 +883,17 @@ export default function Events() {
           body: JSON.stringify({
             email: data.email,
             clientName: data.clientName,
+            eventId: eventRef?.id || 'evt-auto',
             eventTitle: eventName,
+            eventDate,
+            eventDay,
+            eventTime,
+            eventLocation,
             amount: data.amount,
             ticketCode: ticketCode,
             paymentId: data.razorpay_payment_id,
+            orderId: data.razorpay_order_id,
+            paymentStatus: 'VERIFIED',
             actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
           })
         });
