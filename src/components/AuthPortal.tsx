@@ -3,12 +3,20 @@ import {
   ShieldCheck, Lock, Unlock, Users, Globe, Receipt, Cpu, BookOpen,
   ArrowRight, Mail, Phone, Building, User, Key, Eye, EyeOff, 
   CheckCircle, Clock, FileText, ChevronRight, MessageSquare, Send,
-  Award, Sparkles, Terminal, Activity, LogOut, Check, Settings
+  Award, Sparkles, Terminal, Activity, LogOut, Check, Settings, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AppUser } from '../types';
 import { getDynamicInvoices, getDynamicServices } from '../utils/dynamicData';
+import { DatabaseEngine } from '../utils/dbEngine';
 import AdminConsole from './AdminConsole';
+import {
+  auth,
+  signInWithGooglePopup,
+  fetchUserRegistrationsFromFirestore,
+  fetchUserPrivateInfoFromFirestore,
+  syncRegistrationToFirestore,
+} from '../firebase';
 
 // Pre-configured Admin Credentials
 const ADMIN_ACCOUNTS = [
@@ -19,20 +27,27 @@ const ADMIN_ACCOUNTS = [
   { id: 'guest', email: 'guest@scoders.com', password: 'guest123', name: 'Guest Developer', role: 'External Auditor' }
 ];
 
+const isUidIdentifier = (val: string): boolean => {
+  const clean = String(val || '').trim();
+  if (!clean) return false;
+  return /^(BTD-|SC-EVT-|REG-|EVT-|TKT-)/i.test(clean) || (!clean.includes('@') && clean.length >= 4);
+};
+
 interface AuthPortalProps {
   user: AppUser | null;
-  onLogin: (user: AppUser) => void;
+  onLogin: (user: AppUser, token?: string, snapshot?: any) => void;
   onLogout: () => void;
   onOpenPayments: (details?: any) => void;
 }
 
 export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: AuthPortalProps) {
   // Navigation & Form Modes
-  const [activeTab, setActiveTab] = useState<'client' | 'admin'>('admin');
-  const [clientMode, setClientMode] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState<'client' | 'admin'>('client');
+  const [clientMode, setClientMode] = useState<'login' | 'register' | 'recover'>('login');
   const [adminViewMode, setAdminViewMode] = useState<'control_hub' | 'client_view'>('control_hub');
   const [showRegisterAlert, setShowRegisterAlert] = useState(false);
-  
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+
   // Input fields
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -44,12 +59,39 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Gmail OTP Recovery states
+  const [recoveryStep, setRecoveryStep] = useState<'email' | 'otp' | 'verified'>('email');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryOtp, setRecoveryOtp] = useState('');
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState('');
+  const [recoveredRecords, setRecoveredRecords] = useState<any[]>([]);
+  const [recoveredSession, setRecoveredSession] = useState<{ user: AppUser; token?: string; snapshot?: any } | null>(null);
+  const [copiedRecoveredUid, setCopiedRecoveredUid] = useState<string | null>(null);
+
   // Client Dashboard internal state
   const [selectedProjectTemplate, setSelectedProjectTemplate] = useState<'agent' | 'web' | 'mobile'>('agent');
   const [invoices, setInvoices] = useState<any[]>([]);
   const [inquiryText, setInquiryText] = useState('');
   const [inquiryCategory, setInquiryCategory] = useState<'app' | 'website' | 'webpage'>('app');
   const [inquirySuccess, setInquirySuccess] = useState(false);
+
+  // Firebase Google Cloud Sync & Portal Passes state
+  const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [cloudBackupMsg, setCloudBackupMsg] = useState<string | null>(null);
+  const [copiedPortalUid, setCopiedPortalUid] = useState<string | null>(null);
+  const [portalRefreshTick, setPortalRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setPortalRefreshTick((n) => n + 1);
+    window.addEventListener('scoders_db_change', bump);
+    window.addEventListener('scoders_sessions_change', bump);
+    window.addEventListener('scoders_data_change', bump);
+    return () => {
+      window.removeEventListener('scoders_db_change', bump);
+      window.removeEventListener('scoders_sessions_change', bump);
+      window.removeEventListener('scoders_data_change', bump);
+    };
+  }, []);
 
   // Load client's personalized mock invoices on mount / login
   useEffect(() => {
@@ -98,19 +140,22 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
   }, [user]);
 
   // Handle Submission for Client & Admin Access
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authSubmitting) return;
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!email || !password) {
-      setErrorMsg('Please fill in all credentials.');
-      return;
-    }
+    const cleanIdentifier = email.trim();
+    const looksLikeUid = isUidIdentifier(cleanIdentifier);
 
     if (activeTab === 'admin') {
-      // Admin Authorization Flow
-      const normalized = email.toLowerCase().trim().replace(/\s+/g, '');
+      if (!cleanIdentifier || !password) {
+        setErrorMsg('Please fill in all credentials.');
+        return;
+      }
+
+      const normalized = cleanIdentifier.toLowerCase().replace(/\s+/g, '');
       const adminMatch = ADMIN_ACCOUNTS.find(acc => {
         const accId = acc.id.toLowerCase().replace(/\s+/g, '');
         const accEmail = acc.email.toLowerCase().replace(/\s+/g, '');
@@ -138,77 +183,224 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
         setSuccessMsg(`Welcome Administrator: ${adminMatch.name} (${adminMatch.role})`);
         setTimeout(() => {
           onLogin(adminUser);
-        }, 600);
+        }, 400);
       } else {
         setErrorMsg('Invalid Admin ID or Security Password. Please enter your authorized credentials.');
       }
-    } else {
-      // Client Access Flow
-      if (clientMode === 'login') {
-        const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-        const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-        
-        const clientMatch = clients.find(c => c.email.toLowerCase() === email.toLowerCase().trim());
-        
-        // Let's support a password dummy check for test clients, or verify properly against saved hashed key
-        if (clientMatch) {
-          // For simplicity, saved password matches username or client password checks
-          // We stored password alongside in registration or can check against client stored profiles
-          const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-          const storedPass = passwordsMap[clientMatch.email.toLowerCase()] || 'password';
-          
-          if (password === storedPass) {
-            setSuccessMsg(`Access Authorized. Welcome back, ${clientMatch.name}!`);
-            setTimeout(() => {
-              onLogin(clientMatch);
-            }, 800);
-          } else {
-            setErrorMsg('Invalid password for this registered client account.');
+      return;
+    }
+
+    // Client Access Flow (Server-Authoritative Database Auth)
+    if (clientMode === 'login') {
+      if (!cleanIdentifier) {
+        setErrorMsg('Please enter your registered email address or unique registration code (UID).');
+        return;
+      }
+      if (!looksLikeUid && !password.trim()) {
+        setErrorMsg('Please enter your password or your Unique Registration Code (UID).');
+        return;
+      }
+
+      setAuthSubmitting(true);
+      try {
+        const res = await fetch('/api/auth/client/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: cleanIdentifier,
+            password: password.trim() || undefined,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data?.success || !data?.user) {
+          setErrorMsg(data?.error || 'Unable to verify credentials. Please check your email/UID and try again.');
+          if (res.status === 404) {
+            setShowRegisterAlert(true);
           }
-        } else {
-          setErrorMsg('No client account found. Please register first.');
-          setShowRegisterAlert(true);
-        }
-      } else {
-        // Registering a brand new client
-        if (!name) {
-          setErrorMsg('Please specify your name for the portal.');
           return;
         }
 
-        const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-        const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-
-        if (clients.some(c => c.email.toLowerCase() === email.toLowerCase().trim())) {
-          setErrorMsg('An account with this email is already registered.');
-          return;
-        }
-
-        // Create user object
-        const newClient: AppUser = {
-          uid: 'client-' + Date.now().toString(),
-          name,
-          email: email.trim(),
+        const authUser: AppUser = {
+          uid: data.user.uid,
+          name: data.user.name,
+          email: data.user.email,
           role: 'client',
-          company: company.trim() || 'Independent Client',
-          phone: phone.trim() || 'Not Specified',
-          createdAt: new Date().toISOString()
+          company: data.user.company || 'Independent Client',
+          phone: data.user.phone || 'Not Specified',
+          createdAt: data.user.createdAt || new Date().toISOString(),
         };
 
-        // Persist to local client index
-        clients.push(newClient);
-        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-
-        // Persist password secure map
-        const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-        passwordsMap[newClient.email.toLowerCase()] = password;
-        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-
-        setSuccessMsg(`Welcome to S-CODERS Ecosystem, ${name}! Your workspace is being provisioned...`);
+        setSuccessMsg(
+          data.loginMethod === 'uid'
+            ? `Unique Registration Code verified! Welcome back, ${authUser.name}.`
+            : `Access Authorized. Welcome back, ${authUser.name}!`
+        );
         setTimeout(() => {
-          onLogin(newClient);
-        }, 1200);
+          onLogin(authUser, data.token, data.snapshot);
+        }, 400);
+      } catch {
+        setErrorMsg('Unable to connect to authentication server. Please try again.');
+      } finally {
+        setAuthSubmitting(false);
       }
+      return;
+    }
+
+    if (clientMode === 'register') {
+      if (!cleanIdentifier || !cleanIdentifier.includes('@')) {
+        setErrorMsg('Please enter a valid email address.');
+        return;
+      }
+      if (!name.trim()) {
+        setErrorMsg('Please specify your name for the portal.');
+        return;
+      }
+      if (!password || password.length < 4) {
+        setErrorMsg('Please choose a security password of at least 4 characters.');
+        return;
+      }
+
+      setAuthSubmitting(true);
+      try {
+        const res = await fetch('/api/auth/client/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(),
+            email: cleanIdentifier,
+            password,
+            company: company.trim() || 'Independent Client',
+            phone: phone.trim() || 'Not Specified',
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data?.success || !data?.user) {
+          setErrorMsg(data?.error || 'Registration failed. Please verify your details.');
+          return;
+        }
+
+        const newClient: AppUser = {
+          uid: data.user.uid,
+          name: data.user.name,
+          email: data.user.email,
+          role: 'client',
+          company: data.user.company || 'Independent Client',
+          phone: data.user.phone || 'Not Specified',
+          createdAt: data.user.createdAt || new Date().toISOString(),
+        };
+
+        setSuccessMsg(`Welcome to S-CODERS Ecosystem, ${newClient.name}! Your workspace is provisioned.`);
+        setTimeout(() => {
+          onLogin(newClient, data.token, data.snapshot);
+        }, 500);
+      } catch {
+        setErrorMsg('Unable to reach registration server. Please try again.');
+      } finally {
+        setAuthSubmitting(false);
+      }
+    }
+  };
+
+  const handleRequestClientRecoveryOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authSubmitting) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanEmail = recoveryEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setErrorMsg('Please enter your registered Gmail / email address.');
+      return;
+    }
+
+    setAuthSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/client/recovery/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        setErrorMsg(data?.error || `No registered account or UID found for ${cleanEmail}.`);
+        return;
+      }
+      setSuccessMsg(data.message || `A 6-digit recovery OTP was sent to ${cleanEmail} from scoders82@gmail.com.`);
+      setRecoveryStep('otp');
+    } catch {
+      setErrorMsg('Unable to send verification code. Please try again.');
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleVerifyClientRecoveryOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authSubmitting) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanEmail = recoveryEmail.trim().toLowerCase();
+    const cleanOtp = recoveryOtp.trim();
+    if (cleanOtp.length < 6) {
+      setErrorMsg('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
+    if (recoveryNewPassword.trim() && recoveryNewPassword.trim().length < 4) {
+      setErrorMsg('New password must be at least 4 characters.');
+      return;
+    }
+
+    setAuthSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/client/recovery/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          otp: cleanOtp,
+          resendEmail: true,
+          ...(recoveryNewPassword.trim() ? { newPassword: recoveryNewPassword.trim() } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        setErrorMsg(data?.error || 'Invalid or expired verification code.');
+        return;
+      }
+
+      if (data.snapshot) {
+        DatabaseEngine.applyClientAuthSnapshot(data.snapshot);
+      }
+
+      const recs = Array.isArray(data.registrations) ? data.registrations : [];
+      setRecoveredRecords(recs);
+
+      if (data.user) {
+        const recoveredUser: AppUser = {
+          uid: data.user.uid,
+          name: data.user.name,
+          email: data.user.email,
+          role: 'client',
+          company: data.user.company || 'Independent Client',
+          phone: data.user.phone || 'Not Specified',
+          createdAt: data.user.createdAt || new Date().toISOString(),
+        };
+        setRecoveredSession({ user: recoveredUser, token: data.token, snapshot: data.snapshot });
+      }
+
+      setRecoveryStep('verified');
+      setSuccessMsg(
+        data.passwordUpdated
+          ? `Account verified & password updated! Your active registration codes have also been emailed to ${cleanEmail}.`
+          : `Account verified! Recovered ${recs.length} registration record(s) and emailed your active UIDs to ${cleanEmail}.`
+      );
+    } catch {
+      setErrorMsg('Unable to verify recovery code right now.');
+    } finally {
+      setAuthSubmitting(false);
     }
   };
 
@@ -237,6 +429,164 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
     setInquiryText('');
     setInquirySuccess(true);
     setTimeout(() => setInquirySuccess(false), 5000);
+  };
+
+  // Sign in with Google + Sync Cloud Firestore registrations
+  const handleGoogleCloudSignIn = async () => {
+    if (googleSyncing || authSubmitting) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+    setGoogleSyncing(true);
+    try {
+      const fbUser = await signInWithGooglePopup();
+      const verifiedEmail = String(fbUser.email || '').trim().toLowerCase();
+      if (!verifiedEmail || !fbUser.emailVerified) {
+        setErrorMsg('Google account email is not verified.');
+        return;
+      }
+
+      const [cloudRecords, privInfo] = await Promise.all([
+        fetchUserRegistrationsFromFirestore().catch(() => []),
+        fetchUserPrivateInfoFromFirestore().catch(() => null),
+      ]);
+
+      const syncRes = await fetch('/api/registrations/sync-cloud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: verifiedEmail,
+          name: fbUser.displayName || verifiedEmail.split('@')[0],
+          phone: privInfo?.phone || '',
+          company: privInfo?.company || '',
+          cloudRecords,
+        }),
+      });
+      const data = await syncRes.json().catch(() => ({}));
+
+      if (!syncRes.ok || !data?.success || !data?.user) {
+        setErrorMsg(data?.error || 'Could not synchronize Google Cloud account.');
+        return;
+      }
+
+      // Push any server-side registrations up to Firestore so future logins stay complete
+      if (Array.isArray(data.snapshot?.registrationUids)) {
+        for (const rec of data.snapshot.registrationUids) {
+          if (!rec?.uid || rec.status === 'REVOKED') continue;
+          await syncRegistrationToFirestore({
+            uid: String(rec.uid),
+            section: rec.section || 'service',
+            itemId: String(rec.itemId || rec.section || 'service'),
+            itemTitle: String(rec.itemTitle || 'S-CODERS Offering'),
+            clientName: String(rec.clientName || data.user.name || 'S-CODERS Client'),
+            clientEmail: verifiedEmail,
+            clientPhone: rec.clientPhone || data.user.phone || '',
+            clientRole: rec.clientRole || rec.clientOrg || data.user.company || '',
+            requirements: rec.metadata?.requirements || '',
+            notes: rec.metadata?.notes || '',
+            budget: rec.metadata?.budget || '',
+            timeline: rec.metadata?.timeline || '',
+            amount: Number(rec.amount) || 0,
+            paymentStatus: rec.paymentStatus === 'VERIFIED' ? 'VERIFIED' : 'NOT_REQUIRED',
+            paymentId: rec.paymentId || '',
+            status: rec.status === 'EXPIRED' ? 'EXPIRED' : 'ACTIVE',
+            chatId: rec.chatId || '',
+            issuedAt: rec.issuedAt || new Date().toISOString(),
+            validUntil: rec.validUntil || '',
+          }).catch(() => {});
+        }
+      }
+
+      const authUser: AppUser = {
+        uid: data.user.uid,
+        name: data.user.name,
+        email: data.user.email,
+        role: 'client',
+        company: data.user.company || 'Independent Client',
+        phone: data.user.phone || 'Not Specified',
+        createdAt: data.user.createdAt || new Date().toISOString(),
+      };
+
+      setSuccessMsg(`Google Cloud verified! Restored your workspace and ${data.snapshot?.registrationUids?.length || 0} registration(s).`);
+      setTimeout(() => {
+        onLogin(authUser, data.token, data.snapshot);
+      }, 400);
+    } catch (err: any) {
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setErrorMsg('Google sign-in popup was closed before completing.');
+      } else {
+        setErrorMsg(err?.message || 'Google Cloud Sign-In failed. Please try again.');
+      }
+    } finally {
+      setGoogleSyncing(false);
+    }
+  };
+
+  // Manual Cloud Backup trigger when already logged in via UID or Email
+  const handleBackupRegistrationsToGoogleCloud = async () => {
+    if (!user || googleSyncing) return;
+    setGoogleSyncing(true);
+    setCloudBackupMsg(null);
+    try {
+      let fbUser = auth.currentUser;
+      if (!fbUser || !fbUser.emailVerified) {
+        fbUser = await signInWithGooglePopup();
+      }
+      const verifiedEmail = String(fbUser.email || user.email || '').trim().toLowerCase();
+      const cloudRecords = await fetchUserRegistrationsFromFirestore().catch(() => []);
+
+      const syncRes = await fetch('/api/registrations/sync-cloud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: verifiedEmail,
+          name: user.name || fbUser.displayName || verifiedEmail.split('@')[0],
+          phone: user.phone || '',
+          company: user.company || '',
+          cloudRecords,
+        }),
+      });
+      const data = await syncRes.json().catch(() => ({}));
+      if (syncRes.ok && data?.success) {
+        if (data.snapshot) {
+          DatabaseEngine.applyClientAuthSnapshot(data.snapshot);
+        }
+        const recs = Array.isArray(data.snapshot?.registrationUids) ? data.snapshot.registrationUids : [];
+        let pushed = 0;
+        for (const rec of recs) {
+          if (!rec?.uid || rec.status === 'REVOKED') continue;
+          const ok = await syncRegistrationToFirestore({
+            uid: String(rec.uid),
+            section: rec.section || 'service',
+            itemId: String(rec.itemId || rec.section || 'service'),
+            itemTitle: String(rec.itemTitle || 'S-CODERS Offering'),
+            clientName: String(rec.clientName || user.name || 'S-CODERS Client'),
+            clientEmail: verifiedEmail,
+            clientPhone: rec.clientPhone || user.phone || '',
+            clientRole: rec.clientRole || rec.clientOrg || user.company || '',
+            requirements: rec.metadata?.requirements || '',
+            notes: rec.metadata?.notes || '',
+            budget: rec.metadata?.budget || '',
+            timeline: rec.metadata?.timeline || '',
+            amount: Number(rec.amount) || 0,
+            paymentStatus: rec.paymentStatus === 'VERIFIED' ? 'VERIFIED' : 'NOT_REQUIRED',
+            paymentId: rec.paymentId || '',
+            status: rec.status === 'EXPIRED' ? 'EXPIRED' : 'ACTIVE',
+            chatId: rec.chatId || '',
+            issuedAt: rec.issuedAt || new Date().toISOString(),
+            validUntil: rec.validUntil || '',
+          });
+          if (ok) pushed++;
+        }
+        setCloudBackupMsg(`Synced ${pushed} registration(s) permanently to Cloud Firestore (${verifiedEmail}).`);
+        setPortalRefreshTick((n) => n + 1);
+      } else {
+        setCloudBackupMsg(data?.error || 'Could not complete cloud sync.');
+      }
+    } catch (err: any) {
+      setCloudBackupMsg(err?.code === 'auth/popup-closed-by-user' ? 'Google popup closed before completing backup.' : (err?.message || 'Cloud sync failed.'));
+    } finally {
+      setGoogleSyncing(false);
+    }
   };
 
   return (
@@ -302,11 +652,15 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
 
             {/* Client Mode Switcher (only shown for Client tab) */}
             {activeTab === 'client' && (
-              <div className="flex justify-center gap-4 mb-6 pb-2 border-b border-white/5 text-xs">
+              <div className="flex flex-wrap justify-center gap-4 mb-6 pb-2 border-b border-white/5 text-xs">
                 <button
                   type="button"
-                  onClick={() => setClientMode('login')}
-                  className={`font-semibold transition-colors pb-1 ${
+                  onClick={() => {
+                    setClientMode('login');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  className={`font-semibold transition-colors pb-1 cursor-pointer ${
                     clientMode === 'login'
                       ? 'text-brand-teal border-b-2 border-brand-teal'
                       : 'text-gray-400 hover:text-gray-200'
@@ -316,14 +670,34 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setClientMode('register')}
-                  className={`font-semibold transition-colors pb-1 ${
+                  onClick={() => {
+                    setClientMode('register');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  className={`font-semibold transition-colors pb-1 cursor-pointer ${
                     clientMode === 'register'
                       ? 'text-brand-teal border-b-2 border-brand-teal'
                       : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
                   Register Workspace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientMode('recover');
+                    setRecoveryStep('email');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  className={`font-semibold transition-colors pb-1 cursor-pointer ${
+                    clientMode === 'recover'
+                      ? 'text-brand-teal border-b-2 border-brand-teal'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  Recover via Gmail
                 </button>
               </div>
             )}
@@ -358,125 +732,348 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
               )}
             </AnimatePresence>
 
-            {/* Form */}
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
-              
-              {/* Common Email field */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
-                  {activeTab === 'admin' ? 'Admin Username / ID' : 'Workspace Email Address'}
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    type={activeTab === 'admin' ? "text" : "email"}
-                    placeholder={activeTab === 'admin' ? "e.g. bhuvan" : "client@company.com"}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
-                  />
+            {/* Form or Gmail Recovery Flow */}
+            {activeTab === 'client' && clientMode === 'recover' ? (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-brand-teal/5 border border-brand-teal/20 text-xs text-gray-300 leading-relaxed">
+                  Forgot your password or lost your Unique Registration Code (UID)? Verify your registered Gmail address via a 6-digit code dispatched from{' '}
+                  <span className="text-brand-teal font-mono font-bold">scoders82@gmail.com</span>.
                 </div>
-              </div>
 
-              {/* Client Registration fields */}
-              {activeTab === 'client' && clientMode === 'register' && (
-                <>
-                  {/* Full Name */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
-                      Your Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                {recoveryStep === 'email' && (
+                  <form onSubmit={handleRequestClientRecoveryOtp} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                        Registered Gmail / Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                          type="email"
+                          placeholder="your.email@gmail.com"
+                          value={recoveryEmail}
+                          onChange={(e) => setRecoveryEmail(e.target.value)}
+                          required
+                          className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={authSubmitting}
+                      className="w-full py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold tracking-wider text-xs sm:text-sm rounded-xl uppercase transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${authSubmitting ? 'animate-spin' : ''}`} />
+                      <span>{authSubmitting ? 'Sending Code to Gmail...' : 'Send 6-Digit Recovery Code'}</span>
+                    </button>
+                  </form>
+                )}
+
+                {recoveryStep === 'otp' && (
+                  <form onSubmit={handleVerifyClientRecoveryOtp} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                        6-Digit Code Sent to {recoveryEmail}
+                      </label>
                       <input
                         type="text"
-                        placeholder="John Doe"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        maxLength={6}
+                        placeholder="e.g. 482910"
+                        value={recoveryOtp}
+                        onChange={(e) => setRecoveryOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         required
-                        className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
+                        className="w-full bg-brand-dark/60 border border-brand-teal/40 rounded-xl py-3 px-4 text-center text-base font-mono font-bold tracking-[0.35em] text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
                       />
                     </div>
-                  </div>
 
-                  {/* Company Name */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
-                      Company / Organization
-                    </label>
-                    <div className="relative">
-                      <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                      <input
-                        type="text"
-                        placeholder="MyStartup Inc."
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
-                      />
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                        Set / Reset Workspace Password (Optional)
+                      </label>
+                      <div className="relative">
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Leave blank to keep existing password"
+                          value={recoveryNewPassword}
+                          onChange={(e) => setRecoveryNewPassword(e.target.value)}
+                          className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Phone Number */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
-                      Phone Number
-                    </label>
-                    <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                      <input
-                        type="tel"
-                        placeholder="+91 98765 43210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
-                      />
+                    <div className="flex gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRecoveryStep('email');
+                          setRecoveryOtp('');
+                          setErrorMsg('');
+                        }}
+                        className="px-4 py-3.5 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-xs font-mono uppercase font-bold cursor-pointer"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={authSubmitting}
+                        className="flex-1 py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold tracking-wider text-xs sm:text-sm rounded-xl uppercase transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>{authSubmitting ? 'Verifying...' : 'Verify & Recover Account'}</span>
+                      </button>
                     </div>
-                  </div>
-                </>
-              )}
+                  </form>
+                )}
 
-              {/* Password field */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
-                    {activeTab === 'admin' ? 'Admin Password' : 'Workspace Security Password'}
-                  </label>
-                </div>
-                <div className="relative">
-                  <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                {recoveryStep === 'verified' && (
+                  <div className="space-y-4">
+                    {recoveredRecords.length > 0 && (
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        <div className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold">
+                          Recovered Registration Codes ({recoveredRecords.length})
+                        </div>
+                        {recoveredRecords.map((rec) => (
+                          <div
+                            key={rec.uid}
+                            className="p-3 rounded-xl bg-brand-dark/80 border border-white/10 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-white truncate">{rec.itemTitle}</span>
+                              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-brand-teal/15 text-brand-teal border border-brand-teal/25">
+                                {rec.section}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 bg-black/40 border border-white/10 rounded-lg px-3 py-2">
+                              <code className="font-mono text-xs font-bold text-amber-300 select-all">{rec.uid}</code>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(rec.uid);
+                                    setCopiedRecoveredUid(rec.uid);
+                                    setTimeout(() => setCopiedRecoveredUid(null), 1800);
+                                  }}
+                                  className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[10px] font-mono cursor-pointer"
+                                >
+                                  {copiedRecoveredUid === rec.uid ? 'Copied' : 'Copy'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setClientMode('login');
+                                    setEmail(rec.uid);
+                                    setPassword('');
+                                    setErrorMsg('');
+                                    setSuccessMsg(`Loaded code ${rec.uid}. Click Sign In Partner Workspace below.`);
+                                  }}
+                                  className="px-2 py-1 bg-brand-teal hover:bg-white text-brand-dark rounded text-[10px] font-mono font-bold cursor-pointer"
+                                >
+                                  Use UID
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {recoveredSession && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onLogin(
+                            recoveredSession.user,
+                            recoveredSession.token,
+                            recoveredSession.snapshot
+                          )
+                        }
+                        className="w-full py-3.5 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold tracking-wider text-xs sm:text-sm rounded-xl uppercase transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <span>Enter Unlocked Client Workspace</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
+            ) : (
+              <form onSubmit={handleAuthSubmit} className="space-y-4">
+                {/* Common Email / UID field */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                    {activeTab === 'admin'
+                      ? 'Admin Username / ID'
+                      : clientMode === 'login'
+                        ? 'Registered Email or Unique Code (UID)'
+                        : 'Workspace Email Address'}
+                  </label>
+                  <div className="relative">
+                    {activeTab === 'client' && clientMode === 'login' && isUidIdentifier(email) ? (
+                      <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-teal" />
+                    ) : (
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    )}
+                    <input
+                      type={activeTab === 'client' && clientMode === 'register' ? 'email' : 'text'}
+                      placeholder={
+                        activeTab === 'admin'
+                          ? 'e.g. bhuvan'
+                          : clientMode === 'login'
+                            ? 'client@gmail.com or BTD-SERV-... / BTD-WKSP-...'
+                            : 'client@company.com'
+                      }
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
+                    />
+                  </div>
+                  {activeTab === 'client' && clientMode === 'login' && (
+                    <p className="text-[10px] text-gray-400 font-mono">
+                      Tip: You can sign in directly with your Unique Registration Code (e.g. BTD-SERV-..., BTD-WKSP-...) or your Email & Password.
+                    </p>
+                  )}
+                </div>
 
-              <button
-                type="submit"
-                className="w-full mt-6 py-4 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold tracking-wider text-sm rounded-xl uppercase transition-all duration-300 shadow-xl shadow-brand-teal/10 flex items-center justify-center gap-2 group cursor-pointer focus:outline-none"
-              >
-                <span>
-                  {activeTab === 'admin' 
-                    ? 'Authorize Admin Console' 
-                    : clientMode === 'login' 
-                      ? 'Sign In Partner Workspace' 
-                      : 'Register S-CODERS Workspace'}
-                </span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </form>
+                {/* Client Registration fields */}
+                {activeTab === 'client' && clientMode === 'register' && (
+                  <>
+                    {/* Full Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                        Your Full Name
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                          type="text"
+                          placeholder="John Doe"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Company Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                        Company / Organization
+                      </label>
+                      <div className="relative">
+                        <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                          type="text"
+                          placeholder="MyStartup Inc."
+                          value={company}
+                          onChange={(e) => setCompany(e.target.value)}
+                          className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Phone Number */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                          type="tel"
+                          placeholder="+91 98765 43210"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Password field (optional when logging in directly via Unique Registration Code) */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block font-bold">
+                      {activeTab === 'admin'
+                        ? 'Admin Password'
+                        : clientMode === 'login'
+                          ? isUidIdentifier(email)
+                            ? 'Password (Optional with Unique Code)'
+                            : 'Password or Unique Code (UID)'
+                          : 'Workspace Security Password'}
+                    </label>
+                    {activeTab === 'client' && clientMode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClientMode('recover');
+                          setRecoveryStep('email');
+                          if (email.includes('@')) setRecoveryEmail(email.trim());
+                          setErrorMsg('');
+                          setSuccessMsg('');
+                        }}
+                        className="text-[10px] font-mono text-brand-teal hover:underline cursor-pointer"
+                      >
+                        Forgot Password / UID?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder={
+                        activeTab === 'client' && clientMode === 'login' && isUidIdentifier(email)
+                          ? 'Optional — press Sign In directly'
+                          : '••••••••••••'
+                      }
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required={
+                        activeTab === 'admin' ||
+                        clientMode === 'register' ||
+                        !isUidIdentifier(email)
+                      }
+                      className="w-full bg-brand-dark/60 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-sm text-white focus:outline-none focus:border-brand-teal transition-all placeholder:text-gray-600 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authSubmitting}
+                  className="w-full mt-6 py-4 bg-brand-teal hover:bg-white text-brand-dark font-display font-bold tracking-wider text-sm rounded-xl uppercase transition-all duration-300 shadow-xl shadow-brand-teal/10 flex items-center justify-center gap-2 group cursor-pointer focus:outline-none disabled:opacity-50"
+                >
+                  <span>
+                    {authSubmitting
+                      ? 'Verifying Credentials...'
+                      : activeTab === 'admin'
+                        ? 'Authorize Admin Console'
+                        : clientMode === 'login'
+                          ? 'Sign In Partner Workspace'
+                          : 'Register S-CODERS Workspace'}
+                  </span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </form>
+            )}
 
             {/* Admin Credential Notice */}
             {activeTab === 'admin' && (
@@ -488,43 +1085,48 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
               </div>
             )}
 
-            {/* Test Credentials Quick Autofills for evaluation/testing */}
+            {/* Google Cloud Sign-In & Test Credentials Triggers */}
             {activeTab !== 'admin' && (
-              <div className="mt-8 pt-6 border-t border-white/5 space-y-3">
-                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold">
-                  Quick Evaluation Triggers
-                </div>
-                <div className="space-y-1.5">
+              <div className="mt-6 pt-5 border-t border-white/10 space-y-4">
+                <button
+                  type="button"
+                  disabled={googleSyncing || authSubmitting}
+                  onClick={handleGoogleCloudSignIn}
+                  className="w-full py-3 px-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Globe className="w-4 h-4 text-brand-teal" />
+                  <span>{googleSyncing ? 'Connecting Google Cloud...' : 'Continue with Google (Cloud Backup & Restore)'}</span>
+                </button>
+
+                <div className="pt-2 border-t border-white/5 space-y-2">
+                  <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-semibold">
+                    Quick Evaluation Triggers
+                  </div>
                   <p className="text-[10px] text-gray-400 font-light">
-                    Select <span className="text-brand-teal font-semibold">Register Workspace</span> to create your customized mock workspace with real project logs and settle-able test invoices!
+                    Select <span className="text-brand-teal font-semibold">Register Workspace</span> to create your workspace or use <span className="text-brand-teal font-semibold">Recover via Gmail</span> anytime!
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       setActiveTab('client');
                       setClientMode('login');
                       setEmail('bengalurutech@gmail.com');
                       setPassword('bengaluru2026');
                       setErrorMsg('');
-                      // Pre-seed this demo client into localStorage if not present
-                      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-                      const clients = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-                      if (!clients.some((c: any) => c.email === 'bengalurutech@gmail.com')) {
-                        clients.push({
-                          uid: 'client-demo',
-                          name: 'Bengaluru Tech Builders',
-                          email: 'bengalurutech@gmail.com',
-                          role: 'client',
-                          company: 'Bengaluru Tech Builders LLP',
-                          phone: '+91 98989 77777',
-                          createdAt: new Date().toISOString()
+                      setSuccessMsg('');
+                      try {
+                        await fetch('/api/auth/client/register', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            name: 'Bengaluru Tech Builders',
+                            email: 'bengalurutech@gmail.com',
+                            password: 'bengaluru2026',
+                            company: 'Bengaluru Tech Builders LLP',
+                            phone: '+91 98989 77777',
+                          }),
                         });
-                        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-                        
-                        const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-                        passwordsMap['bengalurutech@gmail.com'] = 'bengaluru2026';
-                        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-                      }
+                      } catch {}
                     }}
                     className="w-full text-center py-2.5 bg-white/5 hover:bg-brand-teal/10 hover:border-brand-teal/30 border border-transparent rounded-xl text-[11px] font-mono text-brand-teal transition-all uppercase font-bold cursor-pointer focus:outline-none"
                   >
@@ -648,6 +1250,177 @@ export default function AuthPortal({ user, onLogin, onLogout, onOpenPayments }: 
               </div>
             </div>
           </div>
+
+          {/* My Registered Passes, UID Keys & Cloud Sync */}
+          {(() => {
+            void portalRefreshTick;
+            const userEmail = String(user.email || '').trim().toLowerCase();
+            const sessionUids = new Set(DatabaseEngine.getSessionUnlockedUids());
+            const svcRegs = DatabaseEngine.getServiceRegistrations().filter(
+              (r) =>
+                String(r.clientProfile?.email || '').trim().toLowerCase() === userEmail ||
+                sessionUids.has(String(r.uniqueKey || '').trim().toUpperCase())
+            );
+            const wkspRegs = DatabaseEngine.getWorkshopRegistrations().filter(
+              (r) =>
+                !r.isRevoked &&
+                r.paymentStatus !== 'Cancelled' &&
+                r.paymentStatus !== 'Revoked' &&
+                (String(r.participantProfile?.email || '').trim().toLowerCase() === userEmail ||
+                  sessionUids.has(String(r.uniqueAccessKey || '').trim().toUpperCase()))
+            );
+            let eventTickets: any[] = [];
+            try {
+              const rawTickets = JSON.parse(localStorage.getItem('scoders_event_tickets') || '[]');
+              if (Array.isArray(rawTickets)) {
+                eventTickets = rawTickets.filter(
+                  (t) =>
+                    String(t?.participantEmail || '').trim().toLowerCase() === userEmail ||
+                    sessionUids.has(String(t?.ticketCode || '').trim().toUpperCase())
+                );
+              }
+            } catch {}
+
+            const totalItems = svcRegs.length + wkspRegs.length + eventTickets.length;
+
+            return (
+              <div className="bg-brand-card border border-brand-teal/20 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-display font-bold text-white flex items-center gap-2">
+                      <Key className="w-5 h-5 text-brand-teal" />
+                      My Registered Passes &amp; Saved Profiles ({totalItems})
+                    </h2>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      Permanent UIDs, saved project/workshop notes, and cloud backup linked to {user.email}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={googleSyncing}
+                    onClick={handleBackupRegistrationsToGoogleCloud}
+                    className="px-4 py-2.5 bg-brand-teal/15 hover:bg-brand-teal text-brand-teal hover:text-brand-dark border border-brand-teal/30 rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${googleSyncing ? 'animate-spin' : ''}`} />
+                    <span>{googleSyncing ? 'Syncing Cloud...' : 'Sync to Google Cloud'}</span>
+                  </button>
+                </div>
+
+                {cloudBackupMsg && (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-mono text-emerald-300">
+                    {cloudBackupMsg}
+                  </div>
+                )}
+
+                {totalItems === 0 ? (
+                  <div className="p-5 rounded-2xl bg-brand-dark/60 border border-white/5 text-xs text-gray-400 font-mono">
+                    No active Service, Workshop, or Event UIDs linked to this account yet. Register from Services, Workshops, or Events—or verify an existing UID there—and it will appear here permanently.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {svcRegs.map((reg) => {
+                      const uid = String(reg.uniqueKey || '').trim().toUpperCase();
+                      return (
+                        <div key={uid} className="p-4 rounded-2xl bg-brand-dark/70 border border-white/10 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-brand-teal/15 text-brand-teal border border-brand-teal/30">
+                              Service
+                            </span>
+                            <span className="text-[11px] font-mono text-gray-400">{reg.projectStatus || 'Active'}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-white truncate">{reg.selectedServiceTitle}</h4>
+                          <div className="flex items-center justify-between gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2">
+                            <code className="font-mono text-xs font-bold text-amber-300 select-all truncate">{uid}</code>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(uid);
+                                setCopiedPortalUid(uid);
+                                setTimeout(() => setCopiedPortalUid(null), 1800);
+                              }}
+                              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[10px] font-mono cursor-pointer shrink-0"
+                            >
+                              {copiedPortalUid === uid ? 'Copied' : 'Copy UID'}
+                            </button>
+                          </div>
+                          {(reg.notes || reg.projectRequirements) && (
+                            <p className="text-[11px] text-gray-300 line-clamp-2">
+                              Saved Notes: {reg.notes || reg.projectRequirements}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {wkspRegs.map((reg) => {
+                      const uid = String(reg.uniqueAccessKey || '').trim().toUpperCase();
+                      return (
+                        <div key={uid} className="p-4 rounded-2xl bg-brand-dark/70 border border-white/10 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              Workshop
+                            </span>
+                            <span className="text-[11px] font-mono text-emerald-400">
+                              {reg.amountPaid ? `₹${Number(reg.amountPaid).toLocaleString()}` : reg.paymentStatus}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-white truncate">{reg.workshopTitle}</h4>
+                          <div className="flex items-center justify-between gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2">
+                            <code className="font-mono text-xs font-bold text-amber-300 select-all truncate">{uid}</code>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(uid);
+                                setCopiedPortalUid(uid);
+                                setTimeout(() => setCopiedPortalUid(null), 1800);
+                              }}
+                              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[10px] font-mono cursor-pointer shrink-0"
+                            >
+                              {copiedPortalUid === uid ? 'Copied' : 'Copy UID'}
+                            </button>
+                          </div>
+                          {reg.notes && (
+                            <p className="text-[11px] text-gray-300 line-clamp-2">
+                              Saved Notes: {reg.notes}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {eventTickets.map((tkt) => {
+                      const uid = String(tkt.ticketCode || '').trim().toUpperCase();
+                      return (
+                        <div key={uid} className="p-4 rounded-2xl bg-brand-dark/70 border border-white/10 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                              Event Pass
+                            </span>
+                            <span className="text-[11px] font-mono text-gray-400">{tkt.eventDate || 'Confirmed'}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-white truncate">{tkt.eventName}</h4>
+                          <div className="flex items-center justify-between gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2">
+                            <code className="font-mono text-xs font-bold text-amber-300 select-all truncate">{uid}</code>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(uid);
+                                setCopiedPortalUid(uid);
+                                setTimeout(() => setCopiedPortalUid(null), 1800);
+                              }}
+                              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[10px] font-mono cursor-pointer shrink-0"
+                            >
+                              {copiedPortalUid === uid ? 'Copied' : 'Copy UID'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             

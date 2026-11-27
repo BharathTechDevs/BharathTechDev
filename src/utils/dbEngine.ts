@@ -1,5 +1,6 @@
 import { AppUser, Service, WorkshopEvent, CandidateApplication } from '../types';
 import { getLeaderPhoto } from './leaderPhotos';
+import { syncRegistrationToFirestore } from '../firebase';
 
 // ==========================================
 // 1. DATABASE SCHEMA TYPES
@@ -17,6 +18,7 @@ export interface ServiceRegistration {
   selectedServiceTitle: string;
   uniqueKey: string; // Assigned Client Service Key
   projectRequirements: string;
+  notes?: string;
   budget: string;
   timeline: string;
   projectStatus: 'Pending' | 'In Progress' | 'Completed' | 'Delivered' | 'Cancelled';
@@ -61,6 +63,7 @@ export interface WorkshopRegistration {
   paymentDate: string;
   transactionId: string; // e.g. "TXN-74891"
   uniqueAccessKey: string; // assigned workshop key
+  notes?: string;
   materialsFileIds: string[]; // Ref to FileRecord[]
   chatId: string | null; // Ref to ChatConversation
   feedbackId: string | null; // Ref to FeedbackItem
@@ -537,6 +540,301 @@ const SEED_WORKSHOPS_REG: WorkshopRegistration[] = [
 
 export class DatabaseEngine {
   private static isSyncing = false;
+  private static lastLocalWriteAt: Record<string, number> = {};
+  private static readonly WRITE_GUARD_MS = 6000;
+  private static readonly BLOCKED_SYNC_KEYS = new Set([
+    'scoders_client_passwords',
+    'db_uid_recovery_otps',
+    'db_client_accounts',
+    'scoders_registered_services',
+    'scoders_registered_workshops',
+    'scoders_session_unlocked_uids',
+    'scoders_user',
+    'scoders_admin_auth',
+  ]);
+
+  private static markLocalWrite(key: string): void {
+    this.lastLocalWriteAt[key] = Date.now();
+  }
+
+  public static getSessionUnlockedUids(): string[] {
+    try {
+      const raw = localStorage.getItem('scoders_session_unlocked_uids');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.map((u) => String(u).trim().toUpperCase()).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public static addSessionUnlockedUid(uid: string): void {
+    const clean = String(uid || '').trim().toUpperCase();
+    if (!clean || clean === 'ENTER-KEY-TO-VERIFY' || clean === 'PASS-KEY') return;
+    try {
+      const current = new Set(this.getSessionUnlockedUids());
+      current.add(clean);
+      localStorage.setItem('scoders_session_unlocked_uids', JSON.stringify(Array.from(current)));
+    } catch {}
+  }
+
+  public static clearClientSessionData(): void {
+    try {
+      localStorage.removeItem('scoders_registered_services');
+      localStorage.removeItem('scoders_registered_workshops');
+      localStorage.removeItem('scoders_session_unlocked_uids');
+    } catch {}
+  }
+
+  private static mergeByKey<T extends Record<string, any>>(
+    existing: T[],
+    incoming: T[],
+    getKey: (item: T) => string
+  ): T[] {
+    const map = new Map<string, T>();
+    const order: string[] = [];
+    for (const item of incoming) {
+      const k = getKey(item);
+      if (!k) continue;
+      if (!map.has(k)) order.push(k);
+      map.set(k, item);
+    }
+    for (const item of existing) {
+      const k = getKey(item);
+      if (!k) continue;
+      if (!map.has(k)) {
+        order.push(k);
+        map.set(k, item);
+      }
+    }
+    return order.map((k) => map.get(k)!);
+  }
+
+  public static hydrateVerifiedRecord(record: any, hydrated?: any): void {
+    if (typeof window === 'undefined' || (!record && !hydrated)) return;
+    try {
+      const cleanUid = String(record?.uid || hydrated?.serviceRegistration?.uniqueKey || hydrated?.workshopRegistration?.uniqueAccessKey || hydrated?.eventTicket?.ticketCode || '')
+        .trim()
+        .toUpperCase();
+
+      if (cleanUid) {
+        this.addSessionUnlockedUid(cleanUid);
+      }
+
+      // 1. Upsert db_registration_uids
+      if (record?.uid) {
+        const uidsRaw = localStorage.getItem('db_registration_uids');
+        const uids: any[] = uidsRaw ? JSON.parse(uidsRaw) : [];
+        const normalizedRecord = { ...record, uid: String(record.uid).trim().toUpperCase() };
+        const mergedUids = this.mergeByKey(Array.isArray(uids) ? uids : [], [normalizedRecord], (u) =>
+          String(u?.uid || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('db_registration_uids');
+        localStorage.setItem('db_registration_uids', JSON.stringify(mergedUids));
+      }
+
+      // 2. Service hydration
+      const svcReg = hydrated?.serviceRegistration;
+      if (svcReg?.uniqueKey || (record?.section === 'service' && record?.itemId)) {
+        if (svcReg?.uniqueKey) {
+          const existing = this.getServiceRegistrations();
+          const merged = this.mergeByKey(existing, [svcReg], (r) =>
+            String(r?.uniqueKey || r?.id || '').trim().toUpperCase()
+          );
+          this.markLocalWrite('db_service_registrations');
+          localStorage.setItem('db_service_registrations', JSON.stringify(merged));
+        }
+
+        const svcId = svcReg?.serviceId || record?.itemId;
+        if (svcId && cleanUid) {
+          const savedMapRaw = localStorage.getItem('scoders_registered_services');
+          const savedMap = savedMapRaw ? JSON.parse(savedMapRaw) : {};
+          const resolvedNotes = svcReg?.notes || svcReg?.projectRequirements || record?.metadata?.notes || record?.metadata?.requirements || '';
+          savedMap[svcId] = {
+            key: cleanUid,
+            name: svcReg?.clientProfile?.name || record?.clientName || 'Registered Client',
+            email: (svcReg?.clientProfile?.email || record?.clientEmail || '').toLowerCase(),
+            role: svcReg?.clientProfile?.company || record?.clientRole || 'Client Partner',
+            phone: svcReg?.clientProfile?.phone || record?.clientPhone || '',
+            requirements: svcReg?.projectRequirements || record?.metadata?.requirements || resolvedNotes || '',
+            notes: resolvedNotes,
+            budget: svcReg?.budget || record?.metadata?.budget || 'TBD',
+            timeline: svcReg?.timeline || record?.metadata?.timeline || 'TBD',
+            chatId: svcReg?.chatId || record?.chatId || `chat-svc-${cleanUid}`,
+            timestamp: svcReg?.registrationDate || record?.issuedAt || new Date().toISOString(),
+          };
+          localStorage.setItem('scoders_registered_services', JSON.stringify(savedMap));
+        }
+      }
+
+      // 3. Workshop hydration
+      const wkspReg = hydrated?.workshopRegistration;
+      if (wkspReg?.uniqueAccessKey || (record?.section === 'workshop' && record?.itemId)) {
+        if (wkspReg?.uniqueAccessKey) {
+          const existing = this.getWorkshopRegistrations();
+          const merged = this.mergeByKey(existing, [wkspReg], (r) =>
+            String(r?.uniqueAccessKey || r?.id || '').trim().toUpperCase()
+          );
+          this.markLocalWrite('db_workshop_registrations');
+          localStorage.setItem('db_workshop_registrations', JSON.stringify(merged));
+        }
+
+        const wkspId = wkspReg?.workshopId || record?.itemId;
+        if (wkspId && cleanUid) {
+          const savedMapRaw = localStorage.getItem('scoders_registered_workshops');
+          const savedMap = savedMapRaw ? JSON.parse(savedMapRaw) : {};
+          const resolvedNotes = wkspReg?.notes || record?.metadata?.notes || '';
+          savedMap[wkspId] = {
+            key: cleanUid,
+            name: wkspReg?.participantProfile?.name || record?.clientName || 'Registered Attendee',
+            email: (wkspReg?.participantProfile?.email || record?.clientEmail || '').toLowerCase(),
+            role: wkspReg?.participantProfile?.role || record?.clientRole || 'Developer',
+            phone: wkspReg?.participantProfile?.phone || record?.clientPhone || '',
+            notes: resolvedNotes,
+            tickets: 1,
+            totalPaid: Number(wkspReg?.amountPaid ?? record?.amount) || 0,
+            chatId: wkspReg?.chatId || record?.chatId || `chat-wksp-${cleanUid}`,
+            timestamp: wkspReg?.paymentDate || record?.issuedAt || new Date().toLocaleDateString(),
+          };
+          localStorage.setItem('scoders_registered_workshops', JSON.stringify(savedMap));
+        }
+      }
+
+      // 4. Event ticket hydration
+      const evtTicket = hydrated?.eventTicket;
+      if (evtTicket?.ticketCode) {
+        const existingRaw = localStorage.getItem('scoders_event_tickets');
+        const existing: any[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const merged = this.mergeByKey(Array.isArray(existing) ? existing : [], [evtTicket], (t) =>
+          String(t?.ticketCode || t?.id || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('scoders_event_tickets');
+        localStorage.setItem('scoders_event_tickets', JSON.stringify(merged));
+      }
+
+      // 5. Chat hydration
+      if (hydrated?.chatRecord?.id) {
+        const existingChats = this.getChats();
+        const mergedChats = this.mergeByKey(existingChats, [hydrated.chatRecord], (c) =>
+          String(c?.id || c?.uniqueAccessKey || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('db_chats');
+        localStorage.setItem('db_chats', JSON.stringify(mergedChats));
+      }
+
+      // 6. Persist to Cloud Firestore when authenticated via Google
+      if (record?.uid && record?.section && record?.clientEmail) {
+        void syncRegistrationToFirestore({
+          uid: String(record.uid).trim().toUpperCase(),
+          section: record.section,
+          itemId: String(record.itemId || record.section),
+          itemTitle: String(record.itemTitle || 'S-CODERS Offering'),
+          clientName: String(record.clientName || 'Registered Client'),
+          clientEmail: String(record.clientEmail).toLowerCase(),
+          clientPhone: record.clientPhone || svcReg?.clientProfile?.phone || wkspReg?.participantProfile?.phone || '',
+          clientRole: record.clientRole || record.clientOrg || svcReg?.clientProfile?.company || wkspReg?.participantProfile?.role || '',
+          requirements: svcReg?.projectRequirements || record.metadata?.requirements || '',
+          notes: svcReg?.notes || wkspReg?.notes || record.metadata?.notes || '',
+          budget: svcReg?.budget || record.metadata?.budget || '',
+          timeline: svcReg?.timeline || record.metadata?.timeline || '',
+          amount: Number(record.amount) || 0,
+          paymentStatus: record.paymentStatus === 'VERIFIED' ? 'VERIFIED' : 'NOT_REQUIRED',
+          paymentId: record.paymentId || '',
+          status: record.status === 'EXPIRED' ? 'EXPIRED' : record.status === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
+          chatId: record.chatId || svcReg?.chatId || wkspReg?.chatId || '',
+          issuedAt: record.issuedAt || new Date().toISOString(),
+          validUntil: record.validUntil || '',
+        }).catch(() => {});
+      }
+
+      window.dispatchEvent(new Event('scoders_db_change'));
+      window.dispatchEvent(new Event('scoders_data_change'));
+      window.dispatchEvent(new Event('scoders_sessions_change'));
+      window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+    } catch (err) {
+      console.warn('hydrateVerifiedRecord warning:', err);
+    }
+  }
+
+  public static applyClientAuthSnapshot(snapshot: any): void {
+    if (typeof window === 'undefined' || !snapshot || typeof snapshot !== 'object') return;
+    try {
+      if (Array.isArray(snapshot.registrationUids)) {
+        const uidsRaw = localStorage.getItem('db_registration_uids');
+        const existing: any[] = uidsRaw ? JSON.parse(uidsRaw) : [];
+        const merged = this.mergeByKey(Array.isArray(existing) ? existing : [], snapshot.registrationUids, (u) =>
+          String(u?.uid || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('db_registration_uids');
+        localStorage.setItem('db_registration_uids', JSON.stringify(merged));
+        for (const u of snapshot.registrationUids) {
+          if (u?.uid && u?.status !== 'REVOKED') {
+            this.addSessionUnlockedUid(u.uid);
+          }
+        }
+      }
+
+      if (Array.isArray(snapshot.serviceRegistrations)) {
+        const existing = this.getServiceRegistrations();
+        const merged = this.mergeByKey(existing, snapshot.serviceRegistrations, (r) =>
+          String(r?.uniqueKey || r?.id || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('db_service_registrations');
+        localStorage.setItem('db_service_registrations', JSON.stringify(merged));
+        for (const s of snapshot.serviceRegistrations) {
+          if (s?.uniqueKey) this.addSessionUnlockedUid(s.uniqueKey);
+        }
+      }
+
+      if (Array.isArray(snapshot.workshopRegistrations)) {
+        const existing = this.getWorkshopRegistrations();
+        const merged = this.mergeByKey(existing, snapshot.workshopRegistrations, (r) =>
+          String(r?.uniqueAccessKey || r?.id || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('db_workshop_registrations');
+        localStorage.setItem('db_workshop_registrations', JSON.stringify(merged));
+        for (const w of snapshot.workshopRegistrations) {
+          if (w?.uniqueAccessKey) this.addSessionUnlockedUid(w.uniqueAccessKey);
+        }
+      }
+
+      if (Array.isArray(snapshot.eventTickets)) {
+        const existingRaw = localStorage.getItem('scoders_event_tickets');
+        const existing: any[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const merged = this.mergeByKey(Array.isArray(existing) ? existing : [], snapshot.eventTickets, (t) =>
+          String(t?.ticketCode || t?.id || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('scoders_event_tickets');
+        localStorage.setItem('scoders_event_tickets', JSON.stringify(merged));
+        for (const t of snapshot.eventTickets) {
+          if (t?.ticketCode) this.addSessionUnlockedUid(t.ticketCode);
+        }
+      }
+
+      if (Array.isArray(snapshot.chats)) {
+        const existingChats = this.getChats();
+        const mergedChats = this.mergeByKey(existingChats, snapshot.chats, (c) =>
+          String(c?.id || c?.uniqueAccessKey || '').trim().toUpperCase()
+        );
+        this.markLocalWrite('db_chats');
+        localStorage.setItem('db_chats', JSON.stringify(mergedChats));
+      }
+
+      if (snapshot.registeredServicesMap && typeof snapshot.registeredServicesMap === 'object') {
+        localStorage.setItem('scoders_registered_services', JSON.stringify(snapshot.registeredServicesMap));
+      }
+
+      if (snapshot.registeredWorkshopsMap && typeof snapshot.registeredWorkshopsMap === 'object') {
+        localStorage.setItem('scoders_registered_workshops', JSON.stringify(snapshot.registeredWorkshopsMap));
+      }
+
+      window.dispatchEvent(new Event('scoders_db_change'));
+      window.dispatchEvent(new Event('scoders_data_change'));
+      window.dispatchEvent(new Event('scoders_sessions_change'));
+      window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+    } catch (err) {
+      console.warn('applyClientAuthSnapshot warning:', err);
+    }
+  }
 
   private static getStored<T>(key: string, defaultValue: T): T {
     try {
@@ -551,6 +849,7 @@ export class DatabaseEngine {
   }
 
   private static setStored<T>(key: string, value: T): void {
+    this.markLocalWrite(key);
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
@@ -582,9 +881,12 @@ export class DatabaseEngine {
       if (data.success && data.state) {
         let changed = false;
         const serverState = data.state;
-        
-        // 1. Sync from server to local
+        const now = Date.now();
+
+        // 1. Sync from server to local (respecting recent local writes & excluding auth/session-scoped keys)
         for (const [key, val] of Object.entries(serverState)) {
+          if (this.BLOCKED_SYNC_KEYS.has(key)) continue;
+          if (now - (this.lastLocalWriteAt[key] || 0) < this.WRITE_GUARD_MS) continue;
           const localValStr = localStorage.getItem(key);
           const serverValStr = JSON.stringify(val);
           if (localValStr !== serverValStr) {
@@ -592,6 +894,84 @@ export class DatabaseEngine {
             changed = true;
           }
         }
+
+        // Refresh only the currently logged-in user's unlocked services/workshops maps if logged in
+        try {
+          const userStr = localStorage.getItem('scoders_user');
+          const activeUser = userStr ? JSON.parse(userStr) : null;
+          const activeEmail = String(activeUser?.email || '').trim().toLowerCase();
+          if (activeEmail) {
+            const svcRegs: any[] = Array.isArray(serverState['db_service_registrations'])
+              ? serverState['db_service_registrations']
+              : [];
+            const currentSvcMap = JSON.parse(localStorage.getItem('scoders_registered_services') || '{}');
+            let svcMapTouched = false;
+            for (const reg of svcRegs) {
+              const regEmail = String(reg?.clientProfile?.email || '').trim().toLowerCase();
+              if (regEmail === activeEmail && reg?.serviceId && reg?.uniqueKey) {
+                const resolvedNotes = reg.notes || reg.projectRequirements || currentSvcMap[reg.serviceId]?.notes || '';
+                currentSvcMap[reg.serviceId] = {
+                  ...(currentSvcMap[reg.serviceId] || {}),
+                  key: reg.uniqueKey,
+                  name: reg.clientProfile?.name || currentSvcMap[reg.serviceId]?.name || 'Registered Client',
+                  email: regEmail,
+                  role: reg.clientProfile?.company || currentSvcMap[reg.serviceId]?.role || 'Client Partner',
+                  phone: reg.clientProfile?.phone || currentSvcMap[reg.serviceId]?.phone || '',
+                  requirements: reg.projectRequirements || currentSvcMap[reg.serviceId]?.requirements || resolvedNotes || '',
+                  notes: resolvedNotes,
+                  budget: reg.budget || currentSvcMap[reg.serviceId]?.budget || 'TBD',
+                  timeline: reg.timeline || currentSvcMap[reg.serviceId]?.timeline || 'TBD',
+                  chatId: reg.chatId || `chat-svc-${reg.uniqueKey}`,
+                  timestamp: reg.registrationDate || new Date().toISOString(),
+                };
+                this.addSessionUnlockedUid(reg.uniqueKey);
+                svcMapTouched = true;
+              }
+            }
+            if (svcMapTouched) {
+              localStorage.setItem('scoders_registered_services', JSON.stringify(currentSvcMap));
+            }
+
+            const wkspRegs: any[] = Array.isArray(serverState['db_workshop_registrations'])
+              ? serverState['db_workshop_registrations']
+              : [];
+            const revokedMap = serverState['scoders_revoked_passes'] || {};
+            const currentWkspMap = JSON.parse(localStorage.getItem('scoders_registered_workshops') || '{}');
+            let wkspMapTouched = false;
+            for (const reg of wkspRegs) {
+              const regEmail = String(reg?.participantProfile?.email || '').trim().toLowerCase();
+              const regKey = String(reg?.uniqueAccessKey || '').trim().toUpperCase();
+              if (
+                regEmail === activeEmail &&
+                reg?.workshopId &&
+                regKey &&
+                !reg?.isRevoked &&
+                reg?.paymentStatus !== 'Cancelled' &&
+                reg?.paymentStatus !== 'Revoked' &&
+                !revokedMap[regKey]
+              ) {
+                currentWkspMap[reg.workshopId] = {
+                  ...(currentWkspMap[reg.workshopId] || {}),
+                  key: regKey,
+                  name: reg.participantProfile?.name || 'Registered Attendee',
+                  email: regEmail,
+                  role: reg.participantProfile?.role || 'Developer',
+                  phone: reg.participantProfile?.phone || '',
+                  notes: reg.notes || currentWkspMap[reg.workshopId]?.notes || '',
+                  tickets: 1,
+                  totalPaid: Number(reg.amountPaid) || 0,
+                  chatId: reg.chatId || `chat-wksp-${regKey}`,
+                  timestamp: reg.paymentDate || new Date().toLocaleDateString(),
+                };
+                this.addSessionUnlockedUid(regKey);
+                wkspMapTouched = true;
+              }
+            }
+            if (wkspMapTouched) {
+              localStorage.setItem('scoders_registered_workshops', JSON.stringify(currentWkspMap));
+            }
+          }
+        } catch {}
 
         // 2. If local has existing collections not yet on server, push them
         const localPushEntries: Record<string, any> = {};
@@ -601,8 +981,7 @@ export class DatabaseEngine {
           'db_gallery_media', 'db_candidate_applications', 'db_registration_uids',
           'scoders_event_tickets', 'scoders_revoked_passes', 'scoders_dynamic_events',
           'scoders_dynamic_services', 'scoders_dynamic_workshops', 'scoders_dynamic_invoices',
-          'scoders_dynamic_networking', 'scoders_saved_candidate_applications',
-          'scoders_registered_services', 'scoders_registered_workshops', 'scoders_enquiries',
+          'scoders_dynamic_networking', 'scoders_saved_candidate_applications', 'scoders_enquiries',
           'scoders_department_configs', 'scoders_department_meetings', 'scoders_main_whatsapp_community',
           'scoders_photo_shreyas', 'scoders_photo_lokesh', 'scoders_photo_bhuvan', 'scoders_team_photos'
         ];
@@ -650,77 +1029,75 @@ export class DatabaseEngine {
 
   public static saveServiceRegistrations(data: ServiceRegistration[]): void {
     this.setStored('db_service_registrations', data);
-    // Backward compatibility sync
-    const scodersReg: Record<string, any> = {};
-    data.forEach((reg) => {
-      scodersReg[reg.serviceId] = {
-        key: reg.uniqueKey,
-        name: reg.clientProfile.name,
-        email: reg.clientProfile.email,
-        role: reg.clientProfile.company || 'Client Partner',
-        requirements: reg.projectRequirements,
-        budget: reg.budget,
-        timeline: reg.timeline,
-        chatId: reg.chatId || `chat-svc-${reg.uniqueKey}`,
-        timestamp: reg.registrationDate
-      };
-    });
-    this.setStored('scoders_registered_services', scodersReg);
   }
 
-  public static updateServiceClientProfile(params: {
+  public static async updateServiceClientProfile(params: {
     serviceId: string;
     uniqueKey?: string;
     name?: string;
     email?: string;
+    phone?: string;
     role?: string;
     budget?: string;
     timeline?: string;
     requirements?: string;
-  }): void {
-    const cleanKey = (params.uniqueKey || '').trim().toUpperCase();
+    notes?: string;
+  }): Promise<{ success: boolean; error?: string; record?: any }> {
+    const rawKey = (params.uniqueKey || '').trim().toUpperCase();
+    const cleanKey = rawKey && rawKey !== 'ENTER-KEY-TO-VERIFY' ? rawKey : '';
     const cleanEmail = (params.email || '').trim().toLowerCase();
     const cleanName = (params.name || '').trim();
     const cleanRole = (params.role || '').trim();
+    const cleanPhone = (params.phone || '').trim();
 
     try {
+      this.markLocalWrite('db_service_registrations');
+      this.markLocalWrite('db_chats');
+
       const currentRegs = this.getServiceRegistrations();
       let touchedRegs = false;
       const updatedRegs = currentRegs.map((reg) => {
-        const keyMatch = cleanKey && cleanKey !== 'ENTER-KEY-TO-VERIFY' && reg.uniqueKey?.trim().toUpperCase() === cleanKey;
-        const svcMatch = reg.serviceId === params.serviceId && (!cleanKey || !reg.uniqueKey);
+        const regEmail = (reg.clientProfile?.email || '').trim().toLowerCase();
+        const keyMatch = cleanKey && reg.uniqueKey?.trim().toUpperCase() === cleanKey;
+        const svcMatch = !cleanKey && reg.serviceId === params.serviceId && (!cleanEmail || !regEmail || regEmail === cleanEmail);
         if (keyMatch || svcMatch) {
           touchedRegs = true;
+          const updatedNotes = params.notes !== undefined ? params.notes : (params.requirements ?? reg.notes);
           return {
             ...reg,
             clientProfile: {
               ...reg.clientProfile,
               name: cleanName || reg.clientProfile.name,
               email: cleanEmail || reg.clientProfile.email,
+              phone: cleanPhone || reg.clientProfile.phone,
               company: cleanRole || reg.clientProfile.company,
             },
             budget: params.budget || reg.budget,
             timeline: params.timeline || reg.timeline,
-            projectRequirements: params.requirements || reg.projectRequirements,
+            projectRequirements: params.requirements || (params.notes ? params.notes : reg.projectRequirements),
+            notes: updatedNotes,
           };
         }
         return reg;
       });
       if (touchedRegs) {
-        this.setStored('db_service_registrations', updatedRegs);
+        localStorage.setItem('db_service_registrations', JSON.stringify(updatedRegs));
       }
 
       const regServicesRaw = localStorage.getItem('scoders_registered_services');
       const regServices = regServicesRaw ? JSON.parse(regServicesRaw) : {};
       if (regServices && typeof regServices === 'object' && regServices[params.serviceId]) {
+        const nextNotes = params.notes !== undefined ? params.notes : (params.requirements ?? regServices[params.serviceId].notes);
         regServices[params.serviceId] = {
           ...regServices[params.serviceId],
           name: cleanName || regServices[params.serviceId].name,
           email: cleanEmail || regServices[params.serviceId].email,
+          phone: cleanPhone || regServices[params.serviceId].phone,
           role: cleanRole || regServices[params.serviceId].role,
           budget: params.budget || regServices[params.serviceId].budget,
           timeline: params.timeline || regServices[params.serviceId].timeline,
           requirements: params.requirements || regServices[params.serviceId].requirements,
+          notes: nextNotes,
           autoSavedAt: new Date().toISOString(),
         };
         localStorage.setItem('scoders_registered_services', JSON.stringify(regServices));
@@ -749,7 +1126,7 @@ export class DatabaseEngine {
         window.dispatchEvent(new Event('scoders_db_change'));
       }
 
-      fetch('/api/services/update-profile', {
+      const res = await fetch('/api/services/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -757,14 +1134,54 @@ export class DatabaseEngine {
           uniqueKey: cleanKey || undefined,
           name: cleanName || undefined,
           email: cleanEmail || undefined,
+          phone: cleanPhone || undefined,
           role: cleanRole || undefined,
           budget: params.budget || undefined,
           timeline: params.timeline || undefined,
           requirements: params.requirements || undefined,
+          notes: params.notes !== undefined ? params.notes : undefined,
         }),
-      }).catch(() => {});
-    } catch (err) {
-      console.warn('Auto-save service profile warning:', err);
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success || data?.updated === false) {
+        return {
+          success: false,
+          error: data?.error || `Server returned status ${res.status} while saving service profile.`,
+        };
+      }
+
+      if (data.record?.uniqueKey) {
+        this.markLocalWrite('db_service_registrations');
+        const latestRegs = this.getServiceRegistrations();
+        const merged = this.mergeByKey(latestRegs, [data.record], (r) =>
+          String(r?.uniqueKey || r?.id || '').trim().toUpperCase()
+        );
+        localStorage.setItem('db_service_registrations', JSON.stringify(merged));
+
+        void syncRegistrationToFirestore({
+          uid: data.record.uniqueKey,
+          section: 'service',
+          itemId: data.record.serviceId || params.serviceId,
+          itemTitle: data.record.selectedServiceTitle || 'S-CODERS Custom Service',
+          clientName: data.record.clientProfile?.name || cleanName || 'Registered Client',
+          clientEmail: data.record.clientProfile?.email || cleanEmail,
+          clientPhone: data.record.clientProfile?.phone || cleanPhone,
+          clientRole: data.record.clientProfile?.company || cleanRole,
+          requirements: data.record.projectRequirements || params.requirements || '',
+          notes: data.record.notes ?? params.notes ?? '',
+          budget: data.record.budget || params.budget || '',
+          timeline: data.record.timeline || params.timeline || '',
+          amount: 0,
+          paymentStatus: 'NOT_REQUIRED',
+          status: 'ACTIVE',
+          chatId: data.record.chatId || '',
+        }).catch(() => {});
+      }
+
+      return { success: true, record: data.record };
+    } catch (err: any) {
+      console.warn('Save service profile warning:', err);
+      return { success: false, error: err?.message || 'Unable to reach server to save service profile.' };
     }
   }
 
@@ -904,22 +1321,6 @@ export class DatabaseEngine {
 
   public static saveWorkshopRegistrations(data: WorkshopRegistration[]): void {
     this.setStored('db_workshop_registrations', data);
-    // Backward compatibility sync - only active, non-revoked passes
-    const scodersReg: Record<string, any> = {};
-    data.forEach((reg) => {
-      if (reg.paymentStatus !== 'Cancelled' && reg.paymentStatus !== 'Refunded' && reg.paymentStatus !== 'Revoked' && !reg.isRevoked) {
-        scodersReg[reg.workshopId] = {
-          key: reg.uniqueAccessKey,
-          name: reg.participantProfile?.name || 'Attendee',
-          email: reg.participantProfile?.email || '',
-          role: reg.participantProfile?.role || 'Developer',
-          tickets: 1,
-          totalPaid: reg.amountPaid,
-          timestamp: reg.paymentDate
-        };
-      }
-    });
-    this.setStored('scoders_registered_workshops', scodersReg);
   }
 
   public static async updateWorkshopClientProfile(params: {
@@ -927,15 +1328,21 @@ export class DatabaseEngine {
     uniqueKey?: string;
     name?: string;
     email?: string;
+    phone?: string;
     role?: string;
-  }): Promise<void> {
+    notes?: string;
+  }): Promise<{ success: boolean; error?: string; record?: any }> {
     const cleanKey = (params.uniqueKey || '').trim().toUpperCase();
     const cleanName = (params.name || '').trim();
     const cleanEmail = (params.email || '').trim().toLowerCase();
     const cleanRole = (params.role || '').trim();
+    const cleanPhone = (params.phone || '').trim();
     const validKey = cleanKey && cleanKey !== 'PASS-KEY' ? cleanKey : '';
 
     try {
+      this.markLocalWrite('db_workshop_registrations');
+      this.markLocalWrite('db_chats');
+
       const currentRegs = this.getWorkshopRegistrations();
       let touchedRegs = false;
       const updatedRegs = currentRegs.map((reg) => {
@@ -951,8 +1358,10 @@ export class DatabaseEngine {
               ...reg.participantProfile,
               name: cleanName || reg.participantProfile?.name,
               email: cleanEmail || reg.participantProfile?.email,
+              phone: cleanPhone || reg.participantProfile?.phone,
               role: cleanRole || reg.participantProfile?.role,
             },
+            ...(params.notes !== undefined ? { notes: params.notes } : {}),
           };
         }
         return reg;
@@ -968,7 +1377,9 @@ export class DatabaseEngine {
           ...savedWksps[params.workshopId],
           name: cleanName || savedWksps[params.workshopId].name,
           email: cleanEmail || savedWksps[params.workshopId].email,
+          phone: cleanPhone || savedWksps[params.workshopId].phone,
           role: cleanRole || savedWksps[params.workshopId].role,
+          ...(params.notes !== undefined ? { notes: params.notes } : {}),
           autoSavedAt: new Date().toISOString(),
         };
         localStorage.setItem('scoders_registered_workshops', JSON.stringify(savedWksps));
@@ -998,7 +1409,7 @@ export class DatabaseEngine {
         window.dispatchEvent(new Event('scoders_db_change'));
       }
 
-      fetch('/api/workshops/update-profile', {
+      const res = await fetch('/api/workshops/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1006,11 +1417,49 @@ export class DatabaseEngine {
           uniqueKey: validKey || undefined,
           name: cleanName || undefined,
           email: cleanEmail || undefined,
+          phone: cleanPhone || undefined,
           role: cleanRole || undefined,
+          notes: params.notes !== undefined ? params.notes : undefined,
         }),
-      }).catch(() => {});
-    } catch (err) {
-      console.warn('Auto-save workshop profile warning:', err);
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success || data?.updated === false) {
+        return {
+          success: false,
+          error: data?.error || `Server returned status ${res.status} while saving workshop profile.`,
+        };
+      }
+
+      if (data.record?.uniqueAccessKey) {
+        this.markLocalWrite('db_workshop_registrations');
+        const latestRegs = this.getWorkshopRegistrations();
+        const merged = this.mergeByKey(latestRegs, [data.record], (r) =>
+          String(r?.uniqueAccessKey || r?.id || '').trim().toUpperCase()
+        );
+        localStorage.setItem('db_workshop_registrations', JSON.stringify(merged));
+
+        void syncRegistrationToFirestore({
+          uid: data.record.uniqueAccessKey,
+          section: 'workshop',
+          itemId: data.record.workshopId || params.workshopId,
+          itemTitle: data.record.workshopTitle || 'S-CODERS Workshop',
+          clientName: data.record.participantProfile?.name || cleanName || 'Registered Attendee',
+          clientEmail: data.record.participantProfile?.email || cleanEmail,
+          clientPhone: data.record.participantProfile?.phone || cleanPhone,
+          clientRole: data.record.participantProfile?.role || cleanRole,
+          notes: data.record.notes ?? params.notes ?? '',
+          amount: Number(data.record.amountPaid) || 0,
+          paymentStatus: 'VERIFIED',
+          paymentId: data.record.transactionId || '',
+          status: 'ACTIVE',
+          chatId: data.record.chatId || '',
+        }).catch(() => {});
+      }
+
+      return { success: true, record: data.record };
+    } catch (err: any) {
+      console.warn('Save workshop profile warning:', err);
+      return { success: false, error: err?.message || 'Unable to reach server to save workshop profile.' };
     }
   }
 

@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import MarqueeTicker from './MarqueeTicker';
 import { getDynamicEvents, saveDynamicEvents, getEventTickets, saveEventTickets } from '../utils/dynamicData';
+import { DatabaseEngine } from '../utils/dbEngine';
 import { SCODERSEvent, EventTicket } from '../types';
 import EmailNotificationModal, { EmailNotificationData } from './EmailNotificationModal';
 import RazorpayModal, { RazorpayPaymentSuccessData } from './RazorpayModal';
@@ -255,6 +256,7 @@ export default function Events() {
 
       if (verifyRes.ok && verifyData?.valid && verifyData?.record) {
         const rec = verifyData.record;
+        DatabaseEngine.hydrateVerifiedRecord(rec, verifyData.hydrated);
         const ticketToOpen: EventTicket = foundLocal || {
           id: 'TKT-' + rec.uid,
           ticketCode: rec.uid,
@@ -386,6 +388,7 @@ export default function Events() {
             .then(data => {
               if (data?.valid && data?.record) {
                 const rec = data.record;
+                DatabaseEngine.hydrateVerifiedRecord(rec, data.hydrated);
                 const restored: EventTicket = {
                   id: 'TKT-' + rec.uid,
                   ticketCode: rec.uid,
@@ -536,69 +539,60 @@ export default function Events() {
       if (isFreeEvent) {
         const freePayId = `FREE_PASS_${Date.now()}`;
         const freeOrdId = `FREE_ORD_${Date.now()}`;
-        let ticketCode = generateUniqueTicketCode();
-        let validUntil: string | undefined;
-        let dispatchedViaUnified = false;
-        let emailDeliveryMode: string | undefined;
-        let emailRealDelivered: boolean | undefined;
-        let emailDeliveryError: string | undefined;
-        let emailPreviewUrl: string | undefined;
 
-        try {
-          const regRes = await fetch('/api/registrations/register-and-notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              section: 'event',
-              itemId: selectedEvent.id,
-              itemTitle: selectedEvent.name,
-              clientName: regName.trim(),
-              clientEmail: regEmail.trim(),
-              clientPhone: regPhone.trim(),
-              clientOrg: regOrg.trim() || 'Independent Builder',
-              amount: 0,
-              paymentStatus: 'VERIFIED',
-              paymentId: freePayId,
-              orderId: freeOrdId,
-              metadata: {
-                date: selectedEvent.date,
-                day: selectedEvent.day,
-                time: selectedEvent.time,
-                location: selectedEvent.location,
-                description: selectedEvent.description,
-                registrationStartDate: selectedEvent.registrationStartDate,
-                registrationEndDate: selectedEvent.registrationEndDate,
-                status: selectedEvent.status,
-              },
-              actionUrl: buildPublicShareUrl('/?view=events'),
-            }),
-          });
-          if (regRes.status === 403) {
-            const errData = await regRes.json().catch(() => ({}));
-            if (errData?.registrationClosed) {
-              setIsProcessing(false);
-              setPaymentStatusNotice(null);
-              setPaymentError(errData.error || serverWin.message);
-              setClosedModalEval(errData.windowStatus || serverWin);
-              setShowClosedModal(true);
-              return;
-            }
-          }
-          if (regRes.ok) {
-            const regData = await regRes.json();
-            if (regData?.success && regData?.uid) {
-              ticketCode = regData.uid;
-              validUntil = regData.validUntil || regData.record?.validUntil;
-              emailDeliveryMode = regData.deliveryMode;
-              emailRealDelivered = Boolean(regData.realEmailDelivered);
-              emailDeliveryError = regData.emailError;
-              emailPreviewUrl = regData.previewUrl;
-              dispatchedViaUnified = true;
-            }
-          }
-        } catch (err) {
-          console.warn("Unified free event registration fallback:", err);
+        const regRes = await fetch('/api/registrations/register-and-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            section: 'event',
+            itemId: selectedEvent.id,
+            itemTitle: selectedEvent.name,
+            clientName: regName.trim(),
+            clientEmail: regEmail.trim(),
+            clientPhone: regPhone.trim(),
+            clientOrg: regOrg.trim() || 'Independent Builder',
+            amount: 0,
+            paymentStatus: 'VERIFIED',
+            paymentId: freePayId,
+            orderId: freeOrdId,
+            metadata: {
+              date: selectedEvent.date,
+              day: selectedEvent.day,
+              time: selectedEvent.time,
+              location: selectedEvent.location,
+              description: selectedEvent.description,
+              registrationStartDate: selectedEvent.registrationStartDate,
+              registrationEndDate: selectedEvent.registrationEndDate,
+              status: selectedEvent.status,
+            },
+            actionUrl: buildPublicShareUrl('/?view=events'),
+          }),
+        });
+        const regData = await regRes.json().catch(() => ({}));
+        if (regRes.status === 403 && regData?.registrationClosed) {
+          setIsProcessing(false);
+          setPaymentStatusNotice(null);
+          setPaymentError(regData.error || serverWin.message);
+          setClosedModalEval(regData.windowStatus || serverWin);
+          setShowClosedModal(true);
+          return;
         }
+        if (!regRes.ok || !regData?.success || !regData?.uid) {
+          setIsProcessing(false);
+          const errMsg = regData?.error || 'Could not save event registration to database. Please try again.';
+          setPaymentError(errMsg);
+          setPaymentStatusNotice({ type: 'FAILED', message: errMsg });
+          return;
+        }
+
+        const ticketCode: string = regData.uid;
+        const validUntil: string | undefined = regData.validUntil || regData.record?.validUntil;
+        const emailDeliveryMode: string | undefined = regData.deliveryMode;
+        const emailRealDelivered: boolean = Boolean(regData.realEmailDelivered);
+        const emailDeliveryError: string | undefined = regData.emailError;
+        const emailPreviewUrl: string | undefined = regData.previewUrl;
+
+        DatabaseEngine.hydrateVerifiedRecord(regData.record, regData.hydrated);
 
         const now = new Date();
         const existingLocal = tickets.find(t => t.ticketCode.toUpperCase() === ticketCode.toUpperCase());
@@ -630,34 +624,7 @@ export default function Events() {
         }
 
         const evtName = selectedEvent.name;
-        // Close selected event modal so user sees their generated ticket
         setSelectedEvent(null);
-
-        if (!dispatchedViaUnified) {
-          try {
-            const fbRes = await fetch('/api/email/event-payment-verified', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: regEmail.trim(),
-                clientName: regName.trim(),
-                eventTitle: evtName,
-                amount: 0,
-                ticketCode: ticketCode,
-                paymentId: freePayId,
-                actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
-              })
-            });
-            if (fbRes.ok) {
-              const fbData = await fbRes.json().catch(() => null);
-              if (fbData) {
-                emailDeliveryMode = fbData.deliveryMode;
-                emailRealDelivered = Boolean(fbData.realEmailDelivered);
-                emailPreviewUrl = fbData.previewUrl;
-              }
-            }
-          } catch {}
-        }
 
         setViewingTicket(newTicket);
         setPaymentStatusNotice({
@@ -785,11 +752,10 @@ export default function Events() {
 
   const handleRazorpayEventSuccess = async (data: RazorpayPaymentSuccessData) => {
     setShowRazorpayModal(false);
-    setIsProcessing(false);
-    
-    const eventRef = selectedEvent;
-    setSelectedEvent(null);
+    setIsProcessing(true);
+    setPaymentError(null);
 
+    const eventRef = selectedEvent;
     const now = new Date();
     const eventName = eventRef?.name || data.purpose || 'S-CODERS Tech Summit';
     const eventDate = eventRef?.date || now.toLocaleDateString();
@@ -797,16 +763,10 @@ export default function Events() {
     const eventTime = eventRef?.time || '10:00 AM IST';
     const eventLocation = eventRef?.location || 'S-CODERS Lab, Koramangala, Bengaluru';
 
-    let ticketCode = generateUniqueTicketCode();
-    let validUntil: string | undefined;
-    let dispatchedViaUnified = false;
-    let emailDeliveryMode: string | undefined;
-    let emailRealDelivered: boolean | undefined;
-    let emailDeliveryError: string | undefined;
-    let emailPreviewUrl: string | undefined;
-
+    let regRes: Response;
+    let regData: any = {};
     try {
-      const regRes = await fetch('/api/registrations/register-and-notify', {
+      regRes = await fetch('/api/registrations/register-and-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -827,25 +787,41 @@ export default function Events() {
             time: eventTime,
             location: eventLocation,
             description: eventRef?.description,
+            registrationStartDate: eventRef?.registrationStartDate,
+            registrationEndDate: eventRef?.registrationEndDate,
+            status: eventRef?.status,
           },
           actionUrl: buildPublicShareUrl('/?view=events'),
         }),
       });
-      if (regRes.ok) {
-        const regData = await regRes.json();
-        if (regData?.success && regData?.uid) {
-          ticketCode = regData.uid;
-          validUntil = regData.validUntil || regData.record?.validUntil;
-          emailDeliveryMode = regData.deliveryMode;
-          emailRealDelivered = Boolean(regData.realEmailDelivered);
-          emailDeliveryError = regData.emailError;
-          emailPreviewUrl = regData.previewUrl;
-          dispatchedViaUnified = true;
-        }
-      }
-    } catch (err) {
-      console.warn("Unified paid event registration fallback:", err);
+      regData = await regRes.json().catch(() => ({}));
+    } catch (err: any) {
+      setIsProcessing(false);
+      const errMsg = `Payment ${data.razorpay_payment_id} received, but server connection failed while saving your ticket. Please retry or contact scoders82@gmail.com.`;
+      setPaymentError(errMsg);
+      setPaymentStatusNotice({ type: 'FAILED', message: errMsg });
+      return;
     }
+
+    if (!regRes.ok || !regData?.success || !regData?.uid) {
+      setIsProcessing(false);
+      const errMsg =
+        regData?.error ||
+        `Payment ${data.razorpay_payment_id} received, but database persistence failed. Please retry or contact scoders82@gmail.com.`;
+      setPaymentError(errMsg);
+      setPaymentStatusNotice({ type: 'FAILED', message: errMsg });
+      return;
+    }
+
+    const ticketCode: string = regData.uid;
+    const validUntil: string | undefined = regData.validUntil || regData.record?.validUntil;
+    const emailDeliveryMode: string | undefined = regData.deliveryMode;
+    const emailRealDelivered: boolean = Boolean(regData.realEmailDelivered);
+    const emailDeliveryError: string | undefined = regData.emailError;
+    const emailPreviewUrl: string | undefined = regData.previewUrl;
+
+    DatabaseEngine.hydrateVerifiedRecord(regData.record, regData.hydrated);
+    setSelectedEvent(null);
 
     const existingLocal = tickets.find(t => t.ticketCode.toUpperCase() === ticketCode.toUpperCase());
     const verifiedTicket: EventTicket = existingLocal || {
@@ -875,44 +851,12 @@ export default function Events() {
       saveEventTickets(updatedTickets);
     }
 
-    if (!dispatchedViaUnified) {
-      try {
-        const fbRes = await fetch('/api/email/event-payment-verified', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: data.email,
-            clientName: data.clientName,
-            eventId: eventRef?.id || 'evt-auto',
-            eventTitle: eventName,
-            eventDate,
-            eventDay,
-            eventTime,
-            eventLocation,
-            amount: data.amount,
-            ticketCode: ticketCode,
-            paymentId: data.razorpay_payment_id,
-            orderId: data.razorpay_order_id,
-            paymentStatus: 'VERIFIED',
-            actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
-          })
-        });
-        if (fbRes.ok) {
-          const fbData = await fbRes.json().catch(() => null);
-          if (fbData) {
-            emailDeliveryMode = fbData.deliveryMode;
-            emailRealDelivered = Boolean(fbData.realEmailDelivered);
-            emailPreviewUrl = fbData.previewUrl;
-          }
-        }
-      } catch {}
-    }
-
     setViewingTicket(verifiedTicket);
     setPaymentStatusNotice({
       type: 'SUCCESS',
       message: 'Razorpay payment verified successfully! Your event pass has been generated.'
     });
+    setIsProcessing(false);
 
     setEmailNoticeData({
       type: 'event',
@@ -973,16 +917,10 @@ export default function Events() {
     const upiPayId = `UPI_UTR_${utrCode}`;
     const upiOrdId = `ORD_UPI_${Date.now()}`;
 
-    let ticketCode = generateUniqueTicketCode();
-    let validUntil: string | undefined;
-    let dispatchedViaUnified = false;
-    let emailDeliveryMode: string | undefined;
-    let emailRealDelivered: boolean | undefined;
-    let emailDeliveryError: string | undefined;
-    let emailPreviewUrl: string | undefined;
-
+    let regRes: Response;
+    let regData: any = {};
     try {
-      const regRes = await fetch('/api/registrations/register-and-notify', {
+      regRes = await fetch('/api/registrations/register-and-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1010,29 +948,39 @@ export default function Events() {
           actionUrl: buildPublicShareUrl('/?view=events'),
         }),
       });
-      if (regRes.status === 403) {
-        const errData = await regRes.json().catch(() => ({}));
-        if (errData?.registrationClosed) {
-          setIsProcessing(false);
-          setPaymentError(errData.error || serverWin.message);
-          setClosedModalEval(errData.windowStatus || serverWin);
-          setShowClosedModal(true);
-          return;
-        }
-      }
-      if (regRes.ok) {
-        const regData = await regRes.json();
-        if (regData?.success && regData?.uid) {
-          ticketCode = regData.uid;
-          validUntil = regData.validUntil || regData.record?.validUntil;
-          emailDeliveryMode = regData.deliveryMode;
-          emailRealDelivered = Boolean(regData.realEmailDelivered);
-          emailDeliveryError = regData.emailError;
-          emailPreviewUrl = regData.previewUrl;
-          dispatchedViaUnified = true;
-        }
-      }
-    } catch {}
+      regData = await regRes.json().catch(() => ({}));
+    } catch {
+      setIsProcessing(false);
+      const errMsg = 'Unable to connect to registration database. Please try again.';
+      setPaymentError(errMsg);
+      setPaymentStatusNotice({ type: 'FAILED', message: errMsg });
+      return;
+    }
+
+    if (regRes.status === 403 && regData?.registrationClosed) {
+      setIsProcessing(false);
+      setPaymentError(regData.error || serverWin.message);
+      setClosedModalEval(regData.windowStatus || serverWin);
+      setShowClosedModal(true);
+      return;
+    }
+
+    if (!regRes.ok || !regData?.success || !regData?.uid) {
+      setIsProcessing(false);
+      const errMsg = regData?.error || 'Could not save event registration to database. Please try again.';
+      setPaymentError(errMsg);
+      setPaymentStatusNotice({ type: 'FAILED', message: errMsg });
+      return;
+    }
+
+    const ticketCode: string = regData.uid;
+    const validUntil: string | undefined = regData.validUntil || regData.record?.validUntil;
+    const emailDeliveryMode: string | undefined = regData.deliveryMode;
+    const emailRealDelivered: boolean = Boolean(regData.realEmailDelivered);
+    const emailDeliveryError: string | undefined = regData.emailError;
+    const emailPreviewUrl: string | undefined = regData.previewUrl;
+
+    DatabaseEngine.hydrateVerifiedRecord(regData.record, regData.hydrated);
 
     const existingLocal = tickets.find(t => t.ticketCode.toUpperCase() === ticketCode.toUpperCase());
     const verifiedTicket: EventTicket = existingLocal || {
@@ -1067,32 +1015,6 @@ export default function Events() {
     const recipientName = regName.trim();
     setSelectedEvent(null);
     setManualUpiRef('');
-
-    if (!dispatchedViaUnified) {
-      try {
-        const fbRes = await fetch('/api/email/event-payment-verified', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: recipientEmail,
-            clientName: recipientName,
-            eventTitle: eventName,
-            amount: paidAmount,
-            ticketCode: ticketCode,
-            paymentId: upiPayId,
-            actionUrl: buildPublicShareUrl(`/?view=events&ticket=${ticketCode}`)
-          })
-        });
-        if (fbRes.ok) {
-          const fbData = await fbRes.json().catch(() => null);
-          if (fbData) {
-            emailDeliveryMode = fbData.deliveryMode;
-            emailRealDelivered = Boolean(fbData.realEmailDelivered);
-            emailPreviewUrl = fbData.previewUrl;
-          }
-        }
-      } catch {}
-    }
 
     setViewingTicket(verifiedTicket);
     setPaymentStatusNotice({

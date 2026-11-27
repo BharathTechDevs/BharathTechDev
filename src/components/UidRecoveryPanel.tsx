@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Key, ShieldCheck, Check, Copy, RefreshCw, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { DatabaseEngine } from '../utils/dbEngine';
 
 export interface RecoveredUidRecord {
   uid: string;
@@ -109,7 +110,31 @@ export default function UidRecoveryPanel({
       if (!res.ok || !data.success) {
         setError(data.error || 'Invalid or expired verification code.');
       } else {
-        setRecords(Array.isArray(data.registrations) ? data.registrations : []);
+        const recs = Array.isArray(data.registrations) ? data.registrations : [];
+        if (data.snapshot) {
+          DatabaseEngine.applyClientAuthSnapshot(data.snapshot);
+        } else {
+          recs.forEach((r: RecoveredUidRecord) => {
+            if (r.status === 'ACTIVE') {
+              DatabaseEngine.hydrateVerifiedRecord(r as any);
+            }
+          });
+        }
+        if (data.user && typeof window !== 'undefined') {
+          try {
+            const existingRaw = localStorage.getItem('scoders_user');
+            if (!existingRaw) {
+              localStorage.setItem('scoders_user', JSON.stringify(data.user));
+              window.dispatchEvent(new Event('scoders_auth_change'));
+            }
+          } catch {}
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('scoders_sessions_change'));
+          window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
+          window.dispatchEvent(new Event('scoders_db_change'));
+        }
+        setRecords(recs);
         setInfoMessage(
           data.message || 'Verification complete! A copy of your active codes has also been emailed from scoders82@gmail.com.'
         );
@@ -257,15 +282,20 @@ export default function UidRecoveryPanel({
                     <span className="text-xs font-display font-bold text-white truncate">
                       {rec.itemTitle}
                     </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase ${
-                        isActive
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                      }`}
-                    >
-                      {rec.status}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/10 text-gray-300 border border-white/10">
+                        {rec.section}
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase ${
+                          isActive
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}
+                      >
+                        {rec.status}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between gap-2 bg-black/50 border border-brand-teal/30 rounded-lg px-3 py-2">

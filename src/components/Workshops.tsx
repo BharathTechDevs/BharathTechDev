@@ -76,43 +76,75 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     return localStorage.getItem('scoders_admin_auth') === 'true';
   });
 
-  // Access control state persistence
-  const [registeredKeys, setRegisteredKeys] = useState<{
-    [workshopId: string]: {
-      key: string;
-      name: string;
-      email: string;
-      role: string;
-      timestamp: string;
-      chatId?: string;
+  // Sync current user state
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('scoders_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
     }
-  }>(() => {
+  });
+
+  const computeUnlockedWorkshopKeys = (userObj: AppUser | null) => {
     let keys: Record<string, any> = {};
     const saved = localStorage.getItem('scoders_registered_workshops');
     if (saved) {
       try {
         keys = JSON.parse(saved) || {};
-      } catch (e) {}
+      } catch {}
     }
+
+    const activeEmail = String(userObj?.email || '').trim().toLowerCase();
+    const sessionUids = new Set(DatabaseEngine.getSessionUnlockedUids());
+
     try {
       const dbRegs = DatabaseEngine.getWorkshopRegistrations();
       if (Array.isArray(dbRegs)) {
         for (const reg of dbRegs) {
-          if (reg.workshopId && reg.uniqueAccessKey && !keys[reg.workshopId]) {
+          const regKey = String(reg.uniqueAccessKey || '').trim().toUpperCase();
+          const regEmail = String(reg.participantProfile?.email || '').trim().toLowerCase();
+          const isRevokedOrCancelled =
+            Boolean(reg.isRevoked) ||
+            reg.paymentStatus === 'Cancelled' ||
+            reg.paymentStatus === 'Refunded' ||
+            reg.paymentStatus === 'Revoked' ||
+            (regKey ? DatabaseEngine.isPassRevoked(regKey) : false);
+          if (isRevokedOrCancelled) continue;
+
+          const belongsToUser = Boolean(activeEmail && regEmail === activeEmail);
+          const unlockedInSession = Boolean(regKey && sessionUids.has(regKey));
+          if (reg.workshopId && regKey && (belongsToUser || unlockedInSession) && !keys[reg.workshopId]) {
             keys[reg.workshopId] = {
-              key: reg.uniqueAccessKey,
+              key: regKey,
               name: reg.participantProfile?.name || 'Registered Attendee',
-              email: reg.participantProfile?.email || '',
+              email: regEmail,
+              phone: reg.participantProfile?.phone || '',
               role: reg.participantProfile?.role || 'Attendee',
-              chatId: reg.chatId || `chat-wksp-${reg.uniqueAccessKey}`,
+              notes: reg.notes || '',
+              chatId: reg.chatId || `chat-wksp-${regKey}`,
               timestamp: reg.paymentDate || new Date().toISOString()
             };
           }
         }
       }
-    } catch (e) {}
+    } catch {}
     return keys;
-  });
+  };
+
+  // Access control state persistence (scoped strictly to active authenticated user or verified session UIDs)
+  const [registeredKeys, setRegisteredKeys] = useState<{
+    [workshopId: string]: {
+      key: string;
+      name: string;
+      email: string;
+      phone?: string;
+      role: string;
+      notes?: string;
+      timestamp: string;
+      chatId?: string;
+    }
+  }>(() => computeUnlockedWorkshopKeys(currentUser));
 
   // Registration Form States
   const [regName, setRegName] = useState('');
@@ -166,7 +198,8 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
     email?: string;
     chatId?: string;
   } | null>(null);
-  const [wkspAutoSaveStatus, setWkspAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const [wkspAutoSaveStatus, setWkspAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const [wkspSaveError, setWkspSaveError] = useState<string | null>(null);
   const [wkspManualSaveFlash, setWkspManualSaveFlash] = useState(false);
   const wkspDraftFirstRenderRef = useRef(true);
 
@@ -193,24 +226,27 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
   const [lastDownloadedItem, setLastDownloadedItem] = useState<{ id: string; filename: string } | null>(null);
 
-
-  // Sync current user state
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('scoders_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
   useEffect(() => {
     const handleSyncAuth = () => {
       setIsAdmin(localStorage.getItem('scoders_admin_auth') === 'true');
-      const savedUser = localStorage.getItem('scoders_user');
-      setCurrentUser(savedUser ? JSON.parse(savedUser) : null);
+      let parsedUser: AppUser | null = null;
+      try {
+        const savedUser = localStorage.getItem('scoders_user');
+        parsedUser = savedUser ? JSON.parse(savedUser) : null;
+      } catch {}
+      setCurrentUser(parsedUser);
+      setRegisteredKeys(computeUnlockedWorkshopKeys(parsedUser));
     };
     const handleSyncKeys = () => {
-      const saved = localStorage.getItem('scoders_registered_workshops');
-      setRegisteredKeys(saved ? JSON.parse(saved) : {});
+      let parsedUser: AppUser | null = null;
+      try {
+        const savedUser = localStorage.getItem('scoders_user');
+        parsedUser = savedUser ? JSON.parse(savedUser) : null;
+      } catch {}
+      setRegisteredKeys(computeUnlockedWorkshopKeys(parsedUser));
     };
     window.addEventListener('scoders_auth_change', handleSyncAuth);
+    window.addEventListener('scoders_sessions_change', handleSyncKeys);
     window.addEventListener('scoders_registered_workshops_changed', handleSyncKeys);
     window.addEventListener('scoders_pass_revoked', handleSyncKeys);
     window.addEventListener('scoders_pass_restored', handleSyncKeys);
@@ -228,6 +264,7 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
 
     return () => {
       window.removeEventListener('scoders_auth_change', handleSyncAuth);
+      window.removeEventListener('scoders_sessions_change', handleSyncKeys);
       window.removeEventListener('scoders_registered_workshops_changed', handleSyncKeys);
       window.removeEventListener('scoders_pass_revoked', handleSyncKeys);
       window.removeEventListener('scoders_pass_restored', handleSyncKeys);
@@ -238,8 +275,8 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   // Pre-populate fields if logged in
   useEffect(() => {
     if (currentUser) {
-      setRegName(currentUser.name || '');
-      setRegEmail(currentUser.email || '');
+      setRegName(prev => prev || currentUser.name || '');
+      setRegEmail(prev => prev || currentUser.email || '');
     }
   }, [currentUser, showRegModal]);
 
@@ -254,10 +291,12 @@ export default function Workshops({ onBookWorkshop }: WorkshopsProps) {
   useEffect(() => {
     const reloadWorkshops = () => {
       setWorkshops(getDynamicWorkshops());
+      let parsedUser: AppUser | null = null;
       try {
-        const saved = localStorage.getItem('scoders_registered_workshops');
-        setRegisteredKeys(saved ? JSON.parse(saved) : {});
+        const savedUser = localStorage.getItem('scoders_user');
+        parsedUser = savedUser ? JSON.parse(savedUser) : null;
       } catch {}
+      setRegisteredKeys(computeUnlockedWorkshopKeys(parsedUser));
     };
     const updatePhotos = () => {
       setLeaderPhotos({
@@ -405,49 +444,13 @@ export default function TenantDashboard() {
     const safeEmail = (clientEmail || regEmail || currentUser?.email || 'participant@scoders.com').trim().toLowerCase();
     const safeRole = (clientRole || regRole || 'Registered Developer').trim();
 
-    // 1. Auto-login or register client in session
-    let activeClient = currentUser;
-    if (!activeClient || activeClient.email.toLowerCase() !== safeEmail) {
-      const newClient: AppUser = {
-        uid: 'client-' + Date.now().toString(),
-        name: safeName,
-        email: safeEmail,
-        role: 'client',
-        company: 'Independent Client',
-        phone: 'Not Specified',
-        createdAt: new Date().toISOString()
-      };
-      
-      const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-      const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-      if (!clients.some(c => c.email.toLowerCase() === safeEmail)) {
-        clients.push(newClient);
-        localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-      }
-
-      const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-      if (!passwordsMap[safeEmail]) {
-        passwordsMap[safeEmail] = 'password';
-        localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-      }
-
-      localStorage.setItem('scoders_user', JSON.stringify(newClient));
-      setCurrentUser(newClient);
-      activeClient = newClient;
-      window.dispatchEvent(new Event('scoders_auth_change'));
-    }
-
-    // 2. Mint collision-free UID & dispatch scoders82@gmail.com confirmation email via unified backend
-    const code = activeWorkshop.id.toUpperCase();
-    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
-    const uniqueId = Math.random().toString(36).substring(2, 6).toUpperCase();
-    let generatedKey = `BTD-WKSP-${code}-${timestamp}-${uniqueId}`;
+    let generatedKey = '';
     let validUntil: string | undefined;
-    let dispatchedViaUnified = false;
     let emailDeliveryMode: string | undefined;
     let emailRealDelivered: boolean | undefined;
     let emailDeliveryError: string | undefined;
     let emailPreviewUrl: string | undefined;
+    let regData: any = null;
 
     try {
       const regRes = await fetch('/api/registrations/register-and-notify', {
@@ -485,31 +488,51 @@ export default function TenantDashboard() {
           return;
         }
       }
-      if (regRes.ok) {
-        const regData = await regRes.json();
-        if (regData?.success && regData?.uid) {
-          generatedKey = regData.uid;
-          validUntil = regData.validUntil || regData.record?.validUntil;
-          emailDeliveryMode = regData.deliveryMode;
-          emailRealDelivered = Boolean(regData.realEmailDelivered);
-          emailDeliveryError = regData.emailError;
-          emailPreviewUrl = regData.previewUrl;
-          dispatchedViaUnified = true;
-        }
+      regData = await regRes.json().catch(() => ({}));
+      if (!regRes.ok || !regData?.success || !regData?.uid) {
+        setPaymentError(
+          regData?.error || 'Could not finalize workshop registration in database. Please try again.'
+        );
+        return;
       }
-    } catch (apiErr) {
-      console.warn("Unified workshop registration fallback:", apiErr);
+
+      generatedKey = String(regData.uid).trim().toUpperCase();
+      validUntil = regData.validUntil || regData.record?.validUntil;
+      emailDeliveryMode = regData.deliveryMode;
+      emailRealDelivered = Boolean(regData.realEmailDelivered);
+      emailDeliveryError = regData.emailError;
+      emailPreviewUrl = regData.previewUrl;
+    } catch (apiErr: any) {
+      setPaymentError(apiErr?.message || 'Unable to reach registration server. Please check your connection.');
+      return;
     }
 
-    const mockChatId = `chat-wksp-${generatedKey}`;
+    // 1. Sync client display profile cleanly without writing passwords locally
+    if (!currentUser || currentUser.email?.toLowerCase() !== safeEmail) {
+      const syncedUser: AppUser = {
+        uid: regData?.clientAccount?.uid || `client-${Date.now()}`,
+        name: regData?.clientAccount?.name || safeName,
+        email: safeEmail,
+        role: 'client',
+        company: regData?.clientAccount?.company || safeRole || 'Independent Client',
+        phone: regData?.clientAccount?.phone || regPhone || 'Not Specified',
+        createdAt: regData?.clientAccount?.createdAt || new Date().toISOString()
+      };
+      localStorage.setItem('scoders_user', JSON.stringify(syncedUser));
+      setCurrentUser(syncedUser);
+    }
 
-    // 3. Save to localStorage registered workshops
+    // 2. Hydrate authoritative server database records + session unlock state
+    DatabaseEngine.hydrateVerifiedRecord(regData?.record, regData?.hydrated);
+
+    const mockChatId = regData?.hydrated?.workshopRegistration?.chatId || regData?.record?.chatId || `chat-wksp-${generatedKey}`;
     const newKeys = {
       ...registeredKeys,
       [activeWorkshop.id]: {
         key: generatedKey,
         name: safeName,
         email: safeEmail,
+        phone: regPhone,
         role: safeRole,
         tickets: payTicketsCount,
         totalPaid: totalAmount,
@@ -521,134 +544,9 @@ export default function TenantDashboard() {
     setRegisteredKeys(newKeys);
     localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
     setRegSuccessKey(generatedKey);
-
-    // 4. Save to relational DatabaseEngine (dedupe check on key)
-    try {
-      const currentRegs = DatabaseEngine.getWorkshopRegistrations();
-      const alreadyStored = currentRegs.some(
-        r => r.uniqueAccessKey?.trim().toUpperCase() === generatedKey.toUpperCase()
-      );
-      if (!alreadyStored) {
-        const regId = 'reg-wksp-' + Date.now();
-        const mockPdfId = 'file-pdf-' + Date.now();
-        const mockSrcId = 'file-src-' + Date.now();
-
-        const dbRegistration: WorkshopRegistration = {
-          id: regId,
-          participantProfile: {
-            name: safeName,
-            email: safeEmail,
-            phone: regPhone.trim() || '+91 99999 00000',
-            role: safeRole
-          },
-          workshopId: activeWorkshop.id,
-          workshopTitle: activeWorkshop.title,
-          paymentStatus: 'Successful',
-          amountPaid: totalAmount,
-          paymentMethod: payMethod,
-          paymentDate: new Date().toISOString().split('T')[0],
-          transactionId: txnId,
-          uniqueAccessKey: generatedKey,
-          materialsFileIds: [mockPdfId, mockSrcId],
-          chatId: mockChatId,
-          feedbackId: null
-        };
-        DatabaseEngine.saveWorkshopRegistrations([dbRegistration, ...currentRegs]);
-
-        const dbTx: PaymentTransaction = {
-          id: txnId,
-          clientId: safeEmail,
-          clientName: safeName,
-          clientEmail: safeEmail,
-          amount: totalAmount,
-          paymentMethod: payMethod,
-          status: 'Successful',
-          timestamp: new Date().toISOString(),
-          reference: `Workshop Pass: ${activeWorkshop.title}`,
-          interrupted: false,
-          failureReason: null
-        };
-        const currentPayments = DatabaseEngine.getPayments();
-        DatabaseEngine.savePayments([dbTx, ...currentPayments]);
-
-        const dbChat: ChatConversation = {
-          id: mockChatId,
-          clientName: safeName,
-          clientEmail: safeEmail,
-          registrationId: regId,
-          reference: activeWorkshop.title,
-          workshopId: activeWorkshop.id,
-          uniqueAccessKey: generatedKey,
-          messages: [
-            { 
-              id: `msg-wksp-1-${Date.now()}`, 
-              sender: 'team', 
-              senderName: 'S-CODERS Mentor Team',
-              senderRole: 'S-CODERS Founder & CEO',
-              content: `Congratulations ${safeName}! You are officially registered for S-CODERS Workshop: '${activeWorkshop.title}'. Your learning materials, developer sandbox, and schedule access are unlocked. This is your private, individual chat with our mentors—feel free to ask questions or share links!`, 
-              timestamp: new Date().toISOString() 
-            }
-          ],
-          lastUpdated: new Date().toISOString()
-        };
-        const currentChats = DatabaseEngine.getChats();
-        DatabaseEngine.saveChats([dbChat, ...currentChats]);
-
-        const dbPdfFile: FileRecord = {
-          id: mockPdfId,
-          name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_guide.pdf`,
-          type: 'workshop_pdf',
-          url: '#download-guide-pdf',
-          size: '1.4 MB',
-          clientId: safeEmail,
-          registrationId: regId,
-          uploadDate: new Date().toISOString().split('T')[0]
-        };
-        const dbSrcFile: FileRecord = {
-          id: mockSrcId,
-          name: `scoders_workshop_${activeWorkshop.id.replace('wksp-', '')}_boilerplate.zip`,
-          type: 'workshop_source_code',
-          url: '#download-boilerplate-zip',
-          size: '890 KB',
-          clientId: safeEmail,
-          registrationId: regId,
-          uploadDate: new Date().toISOString().split('T')[0]
-        };
-        const currentFiles = DatabaseEngine.getFiles();
-        DatabaseEngine.saveFiles([dbPdfFile, dbSrcFile, ...currentFiles]);
-      }
-    } catch (err) {
-      console.warn("DB engine workshop registration save error:", err);
-    }
-
-    // 5. Fallback email trigger ONLY if unified backend endpoint failed on network
-    if (!dispatchedViaUnified) {
-      try {
-        const fbRes = await fetch('/api/email/workshop-payment-verified', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: safeEmail,
-            clientName: safeName,
-            workshopTitle: activeWorkshop.title,
-            amount: totalAmount,
-            uniqueKey: generatedKey,
-            paymentId: txnId,
-            actionUrl: buildPublicShareUrl(`/?view=workshops&key=${generatedKey}`)
-          })
-        });
-        if (fbRes.ok) {
-          const fbData = await fbRes.json().catch(() => null);
-          if (fbData) {
-            emailDeliveryMode = fbData.deliveryMode;
-            emailRealDelivered = Boolean(fbData.realEmailDelivered);
-            emailPreviewUrl = fbData.previewUrl;
-          }
-        }
-      } catch (emailErr) {
-        console.warn("Workshop email dispatch error:", emailErr);
-      }
-    }
+    window.dispatchEvent(new Event('scoders_auth_change'));
+    window.dispatchEvent(new Event('scoders_sessions_change'));
+    window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
 
     // 6. Close the drawer modal immediately
     setShowRegModal(false);
@@ -843,7 +741,7 @@ export default function TenantDashboard() {
     e.preventDefault();
     if (!manualKey.trim() || verifyingManualKey) return;
 
-    const trimmed = manualKey.trim().toUpperCase();
+    const trimmed = manualKey.replace(/\s+/g, '').trim().toUpperCase();
 
     // Check if pass has been revoked by admin
     if (DatabaseEngine.isPassRevoked(trimmed)) {
@@ -860,15 +758,22 @@ export default function TenantDashboard() {
       restoredEmail: string,
       restoredRole: string,
       restoredPaid: number,
-      restoredChatId: string
+      restoredChatId: string,
+      clientAccount?: any,
+      restoredPhone?: string,
+      restoredNotes?: string
     ) => {
+      DatabaseEngine.addSessionUnlockedUid(trimmed);
+
       const newKeys = {
         ...registeredKeys,
         [targetWorkshop.id]: {
           key: trimmed,
           name: restoredName,
           email: restoredEmail,
+          phone: restoredPhone || clientAccount?.phone || '',
           role: restoredRole,
+          notes: restoredNotes || '',
           tickets: 1,
           totalPaid: restoredPaid,
           chatId: restoredChatId,
@@ -878,32 +783,23 @@ export default function TenantDashboard() {
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_workshops', JSON.stringify(newKeys));
 
-      try {
-        const existingChats = DatabaseEngine.getChats();
-        if (!existingChats.some(c => c.id === restoredChatId || c.uniqueAccessKey === trimmed)) {
-          const manualChat: ChatConversation = {
-            id: restoredChatId,
-            clientName: restoredName,
-            clientEmail: restoredEmail,
-            registrationId: trimmed,
-            workshopId: targetWorkshop.id,
-            reference: targetWorkshop.title,
-            uniqueAccessKey: trimmed,
-            messages: [
-              {
-                id: `msg-wksp-${Date.now()}`,
-                sender: 'team',
-                senderName: 'S-CODERS Mentor Team',
-                senderRole: 'S-CODERS Founder & CEO',
-                content: `Welcome to the private discussion channel for '${targetWorkshop.title}'! You can clear your technical doubts and share URLs directly with our engineering mentors here.`,
-                timestamp: new Date().toISOString()
-              }
-            ],
-            lastUpdated: new Date().toISOString()
-          };
-          DatabaseEngine.saveChats([manualChat, ...existingChats]);
-        }
-      } catch {}
+      if (!currentUser && restoredEmail) {
+        const restoredUser: AppUser = {
+          uid: clientAccount?.uid || `client-${Date.now()}`,
+          name: clientAccount?.name || restoredName,
+          email: restoredEmail.toLowerCase(),
+          role: 'client',
+          company: clientAccount?.company || restoredRole,
+          phone: restoredPhone || clientAccount?.phone || 'Not Specified',
+          createdAt: clientAccount?.createdAt || new Date().toISOString(),
+        };
+        localStorage.setItem('scoders_user', JSON.stringify(restoredUser));
+        setCurrentUser(restoredUser);
+      }
+
+      window.dispatchEvent(new Event('scoders_auth_change'));
+      window.dispatchEvent(new Event('scoders_sessions_change'));
+      window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
 
       setShowRegModal(false);
       setManualKey('');
@@ -920,23 +816,25 @@ export default function TenantDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: trimmed, section: 'workshop' }),
       });
-      const verifyData = await verifyRes.json();
+      const verifyData = await verifyRes.json().catch(() => ({}));
 
       if (verifyRes.ok && verifyData?.valid && verifyData?.record) {
         const rec = verifyData.record;
-        const matchedWorkshop = workshops.find(w => w.id === rec.itemId) || activeWorkshop;
-        const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
-        const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
-        const allChats = DatabaseEngine.getChats();
-        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+        DatabaseEngine.hydrateVerifiedRecord(rec, verifyData.hydrated);
+
+        const wkspReg = verifyData.hydrated?.workshopRegistration;
+        const matchedWorkshop = workshops.find(w => w.id === (wkspReg?.workshopId || rec.itemId)) || activeWorkshop;
 
         unlockWorkshopFromDetails(
           matchedWorkshop,
-          rec.clientName || existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee',
-          rec.clientEmail || existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com',
-          rec.clientRole || existingReg?.participantProfile?.role || 'Registered Developer',
-          Number(rec.amount) || existingReg?.amountPaid || matchedWorkshop.price || 1499,
-          rec.chatId || existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`
+          wkspReg?.participantProfile?.name || rec.clientName || currentUser?.name || 'Registered Attendee',
+          (wkspReg?.participantProfile?.email || rec.clientEmail || currentUser?.email || '').toLowerCase(),
+          wkspReg?.participantProfile?.role || rec.clientRole || 'Registered Developer',
+          Number(wkspReg?.amountPaid ?? rec.amount) || matchedWorkshop.price || 1499,
+          wkspReg?.chatId || rec.chatId || `chat-wksp-${trimmed}`,
+          verifyData.clientAccount,
+          wkspReg?.participantProfile?.phone || rec.clientPhone || verifyData.clientAccount?.phone || '',
+          wkspReg?.notes || rec.metadata?.notes || ''
         );
         return;
       }
@@ -946,47 +844,53 @@ export default function TenantDashboard() {
         return;
       }
 
-      // Check local DB before rejecting
+      // Check local DB only if matching stored record exists locally
       const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
-      const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
+      const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed);
       const allChats = DatabaseEngine.getChats();
-      const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
 
       if (existingReg || existingChat) {
-        const matchedWorkshop = workshops.find(w => w.id === existingReg?.workshopId) || activeWorkshop;
+        const matchedWorkshop = workshops.find(w => w.id === (existingReg?.workshopId || existingChat?.workshopId)) || activeWorkshop;
         unlockWorkshopFromDetails(
           matchedWorkshop,
           existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee',
-          existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com',
+          (existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || '').toLowerCase(),
           existingReg?.participantProfile?.role || 'Registered Developer',
           existingReg?.amountPaid || matchedWorkshop.price || 1499,
-          existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`
+          existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`,
+          undefined,
+          existingReg?.participantProfile?.phone || '',
+          existingReg?.notes || ''
         );
         return;
       }
 
       setManualKeyError(
         verifyData?.error ||
-          `No active workshop pass found for UID "${trimmed}". Check your code or recover via email.`
+          `No active workshop pass found for UID "${trimmed}". Expected format like ${expectedPrefix}XXXX-XXXX or recover via email.`
       );
     } catch {
-      // Offline fallback with prefix verification
-      if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
-        const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
-        const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.trim().toUpperCase() === trimmed);
-        const allChats = DatabaseEngine.getChats();
-        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+      const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
+      const existingReg = workshopRegs.find(r => r.uniqueAccessKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed);
+      const allChats = DatabaseEngine.getChats();
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
 
+      if (existingReg || existingChat) {
+        const matchedWorkshop = workshops.find(w => w.id === (existingReg?.workshopId || existingChat?.workshopId)) || activeWorkshop;
         unlockWorkshopFromDetails(
-          activeWorkshop,
+          matchedWorkshop,
           existingReg?.participantProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Attendee',
-          existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || 'attendee@scoders.com',
+          (existingReg?.participantProfile?.email || existingChat?.clientEmail || currentUser?.email || '').toLowerCase(),
           existingReg?.participantProfile?.role || 'Registered Developer',
-          existingReg?.amountPaid || activeWorkshop.price || 1499,
-          existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`
+          existingReg?.amountPaid || matchedWorkshop.price || 1499,
+          existingReg?.chatId || existingChat?.id || `chat-wksp-${trimmed}`,
+          undefined,
+          existingReg?.participantProfile?.phone || '',
+          existingReg?.notes || ''
         );
       } else {
-        setManualKeyError(`Invalid key format. Pass for this session must start with: ${expectedPrefix}`);
+        setManualKeyError(`Unable to verify "${trimmed}". Check your internet connection or recover via email.`);
       }
     } finally {
       setVerifyingManualKey(false);
@@ -1132,7 +1036,7 @@ export default function TenantDashboard() {
     setTimeout(() => setSubmitSuccess(false), 3000);
   };
 
-  // Permanent Profile & Registration Persistence on Mount
+  // Prefill registration form fields from current logged-in user on mount (without unlocking other users' passes)
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('scoders_user');
@@ -1143,33 +1047,7 @@ export default function TenantDashboard() {
           setRegEmail(parsedUser.email || '');
         }
       }
-
-      // Check if any workshop registration exists in DatabaseEngine or localStorage for current user
-      const workshopRegs = DatabaseEngine.getWorkshopRegistrations();
-      if (workshopRegs.length > 0) {
-        const currentKeys = { ...registeredKeys };
-        let updated = false;
-        for (const reg of workshopRegs) {
-          if (reg.participantProfile && reg.workshopId && !currentKeys[reg.workshopId]) {
-            const email = (reg.participantProfile.email || '').toLowerCase().trim();
-            if (!currentUser || email === currentUser.email?.toLowerCase()) {
-              currentKeys[reg.workshopId] = {
-                key: reg.uniqueAccessKey || 'BTD-WKSP-RESTORED',
-                name: reg.participantProfile.name || 'Verified Attendee',
-                email: reg.participantProfile.email || 'attendee@scoders.com',
-                role: reg.participantProfile.role || 'Developer',
-                timestamp: reg.paymentDate || new Date().toLocaleDateString()
-              };
-              updated = true;
-            }
-          }
-        }
-        if (updated) {
-          setRegisteredKeys(currentKeys);
-          localStorage.setItem('scoders_registered_workshops', JSON.stringify(currentKeys));
-        }
-      }
-    } catch (e) {}
+    } catch {}
   }, []);
 
   // Determine currently active registered client name for badge
@@ -1188,20 +1066,27 @@ export default function TenantDashboard() {
       const savedDraftRaw = localStorage.getItem(`scoders_workshop_draft_${selectedWorkshopId}`);
       if (savedDraftRaw) {
         const draft = JSON.parse(savedDraftRaw);
-        if (typeof draft.authorName === 'string') setAuthorName(draft.authorName);
-        if (typeof draft.role === 'string') setRole(draft.role);
-        if (typeof draft.content === 'string') setContent(draft.content);
-        if (typeof draft.rating === 'number') setRating(draft.rating);
+        setAuthorName(typeof draft.authorName === 'string' ? draft.authorName : (activeRegInfo?.name || ''));
+        setRole(typeof draft.role === 'string' ? draft.role : (activeRegInfo?.role || 'Attendee'));
+        setContent(typeof draft.content === 'string' ? draft.content : (activeRegInfo?.notes || ''));
+        setRating(typeof draft.rating === 'number' ? draft.rating : 5);
         return;
       }
     } catch {}
     if (activeRegInfo) {
       setAuthorName(activeRegInfo.name || '');
       setRole(activeRegInfo.role || 'Attendee');
+      setContent(activeRegInfo.notes || '');
+      setRating(5);
+    } else {
+      setAuthorName('');
+      setRole('Attendee');
+      setContent('');
+      setRating(5);
     }
-  }, [selectedWorkshopId]);
+  }, [selectedWorkshopId, activeRegInfo?.key]);
 
-  const persistWorkshopClientDraft = (syncProfile: boolean = true) => {
+  const persistWorkshopClientDraft = async (syncProfile: boolean = true, isManualSave: boolean = false): Promise<boolean> => {
     try {
       localStorage.setItem(
         `scoders_workshop_draft_${selectedWorkshopId}`,
@@ -1215,18 +1100,61 @@ export default function TenantDashboard() {
       );
     } catch {}
 
-    if (syncProfile && isRegistered && activeRegInfo && (authorName.trim() || role.trim())) {
-      DatabaseEngine.updateWorkshopClientProfile({
+    if (syncProfile && (!isRegistered || !activeRegInfo || !activeRegInfo.key)) {
+      if (isManualSave) {
+        setWkspSaveError('Please register or verify your Workshop UID first before saving notes to the database.');
+        setWkspAutoSaveStatus('error');
+        return false;
+      }
+      setWkspSaveError(null);
+      setWkspAutoSaveStatus('saved');
+      return true;
+    }
+
+    if (syncProfile && isRegistered && activeRegInfo) {
+      const updatedName = authorName.trim() || activeRegInfo.name;
+      const updatedRole = role.trim() || activeRegInfo.role;
+
+      const res = await DatabaseEngine.updateWorkshopClientProfile({
         workshopId: activeWorkshop.id,
         uniqueKey: activeRegInfo.key,
-        name: authorName.trim() || activeRegInfo.name,
+        name: updatedName,
         email: activeRegInfo.email,
-        role: role.trim() || activeRegInfo.role,
+        role: updatedRole,
+        notes: content.trim(),
+      });
+
+      if (!res.success) {
+        setWkspSaveError(res.error || 'Could not save details to server database.');
+        setWkspAutoSaveStatus('error');
+        return false;
+      }
+
+      setRegisteredKeys((prev) => {
+        const existingEntry = prev[activeWorkshop.id];
+        if (!existingEntry) return prev;
+        const next = {
+          ...prev,
+          [activeWorkshop.id]: {
+            ...existingEntry,
+            name: updatedName,
+            role: updatedRole,
+            notes: content.trim(),
+          },
+        };
+        try {
+          localStorage.setItem('scoders_registered_workshops', JSON.stringify(next));
+        } catch {}
+        return next;
       });
     }
+
+    setWkspSaveError(null);
+    setWkspAutoSaveStatus('saved');
+    return true;
   };
 
-  // Automatic Auto-Save (400ms debounce) for workshop attendee form/details
+  // Automatic Auto-Save (500ms debounce) for workshop attendee form/details
   useEffect(() => {
     if (wkspDraftFirstRenderRef.current) {
       wkspDraftFirstRenderRef.current = false;
@@ -1234,17 +1162,18 @@ export default function TenantDashboard() {
     }
     setWkspAutoSaveStatus('saving');
     const timer = setTimeout(() => {
-      persistWorkshopClientDraft(true);
-      setWkspAutoSaveStatus('saved');
-    }, 400);
+      void persistWorkshopClientDraft(true, false);
+    }, 500);
     return () => clearTimeout(timer);
   }, [authorName, role, content, rating, selectedWorkshopId]);
 
-  const handleManualSaveWorkshop = () => {
-    persistWorkshopClientDraft(true);
-    setWkspAutoSaveStatus('saved');
-    setWkspManualSaveFlash(true);
-    setTimeout(() => setWkspManualSaveFlash(false), 2000);
+  const handleManualSaveWorkshop = async () => {
+    setWkspAutoSaveStatus('saving');
+    const ok = await persistWorkshopClientDraft(true, true);
+    if (ok) {
+      setWkspManualSaveFlash(true);
+      setTimeout(() => setWkspManualSaveFlash(false), 2000);
+    }
   };
 
   const openCancelWorkshopModal = (workshopObj: WorkshopEvent, regObj: any) => {
@@ -1490,9 +1419,15 @@ export default function TenantDashboard() {
 
       {/* Bottom Action Bar: Auto-Save Status, Cancel Workshop, Save, and Close */}
       <div className="px-4 py-3.5 sm:px-6 sm:py-4 bg-brand-dark/90 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-400">
+        <div className={`flex items-center gap-2 text-[11px] font-mono ${wkspAutoSaveStatus === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-          <span>{wkspAutoSaveStatus === 'saving' ? 'Auto-saving details...' : 'Auto-Save Active: Workshop notes & profile saved'}</span>
+          <span>
+            {wkspAutoSaveStatus === 'saving'
+              ? 'Saving details to database...'
+              : wkspAutoSaveStatus === 'error'
+                ? (wkspSaveError || 'Database Save Error')
+                : 'Auto-Save Active: Workshop notes & profile saved'}
+          </span>
         </div>
 
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
@@ -2527,9 +2462,19 @@ export default function TenantDashboard() {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-mono text-emerald-300">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{wkspAutoSaveStatus === 'saving' ? 'Auto-saving...' : 'Auto-Save Active'}</span>
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-mono ${
+                    wkspAutoSaveStatus === 'error'
+                      ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                      : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                  }`}>
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${wkspAutoSaveStatus === 'error' ? 'text-red-400' : 'text-emerald-400'}`} />
+                    <span>
+                      {wkspAutoSaveStatus === 'saving'
+                        ? 'Saving to Database...'
+                        : wkspAutoSaveStatus === 'error'
+                          ? (wkspSaveError || 'Database Save Error')
+                          : 'Saved to Database'}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2.5 ml-auto">

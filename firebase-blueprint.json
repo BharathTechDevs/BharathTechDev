@@ -1,0 +1,203 @@
+{
+  "entities": {
+    "UserPublic": {
+      "title": "UserPublic",
+      "description": "Non-PII public identity record for an authenticated portal user.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "description": "Public display name shown in greetings."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["client", "admin"],
+          "description": "Authorization role for the user."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when public profile was last updated."
+        }
+      },
+      "required": ["displayName", "role", "updatedAt"]
+    },
+    "UserPrivate": {
+      "title": "UserPrivate",
+      "description": "Owner-only private PII record storing verified contact details and linked UIDs.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Gmail / email address."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number."
+        },
+        "company": {
+          "type": "string",
+          "description": "Company, organization, or technical role."
+        },
+        "linkedUids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of linked registration UIDs owned by the user."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when private info was last updated."
+        }
+      },
+      "required": ["email", "updatedAt"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "Persistent Service, Workshop, or Event registration and saved workspace notes.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning user."
+        },
+        "uid": {
+          "type": "string",
+          "description": "Unique Registration Code (e.g., BTD-SERV-..., BTD-WKSP-..., SC-EVT-...)."
+        },
+        "section": {
+          "type": "string",
+          "enum": ["service", "workshop", "event"],
+          "description": "Application section for this registration."
+        },
+        "itemId": {
+          "type": "string",
+          "description": "Catalog ID of the service, workshop, or event."
+        },
+        "itemTitle": {
+          "type": "string",
+          "description": "Human-readable title of the registered offering."
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Registered client or attendee name."
+        },
+        "clientEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Registered Gmail / email address."
+        },
+        "clientPhone": {
+          "type": "string",
+          "description": "Client phone number."
+        },
+        "clientRole": {
+          "type": "string",
+          "description": "Client role or organization."
+        },
+        "requirements": {
+          "type": "string",
+          "description": "Project requirements for services."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Saved client notes / workshop reflections."
+        },
+        "budget": {
+          "type": "string",
+          "description": "Selected project budget."
+        },
+        "timeline": {
+          "type": "string",
+          "description": "Target project timeline."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Paid registration amount in INR."
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["VERIFIED", "NOT_REQUIRED", "PENDING"],
+          "description": "Payment verification state."
+        },
+        "paymentId": {
+          "type": "string",
+          "description": "Payment transaction or UTR identifier."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "EXPIRED", "REVOKED"],
+          "description": "UID activation state."
+        },
+        "chatId": {
+          "type": "string",
+          "description": "Linked workspace chat thread ID."
+        },
+        "issuedAt": {
+          "type": "string",
+          "description": "ISO date/timestamp when UID was issued."
+        },
+        "validUntil": {
+          "type": "string",
+          "description": "ISO expiration timestamp."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "ownerUid",
+        "uid",
+        "section",
+        "itemId",
+        "itemTitle",
+        "clientName",
+        "clientEmail",
+        "amount",
+        "paymentStatus",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminMarker": {
+      "title": "AdminMarker",
+      "description": "Marker document designating an authorized administrator UID.",
+      "type": "object",
+      "properties": {
+        "grantedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublic" },
+      "description": "Public display name and role per user; no PII."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivate" },
+      "description": "Owner-only PII subcollection storing contact details and linked registration UIDs."
+    },
+    "/registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/Registration" },
+      "description": "Persistent user registrations, unique codes (UIDs), and saved workspace profile/notes."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminMarker" },
+      "description": "Read-only admin marker documents."
+    }
+  }
+}

@@ -105,6 +105,70 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
     return DatabaseEngine.getRevokedPasses();
   });
 
+  // Live Email Automation Status & Diagnostic Test States
+  const [emailHealth, setEmailHealth] = useState<{
+    configured?: boolean;
+    provider?: string;
+    officialSender?: string;
+    smtpVerified?: boolean;
+    smtpVerifyPort?: number;
+    verifyError?: string;
+    message?: string;
+  } | null>(null);
+  const [emailAuditLogs, setEmailAuditLogs] = useState<any[]>([]);
+  const [emailHealthLoading, setEmailHealthLoading] = useState(false);
+  const [testEmailTarget, setTestEmailTarget] = useState('scoders82@gmail.com');
+  const [testEmailSending, setTestEmailSending] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadEmailDiagnostics = async () => {
+    setEmailHealthLoading(true);
+    try {
+      const [statusRes, logsRes] = await Promise.all([
+        fetch('/api/email/config-status?verify=1'),
+        fetch('/api/registrations/email-logs'),
+      ]);
+      const statusJson = await statusRes.json().catch(() => null);
+      const logsJson = await logsRes.json().catch(() => null);
+      if (statusJson) setEmailHealth(statusJson);
+      if (logsJson?.emailLogs) setEmailAuditLogs(logsJson.emailLogs.slice(0, 6));
+    } catch {
+      // keep silent if offline
+    } finally {
+      setEmailHealthLoading(false);
+    }
+  };
+
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmailTarget.trim() || testEmailSending) return;
+    setTestEmailSending(true);
+    setTestEmailResult(null);
+    try {
+      const res = await fetch('/api/email/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: testEmailTarget.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setTestEmailResult({ ok: false, text: json?.error || 'Test email delivery failed.' });
+      } else {
+        setTestEmailResult({
+          ok: true,
+          text: json.realEmailDelivered
+            ? `✓ Live email delivered to ${json.to} via ${json.deliveryMode} (${json.officialSender}).`
+            : `Sandbox preview created (${json.deliveryMode}).`,
+        });
+        loadEmailDiagnostics();
+      }
+    } catch {
+      setTestEmailResult({ ok: false, text: 'Unable to reach email test endpoint.' });
+    } finally {
+      setTestEmailSending(false);
+    }
+  };
+
   // Form edit states
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -153,6 +217,7 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
       setDbCandidateApps(apps);
     }).catch(() => {});
     setDbAnalytics(DatabaseEngine.getAnalytics());
+    loadEmailDiagnostics();
   };
 
   // Workshop Pass Revocation / Restoration (Admin Controlled)
@@ -912,6 +977,108 @@ export default function AdminConsole({ onClose, onRefreshData }: AdminConsolePro
                         <Check className="w-5 h-5" />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Email Automation Status & Live SMTP Test Card */}
+                  <div className={`p-5 rounded-2xl border space-y-4 ${
+                    emailHealth?.smtpVerified || emailHealth?.configured
+                      ? 'bg-emerald-500/5 border-emerald-500/25'
+                      : 'bg-amber-500/5 border-amber-500/25'
+                  }`}>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Mail className={`w-4 h-4 ${emailHealth?.smtpVerified ? 'text-emerald-400' : 'text-amber-400'}`} />
+                          <span className="font-display font-bold text-sm text-white">
+                            Automated Email Dispatch ({emailHealth?.officialSender || 'scoders82@gmail.com'})
+                          </span>
+                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold uppercase ${
+                            emailHealth?.smtpVerified
+                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                              : emailHealth?.configured
+                              ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                              : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                          }`}>
+                            {emailHealthLoading
+                              ? 'Checking SMTP...'
+                              : emailHealth?.smtpVerified
+                              ? `SMTP Verified (Port ${emailHealth.smtpVerifyPort || 465})`
+                              : emailHealth?.configured
+                              ? `${emailHealth.provider || 'Configured'}`
+                              : 'Sandbox Mode'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 font-sans">
+                          {emailHealth?.verifyError
+                            ? `SMTP Warning: ${emailHealth.verifyError}`
+                            : emailHealth?.message || 'Verifying live Gmail SMTP transport...'}
+                        </p>
+                      </div>
+
+                      <form onSubmit={handleSendTestEmail} className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                        <input
+                          type="email"
+                          required
+                          value={testEmailTarget}
+                          onChange={(e) => setTestEmailTarget(e.target.value)}
+                          placeholder="Recipient email..."
+                          className="bg-brand-dark/80 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-teal w-full sm:w-56"
+                        />
+                        <button
+                          type="submit"
+                          disabled={testEmailSending}
+                          className="px-4 py-2 bg-brand-teal hover:bg-white text-brand-dark font-mono font-bold text-xs uppercase rounded-xl transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                        >
+                          {testEmailSending ? 'Sending...' : 'Send Test Email'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={loadEmailDiagnostics}
+                          disabled={emailHealthLoading}
+                          className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl border border-white/10 cursor-pointer"
+                          title="Re-verify SMTP connection"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${emailHealthLoading ? 'animate-spin' : ''}`} />
+                        </button>
+                      </form>
+                    </div>
+
+                    {testEmailResult && (
+                      <div className={`text-xs font-mono px-3 py-2 rounded-xl border ${
+                        testEmailResult.ok
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                          : 'bg-red-500/10 border-red-500/30 text-red-300'
+                      }`}>
+                        {testEmailResult.text}
+                      </div>
+                    )}
+
+                    {emailAuditLogs.length > 0 && (
+                      <div className="pt-2 border-t border-white/5 space-y-1.5">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 block">
+                          Recent Dispatched Emails ({emailAuditLogs.length})
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {emailAuditLogs.slice(0, 4).map((log, i) => (
+                            <div key={log.id || i} className="bg-brand-dark/50 border border-white/5 rounded-xl px-3 py-2 text-[11px] font-mono flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-white truncate">{log.to}</div>
+                                <div className="text-[10px] text-gray-500 truncate">{log.section} • {log.uid || log.itemTitle || 'Email'}</div>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold shrink-0 ${
+                                log.realEmailDelivered
+                                  ? 'bg-emerald-500/15 text-emerald-300'
+                                  : log.status === 'FAILED'
+                                  ? 'bg-red-500/15 text-red-300'
+                                  : 'bg-white/10 text-gray-300'
+                              }`}>
+                                {log.realEmailDelivered ? 'INBOX SENT' : log.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Nested Sub-navigation */}

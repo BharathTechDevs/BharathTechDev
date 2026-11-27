@@ -1,0 +1,90 @@
+{
+  "accounts": [
+    {
+      "uid": "client-mwyyqr40-2fa139",
+      "name": "Test E2E Client Updated",
+      "email": "verify.e2e.client3@gmail.com",
+      "phone": "+91 98765 00001",
+      "company": "Independent Client",
+      "role": "client",
+      "clientRole": "Senior AI Engineer",
+      "hasPassword": false,
+      "linkedRegistrationUids": [
+        "BTD-WKSP-W-1-12D6-D403",
+        "BTD-SERV-AI-3999-295E"
+      ],
+      "createdAt": "2026-11-27T12:34:09.984Z",
+      "updatedAt": "2026-11-27T12:34:32.200Z"
+    },
+    {
+      "uid": "client-mwyypiwn-4c20d2",
+      "name": "Bhuvan M",
+      "email": "verify.e2e.client2@gmail.com",
+      "phone": "+91 99999 00000",
+      "company": "Independent Client",
+      "role": "client",
+      "clientRole": "Client Partner",
+      "hasPassword": false,
+      "linkedRegistrationUids": [
+        "BTD-SERV-AI-C8D0-D172",
+        "BTD-NONEXISTENT-999"
+      ],
+      "createdAt": "2026-11-27T12:33:12.695Z",
+      "updatedAt": "2026-11-27T12:33:33.363Z"
+    },
+    {
+      "uid": "client-mwyynd4w-2c36d4",
+      "name": "Bhuvan M",
+      "email": "verify.e2e.client@gmail.com",
+      "phone": "+91 99999 00000",
+      "company": "Independent Client",
+      "role": "client",
+      "clientRole": "Client Partner",
+      "hasPassword": false,
+      "linkedRegistrationUids": [
+        "BTD-SERV-AI-340D-F545",
+        "BTD-NONEXISTENT-999"
+      ],
+      "createdAt": "2026-11-27T12:31:31.904Z",
+      "updatedAt": "2026-11-27T12:31:31.928Z"
+    }
+  ],
+  "sessions": [
+    {
+      "tokenHash": "7e8a94e21b2d2ae31c41882a0bed4fe753452aa8852ff5f3bdeb0b26482df352",
+      "uid": "client-mwyyqr40-2fa139",
+      "email": "verify.e2e.client3@gmail.com",
+      "role": "client",
+      "expiresAtMs": 1796992472200,
+      "createdAt": "2026-11-27T12:34:32.200Z"
+    },
+    {
+      "tokenHash": "5bc45af13d445ee774f47263c47f444c0477cd994b2ea9407fb8dccd4489b259",
+      "uid": "client-mwyyqr40-2fa139",
+      "email": "verify.e2e.client3@gmail.com",
+      "role": "client",
+      "expiresAtMs": 1796992452866,
+      "createdAt": "2026-11-27T12:34:12.866Z"
+    },
+    {
+      "tokenHash": "364e61f768fdfb0a53b760c01583da1313b3ca816b1a0199aaaa4985d6fde2e4",
+      "uid": "client-mwyyqr40-2fa139",
+      "email": "verify.e2e.client3@gmail.com",
+      "role": "client",
+      "expiresAtMs": 1796992450022,
+      "createdAt": "2026-11-27T12:34:10.022Z"
+    }
+  ],
+  "recoveryOtps": [
+    {
+      "email": "verify.e2e.client3@gmail.com",
+      "section": "service",
+      "otpHash": "049d247003df2eadcd3512ba611efdaf557aeff638fe8a24ce14e133c283aeaa",
+      "expiresAt": "2026-11-27T12:44:29.236Z",
+      "expiresAtMs": 1795783469236,
+      "attempts": 0,
+      "used": false,
+      "createdAt": "2026-11-27T12:34:29.236Z"
+    }
+  ]
+}

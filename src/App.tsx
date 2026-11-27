@@ -25,6 +25,14 @@ import Policies from './components/Policies';
 import Careers from './components/Careers';
 import { DatabaseEngine } from './utils/dbEngine';
 import { initLeaderPhotosSync } from './utils/leaderPhotos';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  auth,
+  testConnection,
+  signOutFirebase,
+  fetchUserRegistrationsFromFirestore,
+  fetchUserPrivateInfoFromFirestore,
+} from './firebase';
 
 type AppView = 'home' | 'about' | 'crew' | 'services' | 'workshops' | 'communities' | 'payments' | 'contact' | 'admin' | 'networking' | 'events' | 'portal' | 'policies' | 'careers';
 
@@ -210,10 +218,37 @@ export default function App() {
     DatabaseEngine.syncWithServer().catch(() => {});
     DatabaseEngine.syncApplicationsFromServer().catch(() => {});
     initLeaderPhotosSync().catch(() => {});
+    testConnection().catch(() => {});
+
+    const unsubscribeFirebaseAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (!fbUser || !fbUser.emailVerified || !fbUser.email) return;
+      try {
+        const [cloudRecords, privInfo] = await Promise.all([
+          fetchUserRegistrationsFromFirestore().catch(() => []),
+          fetchUserPrivateInfoFromFirestore().catch(() => null),
+        ]);
+        const syncRes = await fetch('/api/registrations/sync-cloud', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: fbUser.email.toLowerCase(),
+            name: fbUser.displayName || fbUser.email.split('@')[0],
+            phone: privInfo?.phone || '',
+            company: privInfo?.company || '',
+            cloudRecords,
+          }),
+        });
+        const data = await syncRes.json().catch(() => ({}));
+        if (syncRes.ok && data?.success && data?.snapshot) {
+          DatabaseEngine.applyClientAuthSnapshot(data.snapshot);
+        }
+      } catch {}
+    });
 
     return () => {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('hashchange', handleUrlChange);
+      unsubscribeFirebaseAuth();
     };
   }, []);
 
@@ -223,7 +258,8 @@ export default function App() {
     window.scrollTo(0, 0);
   };
 
-  // Authenticated user state
+  // Authenticated user state (non-secret display profile cached locally; bearer token held strictly in memory)
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [user, setUser] = useState<AppUser | null>(() => {
     try {
       const saved = localStorage.getItem('scoders_user');
@@ -314,19 +350,46 @@ export default function App() {
     return () => window.removeEventListener('scoders_auth_change', handleSyncAuth);
   }, []);
 
-  const handleLogin = (newUser: AppUser) => {
+  const handleLogin = (newUser: AppUser, token?: string, snapshot?: any) => {
+    if (token) {
+      setAuthToken(token);
+    }
     setUser(newUser);
     localStorage.setItem('scoders_user', JSON.stringify(newUser));
     if (newUser.role === 'admin') {
       localStorage.setItem('scoders_admin_auth', 'true');
+    } else {
+      localStorage.removeItem('scoders_admin_auth');
     }
+    if (snapshot) {
+      DatabaseEngine.applyClientAuthSnapshot(snapshot);
+    }
+    window.dispatchEvent(new Event('scoders_auth_change'));
+    window.dispatchEvent(new Event('scoders_sessions_change'));
     setCurrentView('portal');
   };
 
   const handleLogout = () => {
+    const tokenToInvalidate = authToken;
+    setAuthToken(null);
     setUser(null);
     localStorage.removeItem('scoders_user');
     localStorage.removeItem('scoders_admin_auth');
+    DatabaseEngine.clearClientSessionData();
+    void signOutFirebase();
+
+    if (tokenToInvalidate) {
+      fetch('/api/auth/client/logout', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenToInvalidate}`,
+        },
+      }).catch(() => {});
+    }
+
+    window.dispatchEvent(new Event('scoders_auth_change'));
+    window.dispatchEvent(new Event('scoders_sessions_change'));
+    window.dispatchEvent(new Event('scoders_registered_workshops_changed'));
     setCurrentView('home');
   };
 

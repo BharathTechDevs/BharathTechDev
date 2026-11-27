@@ -53,6 +53,186 @@ function escapeEmailHtml(val: any): string {
     .replace(/'/g, "&#39;");
 }
 
+function sanitizeHeaderString(val: any, maxLen = 180): string {
+  return String(val ?? "")
+    .replace(/[\r\n]+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
+function isValidEmailAddress(email: string): boolean {
+  if (!email || email.length > 254) return false;
+  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email.trim());
+}
+
+function getClientWelcomeEmailHtml({
+  clientName,
+  email,
+  company,
+  portalUrl,
+}: {
+  clientName: string;
+  email: string;
+  company?: string;
+  portalUrl: string;
+}) {
+  const safeName = escapeEmailHtml(clientName || "Valued Client");
+  const safeEmail = escapeEmailHtml(email);
+  const safeCompany = escapeEmailHtml(company || "Independent Client");
+  const safeUrl = escapeEmailHtml(portalUrl);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><title>Welcome to S-CODERS</title></head>
+    <body style="margin:0;padding:0;background-color:#0B0F17;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#0B0F17;padding:36px 10px;">
+        <tr><td align="center">
+          <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#131A29;border-radius:16px;border:1px solid #1E293B;overflow:hidden;">
+            <tr><td style="background:linear-gradient(135deg,#0B1120 0%,#0F172A 100%);padding:28px 32px;border-bottom:2px solid #22D3EE;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:800;letter-spacing:1.5px;">S-CODERS</h1>
+              <p style="margin:6px 0 0;color:#22D3EE;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Bharat Tech Developers • Bengaluru</p>
+            </td></tr>
+            <tr><td style="padding:32px;">
+              <h2 style="margin:0 0 12px;color:#FFFFFF;font-size:20px;">Welcome to S-CODERS, ${safeName}!</h2>
+              <p style="margin:0 0 18px;color:#CBD5E1;font-size:14px;line-height:1.6;">
+                Your S-CODERS Client Workspace account has been created and synced to our engineering portal. You can register for software services, developer workshops, and live events using <strong>${safeEmail}</strong>.
+              </p>
+              <table width="100%" style="background-color:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:16px;margin-bottom:20px;">
+                <tr><td style="color:#94A3B8;font-size:12px;padding:4px 0;">Account Email</td><td align="right" style="color:#FFFFFF;font-size:12px;font-weight:700;">${safeEmail}</td></tr>
+                <tr><td style="color:#94A3B8;font-size:12px;padding:4px 0;">Organization / Role</td><td align="right" style="color:#22D3EE;font-size:12px;font-weight:700;">${safeCompany}</td></tr>
+                <tr><td style="color:#94A3B8;font-size:12px;padding:4px 0;">Official Support</td><td align="right" style="color:#CBD5E1;font-size:12px;">scoders82@gmail.com</td></tr>
+              </table>
+              <div style="text-align:center;margin:22px 0 8px;">
+                <a href="${safeUrl}" target="_blank" style="display:inline-block;padding:13px 26px;background-color:#22D3EE;color:#0B0F17;text-decoration:none;font-weight:800;font-size:13px;border-radius:10px;text-transform:uppercase;letter-spacing:1px;">Open S-CODERS Portal</a>
+              </div>
+            </td></tr>
+            <tr><td style="background-color:#0B1120;padding:16px 32px;border-top:1px solid #1E293B;text-align:center;">
+              <p style="margin:0;color:#64748B;font-size:11px;">Automated welcome dispatch from scoders82@gmail.com • S-CODERS</p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+function getContactAcknowledgementEmailHtml({
+  name,
+  email,
+  interest,
+  message,
+  enquiryId,
+}: {
+  name: string;
+  email: string;
+  interest: string;
+  message: string;
+  enquiryId: string;
+}) {
+  const safeName = escapeEmailHtml(name);
+  const safeEmail = escapeEmailHtml(email);
+  const safeInterest = escapeEmailHtml(interest);
+  const safeMessage = escapeEmailHtml(message);
+  const safeId = escapeEmailHtml(enquiryId);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><title>Enquiry Received - S-CODERS</title></head>
+    <body style="margin:0;padding:0;background-color:#0B0F17;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#0B0F17;padding:36px 10px;">
+        <tr><td align="center">
+          <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#131A29;border-radius:16px;border:1px solid #1E293B;overflow:hidden;">
+            <tr><td style="background:linear-gradient(135deg,#0B1120 0%,#0F172A 100%);padding:28px 32px;border-bottom:2px solid #22D3EE;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:800;letter-spacing:1.5px;">S-CODERS</h1>
+              <p style="margin:6px 0 0;color:#22D3EE;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enquiry Confirmation • Reference ${safeId}</p>
+            </td></tr>
+            <tr><td style="padding:32px;">
+              <h2 style="margin:0 0 12px;color:#FFFFFF;font-size:19px;">Hi ${safeName}, we received your inquiry!</h2>
+              <p style="margin:0 0 18px;color:#CBD5E1;font-size:14px;line-height:1.6;">
+                Thank you for reaching out to S-CODERS (Bharat Tech Developers). Shreyas M. or a lead coordinator will review your submission and reply to <strong>${safeEmail}</strong> within 24 hours.
+              </p>
+              <table width="100%" style="background-color:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:16px;margin-bottom:18px;">
+                <tr><td style="color:#94A3B8;font-size:12px;padding:4px 0;">Reference ID</td><td align="right" style="color:#22D3EE;font-size:12px;font-family:monospace;font-weight:700;">${safeId}</td></tr>
+                <tr><td style="color:#94A3B8;font-size:12px;padding:4px 0;">Topic</td><td align="right" style="color:#FFFFFF;font-size:12px;font-weight:700;">${safeInterest}</td></tr>
+              </table>
+              <div style="background-color:#0B1120;border-left:3px solid #22D3EE;padding:14px;border-radius:6px;color:#CBD5E1;font-size:13px;line-height:1.5;">
+                ${safeMessage}
+              </div>
+            </td></tr>
+            <tr><td style="background-color:#0B1120;padding:16px 32px;border-top:1px solid #1E293B;text-align:center;">
+              <p style="margin:0;color:#64748B;font-size:11px;">Sent automatically from scoders82@gmail.com • Reply directly for urgent updates.</p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+function getContactAdminAlertEmailHtml({
+  name,
+  email,
+  company,
+  phone,
+  interest,
+  message,
+  enquiryId,
+}: {
+  name: string;
+  email: string;
+  company?: string;
+  phone?: string;
+  interest: string;
+  message: string;
+  enquiryId: string;
+}) {
+  return `
+    <div style="font-family:sans-serif;background:#0B0F17;color:#E2E8F0;padding:24px;">
+      <div style="max-width:600px;margin:auto;background:#131A29;border:1px solid #1E293B;border-radius:14px;padding:24px;">
+        <h2 style="color:#22D3EE;margin:0 0 12px;">New Website Inquiry (${escapeEmailHtml(enquiryId)})</h2>
+        <p style="margin:4px 0;"><strong>From:</strong> ${escapeEmailHtml(name)} (${escapeEmailHtml(email)})</p>
+        <p style="margin:4px 0;"><strong>Company:</strong> ${escapeEmailHtml(company || "Individual")}</p>
+        <p style="margin:4px 0;"><strong>Phone:</strong> ${escapeEmailHtml(phone || "Not Provided")}</p>
+        <p style="margin:4px 0;"><strong>Topic:</strong> ${escapeEmailHtml(interest)}</p>
+        <div style="margin-top:14px;padding:12px;background:#0F172A;border-radius:8px;border-left:3px solid #22D3EE;white-space:pre-wrap;">${escapeEmailHtml(message)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function getSmtpDiagnosticEmailHtml(recipient: string, provider: string, appUrl: string) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><title>S-CODERS Live Email Verification</title></head>
+    <body style="margin:0;padding:0;background-color:#0B0F17;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#E2E8F0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#0B0F17;padding:36px 10px;">
+        <tr><td align="center">
+          <table width="580" border="0" cellspacing="0" cellpadding="0" style="background-color:#131A29;border-radius:16px;border:1px solid #10B981;overflow:hidden;">
+            <tr><td style="background:#0B1120;padding:24px 28px;border-bottom:2px solid #10B981;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:22px;">S-CODERS Email Automation Verified</h1>
+              <p style="margin:6px 0 0;color:#34D399;font-size:12px;font-weight:700;">LIVE INBOX DISPATCH FROM scoders82@gmail.com</p>
+            </td></tr>
+            <tr><td style="padding:28px;">
+              <p style="margin:0 0 14px;color:#CBD5E1;font-size:14px;line-height:1.6;">
+                This automated test confirms that S-CODERS live email delivery via <strong>${escapeEmailHtml(provider)}</strong> is working and delivering directly to <strong>${escapeEmailHtml(recipient)}</strong>.
+              </p>
+              <p style="margin:0;color:#94A3B8;font-size:12px;">
+                Timestamp: ${escapeEmailHtml(new Date().toISOString())}<br/>
+                Portal: <a href="${escapeEmailHtml(appUrl)}" style="color:#22D3EE;">${escapeEmailHtml(appUrl)}</a>
+              </p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+
 // Email template generator for Service Registration & UID Notification
 function getServiceAcceptanceEmailHtml({
   clientName,
@@ -2831,6 +3011,421 @@ Return ONLY valid JSON with this structure:
   // Shared Data Storage Helpers
   const leaderPhotosFilePath = path.resolve(process.cwd(), "data", "leader-photos.json");
   const appStateFilePath = path.resolve(process.cwd(), "data", "app-state.json");
+  const authStoreFilePath = path.resolve(process.cwd(), "data", "auth-store.json");
+
+  interface ServerClientAccount {
+    uid: string;
+    name: string;
+    email: string;
+    phone?: string;
+    company?: string;
+    role: "client";
+    clientRole?: string;
+    passwordHash?: string;
+    hasPassword: boolean;
+    linkedRegistrationUids: string[];
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  interface ServerAuthSession {
+    tokenHash: string;
+    uid: string;
+    email: string;
+    role: "client" | "admin";
+    expiresAtMs: number;
+    createdAt: string;
+  }
+
+  interface ServerAuthRecoveryOtp {
+    email: string;
+    section: string;
+    otpHash: string;
+    expiresAt: string;
+    expiresAtMs: number;
+    attempts: number;
+    used: boolean;
+    createdAt: string;
+    verifiedAt?: string;
+  }
+
+  interface AuthStoreData {
+    accounts: ServerClientAccount[];
+    sessions: ServerAuthSession[];
+    recoveryOtps: ServerAuthRecoveryOtp[];
+  }
+
+  function atomicWriteJsonSync(filePath: string, data: any): void {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf-8");
+    fs.renameSync(tmpPath, filePath);
+  }
+
+  function hashPasswordScrypt(password: string): string {
+    const salt = crypto.randomBytes(16).toString("hex");
+    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+    return `${salt}:${derived}`;
+  }
+
+  function verifyPasswordScrypt(password: string, storedHash?: string): boolean {
+    if (!storedHash || !storedHash.includes(":")) return false;
+    const [salt, keyHex] = storedHash.split(":");
+    if (!salt || !keyHex) return false;
+    try {
+      const derived = crypto.scryptSync(password, salt, 64);
+      const storedBuf = Buffer.from(keyHex, "hex");
+      if (derived.length !== storedBuf.length) return false;
+      return crypto.timingSafeEqual(derived, storedBuf);
+    } catch {
+      return false;
+    }
+  }
+
+  function getStoredAuthData(): AuthStoreData {
+    try {
+      if (fs.existsSync(authStoreFilePath)) {
+        const content = fs.readFileSync(authStoreFilePath, "utf-8");
+        const parsed = JSON.parse(content || "{}");
+        return {
+          accounts: Array.isArray(parsed?.accounts) ? parsed.accounts : [],
+          sessions: Array.isArray(parsed?.sessions) ? parsed.sessions : [],
+          recoveryOtps: Array.isArray(parsed?.recoveryOtps) ? parsed.recoveryOtps : [],
+        };
+      }
+    } catch (e) {
+      console.error("Error reading auth store file:", e);
+    }
+    return { accounts: [], sessions: [], recoveryOtps: [] };
+  }
+
+  function saveStoredAuthData(data: AuthStoreData): void {
+    try {
+      const nowMs = Date.now();
+      const cleaned: AuthStoreData = {
+        accounts: Array.isArray(data.accounts) ? data.accounts : [],
+        sessions: (Array.isArray(data.sessions) ? data.sessions : [])
+          .filter((s) => Number(s?.expiresAtMs || 0) > nowMs)
+          .slice(0, 1000),
+        recoveryOtps: (Array.isArray(data.recoveryOtps) ? data.recoveryOtps : []).slice(0, 300),
+      };
+      atomicWriteJsonSync(authStoreFilePath, cleaned);
+    } catch (e) {
+      console.error("Error writing auth store file:", e);
+    }
+  }
+
+  function sanitizeClientAccountForResponse(acc: ServerClientAccount) {
+    return {
+      uid: acc.uid,
+      name: acc.name,
+      email: acc.email,
+      phone: acc.phone || "Not Specified",
+      company: acc.company || "Independent Client",
+      role: "client" as const,
+      clientRole: acc.clientRole,
+      hasPassword: Boolean(acc.hasPassword),
+      linkedRegistrationUids: Array.isArray(acc.linkedRegistrationUids) ? acc.linkedRegistrationUids : [],
+      createdAt: acc.createdAt,
+      updatedAt: acc.updatedAt,
+    };
+  }
+
+  function issueClientSessionToken(authData: AuthStoreData, acc: ServerClientAccount): string {
+    const rawToken = `sc_sess_${crypto.randomBytes(32).toString("hex")}`;
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const nowMs = Date.now();
+    authData.sessions.unshift({
+      tokenHash,
+      uid: acc.uid,
+      email: acc.email.toLowerCase(),
+      role: "client",
+      expiresAtMs: nowMs + 14 * 24 * 60 * 60 * 1000,
+      createdAt: new Date(nowMs).toISOString(),
+    });
+    return rawToken;
+  }
+
+  function collectLinkedUidsForEmail(appState: Record<string, any>, cleanEmail: string): string[] {
+    const set = new Set<string>();
+    const addUid = (val: any) => {
+      const s = String(val || "").trim().toUpperCase();
+      if (s && s !== "ENTER-KEY-TO-VERIFY" && s !== "PASS-KEY") set.add(s);
+    };
+    const uidRecs: any[] = Array.isArray(appState["db_registration_uids"]) ? appState["db_registration_uids"] : [];
+    for (const r of uidRecs) {
+      if (String(r?.clientEmail || "").trim().toLowerCase() === cleanEmail && r?.status !== "REVOKED") addUid(r?.uid);
+    }
+    const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+    for (const r of svcRegs) {
+      if (String(r?.clientProfile?.email || "").trim().toLowerCase() === cleanEmail) addUid(r?.uniqueKey);
+    }
+    const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+    for (const r of wkspRegs) {
+      if (String(r?.participantProfile?.email || "").trim().toLowerCase() === cleanEmail && !r?.isRevoked) addUid(r?.uniqueAccessKey);
+    }
+    const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+    for (const t of evtTickets) {
+      if (String(t?.participantEmail || "").trim().toLowerCase() === cleanEmail && t?.status !== "Ticket Cancelled") addUid(t?.ticketCode);
+    }
+    const enquiries: any[] = Array.isArray(appState["db_enquiries"]) ? appState["db_enquiries"] : [];
+    for (const e of enquiries) {
+      if (String(e?.email || "").trim().toLowerCase() === cleanEmail && e?.id) addUid(e?.id);
+    }
+    return Array.from(set);
+  }
+
+  function upsertServerClientAccount(
+    authData: AuthStoreData,
+    appState: Record<string, any>,
+    params: {
+      email: string;
+      name?: string;
+      phone?: string;
+      company?: string;
+      clientRole?: string;
+      password?: string;
+      registrationUid?: string;
+    }
+  ): ServerClientAccount {
+    const cleanEmail = String(params.email || "").trim().toLowerCase();
+    const nowIso = new Date().toISOString();
+    const discoveredUids = collectLinkedUidsForEmail(appState, cleanEmail);
+    const uidSet = new Set<string>(discoveredUids);
+    if (params.registrationUid) {
+      const normalized = String(params.registrationUid).trim().toUpperCase();
+      if (normalized) uidSet.add(normalized);
+    }
+
+    const idx = authData.accounts.findIndex((a) => String(a?.email || "").trim().toLowerCase() === cleanEmail);
+    if (idx >= 0) {
+      const existing = authData.accounts[idx];
+      for (const u of existing.linkedRegistrationUids || []) uidSet.add(String(u).trim().toUpperCase());
+      const cleanName = params.name?.trim();
+      const cleanPhone = params.phone?.trim();
+      const cleanCompany = params.company?.trim();
+      const cleanClientRole = params.clientRole?.trim();
+      const nextAcc: ServerClientAccount = {
+        ...existing,
+        name: cleanName && cleanName !== "Valued Client" && cleanName !== "Attendee" ? cleanName : existing.name,
+        phone: cleanPhone && cleanPhone !== "Not Specified" ? cleanPhone : existing.phone,
+        company: cleanCompany && cleanCompany !== "Independent Client" ? cleanCompany : existing.company,
+        clientRole: cleanClientRole || existing.clientRole,
+        passwordHash: params.password ? hashPasswordScrypt(params.password) : existing.passwordHash,
+        hasPassword: Boolean(params.password || existing.passwordHash),
+        linkedRegistrationUids: Array.from(uidSet),
+        updatedAt: nowIso,
+      };
+      authData.accounts[idx] = nextAcc;
+      return nextAcc;
+    }
+
+    const cleanName = params.name?.trim() || cleanEmail.split("@")[0] || "S-CODERS Client";
+    const newAcc: ServerClientAccount = {
+      uid: `client-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`,
+      name: cleanName,
+      email: cleanEmail,
+      phone: params.phone?.trim() || "Not Specified",
+      company: params.company?.trim() || "Independent Client",
+      role: "client",
+      clientRole: params.clientRole?.trim(),
+      passwordHash: params.password ? hashPasswordScrypt(params.password) : undefined,
+      hasPassword: Boolean(params.password),
+      linkedRegistrationUids: Array.from(uidSet),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    authData.accounts.unshift(newAcc);
+    return newAcc;
+  }
+
+  function findClientAccountOrBootstrapFromAppState(
+    authData: AuthStoreData,
+    appState: Record<string, any>,
+    cleanEmail: string
+  ): ServerClientAccount | null {
+    const existing = authData.accounts.find((a) => String(a?.email || "").trim().toLowerCase() === cleanEmail);
+    if (existing) return existing;
+
+    const uidRecs: any[] = Array.isArray(appState["db_registration_uids"]) ? appState["db_registration_uids"] : [];
+    const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+    const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+    const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+    const enquiries: any[] = Array.isArray(appState["db_enquiries"]) ? appState["db_enquiries"] : [];
+
+    const uMatch = uidRecs.find((r) => String(r?.clientEmail || "").trim().toLowerCase() === cleanEmail);
+    const sMatch = svcRegs.find((r) => String(r?.clientProfile?.email || "").trim().toLowerCase() === cleanEmail);
+    const wMatch = wkspRegs.find((r) => String(r?.participantProfile?.email || "").trim().toLowerCase() === cleanEmail);
+    const eMatch = evtTickets.find((t) => String(t?.participantEmail || "").trim().toLowerCase() === cleanEmail);
+    const qMatch = enquiries.find((q) => String(q?.email || "").trim().toLowerCase() === cleanEmail);
+
+    const svcMap = appState["scoders_registered_services"];
+    const smMatch =
+      svcMap && typeof svcMap === "object"
+        ? Object.values<any>(svcMap).find((v) => String(v?.email || "").trim().toLowerCase() === cleanEmail)
+        : null;
+    const wkspMap = appState["scoders_registered_workshops"];
+    const wmMatch =
+      wkspMap && typeof wkspMap === "object"
+        ? Object.values<any>(wkspMap).find((v) => String(v?.email || "").trim().toLowerCase() === cleanEmail)
+        : null;
+
+    if (!uMatch && !sMatch && !wMatch && !eMatch && !qMatch && !smMatch && !wmMatch) return null;
+
+    const bootstrapped = upsertServerClientAccount(authData, appState, {
+      email: cleanEmail,
+      name:
+        uMatch?.clientName ||
+        sMatch?.clientProfile?.name ||
+        wMatch?.participantProfile?.name ||
+        eMatch?.participantName ||
+        qMatch?.name ||
+        smMatch?.name ||
+        wmMatch?.name,
+      phone:
+        uMatch?.clientPhone ||
+        sMatch?.clientProfile?.phone ||
+        wMatch?.participantProfile?.phone ||
+        eMatch?.participantPhone ||
+        qMatch?.phone,
+      company: uMatch?.clientOrg || sMatch?.clientProfile?.company || eMatch?.participantOrg || smMatch?.role,
+      clientRole: uMatch?.clientRole || wMatch?.participantProfile?.role || wmMatch?.role,
+    });
+    saveStoredAuthData(authData);
+    return bootstrapped;
+  }
+
+  function collectClientRegistrationsSnapshot(appState: Record<string, any>, cleanEmail: string) {
+    const uidRecords: any[] = Array.isArray(appState["db_registration_uids"]) ? appState["db_registration_uids"] : [];
+    const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+    const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+    const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+    const chats: any[] = Array.isArray(appState["db_chats"]) ? appState["db_chats"] : [];
+    const revokedMap: Record<string, any> =
+      appState["scoders_revoked_passes"] && typeof appState["scoders_revoked_passes"] === "object"
+        ? appState["scoders_revoked_passes"]
+        : {};
+
+    const serviceRegistrations = svcRegs.filter(
+      (r) => String(r?.clientProfile?.email || "").trim().toLowerCase() === cleanEmail
+    );
+    const workshopRegistrations = wkspRegs.filter(
+      (r) =>
+        String(r?.participantProfile?.email || "").trim().toLowerCase() === cleanEmail &&
+        !r?.isRevoked &&
+        r?.paymentStatus !== "Cancelled" &&
+        r?.paymentStatus !== "Revoked" &&
+        !revokedMap[String(r?.uniqueAccessKey || "").trim().toUpperCase()]
+    );
+    const eventTickets = evtTickets.filter(
+      (t) =>
+        String(t?.participantEmail || "").trim().toLowerCase() === cleanEmail &&
+        t?.status !== "Ticket Cancelled"
+    );
+
+    const registrationUids = uidRecords.filter(
+      (r) => String(r?.clientEmail || "").trim().toLowerCase() === cleanEmail && r?.status !== "REVOKED"
+    );
+    const uidMetaByKey = new Map<string, any>();
+    for (const u of registrationUids) {
+      if (u?.uid) uidMetaByKey.set(String(u.uid).trim().toUpperCase(), u);
+    }
+
+    const registeredServicesMap: Record<string, any> = {};
+    for (const s of serviceRegistrations) {
+      if (s?.serviceId && s?.uniqueKey) {
+        const uidEntry = uidMetaByKey.get(String(s.uniqueKey).trim().toUpperCase());
+        const savedNotes = s.notes || s.projectRequirements || uidEntry?.metadata?.notes || uidEntry?.metadata?.requirements || "";
+        registeredServicesMap[s.serviceId] = {
+          key: s.uniqueKey,
+          name: s.clientProfile?.name || "Registered Client",
+          email: cleanEmail,
+          phone: s.clientProfile?.phone || uidEntry?.clientPhone || "",
+          role: s.clientProfile?.company || "Client Partner",
+          requirements: s.projectRequirements || savedNotes || "",
+          notes: savedNotes,
+          budget: s.budget || "TBD",
+          timeline: s.timeline || "TBD",
+          chatId: s.chatId || `chat-svc-${s.uniqueKey}`,
+          timestamp: s.registrationDate || new Date().toISOString(),
+        };
+      }
+    }
+    const registeredWorkshopsMap: Record<string, any> = {};
+    for (const w of workshopRegistrations) {
+      if (w?.workshopId && w?.uniqueAccessKey) {
+        const uidEntry = uidMetaByKey.get(String(w.uniqueAccessKey).trim().toUpperCase());
+        const savedNotes = w.notes || uidEntry?.metadata?.notes || "";
+        registeredWorkshopsMap[w.workshopId] = {
+          key: w.uniqueAccessKey,
+          name: w.participantProfile?.name || "Registered Attendee",
+          email: cleanEmail,
+          phone: w.participantProfile?.phone || uidEntry?.clientPhone || "",
+          role: w.participantProfile?.role || "Developer",
+          notes: savedNotes,
+          tickets: 1,
+          totalPaid: Number(w.amountPaid) || 0,
+          chatId: w.chatId || `chat-wksp-${w.uniqueAccessKey}`,
+          timestamp: w.paymentDate || new Date().toLocaleDateString(),
+        };
+      }
+    }
+
+    for (const u of registrationUids) {
+      if (u.section === "service" && u.itemId && !registeredServicesMap[u.itemId]) {
+        const savedNotes = u.metadata?.notes || u.metadata?.requirements || "";
+        registeredServicesMap[u.itemId] = {
+          key: u.uid,
+          name: u.clientName || "Registered Client",
+          email: cleanEmail,
+          phone: u.clientPhone || "",
+          role: u.clientRole || u.clientOrg || "Client Partner",
+          requirements: u.metadata?.requirements || savedNotes || "",
+          notes: savedNotes,
+          budget: u.metadata?.budget || "TBD",
+          timeline: u.metadata?.timeline || "TBD",
+          chatId: u.chatId || `chat-svc-${u.uid}`,
+          timestamp: u.issuedAt || new Date().toISOString(),
+        };
+      }
+      if (u.section === "workshop" && u.itemId && !registeredWorkshopsMap[u.itemId] && !revokedMap[u.uid?.toUpperCase()]) {
+        registeredWorkshopsMap[u.itemId] = {
+          key: u.uid,
+          name: u.clientName || "Registered Attendee",
+          email: cleanEmail,
+          phone: u.clientPhone || "",
+          role: u.clientRole || "Developer",
+          notes: u.metadata?.notes || "",
+          tickets: 1,
+          totalPaid: Number(u.amount) || 0,
+          chatId: u.chatId || `chat-wksp-${u.uid}`,
+          timestamp: u.issuedAt || new Date().toISOString(),
+        };
+      }
+    }
+
+    const matchedKeys = new Set<string>([
+      ...serviceRegistrations.map((s) => String(s?.uniqueKey || "").trim().toUpperCase()),
+      ...workshopRegistrations.map((w) => String(w?.uniqueAccessKey || "").trim().toUpperCase()),
+      ...registrationUids.map((u) => String(u?.uid || "").trim().toUpperCase()),
+    ]);
+    const relatedChats = chats.filter(
+      (c) =>
+        String(c?.clientEmail || "").trim().toLowerCase() === cleanEmail ||
+        matchedKeys.has(String(c?.uniqueAccessKey || "").trim().toUpperCase())
+    );
+
+    return {
+      registrationUids,
+      serviceRegistrations,
+      workshopRegistrations,
+      eventTickets,
+      chats: relatedChats,
+      registeredServicesMap,
+      registeredWorkshopsMap,
+    };
+  }
 
   function getStoredLeaderPhotos(): Record<string, string> {
     const defaults: Record<string, string> = {
@@ -2851,9 +3446,7 @@ Return ONLY valid JSON with this structure:
 
   function saveStoredLeaderPhotos(photos: Record<string, string>): void {
     try {
-      const dataDir = path.dirname(leaderPhotosFilePath);
-      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(leaderPhotosFilePath, JSON.stringify(photos, null, 2), "utf-8");
+      atomicWriteJsonSync(leaderPhotosFilePath, photos);
     } catch (e) {
       console.error("Error writing leader photos file:", e);
     }
@@ -2876,9 +3469,7 @@ Return ONLY valid JSON with this structure:
 
   function saveStoredAppState(state: Record<string, any>): void {
     try {
-      const dataDir = path.dirname(appStateFilePath);
-      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(appStateFilePath, JSON.stringify(state, null, 2), "utf-8");
+      atomicWriteJsonSync(appStateFilePath, state);
     } catch (e) {
       console.error("Error writing app state file:", e);
     }
@@ -2991,20 +3582,106 @@ Return ONLY valid JSON with this structure:
     }
   });
 
+  function mergeUniqueArrayByKey(existingArr: any[], incomingArr: any[], getKeys: (item: any) => string[]): any[] {
+    const result: any[] = [];
+    const seen = new Map<string, number>();
+
+    const upsert = (item: any) => {
+      if (!item || typeof item !== "object") return;
+      const keys = getKeys(item).map((k) => String(k || "").trim().toUpperCase()).filter(Boolean);
+      let matchedIdx = -1;
+      for (const k of keys) {
+        if (seen.has(k)) {
+          matchedIdx = seen.get(k)!;
+          break;
+        }
+      }
+      if (matchedIdx >= 0) {
+        result[matchedIdx] = { ...result[matchedIdx], ...item };
+        for (const k of keys) seen.set(k, matchedIdx);
+      } else {
+        const idx = result.length;
+        result.push(item);
+        for (const k of keys) seen.set(k, idx);
+      }
+    };
+
+    if (Array.isArray(existingArr)) existingArr.forEach(upsert);
+    if (Array.isArray(incomingArr)) incomingArr.forEach(upsert);
+    return result;
+  }
+
+  function applySafeAppStateWrite(current: Record<string, any>, key: string, value: any, replaceExact: boolean): void {
+    if (key === "db_uid_recovery_otps" || key === "db_client_accounts" || key === "scoders_client_passwords") {
+      // Security: Never store OTP hashes or client credentials in public app-state
+      return;
+    }
+    if (replaceExact) {
+      current[key] = value;
+      return;
+    }
+
+    const existing = current[key];
+    if (key === "db_service_registrations" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (r) => [r?.uniqueKey, r?.id]);
+      return;
+    }
+    if (key === "db_workshop_registrations" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (r) => [r?.uniqueAccessKey, r?.id]);
+      return;
+    }
+    if (key === "db_registration_uids" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (r) => [r?.uid]);
+      return;
+    }
+    if (key === "scoders_event_tickets" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (t) => [t?.ticketCode, t?.id]);
+      return;
+    }
+    if (key === "db_payments" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (p) => [p?.id, p?.razorpayPaymentId]);
+      return;
+    }
+    if (key === "db_chats" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (c) => [c?.uniqueAccessKey, c?.id]);
+      return;
+    }
+    if (key === "db_files" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (f) => [f?.id]);
+      return;
+    }
+    if (key === "db_enquiries" && Array.isArray(value)) {
+      current[key] = mergeUniqueArrayByKey(Array.isArray(existing) ? existing : [], value, (e) => [e?.id]);
+      return;
+    }
+    if ((key === "scoders_registered_services" || key === "scoders_registered_workshops") && value && typeof value === "object") {
+      current[key] = { ...(existing && typeof existing === "object" ? existing : {}), ...value };
+      return;
+    }
+    current[key] = value;
+  }
+
   // 2. Shared Global App State Sync Endpoints (Database, Workshops, Services, Invoices, Agreements)
   app.get("/api/app-state", (req, res) => {
+    const state = { ...getStoredAppState() };
+    delete state["db_uid_recovery_otps"];
+    delete state["db_client_accounts"];
+    delete state["scoders_client_passwords"];
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.json({ success: true, state: getStoredAppState() });
+    res.json({ success: true, state });
   });
 
   app.post("/api/app-state", (req, res) => {
     try {
-      const { key, value, entries } = req.body;
+      const { key, value, entries, replaceExact } = req.body || {};
       const current = getStoredAppState();
-      if (entries && typeof entries === 'object') {
-        Object.assign(current, entries);
+      const forceReplace = Boolean(replaceExact);
+      if (entries && typeof entries === "object") {
+        for (const [k, v] of Object.entries(entries)) {
+          if (v !== undefined) applySafeAppStateWrite(current, k, v, forceReplace);
+        }
       } else if (key && value !== undefined) {
-        current[key] = value;
+        applySafeAppStateWrite(current, String(key), value, forceReplace);
       }
       saveStoredAppState(current);
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -3019,57 +3696,65 @@ Return ONLY valid JSON with this structure:
     try {
       const body = req.body || {};
       const serviceId = typeof body.serviceId === "string" ? body.serviceId.trim() : "";
-      const uniqueKey = typeof body.uniqueKey === "string" ? body.uniqueKey.trim().toUpperCase() : "";
+      const rawKey = typeof body.uniqueKey === "string" ? body.uniqueKey : (typeof body.uid === "string" ? body.uid : "");
+      const uniqueKey = rawKey.replace(/\s+/g, "").trim().toUpperCase();
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
       const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 180) : "";
+      const phone = typeof body.phone === "string" ? body.phone.trim().slice(0, 40) : "";
       const role = typeof body.role === "string" ? body.role.trim().slice(0, 180) : "";
       const budget = typeof body.budget === "string" ? body.budget.trim().slice(0, 100) : "";
       const timeline = typeof body.timeline === "string" ? body.timeline.trim().slice(0, 100) : "";
-      const requirements = typeof body.requirements === "string" ? body.requirements.trim().slice(0, 2000) : "";
+      const hasNotesField = typeof body.notes === "string" || typeof body.requirements === "string";
+      const rawNotes = typeof body.notes === "string" ? body.notes : (typeof body.requirements === "string" ? body.requirements : "");
+      const requirements = rawNotes.trim().slice(0, 2000);
 
       if (!serviceId && !uniqueKey) {
         return res.status(400).json({ success: false, error: "serviceId or uniqueKey is required." });
       }
 
       const current = getStoredAppState();
+      const hasValidKey = Boolean(uniqueKey && uniqueKey !== "ENTER-KEY-TO-VERIFY");
       let updated = false;
 
-      if (Array.isArray(current["db_service_registrations"])) {
-        current["db_service_registrations"] = current["db_service_registrations"].map((reg: any) => {
-          const regKey = String(reg?.uniqueKey || "").trim().toUpperCase();
-          const regEmail = String(reg?.clientProfile?.email || "").trim().toLowerCase();
-          const hasValidKey = Boolean(uniqueKey && uniqueKey !== "ENTER-KEY-TO-VERIFY");
-          const keyMatch = hasValidKey && regKey === uniqueKey;
-          const svcMatch = Boolean(
-            !hasValidKey &&
-              serviceId &&
-              reg?.serviceId === serviceId &&
-              ((email && (!regEmail || regEmail === email)) || (!email && !regKey && !regEmail))
-          );
-          if (keyMatch || svcMatch) {
-            updated = true;
-            return {
-              ...reg,
-              clientProfile: {
-                ...(reg.clientProfile || {}),
-                name: name || reg.clientProfile?.name,
-                email: email || reg.clientProfile?.email,
-                company: role || reg.clientProfile?.company,
-              },
-              budget: budget || reg.budget,
-              timeline: timeline || reg.timeline,
-              projectRequirements: requirements || reg.projectRequirements,
-            };
-          }
-          return reg;
-        });
-      }
+      const svcRegs: any[] = Array.isArray(current["db_service_registrations"]) ? [...current["db_service_registrations"]] : [];
+      let matchedReg: any = null;
+
+      current["db_service_registrations"] = svcRegs.map((reg: any) => {
+        const regKey = String(reg?.uniqueKey || "").replace(/\s+/g, "").trim().toUpperCase();
+        const regEmail = String(reg?.clientProfile?.email || "").trim().toLowerCase();
+        const keyMatch = hasValidKey && regKey === uniqueKey;
+        const svcMatch = Boolean(
+          !hasValidKey &&
+            serviceId &&
+            reg?.serviceId === serviceId &&
+            ((email && (!regEmail || regEmail === email)) || (!email && !regKey && !regEmail))
+        );
+        if (keyMatch || svcMatch) {
+          updated = true;
+          matchedReg = {
+            ...reg,
+            clientProfile: {
+              ...(reg.clientProfile || {}),
+              name: name || reg.clientProfile?.name,
+              email: email || reg.clientProfile?.email,
+              phone: phone || reg.clientProfile?.phone,
+              company: role || reg.clientProfile?.company,
+            },
+            budget: budget || reg.budget,
+            timeline: timeline || reg.timeline,
+            projectRequirements: hasNotesField ? (requirements || reg.projectRequirements) : reg.projectRequirements,
+            notes: hasNotesField ? requirements : reg.notes,
+            updatedAt: new Date().toISOString(),
+          };
+          return matchedReg;
+        }
+        return reg;
+      });
 
       if (current["scoders_registered_services"] && typeof current["scoders_registered_services"] === "object") {
         const regMap = { ...current["scoders_registered_services"] };
-        const hasValidKey = Boolean(uniqueKey && uniqueKey !== "ENTER-KEY-TO-VERIFY");
         for (const [k, entry] of Object.entries<any>(regMap)) {
-          const entryKey = String(entry?.key || "").trim().toUpperCase();
+          const entryKey = String(entry?.key || "").replace(/\s+/g, "").trim().toUpperCase();
           const entryEmail = String(entry?.email || "").trim().toLowerCase();
           const keyMatch = hasValidKey && entryKey === uniqueKey;
           const svcMatch =
@@ -3081,10 +3766,12 @@ Return ONLY valid JSON with this structure:
               ...entry,
               name: name || entry?.name,
               email: email || entry?.email,
+              phone: phone || entry?.phone,
               role: role || entry?.role,
               budget: budget || entry?.budget,
               timeline: timeline || entry?.timeline,
-              requirements: requirements || entry?.requirements,
+              requirements: hasNotesField ? (requirements || entry?.requirements) : entry?.requirements,
+              notes: hasNotesField ? requirements : entry?.notes,
               autoSavedAt: new Date().toISOString(),
             };
             updated = true;
@@ -3093,30 +3780,82 @@ Return ONLY valid JSON with this structure:
         current["scoders_registered_services"] = regMap;
       }
 
+      let matchedUidRec: any = null;
       if (Array.isArray(current["db_registration_uids"])) {
         current["db_registration_uids"] = current["db_registration_uids"].map((uidRec: any) => {
-          if (uidRec?.section === "service" && uniqueKey && String(uidRec?.uid || "").trim().toUpperCase() === uniqueKey) {
+          const uidEmail = String(uidRec?.clientEmail || "").trim().toLowerCase();
+          const keyMatch = hasValidKey && String(uidRec?.uid || "").replace(/\s+/g, "").trim().toUpperCase() === uniqueKey;
+          const svcMatch = !hasValidKey && uidRec?.section === "service" && uidRec?.itemId === serviceId && email && uidEmail === email;
+          if (uidRec?.section === "service" && (keyMatch || svcMatch)) {
             updated = true;
-            return {
+            matchedUidRec = {
               ...uidRec,
               clientName: name || uidRec.clientName,
               clientEmail: email || uidRec.clientEmail,
+              clientPhone: phone || uidRec.clientPhone,
               clientRole: role || uidRec.clientRole,
               metadata: {
                 ...(uidRec.metadata || {}),
                 budget: budget || uidRec.metadata?.budget,
                 timeline: timeline || uidRec.metadata?.timeline,
-                requirements: requirements || uidRec.metadata?.requirements,
+                requirements: hasNotesField ? (requirements || uidRec.metadata?.requirements) : uidRec.metadata?.requirements,
+                notes: hasNotesField ? requirements : uidRec.metadata?.notes,
               },
             };
+            return matchedUidRec;
           }
           return uidRec;
         });
       }
 
+      // Self-heal upsert: if key exists in db_registration_uids or scoders_registered_services or db_chats/enquiries
+      if (!matchedReg && (hasValidKey || (serviceId && email))) {
+        const scodersEntry = serviceId ? current["scoders_registered_services"]?.[serviceId] : null;
+        const scodersEntryKey = String(scodersEntry?.key || "").replace(/\s+/g, "").trim().toUpperCase();
+        const scodersEntryEmail = String(scodersEntry?.email || "").trim().toLowerCase();
+        const entryAllowed = Boolean(
+          scodersEntry &&
+            (hasValidKey ? scodersEntryKey === uniqueKey : !scodersEntryEmail || scodersEntryEmail === email)
+        );
+        const resolvedKey = hasValidKey ? uniqueKey : String(scodersEntryKey || matchedUidRec?.uid || "").replace(/\s+/g, "").trim().toUpperCase();
+        if (resolvedKey && resolvedKey !== "ENTER-KEY-TO-VERIFY") {
+          const lookupCheck = matchedUidRec ? { record: matchedUidRec } : findExistingRecordByKeyOrUid(current, resolvedKey, "service");
+          if (lookupCheck.record || entryAllowed) {
+            const newSvcReg = {
+              id: `REG-SVC-${Date.now().toString().slice(-4)}`,
+              clientProfile: {
+                name: name || lookupCheck.record?.clientName || scodersEntry?.name || "Registered Client",
+                email: email || lookupCheck.record?.clientEmail || scodersEntry?.email || "",
+                phone: phone || lookupCheck.record?.clientPhone || scodersEntry?.phone || "+91 99999 00000",
+                company: role || lookupCheck.record?.clientRole || scodersEntry?.role || "Independent Client",
+              },
+              serviceId: serviceId || lookupCheck.record?.itemId || "service",
+              selectedServiceTitle: lookupCheck.record?.itemTitle || "S-CODERS Custom Service",
+              uniqueKey: resolvedKey,
+              projectRequirements: requirements || lookupCheck.record?.metadata?.requirements || scodersEntry?.requirements || "Active Service Scope",
+              notes: requirements || lookupCheck.record?.metadata?.notes || scodersEntry?.notes || "",
+              budget: budget || lookupCheck.record?.metadata?.budget || scodersEntry?.budget || "TBD",
+              timeline: timeline || lookupCheck.record?.metadata?.timeline || scodersEntry?.timeline || "TBD",
+              projectStatus: "In Progress",
+              registrationDate: new Date().toISOString().split("T")[0],
+              projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              sourceCodeFileId: `FIL-SRC-${Date.now().toString().slice(-4)}`,
+              pdfFileId: `FIL-PDF-${Date.now().toString().slice(-4)}`,
+              chatId: lookupCheck.record?.chatId || scodersEntry?.chatId || `chat-svc-${resolvedKey}`,
+              feedbackId: null,
+              invoiceId: `INV-2026-${Date.now().toString().slice(-3)}`,
+              updatedAt: new Date().toISOString(),
+            };
+            current["db_service_registrations"] = [newSvcReg, ...(Array.isArray(current["db_service_registrations"]) ? current["db_service_registrations"] : [])];
+            matchedReg = newSvcReg;
+            updated = true;
+          }
+        }
+      }
+
       if (Array.isArray(current["db_chats"])) {
         current["db_chats"] = current["db_chats"].map((chat: any) => {
-          if (uniqueKey && String(chat?.uniqueAccessKey || "").trim().toUpperCase() === uniqueKey) {
+          if (hasValidKey && String(chat?.uniqueAccessKey || "").replace(/\s+/g, "").trim().toUpperCase() === uniqueKey) {
             updated = true;
             return {
               ...chat,
@@ -3129,12 +3868,31 @@ Return ONLY valid JSON with this structure:
         });
       }
 
-      if (updated) {
-        saveStoredAppState(current);
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          updated: false,
+          error: "No active service registration found for this code. Please verify your registration UID first.",
+        });
+      }
+
+      saveStoredAppState(current);
+
+      const resolvedEmail = email || matchedReg?.clientProfile?.email || matchedUidRec?.clientEmail;
+      if (resolvedEmail && resolvedEmail.includes("@")) {
+        const authData = getStoredAuthData();
+        upsertServerClientAccount(authData, current, {
+          email: resolvedEmail,
+          name: name || matchedReg?.clientProfile?.name,
+          phone: phone || matchedReg?.clientProfile?.phone,
+          clientRole: role || matchedReg?.clientProfile?.company,
+          registrationUid: hasValidKey ? uniqueKey : matchedReg?.uniqueKey,
+        });
+        saveStoredAuthData(authData);
       }
 
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      return res.json({ success: true, updated, savedAt: new Date().toISOString() });
+      return res.json({ success: true, updated: true, savedAt: new Date().toISOString(), record: matchedReg || matchedUidRec || null });
     } catch (err: any) {
       console.error("Service Profile Auto-Save Error:", err);
       return res.status(500).json({ success: false, error: "Failed to auto-save service profile." });
@@ -3308,10 +4066,14 @@ Return ONLY valid JSON with this structure:
     try {
       const body = req.body || {};
       const workshopId = typeof body.workshopId === "string" ? body.workshopId.trim() : "";
-      const uniqueKey = typeof body.uniqueKey === "string" ? body.uniqueKey.trim().toUpperCase() : "";
+      const rawKey = typeof body.uniqueKey === "string" ? body.uniqueKey : (typeof body.uid === "string" ? body.uid : "");
+      const uniqueKey = rawKey.replace(/\s+/g, "").trim().toUpperCase();
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
       const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 180) : "";
+      const phone = typeof body.phone === "string" ? body.phone.trim().slice(0, 40) : "";
       const role = typeof body.role === "string" ? body.role.trim().slice(0, 180) : "";
+      const hasNotesField = typeof body.notes === "string";
+      const notes = hasNotesField ? String(body.notes).trim().slice(0, 2000) : "";
 
       if (!workshopId && !uniqueKey) {
         return res.status(400).json({ success: false, error: "workshopId or uniqueKey is required." });
@@ -3320,10 +4082,11 @@ Return ONLY valid JSON with this structure:
       const current = getStoredAppState();
       const hasValidKey = Boolean(uniqueKey && uniqueKey !== "PASS-KEY");
       let updated = false;
+      let matchedReg: any = null;
 
       if (Array.isArray(current["db_workshop_registrations"])) {
         current["db_workshop_registrations"] = current["db_workshop_registrations"].map((reg: any) => {
-          const regKey = String(reg?.uniqueAccessKey || "").trim().toUpperCase();
+          const regKey = String(reg?.uniqueAccessKey || "").replace(/\s+/g, "").trim().toUpperCase();
           const regEmail = String(reg?.participantProfile?.email || "").trim().toLowerCase();
           const keyMatch = hasValidKey && regKey === uniqueKey;
           const wkspMatch = Boolean(
@@ -3334,15 +4097,19 @@ Return ONLY valid JSON with this structure:
           );
           if (keyMatch || wkspMatch) {
             updated = true;
-            return {
+            matchedReg = {
               ...reg,
               participantProfile: {
                 ...(reg.participantProfile || {}),
                 name: name || reg.participantProfile?.name,
                 email: email || reg.participantProfile?.email,
+                phone: phone || reg.participantProfile?.phone,
                 role: role || reg.participantProfile?.role,
               },
+              notes: hasNotesField ? notes : reg.notes,
+              updatedAt: new Date().toISOString(),
             };
+            return matchedReg;
           }
           return reg;
         });
@@ -3351,7 +4118,7 @@ Return ONLY valid JSON with this structure:
       if (current["scoders_registered_workshops"] && typeof current["scoders_registered_workshops"] === "object") {
         const regMap = { ...current["scoders_registered_workshops"] };
         for (const [k, entry] of Object.entries<any>(regMap)) {
-          const entryKey = String(entry?.key || "").trim().toUpperCase();
+          const entryKey = String(entry?.key || "").replace(/\s+/g, "").trim().toUpperCase();
           const entryEmail = String(entry?.email || "").trim().toLowerCase();
           const keyMatch = hasValidKey && entryKey === uniqueKey;
           const wkspMatch =
@@ -3363,7 +4130,9 @@ Return ONLY valid JSON with this structure:
               ...entry,
               name: name || entry?.name,
               email: email || entry?.email,
+              phone: phone || entry?.phone,
               role: role || entry?.role,
+              notes: hasNotesField ? notes : entry?.notes,
               autoSavedAt: new Date().toISOString(),
             };
             updated = true;
@@ -3372,24 +4141,76 @@ Return ONLY valid JSON with this structure:
         current["scoders_registered_workshops"] = regMap;
       }
 
+      let matchedUidRec: any = null;
       if (Array.isArray(current["db_registration_uids"])) {
         current["db_registration_uids"] = current["db_registration_uids"].map((uidRec: any) => {
-          if (uidRec?.section === "workshop" && hasValidKey && String(uidRec?.uid || "").trim().toUpperCase() === uniqueKey) {
+          const uidEmail = String(uidRec?.clientEmail || "").trim().toLowerCase();
+          const keyMatch = hasValidKey && String(uidRec?.uid || "").replace(/\s+/g, "").trim().toUpperCase() === uniqueKey;
+          const wkspMatch = !hasValidKey && uidRec?.section === "workshop" && uidRec?.itemId === workshopId && email && uidEmail === email;
+          if (uidRec?.section === "workshop" && (keyMatch || wkspMatch)) {
             updated = true;
-            return {
+            matchedUidRec = {
               ...uidRec,
               clientName: name || uidRec.clientName,
               clientEmail: email || uidRec.clientEmail,
+              clientPhone: phone || uidRec.clientPhone,
               clientRole: role || uidRec.clientRole,
+              metadata: {
+                ...(uidRec.metadata || {}),
+                notes: hasNotesField ? notes : uidRec.metadata?.notes,
+              },
             };
+            return matchedUidRec;
           }
           return uidRec;
         });
       }
 
+      if (!matchedReg && (hasValidKey || (workshopId && email))) {
+        const wkspEntry = workshopId ? current["scoders_registered_workshops"]?.[workshopId] : null;
+        const wkspEntryKey = String(wkspEntry?.key || "").replace(/\s+/g, "").trim().toUpperCase();
+        const wkspEntryEmail = String(wkspEntry?.email || "").trim().toLowerCase();
+        const entryAllowed = Boolean(
+          wkspEntry &&
+            (hasValidKey ? wkspEntryKey === uniqueKey : !wkspEntryEmail || wkspEntryEmail === email)
+        );
+        const resolvedKey = hasValidKey ? uniqueKey : String(wkspEntryKey || matchedUidRec?.uid || "").replace(/\s+/g, "").trim().toUpperCase();
+        if (resolvedKey && resolvedKey !== "PASS-KEY") {
+          const lookupCheck = matchedUidRec ? { record: matchedUidRec } : findExistingRecordByKeyOrUid(current, resolvedKey, "workshop");
+          if (lookupCheck.record || entryAllowed) {
+            const regId = `reg-wksp-${Date.now()}`;
+            const newWkspReg = {
+              id: regId,
+              participantProfile: {
+                name: name || lookupCheck.record?.clientName || wkspEntry?.name || "Registered Attendee",
+                email: email || lookupCheck.record?.clientEmail || wkspEntry?.email || "",
+                phone: phone || lookupCheck.record?.clientPhone || wkspEntry?.phone || "+91 99999 00000",
+                role: role || lookupCheck.record?.clientRole || wkspEntry?.role || "Developer",
+              },
+              workshopId: workshopId || lookupCheck.record?.itemId || "w-1",
+              workshopTitle: lookupCheck.record?.itemTitle || "S-CODERS Workshop",
+              paymentStatus: "Successful",
+              amountPaid: Number(lookupCheck.record?.amount || wkspEntry?.totalPaid || 0),
+              paymentMethod: "Verified Workshop Pass",
+              paymentDate: new Date().toISOString().split("T")[0],
+              transactionId: lookupCheck.record?.paymentId || `VERIFIED-${resolvedKey}`,
+              uniqueAccessKey: resolvedKey,
+              materialsFileIds: [`file-pdf-${Date.now()}`, `file-src-${Date.now()}`],
+              chatId: lookupCheck.record?.chatId || wkspEntry?.chatId || `chat-wksp-${resolvedKey}`,
+              feedbackId: null,
+              notes: hasNotesField ? notes : (lookupCheck.record?.metadata?.notes || wkspEntry?.notes || ""),
+              updatedAt: new Date().toISOString(),
+            };
+            current["db_workshop_registrations"] = [newWkspReg, ...(Array.isArray(current["db_workshop_registrations"]) ? current["db_workshop_registrations"] : [])];
+            matchedReg = newWkspReg;
+            updated = true;
+          }
+        }
+      }
+
       if (Array.isArray(current["db_chats"])) {
         current["db_chats"] = current["db_chats"].map((chat: any) => {
-          if (hasValidKey && String(chat?.uniqueAccessKey || "").trim().toUpperCase() === uniqueKey) {
+          if (hasValidKey && String(chat?.uniqueAccessKey || "").replace(/\s+/g, "").trim().toUpperCase() === uniqueKey) {
             updated = true;
             return {
               ...chat,
@@ -3402,12 +4223,31 @@ Return ONLY valid JSON with this structure:
         });
       }
 
-      if (updated) {
-        saveStoredAppState(current);
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          updated: false,
+          error: "No active workshop pass found for this code. Please verify your pass UID first.",
+        });
+      }
+
+      saveStoredAppState(current);
+
+      const resolvedEmail = email || matchedReg?.participantProfile?.email || matchedUidRec?.clientEmail;
+      if (resolvedEmail && resolvedEmail.includes("@")) {
+        const authData = getStoredAuthData();
+        upsertServerClientAccount(authData, current, {
+          email: resolvedEmail,
+          name: name || matchedReg?.participantProfile?.name,
+          phone: phone || matchedReg?.participantProfile?.phone,
+          clientRole: role || matchedReg?.participantProfile?.role,
+          registrationUid: hasValidKey ? uniqueKey : matchedReg?.uniqueAccessKey,
+        });
+        saveStoredAuthData(authData);
       }
 
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      return res.json({ success: true, updated, savedAt: new Date().toISOString() });
+      return res.json({ success: true, updated: true, savedAt: new Date().toISOString(), record: matchedReg || matchedUidRec || null });
     } catch (err: any) {
       console.error("Workshop Profile Auto-Save Error:", err);
       return res.status(500).json({ success: false, error: "Failed to auto-save workshop profile." });
@@ -4494,12 +5334,16 @@ Return ONLY valid JSON with this structure:
         explicitSection === "workshop" ||
         explicitSection === "event" ||
         req.body?.skipReceiptEmail === true;
-      let emailResult: { success: boolean; messageId?: string; simulated?: boolean; error?: any } = { success: false };
+      let emailResult: { success: boolean; messageId?: string; simulated?: boolean; realEmailDelivered?: boolean; deliveryMode?: string; error?: any } = { success: false };
       if (email && !shouldDeferToRegistrationEmail) {
         const receiptDedupeKey = `payment:receipt:${finalPaymentId}`;
         const existingEmailLogs: any[] = Array.isArray(appState["db_email_logs"]) ? appState["db_email_logs"] : [];
+        const cfg = getEmailProviderConfig();
         const alreadySentReceipt = existingEmailLogs.some(
-          (l) => l?.status === "SENT" && l?.dedupeKey === receiptDedupeKey
+          (l) =>
+            l?.status === "SENT" &&
+            l?.dedupeKey === receiptDedupeKey &&
+            (Boolean(l?.realEmailDelivered) || (!l?.simulated && !cfg.anyRealProviderConfigured))
         );
         if (!alreadySentReceipt) {
           emailResult = await sendEmailNotification({
@@ -4525,6 +5369,8 @@ Return ONLY valid JSON with this structure:
             status: emailResult.success ? "SENT" : "FAILED",
             messageId: emailResult.messageId,
             simulated: emailResult.simulated,
+            realEmailDelivered: emailResult.realEmailDelivered,
+            deliveryMode: emailResult.deliveryMode,
           });
           saveStoredAppState(appState);
         }
@@ -4889,6 +5735,7 @@ Return ONLY valid JSON with this structure:
       location?: string;
       description?: string;
       requirements?: string;
+      notes?: string;
       budget?: string;
       timeline?: string;
     };
@@ -4898,6 +5745,8 @@ Return ONLY valid JSON with this structure:
     status: "ACTIVE" | "EXPIRED" | "REVOKED";
     confirmationEmailSent: boolean;
     confirmationEmailSentAt?: string;
+    realEmailDelivered?: boolean;
+    deliveryMode?: EmailDeliveryMode;
     emailFrom?: string;
     emailMessageId?: string;
   }
@@ -4997,6 +5846,8 @@ Return ONLY valid JSON with this structure:
       messageId?: string;
       previewUrl?: string;
       simulated?: boolean;
+      realEmailDelivered?: boolean;
+      deliveryMode?: string;
       error?: string;
       detailsSummary?: string;
     }
@@ -5009,6 +5860,85 @@ Return ONLY valid JSON with this structure:
     });
     appState["db_email_logs"] = logs.slice(0, 500);
   }
+
+  function buildSectionEmailPayload(
+    req: express.Request,
+    rec: RegistrationUidRecord,
+    overrideActionUrl?: string
+  ): { subject: string; html: string } {
+    const targetUrl =
+      overrideActionUrl && String(overrideActionUrl).startsWith("http")
+        ? String(overrideActionUrl)
+        : resolveAppUrl(
+            req,
+            rec.section === "service"
+              ? `/?view=services&key=${rec.uid}`
+              : rec.section === "workshop"
+              ? `/?view=workshops&key=${rec.uid}`
+              : `/?view=events&ticket=${rec.uid}`
+          );
+
+    if (rec.section === "service") {
+      return {
+        subject: `✅ Service Registered - Your Unique S-CODERS Code (${rec.uid})`,
+        html: getServiceAcceptanceEmailHtml({
+          clientName: rec.clientName,
+          serviceTitle: rec.itemTitle,
+          uniqueKey: rec.uid,
+          actionUrl: targetUrl,
+          validFrom: rec.validFrom,
+          validUntil: rec.validUntil,
+          amount: Number(rec.amount) || 0,
+          currency: rec.currency || "INR",
+          paymentStatus: rec.paymentStatus,
+          paymentId: rec.paymentId,
+        }),
+      };
+    }
+
+    if (rec.section === "workshop") {
+      return {
+        subject: `🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (${rec.uid})`,
+        html: getWorkshopEmailHtml({
+          status: "SUCCESS",
+          clientName: rec.clientName,
+          workshopTitle: rec.itemTitle,
+          amount: Number(rec.amount) || 0,
+          currency: rec.currency || "INR",
+          uniqueKey: rec.uid,
+          actionUrl: targetUrl,
+          paymentId: rec.paymentId || `pay_wksp_${Date.now()}`,
+          workshopDate: rec.metadata?.date,
+          workshopTime: rec.metadata?.time,
+          workshopLocation: rec.metadata?.location,
+          validUntil: rec.validUntil,
+        }),
+      };
+    }
+
+    return {
+      subject: `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${rec.uid})`,
+      html: getEventEmailHtml({
+        status: "SUCCESS",
+        clientName: rec.clientName,
+        eventTitle: rec.itemTitle,
+        amount: Number(rec.amount) || 0,
+        currency: rec.currency || "INR",
+        ticketCode: rec.uid,
+        actionUrl: targetUrl,
+        paymentId: rec.paymentId || (Number(rec.amount) === 0 ? `FREE_PASS_${Date.now()}` : `pay_evt_${Date.now()}`),
+        eventDate: rec.metadata?.date,
+        eventDay: rec.metadata?.day,
+        eventTime: rec.metadata?.time,
+        eventLocation: rec.metadata?.location,
+        eventDescription: rec.metadata?.description,
+        validUntil: rec.validUntil,
+      }),
+    };
+  }
+
+  const resendCooldownMap = new Map<string, number>();
+  const testEmailWindowTimestamps: number[] = [];
 
   function isPaymentVerifiedForRegistration(
     section: RegistrationSection,
@@ -5088,7 +6018,7 @@ Return ONLY valid JSON with this structure:
     uid: string,
     sectionFilter?: RegistrationSection | null
   ): { record?: RegistrationUidRecord; revoked?: boolean; expired?: boolean } {
-    const normalizedUid = uid.trim().toUpperCase();
+    const normalizedUid = uid.replace(/\s+/g, "").trim().toUpperCase();
     const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
       ? appState["db_registration_uids"]
       : [];
@@ -5103,7 +6033,7 @@ Return ONLY valid JSON with this structure:
 
     let matched = uidRecords.find(
       (r) =>
-        r?.uid?.trim().toUpperCase() === normalizedUid &&
+        r?.uid?.replace(/\s+/g, "").trim().toUpperCase() === normalizedUid &&
         (!sectionFilter || r.section === sectionFilter)
     );
 
@@ -5116,10 +6046,10 @@ Return ONLY valid JSON with this structure:
       return { record: matched };
     }
 
-    // Backward-compatible lookup in legacy appState collections (services / workshops / event tickets)
+    // Backward-compatible lookup in legacy appState collections (services / workshops / event tickets / enquiries)
     if (!sectionFilter || sectionFilter === "service") {
       const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
-      const svc = svcRegs.find((s) => s?.uniqueKey?.trim().toUpperCase() === normalizedUid);
+      const svc = svcRegs.find((s) => s?.uniqueKey?.replace(/\s+/g, "").trim().toUpperCase() === normalizedUid);
       if (svc) {
         const validity = computeUidValidityWindow("service", svc.projectSubmissionDate || svc.registrationDate);
         return {
@@ -5139,6 +6069,7 @@ Return ONLY valid JSON with this structure:
             chatId: svc.chatId,
             metadata: {
               requirements: svc.projectRequirements,
+              notes: svc.notes || svc.projectRequirements,
               budget: svc.budget,
               timeline: svc.timeline,
             },
@@ -5154,7 +6085,7 @@ Return ONLY valid JSON with this structure:
 
     if (!sectionFilter || sectionFilter === "workshop") {
       const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
-      const wksp = wkspRegs.find((w) => w?.uniqueAccessKey?.trim().toUpperCase() === normalizedUid);
+      const wksp = wkspRegs.find((w) => w?.uniqueAccessKey?.replace(/\s+/g, "").trim().toUpperCase() === normalizedUid);
       if (wksp) {
         if (wksp.isRevoked || wksp.paymentStatus === "Revoked") {
           return { revoked: true };
@@ -5176,6 +6107,9 @@ Return ONLY valid JSON with this structure:
             paymentId: wksp.transactionId,
             dedupeKey: `legacy-wksp-${wksp.uniqueAccessKey}`,
             chatId: wksp.chatId,
+            metadata: {
+              notes: wksp.notes,
+            },
             issuedAt: wksp.paymentDate || new Date().toISOString(),
             validFrom: validity.validFrom,
             validUntil: validity.validUntil,
@@ -5190,8 +6124,8 @@ Return ONLY valid JSON with this structure:
       const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
       const tkt = evtTickets.find(
         (t) =>
-          t?.ticketCode?.trim().toUpperCase() === normalizedUid ||
-          (t?.id && String(t.id).trim().toUpperCase() === normalizedUid)
+          t?.ticketCode?.replace(/\s+/g, "").trim().toUpperCase() === normalizedUid ||
+          (t?.id && String(t.id).replace(/\s+/g, "").trim().toUpperCase() === normalizedUid)
       );
       if (tkt) {
         if (tkt.status === "Ticket Cancelled") return { revoked: true };
@@ -5228,7 +6162,339 @@ Return ONLY valid JSON with this structure:
       }
     }
 
+    // Also check scoders_registered_services / scoders_registered_workshops maps if not found in arrays
+    if (!sectionFilter || sectionFilter === "service") {
+      const regMap = appState["scoders_registered_services"];
+      if (regMap && typeof regMap === "object") {
+        for (const [svcId, entry] of Object.entries<any>(regMap)) {
+          if (String(entry?.key || "").replace(/\s+/g, "").trim().toUpperCase() === normalizedUid) {
+            const validity = computeUidValidityWindow("service", entry.timestamp);
+            return {
+              record: {
+                uid: String(entry.key).trim().toUpperCase(),
+                section: "service",
+                itemId: svcId,
+                itemTitle: "S-CODERS Service",
+                clientName: entry.name || "Registered Client",
+                clientEmail: entry.email || "client@scoders.dev",
+                clientPhone: entry.phone,
+                clientRole: entry.role,
+                amount: 0,
+                currency: "INR",
+                paymentStatus: "NOT_REQUIRED",
+                dedupeKey: `map-svc-${entry.key}`,
+                chatId: entry.chatId || `chat-svc-${entry.key}`,
+                metadata: {
+                  requirements: entry.requirements,
+                  notes: entry.notes || entry.requirements,
+                  budget: entry.budget,
+                  timeline: entry.timeline,
+                },
+                issuedAt: entry.timestamp || validity.validFrom,
+                validFrom: validity.validFrom,
+                validUntil: validity.validUntil,
+                status: "ACTIVE",
+                confirmationEmailSent: true,
+              },
+            };
+          }
+        }
+      }
+
+      // Check db_enquiries (e.g. legacy BTD-PROJ-... IDs)
+      const enquiries: any[] = Array.isArray(appState["db_enquiries"]) ? appState["db_enquiries"] : [];
+      const enq = enquiries.find((e) => String(e?.id || "").replace(/\s+/g, "").trim().toUpperCase() === normalizedUid);
+      if (enq && isValidEmailAddress(enq.email)) {
+        const validity = computeUidValidityWindow("service");
+        return {
+          record: {
+            uid: String(enq.id).trim().toUpperCase(),
+            section: "service",
+            itemId: "proj-custom",
+            itemTitle: String(enq.subject || "S-CODERS Custom Project").replace(/^Project Enquiry:\s*/i, "").trim(),
+            clientName: enq.name || "Registered Client",
+            clientEmail: String(enq.email).trim().toLowerCase(),
+            clientPhone: enq.phone,
+            amount: 0,
+            currency: "INR",
+            paymentStatus: "NOT_REQUIRED",
+            dedupeKey: `enq-svc-${enq.id}`,
+            chatId: `chat-svc-${enq.id}`,
+            metadata: {
+              requirements: enq.message || "",
+              notes: enq.message || "",
+            },
+            issuedAt: enq.timestamp || validity.validFrom,
+            validFrom: validity.validFrom,
+            validUntil: validity.validUntil,
+            status: "ACTIVE",
+            confirmationEmailSent: true,
+          },
+        };
+      }
+    }
+
+    if (!sectionFilter || sectionFilter === "workshop") {
+      const regMap = appState["scoders_registered_workshops"];
+      if (regMap && typeof regMap === "object") {
+        for (const [wkId, entry] of Object.entries<any>(regMap)) {
+          if (String(entry?.key || "").replace(/\s+/g, "").trim().toUpperCase() === normalizedUid) {
+            const validity = computeUidValidityWindow("workshop");
+            return {
+              record: {
+                uid: String(entry.key).trim().toUpperCase(),
+                section: "workshop",
+                itemId: wkId,
+                itemTitle: "S-CODERS Workshop",
+                clientName: entry.name || "Registered Attendee",
+                clientEmail: entry.email || "attendee@scoders.com",
+                clientPhone: entry.phone,
+                clientRole: entry.role || "Developer",
+                amount: Number(entry.totalPaid) || 0,
+                currency: "INR",
+                paymentStatus: "VERIFIED",
+                dedupeKey: `map-wksp-${entry.key}`,
+                chatId: entry.chatId || `chat-wksp-${entry.key}`,
+                metadata: {
+                  notes: entry.notes,
+                },
+                issuedAt: entry.timestamp || validity.validFrom,
+                validFrom: validity.validFrom,
+                validUntil: validity.validUntil,
+                status: "ACTIVE",
+                confirmationEmailSent: true,
+              },
+            };
+          }
+        }
+      }
+    }
+
     return {};
+  }
+
+  function ensureHydratedRecordsInAppState(
+    appState: Record<string, any>,
+    rec: RegistrationUidRecord,
+    opts?: { chatId?: string; paymentMethod?: string }
+  ) {
+    const cleanUid = rec.uid.replace(/\s+/g, "").trim().toUpperCase();
+    const cleanEmail = rec.clientEmail.trim().toLowerCase();
+    const cleanName = rec.clientName.trim() || "Valued Client";
+    const resolvedChatId =
+      opts?.chatId ||
+      rec.chatId ||
+      (rec.section === "service" ? `chat-svc-${cleanUid}` : rec.section === "workshop" ? `chat-wksp-${cleanUid}` : undefined);
+
+    let serviceRegistration: any = null;
+    let workshopRegistration: any = null;
+    let eventTicket: any = null;
+    let chatRecord: any = null;
+
+    // 1. Ensure db_registration_uids has rec
+    const uidRecords: any[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
+    const uidIdx = uidRecords.findIndex((u) => String(u?.uid || "").replace(/\s+/g, "").trim().toUpperCase() === cleanUid);
+    if (uidIdx < 0) {
+      uidRecords.unshift({ ...rec, uid: cleanUid, chatId: resolvedChatId });
+      appState["db_registration_uids"] = uidRecords;
+    } else if (resolvedChatId && !uidRecords[uidIdx].chatId) {
+      uidRecords[uidIdx] = { ...uidRecords[uidIdx], chatId: resolvedChatId };
+      appState["db_registration_uids"] = uidRecords;
+    }
+
+    // 2. Section-specific relational collections
+    if (rec.section === "service") {
+      const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? [...appState["db_service_registrations"]] : [];
+      serviceRegistration = svcRegs.find((s) => String(s?.uniqueKey || "").replace(/\s+/g, "").trim().toUpperCase() === cleanUid);
+      if (!serviceRegistration) {
+        const regId = `REG-SVC-${Date.now().toString().slice(-5)}`;
+        serviceRegistration = {
+          id: regId,
+          clientProfile: {
+            name: cleanName,
+            email: cleanEmail,
+            phone: rec.clientPhone || "+91 99999 00000",
+            company: rec.clientRole || rec.clientOrg || "Independent Client",
+          },
+          serviceId: rec.itemId || "service",
+          selectedServiceTitle: rec.itemTitle || "S-CODERS Custom Service",
+          uniqueKey: cleanUid,
+          projectRequirements: rec.metadata?.requirements || "Custom Architecture & Implementation",
+          notes: rec.metadata?.notes || rec.metadata?.requirements || "",
+          budget: rec.metadata?.budget || (rec.amount > 0 ? `₹${Number(rec.amount).toLocaleString("en-IN")}` : "TBD"),
+          timeline: rec.metadata?.timeline || "2-3 Weeks",
+          projectStatus: Number(rec.amount) > 0 ? "In Progress" : "Pending",
+          registrationDate: (rec.issuedAt || new Date().toISOString()).split("T")[0],
+          projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          sourceCodeFileId: `FIL-SRC-${Date.now().toString().slice(-4)}`,
+          pdfFileId: `FIL-PDF-${Date.now().toString().slice(-4)}`,
+          chatId: resolvedChatId,
+          feedbackId: null,
+          invoiceId: `INV-2026-${Date.now().toString().slice(-3)}`,
+        };
+        svcRegs.unshift(serviceRegistration);
+        appState["db_service_registrations"] = svcRegs;
+      }
+
+      const svcMap =
+        appState["scoders_registered_services"] && typeof appState["scoders_registered_services"] === "object"
+          ? { ...appState["scoders_registered_services"] }
+          : {};
+      if (rec.itemId && !svcMap[rec.itemId]) {
+        svcMap[rec.itemId] = {
+          key: cleanUid,
+          name: cleanName,
+          email: cleanEmail,
+          phone: serviceRegistration.clientProfile?.phone || rec.clientPhone || "",
+          role: rec.clientRole || "Developer",
+          requirements: serviceRegistration.projectRequirements,
+          notes: serviceRegistration.notes || serviceRegistration.projectRequirements || "",
+          budget: serviceRegistration.budget,
+          timeline: serviceRegistration.timeline,
+          chatId: resolvedChatId,
+          timestamp: new Date().toISOString(),
+        };
+        appState["scoders_registered_services"] = svcMap;
+      }
+    } else if (rec.section === "workshop") {
+      const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? [...appState["db_workshop_registrations"]] : [];
+      workshopRegistration = wkspRegs.find((w) => String(w?.uniqueAccessKey || "").replace(/\s+/g, "").trim().toUpperCase() === cleanUid);
+      if (!workshopRegistration) {
+        const regId = `reg-wksp-${Date.now()}`;
+        workshopRegistration = {
+          id: regId,
+          participantProfile: {
+            name: cleanName,
+            email: cleanEmail,
+            phone: rec.clientPhone || "+91 99999 00000",
+            role: rec.clientRole || "Registered Developer",
+          },
+          workshopId: rec.itemId || "w-1",
+          workshopTitle: rec.itemTitle || "S-CODERS Workshop",
+          paymentStatus: "Successful",
+          amountPaid: Number(rec.amount) || 0,
+          paymentMethod: opts?.paymentMethod || "Verified Gateway Payment",
+          paymentDate: (rec.issuedAt || new Date().toISOString()).split("T")[0],
+          transactionId: rec.paymentId || `TXN-${Date.now()}`,
+          uniqueAccessKey: cleanUid,
+          materialsFileIds: [`file-pdf-${Date.now()}`, `file-src-${Date.now()}`],
+          chatId: resolvedChatId,
+          feedbackId: null,
+          notes: rec.metadata?.notes || "",
+        };
+        wkspRegs.unshift(workshopRegistration);
+        appState["db_workshop_registrations"] = wkspRegs;
+      }
+
+      const wkspMap =
+        appState["scoders_registered_workshops"] && typeof appState["scoders_registered_workshops"] === "object"
+          ? { ...appState["scoders_registered_workshops"] }
+          : {};
+      if (rec.itemId && !wkspMap[rec.itemId]) {
+        wkspMap[rec.itemId] = {
+          key: cleanUid,
+          name: cleanName,
+          email: cleanEmail,
+          phone: workshopRegistration.participantProfile?.phone || rec.clientPhone || "",
+          role: rec.clientRole || "Registered Developer",
+          notes: workshopRegistration.notes || rec.metadata?.notes || "",
+          tickets: 1,
+          totalPaid: Number(rec.amount) || 0,
+          chatId: resolvedChatId,
+          timestamp: new Date().toLocaleDateString(),
+        };
+        appState["scoders_registered_workshops"] = wkspMap;
+      }
+    } else if (rec.section === "event") {
+      const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? [...appState["scoders_event_tickets"]] : [];
+      eventTicket = evtTickets.find((t) => String(t?.ticketCode || "").trim().toUpperCase() === cleanUid);
+      if (!eventTicket) {
+        const now = new Date();
+        eventTicket = {
+          id: `TKT-${cleanUid}`,
+          ticketCode: cleanUid,
+          eventId: rec.itemId || "evt-1",
+          eventName: rec.itemTitle || "S-CODERS Tech Event",
+          eventDate: rec.metadata?.date || now.toLocaleDateString(),
+          eventDay: rec.metadata?.day || "Saturday",
+          eventTime: rec.metadata?.time || "10:00 AM IST",
+          eventLocation: rec.metadata?.location || "S-CODERS Lab, Koramangala, Bengaluru",
+          participantName: cleanName,
+          participantEmail: cleanEmail,
+          participantPhone: rec.clientPhone || "+91 8310463417",
+          participantOrg: rec.clientOrg || "Independent Builder",
+          bookingDate: now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          bookingTime: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          amountPaid: Number(rec.amount) || 0,
+          paymentId: rec.paymentId || `PASS-${cleanUid}`,
+          orderId: rec.orderId || `ORD-${cleanUid}`,
+          status: "Ticket Generated",
+          qrCodeData: `SCODERS|${cleanUid}|${rec.itemId || "evt"}|${rec.paymentId || "VERIFIED"}`,
+        };
+        evtTickets.unshift(eventTicket);
+        appState["scoders_event_tickets"] = evtTickets;
+      }
+    }
+
+    // 3. Ensure db_chats entry exists for Service / Workshop
+    if (resolvedChatId && (rec.section === "service" || rec.section === "workshop")) {
+      const chats: any[] = Array.isArray(appState["db_chats"]) ? [...appState["db_chats"]] : [];
+      chatRecord = chats.find(
+        (c) => String(c?.id || "") === resolvedChatId || String(c?.uniqueAccessKey || "").trim().toUpperCase() === cleanUid
+      );
+      if (!chatRecord) {
+        const regId = serviceRegistration?.id || workshopRegistration?.id || cleanUid;
+        chatRecord = {
+          id: resolvedChatId,
+          clientName: cleanName,
+          clientEmail: cleanEmail,
+          registrationId: regId,
+          reference: rec.itemTitle || "S-CODERS Workspace",
+          ...(rec.section === "service" ? { serviceId: rec.itemId } : { workshopId: rec.itemId }),
+          uniqueAccessKey: cleanUid,
+          messages: [
+            {
+              id: `msg-init-${Date.now()}`,
+              sender: "team",
+              senderName: rec.section === "workshop" ? "S-CODERS Mentor Team" : "S-CODERS Lead Team",
+              senderRole: "S-CODERS Founder & CEO",
+              content:
+                rec.section === "workshop"
+                  ? `Congratulations ${cleanName}! You are officially registered for '${rec.itemTitle}'. This is your dedicated channel with our mentors.`
+                  : `Welcome ${cleanName} to S-CODERS! Your dedicated engineering workspace for '${rec.itemTitle}' is active.`,
+              timestamp: new Date().toISOString(),
+            },
+          ],
+          lastUpdated: new Date().toISOString(),
+        };
+        chats.unshift(chatRecord);
+        appState["db_chats"] = chats;
+      }
+    }
+
+    // 4. Ensure payment log exists if paid
+    if (Number(rec.amount) > 0 && rec.paymentId) {
+      const payments: any[] = Array.isArray(appState["db_payments"]) ? [...appState["db_payments"]] : [];
+      const hasPay = payments.some((p) => p?.id === rec.paymentId || p?.razorpayPaymentId === rec.paymentId);
+      if (!hasPay) {
+        payments.unshift({
+          id: rec.paymentId,
+          clientId: cleanEmail,
+          clientName: cleanName,
+          clientEmail: cleanEmail,
+          amount: Number(rec.amount),
+          paymentMethod: opts?.paymentMethod || "Verified Gateway Payment",
+          status: "Successful",
+          timestamp: rec.issuedAt || new Date().toISOString(),
+          reference: `${rec.section.toUpperCase()}: ${rec.itemTitle}`,
+          interrupted: false,
+          failureReason: null,
+        });
+        appState["db_payments"] = payments;
+      }
+    }
+
+    return { serviceRegistration, workshopRegistration, eventTicket, chatRecord };
   }
 
   // Registration Window Status & Server Clock Authority Endpoints
@@ -5433,8 +6699,98 @@ Return ONLY valid JSON with this structure:
       );
 
       if (existingRecordIdx >= 0 || alreadySentLog) {
-        const existingRecord = existingRecordIdx >= 0 ? uidRecords[existingRecordIdx] : undefined;
+        const existingRecord = existingRecordIdx >= 0 ? { ...uidRecords[existingRecordIdx] } : undefined;
         const resolvedUid = existingRecord?.uid || alreadySentLog?.uid || requestedUid || "EXISTING-UID";
+        let hydrated: any = {};
+        if (existingRecord) {
+          hydrated = ensureHydratedRecordsInAppState(appState, existingRecord, { chatId });
+        }
+        const authData = getStoredAuthData();
+        const linkedAcc = upsertServerClientAccount(authData, appState, {
+          email: cleanEmail,
+          name: cleanName,
+          phone: clientPhone ? String(clientPhone).trim() : undefined,
+          company: clientOrg ? String(clientOrg).trim() : undefined,
+          clientRole: clientRole ? String(clientRole).trim() : undefined,
+          registrationUid: resolvedUid,
+        });
+        saveStoredAuthData(authData);
+
+        const cfg = getEmailProviderConfig();
+        const priorLogsForUid = emailLogsList.filter(
+          (l) =>
+            l &&
+            l.status === "SENT" &&
+            ((l.uid && String(l.uid).toUpperCase() === String(resolvedUid).toUpperCase()) ||
+              (l.dedupeKey && l.dedupeKey === computedDedupeKey))
+        );
+        const confirmedRealPriorLog = priorLogsForUid.some(
+          (l) => Boolean(l.realEmailDelivered) || (l.simulated === false && !l.previewUrl && l.from === OFFICIAL_SCODERS_EMAIL)
+        );
+        const priorRealDelivered = Boolean(existingRecord?.realEmailDelivered) || confirmedRealPriorLog;
+
+        // If the prior attempt only used sandbox/ethereal or failed, and a real SMTP/API provider is now active, deliver the real confirmation email now
+        if (!priorRealDelivered && cfg.anyRealProviderConfigured && existingRecord) {
+          const { subject, html } = buildSectionEmailPayload(req, existingRecord, actionUrl);
+          const upgradeEmailRes = await sendEmailNotification({
+            to: existingRecord.clientEmail || cleanEmail,
+            subject,
+            html,
+            from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+            replyTo: OFFICIAL_SCODERS_EMAIL,
+          });
+
+          if (existingRecordIdx >= 0) {
+            uidRecords[existingRecordIdx] = {
+              ...existingRecord,
+              confirmationEmailSent: Boolean(upgradeEmailRes.success),
+              confirmationEmailSentAt: upgradeEmailRes.success ? new Date().toISOString() : existingRecord.confirmationEmailSentAt,
+              realEmailDelivered: Boolean(upgradeEmailRes.realEmailDelivered),
+              deliveryMode: upgradeEmailRes.deliveryMode,
+              emailFrom: OFFICIAL_SCODERS_EMAIL,
+              emailMessageId: upgradeEmailRes.messageId || existingRecord.emailMessageId,
+            };
+            appState["db_registration_uids"] = uidRecords;
+          }
+
+          appendEmailDispatchLog(appState, {
+            section,
+            to: existingRecord.clientEmail || cleanEmail,
+            from: OFFICIAL_SCODERS_EMAIL,
+            subject,
+            uid: resolvedUid,
+            dedupeKey: computedDedupeKey,
+            itemTitle: cleanItemTitle,
+            status: upgradeEmailRes.success ? "SENT" : "FAILED",
+            messageId: upgradeEmailRes.messageId,
+            previewUrl: upgradeEmailRes.previewUrl,
+            simulated: upgradeEmailRes.simulated,
+            realEmailDelivered: upgradeEmailRes.realEmailDelivered,
+            deliveryMode: upgradeEmailRes.deliveryMode,
+            error: upgradeEmailRes.error,
+            detailsSummary: "Real inbox confirmation dispatched for existing UID (upgraded from prior sandbox/pending log).",
+          });
+          saveStoredAppState(appState);
+
+          return res.json({
+            success: true,
+            deduplicated: true,
+            alreadyRegistered: true,
+            upgradedFromSandbox: true,
+            uid: resolvedUid,
+            validUntil: existingRecord.validUntil,
+            emailSent: Boolean(upgradeEmailRes.success),
+            realEmailDelivered: Boolean(upgradeEmailRes.realEmailDelivered),
+            deliveryMode: upgradeEmailRes.deliveryMode,
+            emailFrom: OFFICIAL_SCODERS_EMAIL,
+            previewUrl: upgradeEmailRes.previewUrl,
+            emailError: upgradeEmailRes.error,
+            record: existingRecordIdx >= 0 ? uidRecords[existingRecordIdx] : existingRecord,
+            hydrated,
+            clientAccount: sanitizeClientAccountForResponse(linkedAcc),
+          });
+        }
+
         appendEmailDispatchLog(appState, {
           section,
           to: cleanEmail,
@@ -5444,6 +6800,7 @@ Return ONLY valid JSON with this structure:
           dedupeKey: computedDedupeKey,
           itemTitle: cleanItemTitle,
           status: "SKIPPED_DUPLICATE",
+          realEmailDelivered: priorRealDelivered,
           detailsSummary: "Existing active UID / sent log matched; duplicate email prevented.",
         });
         saveStoredAppState(appState);
@@ -5453,10 +6810,16 @@ Return ONLY valid JSON with this structure:
           deduplicated: true,
           alreadyRegistered: true,
           uid: resolvedUid,
+          validUntil: existingRecord?.validUntil,
           emailSent: false,
           emailSkippedDuplicate: true,
+          alreadyDeliveredToInbox: priorRealDelivered,
+          realEmailDelivered: priorRealDelivered,
+          deliveryMode: priorRealDelivered ? existingRecord?.deliveryMode || "smtp" : "skipped_duplicate",
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           record: existingRecord,
+          hydrated,
+          clientAccount: sanitizeClientAccountForResponse(linkedAcc),
         });
       }
 
@@ -5468,80 +6831,11 @@ Return ONLY valid JSON with this structure:
           : generateCollisionFreeUid(section, cleanItemId, appState);
 
       const { validFrom, validUntil } = computeUidValidityWindow(section, metadata?.date);
-      const targetUrl =
-        actionUrl && String(actionUrl).startsWith("http")
-          ? String(actionUrl)
-          : resolveAppUrl(
-              req,
-              section === "service"
-                ? `/?view=services&key=${finalUid}`
-                : section === "workshop"
-                ? `/?view=workshops&key=${finalUid}`
-                : `/?view=events&ticket=${finalUid}`
-            );
+      const resolvedChatId =
+        chatId || (section === "service" ? `chat-svc-${finalUid}` : section === "workshop" ? `chat-wksp-${finalUid}` : undefined);
 
       // 4. Build section-specific automated email & dispatch from scoders82@gmail.com
-      let subject = "";
-      let html = "";
-      if (section === "service") {
-        subject = `✅ Service Registered - Your Unique S-CODERS Code (${finalUid})`;
-        html = getServiceAcceptanceEmailHtml({
-          clientName: cleanName,
-          serviceTitle: cleanItemTitle,
-          uniqueKey: finalUid,
-          actionUrl: targetUrl,
-          validFrom,
-          validUntil,
-          amount: Number(amount) || 0,
-          currency,
-          paymentStatus: payCheck.status,
-          paymentId: paymentId ? String(paymentId).trim() : undefined,
-        });
-      } else if (section === "workshop") {
-        subject = `🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (${finalUid})`;
-        html = getWorkshopEmailHtml({
-          status: "SUCCESS",
-          clientName: cleanName,
-          workshopTitle: cleanItemTitle,
-          amount: Number(amount) || 0,
-          currency,
-          uniqueKey: finalUid,
-          actionUrl: targetUrl,
-          paymentId: paymentId || `pay_wksp_${Date.now()}`,
-          workshopDate: metadata?.date,
-          workshopTime: metadata?.time,
-          workshopLocation: metadata?.location,
-          validUntil,
-        });
-      } else {
-        subject = `🎟️ Event Registration Confirmed & Pass UID - S-CODERS (${finalUid})`;
-        html = getEventEmailHtml({
-          status: "SUCCESS",
-          clientName: cleanName,
-          eventTitle: cleanItemTitle,
-          amount: Number(amount) || 0,
-          currency,
-          ticketCode: finalUid,
-          actionUrl: targetUrl,
-          paymentId: paymentId || (Number(amount) === 0 ? `FREE_PASS_${Date.now()}` : `pay_evt_${Date.now()}`),
-          eventDate: metadata?.date,
-          eventDay: metadata?.day,
-          eventTime: metadata?.time,
-          eventLocation: metadata?.location,
-          eventDescription: metadata?.description,
-          validUntil,
-        });
-      }
-
-      const emailRes = await sendEmailNotification({
-        to: cleanEmail,
-        subject,
-        html,
-        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
-        replyTo: OFFICIAL_SCODERS_EMAIL,
-      });
-
-      const newRecord: RegistrationUidRecord = {
+      const provisionalRecord: RegistrationUidRecord = {
         uid: finalUid,
         section,
         itemId: cleanItemId,
@@ -5557,20 +6851,49 @@ Return ONLY valid JSON with this structure:
         paymentId: paymentId ? String(paymentId).trim() : undefined,
         orderId: orderId ? String(orderId).trim() : undefined,
         dedupeKey: computedDedupeKey,
-        chatId: chatId || undefined,
+        chatId: resolvedChatId,
         metadata,
         issuedAt: validFrom,
         validFrom,
         validUntil,
         status: "ACTIVE",
+        confirmationEmailSent: false,
+      };
+      const { subject, html } = buildSectionEmailPayload(req, provisionalRecord, actionUrl);
+
+      const emailRes = await sendEmailNotification({
+        to: cleanEmail,
+        subject,
+        html,
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+
+      const newRecord: RegistrationUidRecord = {
+        ...provisionalRecord,
         confirmationEmailSent: Boolean(emailRes.success),
         confirmationEmailSentAt: emailRes.success ? new Date().toISOString() : undefined,
+        realEmailDelivered: Boolean(emailRes.realEmailDelivered),
+        deliveryMode: emailRes.deliveryMode,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         emailMessageId: emailRes.messageId,
       };
 
-      uidRecords.unshift(newRecord);
-      appState["db_registration_uids"] = uidRecords;
+      const hydrated = ensureHydratedRecordsInAppState(appState, newRecord, {
+        chatId: resolvedChatId,
+        paymentMethod: metadata?.paymentMethod,
+      });
+
+      const authData = getStoredAuthData();
+      const linkedAcc = upsertServerClientAccount(authData, appState, {
+        email: cleanEmail,
+        name: cleanName,
+        phone: clientPhone ? String(clientPhone).trim() : undefined,
+        company: clientOrg ? String(clientOrg).trim() : undefined,
+        clientRole: clientRole ? String(clientRole).trim() : undefined,
+        registrationUid: finalUid,
+      });
+      saveStoredAuthData(authData);
 
       appendEmailDispatchLog(appState, {
         section,
@@ -5584,6 +6907,8 @@ Return ONLY valid JSON with this structure:
         messageId: emailRes.messageId,
         previewUrl: emailRes.previewUrl,
         simulated: emailRes.simulated,
+        realEmailDelivered: emailRes.realEmailDelivered,
+        deliveryMode: emailRes.deliveryMode,
         error: emailRes.error,
         detailsSummary:
           section === "service"
@@ -5608,10 +6933,115 @@ Return ONLY valid JSON with this structure:
         previewUrl: emailRes.previewUrl,
         emailError: emailRes.error,
         record: newRecord,
+        hydrated,
+        clientAccount: sanitizeClientAccountForResponse(linkedAcc),
       });
     } catch (err: any) {
       console.error("Unified Registration & Notify Error:", err);
       return res.status(500).json({ success: false, error: err?.message || "Failed to register and send notification." });
+    }
+  });
+
+  // Explicit On-Demand Confirmation Email Resend for an active UID (to its registered email)
+  app.post("/api/registrations/resend-email", async (req, res) => {
+    try {
+      const cleanUid = String(req.body?.uid || "").trim().toUpperCase();
+      const suppliedEmail = req.body?.email ? String(req.body.email).trim().toLowerCase() : "";
+      if (!cleanUid) {
+        return res.status(400).json({ success: false, error: "Registration code (UID) is required." });
+      }
+
+      const lastSentAt = resendCooldownMap.get(cleanUid) || 0;
+      if (Date.now() - lastSentAt < 15000) {
+        return res.status(429).json({
+          success: false,
+          error: "A confirmation email was just sent for this code. Please check your inbox or wait a few seconds before retrying.",
+        });
+      }
+
+      const appState = getStoredAppState();
+      const lookup = findExistingRecordByKeyOrUid(appState, cleanUid, null);
+      if (lookup.revoked) {
+        return res.status(403).json({ success: false, error: `Registration code ${cleanUid} is revoked.` });
+      }
+      if (lookup.expired) {
+        return res.status(410).json({ success: false, error: `Registration code ${cleanUid} has expired.` });
+      }
+      if (!lookup.record) {
+        return res.status(404).json({ success: false, error: `No active registration found for code ${cleanUid}.` });
+      }
+
+      const registeredEmail = String(lookup.record.clientEmail || "").trim().toLowerCase();
+      if (!isValidEmailAddress(registeredEmail)) {
+        return res.status(400).json({ success: false, error: "No valid email address is linked to this registration." });
+      }
+      if (suppliedEmail && suppliedEmail !== registeredEmail) {
+        return res.status(403).json({
+          success: false,
+          error: "Provided email does not match the registered email address for this UID.",
+        });
+      }
+
+      const { subject, html } = buildSectionEmailPayload(req, lookup.record);
+      const emailRes = await sendEmailNotification({
+        to: registeredEmail,
+        subject,
+        html,
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+      resendCooldownMap.set(cleanUid, Date.now());
+
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+        ? [...appState["db_registration_uids"]]
+        : [];
+      const recIdx = uidRecords.findIndex((r) => String(r?.uid || "").trim().toUpperCase() === cleanUid);
+      if (recIdx >= 0) {
+        uidRecords[recIdx] = {
+          ...uidRecords[recIdx],
+          confirmationEmailSent: Boolean(emailRes.success) || uidRecords[recIdx].confirmationEmailSent,
+          confirmationEmailSentAt: emailRes.success ? new Date().toISOString() : uidRecords[recIdx].confirmationEmailSentAt,
+          realEmailDelivered: Boolean(emailRes.realEmailDelivered) || Boolean(uidRecords[recIdx].realEmailDelivered),
+          deliveryMode: emailRes.deliveryMode,
+          emailFrom: OFFICIAL_SCODERS_EMAIL,
+          emailMessageId: emailRes.messageId || uidRecords[recIdx].emailMessageId,
+        };
+        appState["db_registration_uids"] = uidRecords;
+      }
+
+      appendEmailDispatchLog(appState, {
+        section: lookup.record.section,
+        to: registeredEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject,
+        uid: cleanUid,
+        dedupeKey: `${lookup.record.section}:resend:${cleanUid}:${Date.now()}`,
+        itemTitle: lookup.record.itemTitle,
+        status: emailRes.success ? "SENT" : "FAILED",
+        messageId: emailRes.messageId,
+        previewUrl: emailRes.previewUrl,
+        simulated: emailRes.simulated,
+        realEmailDelivered: emailRes.realEmailDelivered,
+        deliveryMode: emailRes.deliveryMode,
+        error: emailRes.error,
+        detailsSummary: `Manual resend confirmation for ${cleanUid}`,
+      });
+      saveStoredAppState(appState);
+
+      return res.json({
+        success: Boolean(emailRes.success),
+        uid: cleanUid,
+        to: registeredEmail,
+        emailSent: Boolean(emailRes.success),
+        realEmailDelivered: Boolean(emailRes.realEmailDelivered),
+        deliveryMode: emailRes.deliveryMode,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        previewUrl: emailRes.previewUrl,
+        error: emailRes.error,
+      });
+    } catch (err: any) {
+      console.error("Resend Email Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to resend confirmation email." });
     }
   });
 
@@ -5638,7 +7068,6 @@ Return ONLY valid JSON with this structure:
       }
 
       if (lookup.expired) {
-        // Persist expired status on record if stored in db_registration_uids
         const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
           ? [...appState["db_registration_uids"]]
           : [];
@@ -5665,10 +7094,32 @@ Return ONLY valid JSON with this structure:
         });
       }
 
+      // Self-heal & return full hydrated records so cleared/new browsers restore completely
+      const hydrated = ensureHydratedRecordsInAppState(appState, lookup.record);
+      saveStoredAppState(appState);
+
+      const authData = getStoredAuthData();
+      let clientAccount: any = null;
+      if (lookup.record.clientEmail && lookup.record.clientEmail.includes("@")) {
+        const acc = upsertServerClientAccount(authData, appState, {
+          email: lookup.record.clientEmail,
+          name: lookup.record.clientName,
+          phone: lookup.record.clientPhone,
+          company: lookup.record.clientOrg,
+          clientRole: lookup.record.clientRole,
+          registrationUid: lookup.record.uid,
+        });
+        saveStoredAuthData(authData);
+        clientAccount = sanitizeClientAccountForResponse(acc);
+      }
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       return res.json({
         success: true,
         valid: true,
         record: lookup.record,
+        hydrated,
+        clientAccount,
       });
     } catch (err: any) {
       console.error("Verify UID Error:", err);
@@ -5676,8 +7127,226 @@ Return ONLY valid JSON with this structure:
     }
   });
 
-  // Step 1 of UID Recovery: Send 6-digit OTP verification code from scoders82@gmail.com
-  app.post("/api/registrations/recovery/request", async (req, res) => {
+  function gatherAllRecoveredRegistrationsForEmail(
+    appState: Record<string, any>,
+    cleanEmail: string,
+    sectionFilter: RegistrationSection | null
+  ): RegistrationUidRecord[] {
+    const recoveredMap = new Map<string, RegistrationUidRecord>();
+    const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+      ? appState["db_registration_uids"]
+      : [];
+    const revokedMap: Record<string, any> = appState["scoders_revoked_passes"] || {};
+
+    for (const r of uidRecords) {
+      if (r?.clientEmail?.toLowerCase() === cleanEmail && (!sectionFilter || r.section === sectionFilter)) {
+        const isRevoked = r.status === "REVOKED" || Boolean(revokedMap[r.uid.toUpperCase()]);
+        const isExpired = !isNaN(Date.parse(r.validUntil)) && Date.parse(r.validUntil) < Date.now();
+        recoveredMap.set(r.uid.toUpperCase(), {
+          ...r,
+          status: isRevoked ? "REVOKED" : isExpired ? "EXPIRED" : "ACTIVE",
+        });
+      }
+    }
+
+    if (!sectionFilter || sectionFilter === "service") {
+      const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
+      for (const s of svcRegs) {
+        if (s?.clientProfile?.email?.toLowerCase() === cleanEmail && s.uniqueKey && !recoveredMap.has(s.uniqueKey.toUpperCase())) {
+          const w = computeUidValidityWindow("service", s.projectSubmissionDate);
+          recoveredMap.set(s.uniqueKey.toUpperCase(), {
+            uid: s.uniqueKey,
+            section: "service",
+            itemId: s.serviceId || "service",
+            itemTitle: s.selectedServiceTitle || "Service",
+            clientName: s.clientProfile?.name || "Client",
+            clientEmail: cleanEmail,
+            clientPhone: s.clientProfile?.phone,
+            clientRole: s.clientProfile?.company,
+            amount: 0,
+            currency: "INR",
+            paymentStatus: "NOT_REQUIRED",
+            dedupeKey: `legacy-svc-${s.uniqueKey}`,
+            chatId: s.chatId,
+            metadata: {
+              requirements: s.projectRequirements,
+              notes: s.notes || s.projectRequirements,
+              budget: s.budget,
+              timeline: s.timeline,
+            },
+            issuedAt: s.registrationDate || w.validFrom,
+            validFrom: w.validFrom,
+            validUntil: w.validUntil,
+            status: "ACTIVE",
+            confirmationEmailSent: true,
+          });
+        }
+      }
+      const svcMap = appState["scoders_registered_services"];
+      if (svcMap && typeof svcMap === "object") {
+        for (const [svcId, entry] of Object.entries<any>(svcMap)) {
+          if (entry?.email?.toLowerCase() === cleanEmail && entry?.key && !recoveredMap.has(String(entry.key).toUpperCase())) {
+            const w = computeUidValidityWindow("service");
+            recoveredMap.set(String(entry.key).toUpperCase(), {
+              uid: String(entry.key).toUpperCase(),
+              section: "service",
+              itemId: svcId,
+              itemTitle: "S-CODERS Service",
+              clientName: entry.name || "Client",
+              clientEmail: cleanEmail,
+              clientPhone: entry.phone,
+              clientRole: entry.role,
+              amount: 0,
+              currency: "INR",
+              paymentStatus: "NOT_REQUIRED",
+              dedupeKey: `map-svc-${entry.key}`,
+              chatId: entry.chatId,
+              metadata: {
+                requirements: entry.requirements,
+                notes: entry.notes || entry.requirements,
+                budget: entry.budget,
+                timeline: entry.timeline,
+              },
+              issuedAt: entry.timestamp || w.validFrom,
+              validFrom: w.validFrom,
+              validUntil: w.validUntil,
+              status: "ACTIVE",
+              confirmationEmailSent: true,
+            });
+          }
+        }
+      }
+      const enquiries: any[] = Array.isArray(appState["db_enquiries"]) ? appState["db_enquiries"] : [];
+      for (const e of enquiries) {
+        if (String(e?.email || "").trim().toLowerCase() === cleanEmail && e?.id && !recoveredMap.has(String(e.id).toUpperCase())) {
+          const w = computeUidValidityWindow("service");
+          recoveredMap.set(String(e.id).toUpperCase(), {
+            uid: String(e.id).toUpperCase(),
+            section: "service",
+            itemId: "proj-custom",
+            itemTitle: String(e.subject || "S-CODERS Custom Project").replace(/^Project Enquiry:\s*/i, "").trim(),
+            clientName: e.name || "Client",
+            clientEmail: cleanEmail,
+            clientPhone: e.phone,
+            amount: 0,
+            currency: "INR",
+            paymentStatus: "NOT_REQUIRED",
+            dedupeKey: `enq-svc-${e.id}`,
+            chatId: `chat-svc-${e.id}`,
+            metadata: {
+              requirements: e.message || "",
+              notes: e.message || "",
+            },
+            issuedAt: e.timestamp || w.validFrom,
+            validFrom: w.validFrom,
+            validUntil: w.validUntil,
+            status: "ACTIVE",
+            confirmationEmailSent: true,
+          });
+        }
+      }
+    }
+
+    if (!sectionFilter || sectionFilter === "workshop") {
+      const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
+      for (const wk of wkspRegs) {
+        if (wk?.participantProfile?.email?.toLowerCase() === cleanEmail && wk.uniqueAccessKey && !recoveredMap.has(wk.uniqueAccessKey.toUpperCase())) {
+          const w = computeUidValidityWindow("workshop");
+          const isRev = Boolean(wk.isRevoked || wk.paymentStatus === "Revoked" || revokedMap[wk.uniqueAccessKey.toUpperCase()]);
+          recoveredMap.set(wk.uniqueAccessKey.toUpperCase(), {
+            uid: wk.uniqueAccessKey,
+            section: "workshop",
+            itemId: wk.workshopId || "workshop",
+            itemTitle: wk.workshopTitle || "Workshop",
+            clientName: wk.participantProfile?.name || "Participant",
+            clientEmail: cleanEmail,
+            clientPhone: wk.participantProfile?.phone,
+            clientRole: wk.participantProfile?.role,
+            amount: Number(wk.amountPaid) || 0,
+            currency: "INR",
+            paymentStatus: "VERIFIED",
+            paymentId: wk.transactionId,
+            dedupeKey: `legacy-wksp-${wk.uniqueAccessKey}`,
+            chatId: wk.chatId,
+            metadata: {
+              notes: wk.notes,
+            },
+            issuedAt: wk.paymentDate || w.validFrom,
+            validFrom: w.validFrom,
+            validUntil: w.validUntil,
+            status: isRev ? "REVOKED" : "ACTIVE",
+            confirmationEmailSent: true,
+          });
+        }
+      }
+      const wkspMap = appState["scoders_registered_workshops"];
+      if (wkspMap && typeof wkspMap === "object") {
+        for (const [wkId, entry] of Object.entries<any>(wkspMap)) {
+          if (entry?.email?.toLowerCase() === cleanEmail && entry?.key && !recoveredMap.has(String(entry.key).toUpperCase())) {
+            const w = computeUidValidityWindow("workshop");
+            const isRev = Boolean(revokedMap[String(entry.key).toUpperCase()]);
+            recoveredMap.set(String(entry.key).toUpperCase(), {
+              uid: String(entry.key).toUpperCase(),
+              section: "workshop",
+              itemId: wkId,
+              itemTitle: "S-CODERS Workshop",
+              clientName: entry.name || "Participant",
+              clientEmail: cleanEmail,
+              clientPhone: entry.phone,
+              clientRole: entry.role || "Developer",
+              amount: Number(entry.totalPaid) || 0,
+              currency: "INR",
+              paymentStatus: "VERIFIED",
+              dedupeKey: `map-wksp-${entry.key}`,
+              chatId: entry.chatId,
+              metadata: {
+                notes: entry.notes,
+              },
+              issuedAt: entry.timestamp || w.validFrom,
+              validFrom: w.validFrom,
+              validUntil: w.validUntil,
+              status: isRev ? "REVOKED" : "ACTIVE",
+              confirmationEmailSent: true,
+            });
+          }
+        }
+      }
+    }
+
+    if (!sectionFilter || sectionFilter === "event") {
+      const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
+      for (const t of evtTickets) {
+        if (t?.participantEmail?.toLowerCase() === cleanEmail && t.ticketCode && !recoveredMap.has(t.ticketCode.toUpperCase())) {
+          const w = computeUidValidityWindow("event", t.eventDate);
+          recoveredMap.set(t.ticketCode.toUpperCase(), {
+            uid: t.ticketCode,
+            section: "event",
+            itemId: t.eventId || "event",
+            itemTitle: t.eventName || "Event",
+            clientName: t.participantName || "Attendee",
+            clientEmail: cleanEmail,
+            amount: Number(t.amountPaid) || 0,
+            currency: "INR",
+            paymentStatus: "VERIFIED",
+            paymentId: t.paymentId,
+            orderId: t.orderId,
+            dedupeKey: `legacy-evt-${t.ticketCode}`,
+            metadata: { date: t.eventDate, day: t.eventDay, time: t.eventTime, location: t.eventLocation },
+            issuedAt: t.bookingDate || w.validFrom,
+            validFrom: w.validFrom,
+            validUntil: w.validUntil,
+            status: t.status === "Ticket Cancelled" ? "REVOKED" : "ACTIVE",
+            confirmationEmailSent: true,
+          });
+        }
+      }
+    }
+
+    return Array.from(recoveredMap.values());
+  }
+
+  // Step 1 of UID / Account Recovery: Send 6-digit OTP verification code from scoders82@gmail.com
+  app.post(["/api/registrations/recovery/request", "/api/auth/client/recovery/request"], async (req, res) => {
     try {
       const { email, section: rawSection } = req.body || {};
       const cleanEmail = String(email || "").trim().toLowerCase();
@@ -5687,74 +7356,52 @@ Return ONLY valid JSON with this structure:
 
       const sectionFilter = rawSection ? normalizeSectionName(rawSection) : null;
       const appState = getStoredAppState();
+      const authData = getStoredAuthData();
 
-      // Find all matching registrations for this email (both unified db_registration_uids and legacy tables)
-      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
-        ? appState["db_registration_uids"]
-        : [];
-      const matchingCount = uidRecords.filter(
-        (r) =>
-          r.clientEmail?.toLowerCase() === cleanEmail &&
-          (!sectionFilter || r.section === sectionFilter)
-      ).length;
+      // Check filtered section first, then fallback across all sections + client accounts so valid Gmail users aren't stranded
+      const sectionMatches = gatherAllRecoveredRegistrationsForEmail(appState, cleanEmail, sectionFilter);
+      const allSectionMatches = sectionMatches.length > 0 ? sectionMatches : gatherAllRecoveredRegistrationsForEmail(appState, cleanEmail, null);
+      const clientAccount = findClientAccountOrBootstrapFromAppState(authData, appState, cleanEmail);
 
-      // Also check legacy tables if unified list doesn't have entries yet
-      const legacySvc = Array.isArray(appState["db_service_registrations"])
-        ? appState["db_service_registrations"].filter((s: any) => s?.clientProfile?.email?.toLowerCase() === cleanEmail)
-        : [];
-      const legacyWksp = Array.isArray(appState["db_workshop_registrations"])
-        ? appState["db_workshop_registrations"].filter((w: any) => w?.participantProfile?.email?.toLowerCase() === cleanEmail)
-        : [];
-      const legacyEvt = Array.isArray(appState["scoders_event_tickets"])
-        ? appState["scoders_event_tickets"].filter((t: any) => t?.participantEmail?.toLowerCase() === cleanEmail)
-        : [];
-
-      const hasAnyRegistration =
-        matchingCount > 0 ||
-        ((!sectionFilter || sectionFilter === "service") && legacySvc.length > 0) ||
-        ((!sectionFilter || sectionFilter === "workshop") && legacyWksp.length > 0) ||
-        ((!sectionFilter || sectionFilter === "event") && legacyEvt.length > 0);
-
-      if (!hasAnyRegistration) {
+      if (allSectionMatches.length === 0 && !clientAccount) {
         return res.status(404).json({
           success: false,
-          error: `No active ${sectionFilter || "S-CODERS"} registrations found for ${cleanEmail}.`,
+          error: `No S-CODERS account or registrations found for ${cleanEmail}.`,
         });
       }
 
-      // Generate cryptographically random 6-digit OTP & store hashed with 10 min TTL
       const otpCode = String(crypto.randomInt(100000, 999999));
       const otpHash = crypto.createHash("sha256").update(`${cleanEmail}|${otpCode}`).digest("hex");
       const nowMs = Date.now();
       const expiresAt = new Date(nowMs + 10 * 60 * 1000).toISOString();
 
-      const otps: any[] = Array.isArray(appState["db_uid_recovery_otps"])
-        ? appState["db_uid_recovery_otps"].filter((o: any) => o.email !== cleanEmail)
-        : [];
-      otps.unshift({
-        email: cleanEmail,
-        section: sectionFilter || "all",
-        otpHash,
-        expiresAt,
-        expiresAtMs: nowMs + 10 * 60 * 1000,
-        attempts: 0,
-        used: false,
-        createdAt: new Date(nowMs).toISOString(),
-      });
-      appState["db_uid_recovery_otps"] = otps.slice(0, 200);
+      authData.recoveryOtps = [
+        {
+          email: cleanEmail,
+          section: sectionFilter || "all",
+          otpHash,
+          expiresAt,
+          expiresAtMs: nowMs + 10 * 60 * 1000,
+          attempts: 0,
+          used: false,
+          createdAt: new Date(nowMs).toISOString(),
+        },
+        ...authData.recoveryOtps.filter((o) => o.email !== cleanEmail),
+      ].slice(0, 300);
+      saveStoredAuthData(authData);
 
       const sectionLabel =
-        sectionFilter === "service"
+        sectionFilter === "service" && sectionMatches.length > 0
           ? "Service Workspace"
-          : sectionFilter === "workshop"
+          : sectionFilter === "workshop" && sectionMatches.length > 0
           ? "Workshop Session"
-          : sectionFilter === "event"
+          : sectionFilter === "event" && sectionMatches.length > 0
           ? "Event Pass"
-          : "Service, Workshop & Event";
+          : "S-CODERS Account & Registrations";
 
       const emailRes = await sendEmailNotification({
         to: cleanEmail,
-        subject: `🔐 S-CODERS UID Recovery Verification Code: ${otpCode}`,
+        subject: `🔐 S-CODERS Recovery Verification Code: ${otpCode}`,
         html: getUidRecoveryOtpEmailHtml({
           email: cleanEmail,
           otpCode,
@@ -5768,7 +7415,7 @@ Return ONLY valid JSON with this structure:
         section: sectionFilter || "recovery",
         to: cleanEmail,
         from: OFFICIAL_SCODERS_EMAIL,
-        subject: `S-CODERS UID Recovery Verification Code`,
+        subject: `S-CODERS Recovery Verification Code`,
         status: emailRes.success ? "SENT" : "FAILED",
         messageId: emailRes.messageId,
         previewUrl: emailRes.previewUrl,
@@ -5793,10 +7440,10 @@ Return ONLY valid JSON with this structure:
     }
   });
 
-  // Step 2 of UID Recovery: Verify OTP, reveal active/expired status & optionally resend summary email
-  app.post("/api/registrations/recovery/verify", async (req, res) => {
+  // Step 2 of UID / Account Recovery: Verify OTP, recover all UIDs, optionally set password & sign client in
+  app.post(["/api/registrations/recovery/verify", "/api/auth/client/recovery/verify"], async (req, res) => {
     try {
-      const { email, otp, section: rawSection, resendEmail = true } = req.body || {};
+      const { email, otp, section: rawSection, resendEmail = true, newPassword } = req.body || {};
       const cleanEmail = String(email || "").trim().toLowerCase();
       const cleanOtp = String(otp || "").trim();
 
@@ -5806,7 +7453,9 @@ Return ONLY valid JSON with this structure:
 
       const sectionFilter = rawSection ? normalizeSectionName(rawSection) : null;
       const appState = getStoredAppState();
-      const otps: any[] = Array.isArray(appState["db_uid_recovery_otps"]) ? [...appState["db_uid_recovery_otps"]] : [];
+      const authData = getStoredAuthData();
+
+      const otps = [...authData.recoveryOtps];
       const otpIdx = otps.findIndex((o) => o.email === cleanEmail && !o.used);
 
       if (otpIdx < 0) {
@@ -5816,8 +7465,8 @@ Return ONLY valid JSON with this structure:
       const otpRecord = otps[otpIdx];
       if (Date.now() > Number(otpRecord.expiresAtMs || 0)) {
         otps[otpIdx] = { ...otpRecord, used: true };
-        appState["db_uid_recovery_otps"] = otps;
-        saveStoredAppState(appState);
+        authData.recoveryOtps = otps;
+        saveStoredAuthData(authData);
         return res.status(410).json({ success: false, error: "Verification code has expired. Please request a new code." });
       }
 
@@ -5828,121 +7477,35 @@ Return ONLY valid JSON with this structure:
       const candidateHash = crypto.createHash("sha256").update(`${cleanEmail}|${cleanOtp}`).digest("hex");
       if (candidateHash !== otpRecord.otpHash) {
         otps[otpIdx] = { ...otpRecord, attempts: Number(otpRecord.attempts || 0) + 1 };
-        appState["db_uid_recovery_otps"] = otps;
-        saveStoredAppState(appState);
+        authData.recoveryOtps = otps;
+        saveStoredAuthData(authData);
         return res.status(401).json({ success: false, error: "Invalid verification code. Please check your inbox and try again." });
       }
 
-      // Mark OTP verified & consumed
       otps[otpIdx] = { ...otpRecord, used: true, verifiedAt: new Date().toISOString() };
-      appState["db_uid_recovery_otps"] = otps;
+      authData.recoveryOtps = otps;
 
-      // Gather all registrations belonging to this verified email
-      const recoveredMap = new Map<string, RegistrationUidRecord>();
-      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
-        ? appState["db_registration_uids"]
-        : [];
-      const revokedMap: Record<string, any> = appState["scoders_revoked_passes"] || {};
-
-      for (const r of uidRecords) {
-        if (r?.clientEmail?.toLowerCase() === cleanEmail && (!sectionFilter || r.section === sectionFilter)) {
-          const isRevoked = r.status === "REVOKED" || Boolean(revokedMap[r.uid.toUpperCase()]);
-          const isExpired = !isNaN(Date.parse(r.validUntil)) && Date.parse(r.validUntil) < Date.now();
-          recoveredMap.set(r.uid.toUpperCase(), {
-            ...r,
-            status: isRevoked ? "REVOKED" : isExpired ? "EXPIRED" : "ACTIVE",
-          });
-        }
-      }
-
-      // Also include any legacy synced entries not yet in db_registration_uids
-      if (!sectionFilter || sectionFilter === "service") {
-        const svcRegs: any[] = Array.isArray(appState["db_service_registrations"]) ? appState["db_service_registrations"] : [];
-        for (const s of svcRegs) {
-          if (s?.clientProfile?.email?.toLowerCase() === cleanEmail && s.uniqueKey && !recoveredMap.has(s.uniqueKey.toUpperCase())) {
-            const w = computeUidValidityWindow("service", s.projectSubmissionDate);
-            recoveredMap.set(s.uniqueKey.toUpperCase(), {
-              uid: s.uniqueKey,
-              section: "service",
-              itemId: s.serviceId || "service",
-              itemTitle: s.selectedServiceTitle || "Service",
-              clientName: s.clientProfile?.name || "Client",
-              clientEmail: cleanEmail,
-              amount: 0,
-              currency: "INR",
-              paymentStatus: "NOT_REQUIRED",
-              dedupeKey: `legacy-svc-${s.uniqueKey}`,
-              chatId: s.chatId,
-              issuedAt: s.registrationDate || w.validFrom,
-              validFrom: w.validFrom,
-              validUntil: w.validUntil,
-              status: "ACTIVE",
-              confirmationEmailSent: true,
-            });
-          }
-        }
-      }
-
-      if (!sectionFilter || sectionFilter === "workshop") {
-        const wkspRegs: any[] = Array.isArray(appState["db_workshop_registrations"]) ? appState["db_workshop_registrations"] : [];
-        for (const wk of wkspRegs) {
-          if (wk?.participantProfile?.email?.toLowerCase() === cleanEmail && wk.uniqueAccessKey && !recoveredMap.has(wk.uniqueAccessKey.toUpperCase())) {
-            const w = computeUidValidityWindow("workshop");
-            const isRev = Boolean(wk.isRevoked || wk.paymentStatus === "Revoked" || revokedMap[wk.uniqueAccessKey.toUpperCase()]);
-            recoveredMap.set(wk.uniqueAccessKey.toUpperCase(), {
-              uid: wk.uniqueAccessKey,
-              section: "workshop",
-              itemId: wk.workshopId || "workshop",
-              itemTitle: wk.workshopTitle || "Workshop",
-              clientName: wk.participantProfile?.name || "Participant",
-              clientEmail: cleanEmail,
-              amount: Number(wk.amountPaid) || 0,
-              currency: "INR",
-              paymentStatus: "VERIFIED",
-              paymentId: wk.transactionId,
-              dedupeKey: `legacy-wksp-${wk.uniqueAccessKey}`,
-              chatId: wk.chatId,
-              issuedAt: wk.paymentDate || w.validFrom,
-              validFrom: w.validFrom,
-              validUntil: w.validUntil,
-              status: isRev ? "REVOKED" : "ACTIVE",
-              confirmationEmailSent: true,
-            });
-          }
-        }
-      }
-
-      if (!sectionFilter || sectionFilter === "event") {
-        const evtTickets: any[] = Array.isArray(appState["scoders_event_tickets"]) ? appState["scoders_event_tickets"] : [];
-        for (const t of evtTickets) {
-          if (t?.participantEmail?.toLowerCase() === cleanEmail && t.ticketCode && !recoveredMap.has(t.ticketCode.toUpperCase())) {
-            const w = computeUidValidityWindow("event", t.eventDate);
-            recoveredMap.set(t.ticketCode.toUpperCase(), {
-              uid: t.ticketCode,
-              section: "event",
-              itemId: t.eventId || "event",
-              itemTitle: t.eventName || "Event",
-              clientName: t.participantName || "Attendee",
-              clientEmail: cleanEmail,
-              amount: Number(t.amountPaid) || 0,
-              currency: "INR",
-              paymentStatus: "VERIFIED",
-              paymentId: t.paymentId,
-              orderId: t.orderId,
-              dedupeKey: `legacy-evt-${t.ticketCode}`,
-              metadata: { date: t.eventDate, day: t.eventDay, time: t.eventTime, location: t.eventLocation },
-              issuedAt: t.bookingDate || w.validFrom,
-              validFrom: w.validFrom,
-              validUntil: w.validUntil,
-              status: t.status === "Ticket Cancelled" ? "REVOKED" : "ACTIVE",
-              confirmationEmailSent: true,
-            });
-          }
-        }
-      }
-
-      const allRecovered = Array.from(recoveredMap.values());
+      // Gather matching registrations (preferring section filter if non-empty, otherwise returning all sections)
+      const sectionScoped = gatherAllRecoveredRegistrationsForEmail(appState, cleanEmail, sectionFilter);
+      const allRecovered = sectionScoped.length > 0 ? sectionScoped : gatherAllRecoveredRegistrationsForEmail(appState, cleanEmail, null);
       const activeRecovered = allRecovered.filter((r) => r.status === "ACTIVE");
+
+      // Self-heal & hydrate active recovered records across appState
+      for (const rec of activeRecovered) {
+        ensureHydratedRecordsInAppState(appState, rec);
+      }
+
+      const cleanNewPass = typeof newPassword === "string" && newPassword.trim().length >= 4 ? newPassword.trim() : undefined;
+      const clientAcc = upsertServerClientAccount(authData, appState, {
+        email: cleanEmail,
+        name: activeRecovered[0]?.clientName || allRecovered[0]?.clientName,
+        phone: activeRecovered[0]?.clientPhone,
+        company: activeRecovered[0]?.clientOrg,
+        clientRole: activeRecovered[0]?.clientRole,
+        password: cleanNewPass,
+      });
+      const sessionToken = issueClientSessionToken(authData, clientAcc);
+      saveStoredAuthData(authData);
 
       let resentEmail = false;
       let resentRealDelivered = false;
@@ -5985,6 +7548,7 @@ Return ONLY valid JSON with this structure:
 
       saveStoredAppState(appState);
 
+      const snapshot = collectClientRegistrationsSnapshot(appState, cleanEmail);
       return res.json({
         success: true,
         verified: true,
@@ -5996,10 +7560,384 @@ Return ONLY valid JSON with this structure:
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         registrations: allRecovered,
         activeCount: activeRecovered.length,
+        passwordUpdated: Boolean(cleanNewPass),
+        user: sanitizeClientAccountForResponse(clientAcc),
+        token: sessionToken,
+        snapshot,
       });
     } catch (err: any) {
       console.error("Recovery Verify Error:", err);
       return res.status(500).json({ success: false, error: "Failed to verify recovery code." });
+    }
+  });
+
+  // ============================================================================
+  // PERSISTENT CLIENT ACCOUNT AUTHENTICATION & UID LOGIN APIS
+  // ============================================================================
+  app.post("/api/auth/client/register", async (req, res) => {
+    try {
+      const { name, email, password, company, phone } = req.body || {};
+      const cleanEmail = sanitizeHeaderString(email, 254).toLowerCase();
+      const cleanName = sanitizeHeaderString(name, 120);
+      const cleanCompany = typeof company === "string" ? sanitizeHeaderString(company, 120) : undefined;
+      const cleanPass = String(password || "");
+
+      if (!isValidEmailAddress(cleanEmail)) {
+        return res.status(400).json({ success: false, error: "Please enter a valid email address." });
+      }
+      if (!cleanName) {
+        return res.status(400).json({ success: false, error: "Please specify your full name." });
+      }
+      if (cleanPass.length < 4) {
+        return res.status(400).json({ success: false, error: "Security password must be at least 4 characters long." });
+      }
+
+      const appState = getStoredAppState();
+      const authData = getStoredAuthData();
+
+      const existing = authData.accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+      if (existing && existing.hasPassword) {
+        return res.status(409).json({
+          success: false,
+          error: "An account with this email is already registered. Please sign in or use Gmail Recovery.",
+        });
+      }
+
+      const acc = upsertServerClientAccount(authData, appState, {
+        email: cleanEmail,
+        name: cleanName,
+        phone: typeof phone === "string" ? sanitizeHeaderString(phone, 40) : undefined,
+        company: cleanCompany,
+        password: cleanPass,
+      });
+      const token = issueClientSessionToken(authData, acc);
+      saveStoredAuthData(authData);
+
+      // Dispatch automated welcome confirmation email via scoders82@gmail.com
+      const portalUrl = resolveAppUrl(req, "/?view=portal");
+      const welcomeSubject = `🎉 Welcome to S-CODERS Ecosystem (${cleanName})`;
+      const welcomeRes = await sendEmailNotification({
+        to: cleanEmail,
+        subject: welcomeSubject,
+        html: getClientWelcomeEmailHtml({
+          clientName: cleanName,
+          email: cleanEmail,
+          company: cleanCompany || acc.company,
+          portalUrl,
+        }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+
+      appendEmailDispatchLog(appState, {
+        section: "auth_signup",
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject: welcomeSubject,
+        itemTitle: "Client Portal Account Signup",
+        status: welcomeRes.success ? "SENT" : "FAILED",
+        messageId: welcomeRes.messageId,
+        previewUrl: welcomeRes.previewUrl,
+        simulated: welcomeRes.simulated,
+        realEmailDelivered: welcomeRes.realEmailDelivered,
+        deliveryMode: welcomeRes.deliveryMode,
+        error: welcomeRes.error,
+        detailsSummary: `Welcome email on portal signup (${cleanName})`,
+      });
+      saveStoredAppState(appState);
+
+      const snapshot = collectClientRegistrationsSnapshot(appState, cleanEmail);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({
+        success: true,
+        user: sanitizeClientAccountForResponse(acc),
+        token,
+        snapshot,
+        emailSent: Boolean(welcomeRes.success),
+        realEmailDelivered: Boolean(welcomeRes.realEmailDelivered),
+        deliveryMode: welcomeRes.deliveryMode,
+        previewUrl: welcomeRes.previewUrl,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+      });
+    } catch (err: any) {
+      console.error("Client Register Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to register client account." });
+    }
+  });
+
+  app.post("/api/auth/client/login", (req, res) => {
+    try {
+      const body = req.body || {};
+      const rawIdentifier = String(body.identifier || body.email || body.uid || "").trim();
+      const cleanPassword = typeof body.password === "string" ? body.password : "";
+
+      if (!rawIdentifier) {
+        return res.status(400).json({
+          success: false,
+          error: "Please enter your registered email address or Unique Registration Code (UID).",
+        });
+      }
+
+      const appState = getStoredAppState();
+      const authData = getStoredAuthData();
+
+      const looksLikeUid =
+        /^(BTD-|SC-EVT-|REG-|EVT-)/i.test(rawIdentifier) || !rawIdentifier.includes("@");
+
+      // Path A: Login directly with a Unique Registration Code (UID)
+      if (looksLikeUid) {
+        const cleanUid = rawIdentifier.replace(/\s+/g, "").toUpperCase();
+        const lookup = findExistingRecordByKeyOrUid(appState, cleanUid, null);
+
+        if (lookup.revoked) {
+          return res.status(403).json({
+            success: false,
+            error: `Unique code ${cleanUid} has been revoked by an administrator. Contact ${OFFICIAL_SCODERS_EMAIL}.`,
+          });
+        }
+        if (lookup.expired) {
+          return res.status(410).json({
+            success: false,
+            error: `Unique code ${cleanUid} has expired. Please use Gmail Recovery or re-register.`,
+          });
+        }
+        if (!lookup.record) {
+          return res.status(404).json({
+            success: false,
+            notFound: true,
+            error: `No active account or registration found for code "${cleanUid}". Verify the UID or recover via Gmail.`,
+          });
+        }
+
+        ensureHydratedRecordsInAppState(appState, lookup.record);
+        saveStoredAppState(appState);
+
+        const ownerEmail = (lookup.record.clientEmail || "client@scoders.dev").trim().toLowerCase();
+        const acc = upsertServerClientAccount(authData, appState, {
+          email: ownerEmail,
+          name: lookup.record.clientName,
+          phone: lookup.record.clientPhone,
+          company: lookup.record.clientOrg,
+          clientRole: lookup.record.clientRole,
+          registrationUid: lookup.record.uid,
+        });
+        const token = issueClientSessionToken(authData, acc);
+        saveStoredAuthData(authData);
+
+        const snapshot = collectClientRegistrationsSnapshot(appState, ownerEmail);
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        return res.json({
+          success: true,
+          loginMethod: "uid",
+          user: sanitizeClientAccountForResponse(acc),
+          token,
+          matchedRecord: lookup.record,
+          snapshot,
+        });
+      }
+
+      // Path B: Login with Email + Password (or Email + UID entered in password field!)
+      const cleanEmail = rawIdentifier.toLowerCase();
+      const acc = findClientAccountOrBootstrapFromAppState(authData, appState, cleanEmail);
+      if (!acc) {
+        return res.status(404).json({
+          success: false,
+          notFound: true,
+          error: "No client account found for this email. Please register first or recover via Gmail.",
+        });
+      }
+
+      // Allow authenticating either with their chosen password OR by pasting one of their active UIDs as password
+      const passwordMatchesScrypt = acc.passwordHash ? verifyPasswordScrypt(cleanPassword, acc.passwordHash) : false;
+      const cleanPassUpper = cleanPassword.replace(/\s+/g, "").trim().toUpperCase();
+      let uidMatchesOwner = false;
+      if (!passwordMatchesScrypt && cleanPassUpper.length >= 4) {
+        const uidCheck = findExistingRecordByKeyOrUid(appState, cleanPassUpper, null);
+        if (
+          uidCheck.record &&
+          !uidCheck.revoked &&
+          !uidCheck.expired &&
+          uidCheck.record.clientEmail.trim().toLowerCase() === cleanEmail
+        ) {
+          uidMatchesOwner = true;
+        }
+      }
+
+      if (!passwordMatchesScrypt && !uidMatchesOwner) {
+        if (!acc.hasPassword) {
+          return res.status(401).json({
+            success: false,
+            needsPasswordOrUid: true,
+            error:
+              "This email is linked to an active registration without a portal password yet. Sign in directly using your Unique Registration Code (UID), or click 'Recover via Gmail' to verify OTP and set a password.",
+          });
+        }
+        return res.status(401).json({
+          success: false,
+          error: "Invalid password for this client account. You can also sign in with your Unique Registration Code or recover via Gmail.",
+        });
+      }
+
+      const refreshedAcc = upsertServerClientAccount(authData, appState, { email: cleanEmail });
+      const token = issueClientSessionToken(authData, refreshedAcc);
+      saveStoredAuthData(authData);
+
+      const snapshot = collectClientRegistrationsSnapshot(appState, cleanEmail);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({
+        success: true,
+        loginMethod: uidMatchesOwner ? "email_uid" : "password",
+        user: sanitizeClientAccountForResponse(refreshedAcc),
+        token,
+        snapshot,
+      });
+    } catch (err: any) {
+      console.error("Client Login Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to authenticate client account." });
+    }
+  });
+
+  app.get("/api/auth/client/me", (req, res) => {
+    try {
+      const authHeader = String(req.headers.authorization || "");
+      const rawToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+      if (!rawToken) {
+        return res.status(401).json({ success: false, error: "Authentication token required." });
+      }
+      const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const authData = getStoredAuthData();
+      const session = authData.sessions.find((s) => s.tokenHash === tokenHash && s.expiresAtMs > Date.now());
+      if (!session) {
+        return res.status(401).json({ success: false, error: "Session expired or invalid." });
+      }
+      const appState = getStoredAppState();
+      const acc = findClientAccountOrBootstrapFromAppState(authData, appState, session.email);
+      if (!acc) {
+        return res.status(404).json({ success: false, error: "Client account no longer exists." });
+      }
+      const snapshot = collectClientRegistrationsSnapshot(appState, acc.email);
+      return res.json({
+        success: true,
+        user: sanitizeClientAccountForResponse(acc),
+        snapshot,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: "Failed to validate session." });
+    }
+  });
+
+  app.post("/api/registrations/sync-cloud", (req, res) => {
+    try {
+      const body = req.body || {};
+      const cleanEmail = sanitizeHeaderString(body.email, 180).toLowerCase();
+      const cleanName = sanitizeHeaderString(body.name, 120);
+      const cleanPhone = sanitizeHeaderString(body.phone, 40);
+      const cleanCompany = sanitizeHeaderString(body.company, 180);
+      const rawRecords = Array.isArray(body.records)
+        ? body.records
+        : Array.isArray(body.cloudRecords)
+          ? body.cloudRecords
+          : [];
+      const records: any[] = rawRecords.slice(0, 50);
+      if (!isValidEmailAddress(cleanEmail)) {
+        return res.status(400).json({ success: false, error: "Valid verified email is required." });
+      }
+
+      const appState = getStoredAppState();
+      const authData = getStoredAuthData();
+      const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"])
+        ? [...appState["db_registration_uids"]]
+        : [];
+      const revokedMap: Record<string, any> = appState["scoders_revoked_passes"] || {};
+
+      for (const item of records) {
+        const cleanUid = String(item?.uid || "").replace(/\s+/g, "").trim().toUpperCase();
+        const section = normalizeSectionName(item?.section);
+        const itemEmail = String(item?.clientEmail || cleanEmail).trim().toLowerCase();
+        if (!cleanUid || !/^[A-Z0-9-]{4,64}$/.test(cleanUid) || !section || itemEmail !== cleanEmail) continue;
+        if (revokedMap[cleanUid]) continue;
+
+        const existingLookup = findExistingRecordByKeyOrUid(appState, cleanUid, null);
+        if (existingLookup.record && existingLookup.record.clientEmail?.toLowerCase() !== cleanEmail) {
+          // Never allow overwriting another user's existing registration UID
+          continue;
+        }
+        if (existingLookup.revoked) continue;
+
+        const validity = computeUidValidityWindow(section, item?.validUntil);
+        const rec: RegistrationUidRecord = {
+          uid: cleanUid,
+          section,
+          itemId: String(item?.itemId || section).trim().slice(0, 120),
+          itemTitle: String(item?.itemTitle || "S-CODERS Offering").trim().slice(0, 200),
+          clientName: String(item?.clientName || cleanName || "Registered Client").trim().slice(0, 120),
+          clientEmail: cleanEmail,
+          clientPhone: typeof item?.clientPhone === "string" ? item.clientPhone.trim().slice(0, 40) : undefined,
+          clientRole: typeof item?.clientRole === "string" ? item.clientRole.trim().slice(0, 180) : undefined,
+          amount: Number(item?.amount) || 0,
+          currency: "INR",
+          paymentStatus: item?.paymentStatus === "VERIFIED" ? "VERIFIED" : "NOT_REQUIRED",
+          paymentId: typeof item?.paymentId === "string" ? item.paymentId.trim().slice(0, 120) : undefined,
+          dedupeKey: `${section}:cloud:${cleanUid}`,
+          chatId: typeof item?.chatId === "string" && item.chatId ? item.chatId.trim().slice(0, 120) : undefined,
+          metadata: {
+            requirements: typeof item?.requirements === "string" ? item.requirements.slice(0, 2000) : undefined,
+            notes: typeof item?.notes === "string" ? item.notes.slice(0, 2000) : undefined,
+            budget: typeof item?.budget === "string" ? item.budget.slice(0, 100) : undefined,
+            timeline: typeof item?.timeline === "string" ? item.timeline.slice(0, 100) : undefined,
+          },
+          issuedAt: typeof item?.issuedAt === "string" && item.issuedAt ? item.issuedAt : validity.validFrom,
+          validFrom: validity.validFrom,
+          validUntil: typeof item?.validUntil === "string" && item.validUntil ? item.validUntil : validity.validUntil,
+          status: item?.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
+          confirmationEmailSent: true,
+        };
+
+        ensureHydratedRecordsInAppState(appState, rec);
+        const existingIdx = uidRecords.findIndex((u) => String(u?.uid || "").trim().toUpperCase() === cleanUid);
+        if (existingIdx < 0) {
+          uidRecords.unshift(rec);
+        }
+      }
+      appState["db_registration_uids"] = uidRecords;
+
+      const acc = upsertServerClientAccount(authData, appState, {
+        email: cleanEmail,
+        name: cleanName || undefined,
+        phone: cleanPhone || undefined,
+        clientRole: cleanCompany || undefined,
+      });
+      const token = issueClientSessionToken(authData, acc);
+      saveStoredAuthData(authData);
+      saveStoredAppState(appState);
+
+      const snapshot = collectClientRegistrationsSnapshot(appState, cleanEmail);
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.json({
+        success: true,
+        user: sanitizeClientAccountForResponse(acc),
+        token,
+        snapshot,
+      });
+    } catch (err: any) {
+      console.error("Cloud Sync Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to synchronize cloud registrations." });
+    }
+  });
+
+  app.post("/api/auth/client/logout", (req, res) => {
+    try {
+      const authHeader = String(req.headers.authorization || "");
+      const rawToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+      if (rawToken) {
+        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+        const authData = getStoredAuthData();
+        authData.sessions = authData.sessions.filter((s) => s.tokenHash !== tokenHash);
+        saveStoredAuthData(authData);
+      }
+      return res.json({ success: true });
+    } catch {
+      return res.json({ success: true });
     }
   });
 
@@ -6089,6 +8027,190 @@ Return ONLY valid JSON with this structure:
     }
   });
 
+  // Live SMTP Diagnostic Test Email Trigger (fixed template, rate-limited, no arbitrary HTML injection)
+  app.post("/api/email/send-test", async (req, res) => {
+    try {
+      const recipient = sanitizeHeaderString(req.body?.to || OFFICIAL_SCODERS_EMAIL, 254).toLowerCase();
+      if (!isValidEmailAddress(recipient)) {
+        return res.status(400).json({ success: false, error: "Please enter a valid recipient email address." });
+      }
+
+      const oneMinuteAgo = Date.now() - 60000;
+      while (testEmailWindowTimestamps.length > 0 && testEmailWindowTimestamps[0] < oneMinuteAgo) {
+        testEmailWindowTimestamps.shift();
+      }
+      if (testEmailWindowTimestamps.length >= 6) {
+        return res.status(429).json({ success: false, error: "Rate limit reached. Wait a few seconds before sending another test email." });
+      }
+      testEmailWindowTimestamps.push(Date.now());
+
+      const cfg = getEmailProviderConfig();
+      const providerLabel = cfg.hasSmtp
+        ? "Gmail SMTP (scoders82@gmail.com)"
+        : cfg.hasResend
+        ? "Resend HTTPS API"
+        : cfg.hasSendgrid
+        ? "SendGrid HTTPS API"
+        : "Ethereal Sandbox";
+
+      const subject = `✅ S-CODERS Live Email Automation Test (${new Date().toLocaleTimeString("en-IN")})`;
+      const result = await sendEmailNotification({
+        to: recipient,
+        subject,
+        html: getSmtpDiagnosticEmailHtml(recipient, providerLabel, resolveAppUrl(req, "/")),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+
+      const appState = getStoredAppState();
+      appendEmailDispatchLog(appState, {
+        section: "diagnostic_test",
+        to: recipient,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject,
+        itemTitle: "Admin Live SMTP Verification Test",
+        status: result.success ? "SENT" : "FAILED",
+        messageId: result.messageId,
+        previewUrl: result.previewUrl,
+        simulated: result.simulated,
+        realEmailDelivered: result.realEmailDelivered,
+        deliveryMode: result.deliveryMode,
+        error: result.error,
+        detailsSummary: `Diagnostic test to ${recipient} (${result.deliveryMode})`,
+      });
+      saveStoredAppState(appState);
+
+      return res.status(result.success ? 200 : 502).json({
+        success: Boolean(result.success),
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
+        officialSender: OFFICIAL_SCODERS_EMAIL,
+        to: recipient,
+        messageId: result.messageId,
+        previewUrl: result.previewUrl,
+        error: result.error,
+      });
+    } catch (err: any) {
+      console.error("Send Test Email Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to send diagnostic email." });
+    }
+  });
+
+  // General Website Contact / Inquiry Submission + Dual Automated Emails (Visitor + scoders82@gmail.com)
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const cleanName = sanitizeHeaderString(req.body?.name, 120);
+      const cleanEmail = sanitizeHeaderString(req.body?.email, 254).toLowerCase();
+      const cleanCompany = sanitizeHeaderString(req.body?.company || "Self / Individual", 120);
+      const cleanPhone = sanitizeHeaderString(req.body?.phone || "Not Provided", 40);
+      const cleanInterest = sanitizeHeaderString(req.body?.interest || "General Business Enquiry", 80);
+      const cleanMessage = String(req.body?.message || "").trim().slice(0, 4000);
+
+      if (!cleanName || !isValidEmailAddress(cleanEmail) || !cleanMessage) {
+        return res.status(400).json({
+          success: false,
+          error: "Name, valid email address, and inquiry message are required.",
+        });
+      }
+
+      const enquiryId = `ENQ-${Date.now().toString(36).toUpperCase()}`;
+      const appState = getStoredAppState();
+
+      const storedMessages: any[] = Array.isArray(appState["scoders_messages"]) ? [...appState["scoders_messages"]] : [];
+      storedMessages.unshift({
+        id: enquiryId,
+        name: cleanName,
+        email: cleanEmail,
+        company: cleanCompany,
+        phone: cleanPhone,
+        interest: cleanInterest,
+        message: cleanMessage,
+        timestamp: new Date().toISOString(),
+      });
+      appState["scoders_messages"] = storedMessages.slice(0, 300);
+
+      const dbEnquiries: any[] = Array.isArray(appState["db_enquiries"]) ? [...appState["db_enquiries"]] : [];
+      dbEnquiries.unshift({
+        id: enquiryId,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        subject: `${cleanInterest} [${enquiryId}]`,
+        message: cleanMessage,
+        timestamp: new Date().toISOString(),
+        replyStatus: "Pending",
+        replyMessage: null,
+        replyDate: null,
+      });
+      appState["db_enquiries"] = dbEnquiries.slice(0, 300);
+
+      const clientSubject = `✅ Inquiry Received - S-CODERS (${enquiryId})`;
+      const clientEmailRes = await sendEmailNotification({
+        to: cleanEmail,
+        subject: clientSubject,
+        html: getContactAcknowledgementEmailHtml({
+          name: cleanName,
+          email: cleanEmail,
+          interest: cleanInterest,
+          message: cleanMessage,
+          enquiryId,
+        }),
+        from: `"S-CODERS (Bharat Tech Developers)" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: OFFICIAL_SCODERS_EMAIL,
+      });
+
+      const adminSubject = `📩 New Website Inquiry (${enquiryId}) from ${cleanName}`;
+      const adminEmailRes = await sendEmailNotification({
+        to: OFFICIAL_SCODERS_EMAIL,
+        subject: adminSubject,
+        html: getContactAdminAlertEmailHtml({
+          name: cleanName,
+          email: cleanEmail,
+          company: cleanCompany,
+          phone: cleanPhone,
+          interest: cleanInterest,
+          message: cleanMessage,
+          enquiryId,
+        }),
+        from: `"S-CODERS Website Inquiries" <${OFFICIAL_SCODERS_EMAIL}>`,
+        replyTo: cleanEmail,
+      });
+
+      appendEmailDispatchLog(appState, {
+        section: "contact",
+        to: cleanEmail,
+        from: OFFICIAL_SCODERS_EMAIL,
+        subject: clientSubject,
+        uid: enquiryId,
+        itemTitle: cleanInterest,
+        status: clientEmailRes.success ? "SENT" : "FAILED",
+        messageId: clientEmailRes.messageId,
+        previewUrl: clientEmailRes.previewUrl,
+        simulated: clientEmailRes.simulated,
+        realEmailDelivered: clientEmailRes.realEmailDelivered,
+        deliveryMode: clientEmailRes.deliveryMode,
+        error: clientEmailRes.error,
+        detailsSummary: `Contact confirmation to ${cleanEmail}; admin alert: ${adminEmailRes.success ? "sent" : "failed"}`,
+      });
+      saveStoredAppState(appState);
+
+      return res.json({
+        success: true,
+        enquiryId,
+        emailSent: Boolean(clientEmailRes.success),
+        realEmailDelivered: Boolean(clientEmailRes.realEmailDelivered),
+        deliveryMode: clientEmailRes.deliveryMode,
+        previewUrl: clientEmailRes.previewUrl,
+        emailError: clientEmailRes.error,
+        emailFrom: OFFICIAL_SCODERS_EMAIL,
+        adminNotified: Boolean(adminEmailRes.success),
+      });
+    } catch (err: any) {
+      console.error("Contact Submission Error:", err);
+      return res.status(500).json({ success: false, error: "Failed to submit inquiry." });
+    }
+  });
+
   // 1. Service Registration Accepted Email Endpoint (Deduplicated & Persisted)
   app.post("/api/email/service-accepted", async (req, res) => {
     try {
@@ -6125,10 +8247,12 @@ Return ONLY valid JSON with this structure:
       const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
       const cleanPayId = paymentId ? String(paymentId).trim() : "";
       const cleanOrderId = orderId ? String(orderId).trim() : "";
+      const cfg = getEmailProviderConfig();
       const existing = uidRecords.find(
         (r) =>
           r.section === "service" &&
           r.confirmationEmailSent &&
+          (Boolean(r.realEmailDelivered) || !cfg.anyRealProviderConfigured) &&
           (r.uid?.toUpperCase() === finalKey ||
             (cleanPayId && r.paymentId === cleanPayId) ||
             (cleanOrderId && r.orderId === cleanOrderId))
@@ -6140,6 +8264,7 @@ Return ONLY valid JSON with this structure:
           uid: existing.uid,
           emailSent: false,
           emailSkippedDuplicate: true,
+          realEmailDelivered: Boolean(existing.realEmailDelivered),
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           message: "Confirmation email already dispatched for this service UID.",
         });
@@ -6191,10 +8316,17 @@ Return ONLY valid JSON with this structure:
         status: "ACTIVE",
         confirmationEmailSent: Boolean(result.success),
         confirmationEmailSentAt: result.success ? new Date().toISOString() : undefined,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         emailMessageId: result.messageId,
       };
-      uidRecords.unshift(record);
+      const existingSvcIdx = uidRecords.findIndex((r) => r?.uid?.toUpperCase() === finalKey);
+      if (existingSvcIdx >= 0) {
+        uidRecords[existingSvcIdx] = record;
+      } else {
+        uidRecords.unshift(record);
+      }
       appState["db_registration_uids"] = uidRecords;
       appendEmailDispatchLog(appState, {
         section: "service",
@@ -6208,6 +8340,8 @@ Return ONLY valid JSON with this structure:
         messageId: result.messageId,
         previewUrl: result.previewUrl,
         simulated: result.simulated,
+        realEmailDelivered: result.realEmailDelivered,
+        deliveryMode: result.deliveryMode,
       });
       saveStoredAppState(appState);
 
@@ -6280,10 +8414,12 @@ Return ONLY valid JSON with this structure:
       const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
       const cleanPayId = paymentId ? String(paymentId).trim() : "";
       const cleanOrderId = orderId ? String(orderId).trim() : "";
+      const cfg = getEmailProviderConfig();
       const existing = uidRecords.find(
         (r) =>
           r.section === "workshop" &&
           r.confirmationEmailSent &&
+          (Boolean(r.realEmailDelivered) || !cfg.anyRealProviderConfigured) &&
           (r.uid?.toUpperCase() === finalKey ||
             (cleanPayId && r.paymentId === cleanPayId) ||
             (cleanOrderId && r.orderId === cleanOrderId))
@@ -6295,6 +8431,7 @@ Return ONLY valid JSON with this structure:
           uid: existing.uid,
           emailSent: false,
           emailSkippedDuplicate: true,
+          realEmailDelivered: Boolean(existing.realEmailDelivered),
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           message: "Workshop confirmation email already dispatched.",
         });
@@ -6343,10 +8480,17 @@ Return ONLY valid JSON with this structure:
         status: "ACTIVE",
         confirmationEmailSent: Boolean(result.success),
         confirmationEmailSentAt: result.success ? new Date().toISOString() : undefined,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         emailMessageId: result.messageId,
       };
-      uidRecords.unshift(record);
+      const existingWkspIdx = uidRecords.findIndex((r) => r?.uid?.toUpperCase() === finalKey);
+      if (existingWkspIdx >= 0) {
+        uidRecords[existingWkspIdx] = record;
+      } else {
+        uidRecords.unshift(record);
+      }
       appState["db_registration_uids"] = uidRecords;
       appendEmailDispatchLog(appState, {
         section: "workshop",
@@ -6359,6 +8503,8 @@ Return ONLY valid JSON with this structure:
         messageId: result.messageId,
         previewUrl: result.previewUrl,
         simulated: result.simulated,
+        realEmailDelivered: result.realEmailDelivered,
+        deliveryMode: result.deliveryMode,
       });
       saveStoredAppState(appState);
 
@@ -6468,10 +8614,12 @@ Return ONLY valid JSON with this structure:
       const uidRecords: RegistrationUidRecord[] = Array.isArray(appState["db_registration_uids"]) ? [...appState["db_registration_uids"]] : [];
       const cleanPayId = paymentId ? String(paymentId).trim() : "";
       const cleanOrderId = orderId ? String(orderId).trim() : "";
+      const cfg = getEmailProviderConfig();
       const existing = uidRecords.find(
         (r) =>
           r.section === "event" &&
           r.confirmationEmailSent &&
+          (Boolean(r.realEmailDelivered) || !cfg.anyRealProviderConfigured) &&
           (r.uid?.toUpperCase() === finalCode ||
             (cleanPayId && r.paymentId === cleanPayId) ||
             (cleanOrderId && r.orderId === cleanOrderId))
@@ -6483,6 +8631,7 @@ Return ONLY valid JSON with this structure:
           uid: existing.uid,
           emailSent: false,
           emailSkippedDuplicate: true,
+          realEmailDelivered: Boolean(existing.realEmailDelivered),
           emailFrom: OFFICIAL_SCODERS_EMAIL,
           message: "Event confirmation email already dispatched.",
         });
@@ -6533,10 +8682,17 @@ Return ONLY valid JSON with this structure:
         status: "ACTIVE",
         confirmationEmailSent: Boolean(result.success),
         confirmationEmailSentAt: result.success ? new Date().toISOString() : undefined,
+        realEmailDelivered: Boolean(result.realEmailDelivered),
+        deliveryMode: result.deliveryMode,
         emailFrom: OFFICIAL_SCODERS_EMAIL,
         emailMessageId: result.messageId,
       };
-      uidRecords.unshift(record);
+      const existingEvtIdx = uidRecords.findIndex((r) => r?.uid?.toUpperCase() === finalCode);
+      if (existingEvtIdx >= 0) {
+        uidRecords[existingEvtIdx] = record;
+      } else {
+        uidRecords.unshift(record);
+      }
       appState["db_registration_uids"] = uidRecords;
       appendEmailDispatchLog(appState, {
         section: "event",
@@ -6549,6 +8705,8 @@ Return ONLY valid JSON with this structure:
         messageId: result.messageId,
         previewUrl: result.previewUrl,
         simulated: result.simulated,
+        realEmailDelivered: result.realEmailDelivered,
+        deliveryMode: result.deliveryMode,
       });
       saveStoredAppState(appState);
 

@@ -1,6 +1,31 @@
 {
   "db_service_registrations": [
     {
+      "id": "REG-SVC-49984",
+      "clientProfile": {
+        "name": "Test E2E Client Updated",
+        "email": "verify.e2e.client3@gmail.com",
+        "phone": "+91 98765 00001",
+        "company": "CTO"
+      },
+      "serviceId": "ai",
+      "selectedServiceTitle": "AI Agent Systems",
+      "uniqueKey": "BTD-SERV-AI-3999-295E",
+      "projectRequirements": "Updated persistent service notes!",
+      "notes": "Updated persistent service notes!",
+      "budget": "₹50,000",
+      "timeline": "2 Weeks",
+      "projectStatus": "Pending",
+      "registrationDate": "2026-11-27",
+      "projectSubmissionDate": "2026-12-27",
+      "sourceCodeFileId": "FIL-SRC-9984",
+      "pdfFileId": "FIL-PDF-9984",
+      "chatId": "chat-svc-BTD-SERV-AI-3999-295E",
+      "feedbackId": null,
+      "invoiceId": "INV-2026-984",
+      "updatedAt": "2026-11-27T12:34:10.002Z"
+    },
+    {
       "id": "REG-SVC-4712",
       "clientProfile": {
         "name": "Bhuvan M",
@@ -48,6 +73,31 @@
     }
   ],
   "db_workshop_registrations": [
+    {
+      "id": "reg-wksp-1795782852849",
+      "participantProfile": {
+        "name": "Test E2E Client Updated",
+        "email": "verify.e2e.client3@gmail.com",
+        "phone": "+91 98765 00001",
+        "role": "Senior AI Engineer"
+      },
+      "workshopId": "w-1",
+      "workshopTitle": "Building Real-world AI Agents with n8n & Gemini",
+      "paymentStatus": "Successful",
+      "amountPaid": 1499,
+      "paymentMethod": "Verified Gateway Payment",
+      "paymentDate": "2026-11-27",
+      "transactionId": "PAY_TEST_E2E_003",
+      "uniqueAccessKey": "BTD-WKSP-W-1-12D6-D403",
+      "materialsFileIds": [
+        "file-pdf-1795782852849",
+        "file-src-1795782852849"
+      ],
+      "chatId": "chat-wksp-BTD-WKSP-W-1-12D6-D403",
+      "feedbackId": null,
+      "notes": "Persistent workshop notes saved!",
+      "updatedAt": "2026-11-27T12:34:12.856Z"
+    },
     {
       "id": "reg-wksp-1791130925724",
       "participantProfile": {
@@ -143,6 +193,19 @@
   ],
   "db_payments": [
     {
+      "id": "PAY_TEST_E2E_003",
+      "clientId": "verify.e2e.client3@gmail.com",
+      "clientName": "Test E2E Client",
+      "clientEmail": "verify.e2e.client3@gmail.com",
+      "amount": 1499,
+      "paymentMethod": "Verified Gateway Payment",
+      "status": "Successful",
+      "timestamp": "2026-11-27T12:34:10.029Z",
+      "reference": "WORKSHOP: Building Real-world AI Agents with n8n & Gemini",
+      "interrupted": false,
+      "failureReason": null
+    },
+    {
       "id": "pay_rzp_ALXLUTDO",
       "clientId": "attendee@scoders.com",
       "clientName": "Attendee",
@@ -214,6 +277,46 @@
     }
   ],
   "db_chats": [
+    {
+      "id": "chat-wksp-BTD-WKSP-W-1-12D6-D403",
+      "clientName": "Test E2E Client Updated",
+      "clientEmail": "verify.e2e.client3@gmail.com",
+      "registrationId": "reg-wksp-1795782852849",
+      "reference": "Building Real-world AI Agents with n8n & Gemini",
+      "workshopId": "w-1",
+      "uniqueAccessKey": "BTD-WKSP-W-1-12D6-D403",
+      "messages": [
+        {
+          "id": "msg-init-1795782852849",
+          "sender": "team",
+          "senderName": "S-CODERS Mentor Team",
+          "senderRole": "S-CODERS Founder & CEO",
+          "content": "Congratulations Test E2E Client! You are officially registered for 'Building Real-world AI Agents with n8n & Gemini'. This is your dedicated channel with our mentors.",
+          "timestamp": "2026-11-27T12:34:12.849Z"
+        }
+      ],
+      "lastUpdated": "2026-11-27T12:34:12.857Z"
+    },
+    {
+      "id": "chat-svc-BTD-SERV-AI-3999-295E",
+      "clientName": "Test E2E Client Updated",
+      "clientEmail": "verify.e2e.client3@gmail.com",
+      "registrationId": "REG-SVC-49984",
+      "reference": "AI Agent Systems",
+      "serviceId": "ai",
+      "uniqueAccessKey": "BTD-SERV-AI-3999-295E",
+      "messages": [
+        {
+          "id": "msg-init-1795782849984",
+          "sender": "team",
+          "senderName": "S-CODERS Lead Team",
+          "senderRole": "S-CODERS Founder & CEO",
+          "content": "Welcome Test E2E Client to S-CODERS! Your dedicated engineering workspace for 'AI Agent Systems' is active.",
+          "timestamp": "2026-11-27T12:34:09.984Z"
+        }
+      ],
+      "lastUpdated": "2026-11-27T12:34:10.002Z"
+    },
     {
       "id": "chat-wksp-test",
       "clientName": "Shreyas.M",
@@ -766,6 +869,66 @@
   ],
   "db_registration_uids": [
     {
+      "uid": "BTD-WKSP-W-1-12D6-D403",
+      "section": "workshop",
+      "itemId": "w-1",
+      "itemTitle": "Building Real-world AI Agents with n8n & Gemini",
+      "clientName": "Test E2E Client Updated",
+      "clientEmail": "verify.e2e.client3@gmail.com",
+      "clientPhone": "+91 98765 00001",
+      "clientRole": "Senior AI Engineer",
+      "amount": 1499,
+      "currency": "INR",
+      "paymentStatus": "VERIFIED",
+      "paymentId": "PAY_TEST_E2E_003",
+      "dedupeKey": "workshop:pay:PAY_TEST_E2E_003",
+      "chatId": "chat-wksp-BTD-WKSP-W-1-12D6-D403",
+      "metadata": {
+        "notes": "Persistent workshop notes saved!"
+      },
+      "issuedAt": "2026-11-27T12:34:10.029Z",
+      "validFrom": "2026-11-27T12:34:10.029Z",
+      "validUntil": "2026-12-27T12:34:10.029Z",
+      "status": "ACTIVE",
+      "confirmationEmailSent": true,
+      "confirmationEmailSentAt": "2026-11-27T12:34:12.849Z",
+      "realEmailDelivered": true,
+      "deliveryMode": "smtp",
+      "emailFrom": "scoders82@gmail.com",
+      "emailMessageId": "<3b14ffd4-e5db-d993-a0b3-dd6822efba52@gmail.com>"
+    },
+    {
+      "uid": "BTD-SERV-AI-3999-295E",
+      "section": "service",
+      "itemId": "ai",
+      "itemTitle": "AI Agent Systems",
+      "clientName": "Test E2E Client Updated",
+      "clientEmail": "verify.e2e.client3@gmail.com",
+      "clientPhone": "+91 98765 00001",
+      "clientRole": "CTO",
+      "amount": 0,
+      "currency": "INR",
+      "paymentStatus": "NOT_REQUIRED",
+      "dedupeKey": "service:reg:verify.e2e.client3@gmail.com:ai",
+      "chatId": "chat-svc-BTD-SERV-AI-3999-295E",
+      "metadata": {
+        "requirements": "Updated persistent service notes!",
+        "notes": "Updated persistent service notes!",
+        "budget": "₹50,000",
+        "timeline": "2 Weeks"
+      },
+      "issuedAt": "2026-11-27T12:34:07.918Z",
+      "validFrom": "2026-11-27T12:34:07.918Z",
+      "validUntil": "2027-05-26T12:34:07.918Z",
+      "status": "ACTIVE",
+      "confirmationEmailSent": true,
+      "confirmationEmailSentAt": "2026-11-27T12:34:09.983Z",
+      "realEmailDelivered": true,
+      "deliveryMode": "smtp",
+      "emailFrom": "scoders82@gmail.com",
+      "emailMessageId": "<374a5cd9-2c35-5190-9678-d03f781b7633@gmail.com>"
+    },
+    {
       "uid": "SC-EVT-90326C51",
       "section": "event",
       "itemId": "evt-1",
@@ -847,6 +1010,64 @@
     }
   ],
   "db_email_logs": [
+    {
+      "id": "EML-1795782872184-34A8A0",
+      "section": "service",
+      "to": "verify.e2e.client3@gmail.com",
+      "from": "scoders82@gmail.com",
+      "subject": "S-CODERS Recovery Verification Code",
+      "status": "SENT",
+      "messageId": "<c7e4c56d-ed4f-0434-4c0e-b66cad5aef9e@gmail.com>",
+      "simulated": false,
+      "detailsSummary": "6-digit email verification OTP dispatched for Service Workspace recovery.",
+      "timestamp": "2026-11-27T12:34:32.184Z"
+    },
+    {
+      "id": "EML-1795782854975-EBBBE8",
+      "section": "recovery",
+      "to": "verify.e2e.client3@gmail.com",
+      "from": "scoders82@gmail.com",
+      "subject": "S-CODERS Recovery Verification Code",
+      "status": "SENT",
+      "messageId": "<ca8c6872-ce13-ccf2-a3ff-b523540587c8@gmail.com>",
+      "simulated": false,
+      "detailsSummary": "6-digit email verification OTP dispatched for S-CODERS Account & Registrations recovery.",
+      "timestamp": "2026-11-27T12:34:14.975Z"
+    },
+    {
+      "id": "EML-1795782852850-998A14",
+      "section": "workshop",
+      "to": "verify.e2e.client3@gmail.com",
+      "from": "scoders82@gmail.com",
+      "subject": "🎓 Workshop Confirmed & Payment Verified - S-CODERS UID (BTD-WKSP-W-1-12D6-D403)",
+      "uid": "BTD-WKSP-W-1-12D6-D403",
+      "dedupeKey": "workshop:pay:PAY_TEST_E2E_003",
+      "itemTitle": "Building Real-world AI Agents with n8n & Gemini",
+      "status": "SENT",
+      "messageId": "<3b14ffd4-e5db-d993-a0b3-dd6822efba52@gmail.com>",
+      "simulated": false,
+      "realEmailDelivered": true,
+      "deliveryMode": "smtp",
+      "detailsSummary": "Workshop: Building Real-world AI Agents with n8n & Gemini | Date: TBD | Mid-session rejoin instructions included",
+      "timestamp": "2026-11-27T12:34:12.850Z"
+    },
+    {
+      "id": "EML-1795782849985-477268",
+      "section": "service",
+      "to": "verify.e2e.client3@gmail.com",
+      "from": "scoders82@gmail.com",
+      "subject": "✅ Service Registered - Your Unique S-CODERS Code (BTD-SERV-AI-3999-295E)",
+      "uid": "BTD-SERV-AI-3999-295E",
+      "dedupeKey": "service:reg:verify.e2e.client3@gmail.com:ai",
+      "itemTitle": "AI Agent Systems",
+      "status": "SENT",
+      "messageId": "<374a5cd9-2c35-5190-9678-d03f781b7633@gmail.com>",
+      "simulated": false,
+      "realEmailDelivered": true,
+      "deliveryMode": "smtp",
+      "detailsSummary": "Service: AI Agent Systems | Safe-keeping & recovery notice included",
+      "timestamp": "2026-11-27T12:34:09.985Z"
+    },
     {
       "id": "EML-1795283869975-4F8EEE",
       "section": "service",

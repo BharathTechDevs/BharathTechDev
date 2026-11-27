@@ -20,40 +20,89 @@ export default function Contact() {
   const [interest, setInterest] = useState('project');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedEmailMeta, setSubmittedEmailMeta] = useState<{
+    email: string;
+    enquiryId?: string;
+    realEmailDelivered?: boolean;
+    deliveryMode?: string;
+    previewUrl?: string;
+  } | null>(null);
 
   const [savedMessages, setSavedMessages] = useState<GeneralMessage[]>(() => {
     const saved = localStorage.getItem('scoders_messages');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !message) return;
+    if (!name.trim() || !email.trim() || !message.trim() || submitting) return;
 
-    const newMessage: GeneralMessage = {
-      id: Date.now().toString(),
-      name,
-      email,
-      company: company || 'Self / Individual',
-      phone: phone || 'Not Provided',
-      message,
-      interest,
-      timestamp: new Date().toLocaleDateString(),
-    };
+    setSubmitting(true);
+    setSubmitError(null);
 
-    const updated = [newMessage, ...savedMessages];
-    setSavedMessages(updated);
-    localStorage.setItem('scoders_messages', JSON.stringify(updated));
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCompany = company.trim() || 'Self / Individual';
+    const cleanPhone = phone.trim() || 'Not Provided';
+    const cleanMessage = message.trim();
 
-    setSubmitted(true);
-    
-    // Reset Form
-    setName('');
-    setEmail('');
-    setCompany('');
-    setPhone('');
-    setMessage('');
-    setInterest('project');
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cleanName,
+          email: cleanEmail,
+          company: cleanCompany,
+          phone: cleanPhone,
+          interest,
+          message: cleanMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        setSubmitError(data?.error || 'Failed to send your inquiry. Please verify your email and try again.');
+        return;
+      }
+
+      const newMessage: GeneralMessage = {
+        id: data.enquiryId || Date.now().toString(),
+        name: cleanName,
+        email: cleanEmail,
+        company: cleanCompany,
+        phone: cleanPhone,
+        message: cleanMessage,
+        interest,
+        timestamp: new Date().toLocaleDateString(),
+      };
+
+      const updated = [newMessage, ...savedMessages];
+      setSavedMessages(updated);
+      localStorage.setItem('scoders_messages', JSON.stringify(updated));
+
+      setSubmittedEmailMeta({
+        email: cleanEmail,
+        enquiryId: data.enquiryId,
+        realEmailDelivered: Boolean(data.realEmailDelivered),
+        deliveryMode: data.deliveryMode,
+        previewUrl: data.previewUrl,
+      });
+      setSubmitted(true);
+
+      // Reset Form
+      setName('');
+      setEmail('');
+      setCompany('');
+      setPhone('');
+      setMessage('');
+      setInterest('project');
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Unable to reach S-CODERS server. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const socialLinks = [
@@ -175,11 +224,25 @@ export default function Contact() {
                     <CheckCircle className="w-8 h-8 text-brand-teal" />
                   </div>
                   <h3 className="font-display font-extrabold text-white text-2xl mb-3">Enquiry Registered!</h3>
-                  <p className="text-gray-400 text-sm font-sans font-light max-w-md mx-auto mb-6">
-                    Your request has been successfully saved to our Bengaluru dispatch database. Shreyas M. or an S-CODERS • Bharat Tech Developers lead coordinator will reach out to you within 24 hours.
+                  <p className="text-gray-400 text-sm font-sans font-light max-w-md mx-auto mb-4">
+                    Your request has been saved to our Bengaluru dispatch database{submittedEmailMeta?.enquiryId ? ` (Ref: ${submittedEmailMeta.enquiryId})` : ''}. Shreyas M. or an S-CODERS lead coordinator will reply within 24 hours.
                   </p>
+                  {submittedEmailMeta && (
+                    <div className={`max-w-md mx-auto mb-6 p-3.5 rounded-xl border text-xs ${
+                      submittedEmailMeta.realEmailDelivered
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                        : 'bg-blue-500/10 border-blue-500/30 text-blue-200'
+                    }`}>
+                      {submittedEmailMeta.realEmailDelivered
+                        ? `✓ Confirmation email delivered to ${submittedEmailMeta.email} via scoders82@gmail.com.`
+                        : `Confirmation prepared for ${submittedEmailMeta.email} via scoders82@gmail.com.`}
+                    </div>
+                  )}
                   <button
-                    onClick={() => setSubmitted(false)}
+                    onClick={() => {
+                      setSubmitted(false);
+                      setSubmittedEmailMeta(null);
+                    }}
                     className="px-6 py-2.5 bg-brand-teal text-brand-dark font-bold text-xs rounded-full font-mono uppercase tracking-wider hover:bg-white transition-colors"
                   >
                     Submit Another Inquiry
@@ -273,12 +336,19 @@ export default function Contact() {
                     <span>Your data is securely locked. We respect direct developer-to-client privacy guidelines.</span>
                   </div>
 
+                  {submitError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300">
+                      {submitError}
+                    </div>
+                  )}
+
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="w-full px-6 py-4 bg-brand-teal text-brand-dark font-bold rounded-xl hover:bg-white active:scale-95 transition-all duration-300 text-sm flex items-center justify-center gap-2 group cursor-pointer"
+                      disabled={submitting}
+                      className="w-full px-6 py-4 bg-brand-teal text-brand-dark font-bold rounded-xl hover:bg-white active:scale-95 disabled:opacity-60 transition-all duration-300 text-sm flex items-center justify-center gap-2 group cursor-pointer"
                     >
-                      Transmit Proposal
+                      {submitting ? 'Sending Inquiry & Confirmation Email...' : 'Transmit Proposal'}
                       <Send className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>

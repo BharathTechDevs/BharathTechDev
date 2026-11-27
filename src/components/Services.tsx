@@ -46,50 +46,73 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     return localStorage.getItem('scoders_admin_auth') === 'true';
   });
 
-  // Access control state persistence
-  const [registeredKeys, setRegisteredKeys] = useState<{
-    [serviceId: string]: {
-      key: string;
-      name: string;
-      email: string;
-      purpose?: string;
-      role?: string;
-      requirements?: string;
-      budget?: string;
-      timeline?: string;
-      timestamp: string;
-      chatId?: string;
+  // Sync current user state
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('scoders_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
     }
-  }>(() => {
+  });
+
+  const computeUnlockedServiceKeys = (userObj: AppUser | null) => {
     let keys: Record<string, any> = {};
     const saved = localStorage.getItem('scoders_registered_services');
     if (saved) {
       try {
         keys = JSON.parse(saved) || {};
-      } catch (e) {}
+      } catch {}
     }
+
+    const activeEmail = String(userObj?.email || '').trim().toLowerCase();
+    const sessionUids = new Set(DatabaseEngine.getSessionUnlockedUids());
+
     try {
       const dbRegs = DatabaseEngine.getServiceRegistrations();
       if (Array.isArray(dbRegs)) {
         for (const reg of dbRegs) {
-          if (reg.serviceId && reg.uniqueKey && !keys[reg.serviceId]) {
+          const regKey = String(reg.uniqueKey || '').trim().toUpperCase();
+          const regEmail = String(reg.clientProfile?.email || '').trim().toLowerCase();
+          const belongsToUser = Boolean(activeEmail && regEmail === activeEmail);
+          const unlockedInSession = Boolean(regKey && sessionUids.has(regKey));
+          if (reg.serviceId && regKey && (belongsToUser || unlockedInSession) && !keys[reg.serviceId]) {
             keys[reg.serviceId] = {
-              key: reg.uniqueKey,
+              key: regKey,
               name: reg.clientProfile?.name || 'Registered Client',
-              email: reg.clientProfile?.email || '',
-              role: 'Developer',
+              email: regEmail,
+              phone: reg.clientProfile?.phone || '',
+              role: reg.clientProfile?.company || 'Client Partner',
               requirements: reg.projectRequirements,
               budget: reg.budget,
               timeline: reg.timeline,
-              chatId: reg.chatId || `chat-svc-${reg.uniqueKey}`,
+              chatId: reg.chatId || `chat-svc-${regKey}`,
               timestamp: reg.registrationDate || new Date().toISOString()
             };
           }
         }
       }
-    } catch (e) {}
+    } catch {}
     return keys;
-  });
+  };
+
+  // Access control state persistence (scoped strictly to current authenticated client or verified session UIDs)
+  const [registeredKeys, setRegisteredKeys] = useState<{
+    [serviceId: string]: {
+      key: string;
+      name: string;
+      email: string;
+      phone?: string;
+      purpose?: string;
+      role?: string;
+      requirements?: string;
+      notes?: string;
+      budget?: string;
+      timeline?: string;
+      timestamp: string;
+      chatId?: string;
+    }
+  }>(() => computeUnlockedServiceKeys(currentUser));
 
   // Modals controller
   const [registeringService, setRegisteringService] = useState<Service | null>(null);
@@ -98,6 +121,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   // Registration form states
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState('');
   const [regRequirements, setRegRequirements] = useState('');
   const [regBudget, setRegBudget] = useState('');
@@ -107,12 +131,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     email: string;
     validUntil?: string;
     deduplicated?: boolean;
+    emailSent?: boolean;
     emailFrom?: string;
     deliveryMode?: string;
     realEmailDelivered?: boolean;
     emailError?: string;
     previewUrl?: string;
   } | null>(null);
+  const [resendingSvcEmail, setResendingSvcEmail] = useState(false);
+  const [resendSvcStatus, setResendSvcStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
   const [verifyingKey, setVerifyingKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -127,19 +154,19 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   const [qrPayError, setQrPayError] = useState<string | null>(null);
   const [cancelNotice, setCancelNotice] = useState<string | null>(null);
 
-  // Sync current user state
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('scoders_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
   useEffect(() => {
     const handleSyncAuth = () => {
       setIsAdmin(localStorage.getItem('scoders_admin_auth') === 'true');
-      const savedUser = localStorage.getItem('scoders_user');
-      setCurrentUser(savedUser ? JSON.parse(savedUser) : null);
+      let parsedUser: AppUser | null = null;
+      try {
+        const savedUser = localStorage.getItem('scoders_user');
+        parsedUser = savedUser ? JSON.parse(savedUser) : null;
+      } catch {}
+      setCurrentUser(parsedUser);
+      setRegisteredKeys(computeUnlockedServiceKeys(parsedUser));
     };
     window.addEventListener('scoders_auth_change', handleSyncAuth);
+    window.addEventListener('scoders_sessions_change', handleSyncAuth);
     window.addEventListener('focus', handleSyncAuth);
 
     // Check for direct service key link from email button (?key=BTD-SERV-XXXX)
@@ -157,6 +184,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
 
     return () => {
       window.removeEventListener('scoders_auth_change', handleSyncAuth);
+      window.removeEventListener('scoders_sessions_change', handleSyncAuth);
       window.removeEventListener('focus', handleSyncAuth);
     };
   }, []);
@@ -164,24 +192,24 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
   // Pre-populate registration fields if user is logged in
   useEffect(() => {
     if (currentUser) {
-      setRegName(currentUser.name || '');
-      setRegEmail(currentUser.email || '');
+      setRegName(prev => prev || currentUser.name || '');
+      setRegEmail(prev => prev || currentUser.email || '');
+      if (currentUser.phone && currentUser.phone !== 'Not Specified') {
+        setRegPhone(prev => prev || currentUser.phone || '');
+      }
     }
   }, [currentUser, registeringService]);
 
-  // Listen to external data changes & sync registeredKeys
+  // Listen to external data changes & sync registeredKeys for current session
   useEffect(() => {
     const reloadServices = () => {
       setServices(getDynamicServices());
+      let parsedUser: AppUser | null = null;
       try {
-        const saved = localStorage.getItem('scoders_registered_services');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') {
-            setRegisteredKeys(parsed);
-          }
-        }
+        const savedUser = localStorage.getItem('scoders_user');
+        parsedUser = savedUser ? JSON.parse(savedUser) : null;
       } catch {}
+      setRegisteredKeys(computeUnlockedServiceKeys(parsedUser));
     };
     window.addEventListener('scoders_data_change', reloadServices);
     window.addEventListener('scoders_db_change', reloadServices);
@@ -310,7 +338,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     if (!clientName || !email || !requirements) return;
 
     const projectTitle = `S-CODERS Custom ${activeTab === 'app' ? 'Mobile App' : activeTab === 'website' ? 'Next.js Website' : 'Single Webpage'}`;
-    let finalProjectUid = `BTD-PROJ-${Date.now().toString(36).toUpperCase()}`;
+    let finalProjectUid = '';
 
     try {
       const apiRes = await fetch('/api/registrations/register-and-notify', {
@@ -321,7 +349,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           itemId: `proj-${activeTab}`,
           itemTitle: projectTitle,
           clientName: clientName.trim(),
-          clientEmail: email.trim(),
+          clientEmail: email.trim().toLowerCase(),
           metadata: {
             requirements,
             budget: budget || 'Not Specified',
@@ -330,27 +358,16 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           actionUrl: buildPublicShareUrl('/?view=services')
         })
       });
-      if (apiRes.ok) {
-        const apiData = await apiRes.json();
-        if (apiData?.uid) {
-          finalProjectUid = apiData.uid;
-        }
+      const apiData = await apiRes.json().catch(() => ({}));
+      if (!apiRes.ok || !apiData?.success || !apiData?.uid) {
+        setKeyError(apiData?.error || 'Could not save project inquiry to database. Please try again.');
+        return;
       }
-    } catch (err) {
-      console.warn("Project idea email send notice:", err);
-      try {
-        fetch('/api/email/service-accepted', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.trim(),
-            clientName: clientName.trim(),
-            serviceTitle: projectTitle,
-            uniqueKey: finalProjectUid,
-            actionUrl: buildPublicShareUrl('/?view=services')
-          })
-        }).catch(() => {});
-      } catch {}
+      finalProjectUid = String(apiData.uid).trim().toUpperCase();
+      DatabaseEngine.hydrateVerifiedRecord(apiData.record, apiData.hydrated);
+    } catch (err: any) {
+      setKeyError(err?.message || 'Unable to reach registration server. Please try again.');
+      return;
     }
 
     const newEnquiry: ServiceEnquiry = {
@@ -402,96 +419,74 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     try {
       const cleanEmail = regEmail.trim().toLowerCase();
       const cleanName = regName.trim();
+      const cleanRole = regRole.trim() || 'Developer';
 
-      // Auto-signup / log-in on the fly if not logged in!
-      let activeClient = currentUser;
-      if (!activeClient) {
-        const newClient: AppUser = {
-          uid: 'client-' + Date.now().toString(),
-          name: cleanName,
+      const regRes = await fetch('/api/registrations/register-and-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'service',
+          itemId: registeringService.id,
+          itemTitle: registeringService.title,
+          clientName: cleanName,
+          clientEmail: cleanEmail,
+          clientPhone: regPhone.trim() || currentUser?.phone || '',
+          clientRole: cleanRole,
+          metadata: {
+            requirements: regRequirements,
+            notes: regRequirements,
+            budget: regBudget || 'TBD',
+            timeline: regTimeline || 'TBD',
+          },
+          actionUrl: buildPublicShareUrl('/?view=services'),
+        })
+      });
+
+      const regData = await regRes.json().catch(() => ({}));
+      if (!regRes.ok || !regData?.success || !regData?.uid) {
+        setKeyError(
+          regData?.error || 'Could not save service registration to database. Please verify your details and try again.'
+        );
+        return;
+      }
+
+      const generatedKey = String(regData.uid).trim().toUpperCase();
+      const validUntil: string | undefined = regData.validUntil || regData.record?.validUntil;
+      const isDeduplicated = Boolean(regData.deduplicated);
+      const emailDeliveryMode: string | undefined = regData.deliveryMode;
+      const emailRealDelivered = Boolean(regData.realEmailDelivered);
+      const emailDeliveryError: string | undefined = regData.emailError;
+      const emailPreviewUrl: string | undefined = regData.previewUrl;
+
+      // Sync client display profile cleanly without storing passwords locally
+      if (!currentUser || currentUser.email?.toLowerCase() !== cleanEmail) {
+        const syncedUser: AppUser = {
+          uid: regData.clientAccount?.uid || `client-${Date.now()}`,
+          name: regData.clientAccount?.name || cleanName,
           email: cleanEmail,
           role: 'client',
-          company: 'Independent Client',
-          phone: 'Not Specified',
-          createdAt: new Date().toISOString()
+          company: regData.clientAccount?.company || cleanRole || 'Independent Client',
+          phone: regPhone.trim() || regData.clientAccount?.phone || 'Not Specified',
+          createdAt: regData.clientAccount?.createdAt || new Date().toISOString()
         };
-
-        const registeredClientsStr = localStorage.getItem('scoders_registered_clients');
-        const clients: AppUser[] = registeredClientsStr ? JSON.parse(registeredClientsStr) : [];
-        if (!clients.some(c => c.email.toLowerCase() === cleanEmail)) {
-          clients.push(newClient);
-          localStorage.setItem('scoders_registered_clients', JSON.stringify(clients));
-        }
-
-        const passwordsMap = JSON.parse(localStorage.getItem('scoders_client_passwords') || '{}');
-        if (!passwordsMap[cleanEmail]) {
-          passwordsMap[cleanEmail] = 'password';
-          localStorage.setItem('scoders_client_passwords', JSON.stringify(passwordsMap));
-        }
-
-        localStorage.setItem('scoders_user', JSON.stringify(newClient));
-        setCurrentUser(newClient);
-        activeClient = newClient;
-        window.dispatchEvent(new Event('scoders_auth_change'));
+        localStorage.setItem('scoders_user', JSON.stringify(syncedUser));
+        setCurrentUser(syncedUser);
       }
 
-      const timestamp = Date.now().toString(36).substring(3, 7).toUpperCase();
-      const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
-      let generatedKey = `BTD-SERV-${serviceCode}-${timestamp}-${randomHex}`;
-      let validUntil: string | undefined;
-      let isDeduplicated = false;
-      let dispatchedViaUnified = false;
-      let emailDeliveryMode: string | undefined;
-      let emailRealDelivered: boolean | undefined;
-      let emailDeliveryError: string | undefined;
-      let emailPreviewUrl: string | undefined;
+      // Hydrate authoritative record, service registration, chat, and session unlock state
+      DatabaseEngine.hydrateVerifiedRecord(regData.record, regData.hydrated);
 
-      // Authoritative backend registration: mints collision-free UID, deduplicates, persists, & sends email from scoders82@gmail.com
-      try {
-        const regRes = await fetch('/api/registrations/register-and-notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            section: 'service',
-            itemId: registeringService.id,
-            itemTitle: registeringService.title,
-            clientName: cleanName,
-            clientEmail: cleanEmail,
-            clientRole: regRole || 'Developer',
-            metadata: {
-              requirements: regRequirements,
-              budget: regBudget || 'TBD',
-              timeline: regTimeline || 'TBD',
-            },
-          })
-        });
-        if (regRes.ok) {
-          const regData = await regRes.json();
-          if (regData?.success && regData?.uid) {
-            generatedKey = regData.uid;
-            validUntil = regData.validUntil || regData.record?.validUntil;
-            isDeduplicated = Boolean(regData.deduplicated);
-            emailDeliveryMode = regData.deliveryMode;
-            emailRealDelivered = Boolean(regData.realEmailDelivered);
-            emailDeliveryError = regData.emailError;
-            emailPreviewUrl = regData.previewUrl;
-            dispatchedViaUnified = true;
-          }
-        }
-      } catch (apiErr) {
-        console.warn("Unified service registration fallback:", apiErr);
-      }
-
-      const mockChatId = `chat-svc-${generatedKey}`;
+      const mockChatId = regData.hydrated?.serviceRegistration?.chatId || regData.record?.chatId || `chat-svc-${generatedKey}`;
       const newKeys = {
         ...registeredKeys,
         [registeringService.id]: {
           key: generatedKey,
           name: cleanName,
           email: cleanEmail,
-          role: regRole || 'Developer',
+          phone: regPhone.trim() || regData.clientAccount?.phone || '',
+          role: cleanRole,
           requirements: regRequirements,
+          notes: regRequirements,
           budget: regBudget || 'TBD',
           timeline: regTimeline || 'TBD',
           chatId: mockChatId,
@@ -501,135 +496,15 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
 
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+      window.dispatchEvent(new Event('scoders_auth_change'));
+      window.dispatchEvent(new Event('scoders_sessions_change'));
 
-      // Complete relational DatabaseEngine integration (avoid duplicate record if deduplicated key already exists)
-      try {
-        const currentRegs = DatabaseEngine.getServiceRegistrations();
-        const alreadyInLocalDb = currentRegs.some(
-          r => r.uniqueKey?.trim().toUpperCase() === generatedKey.toUpperCase()
-        );
-        if (!alreadyInLocalDb) {
-          const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
-          const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
-          const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
-          const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
-
-          const dbServiceReg: ServiceRegistration = {
-            id: regId,
-            clientProfile: {
-              name: cleanName,
-              email: cleanEmail,
-              phone: '+91 99999 00000',
-              company: 'Independent Client'
-            },
-            serviceId: registeringService.id,
-            selectedServiceTitle: registeringService.title,
-            uniqueKey: generatedKey,
-            projectRequirements: regRequirements,
-            budget: regBudget || 'TBD',
-            timeline: regTimeline || 'TBD',
-            projectStatus: 'Pending',
-            registrationDate: new Date().toISOString().split('T')[0],
-            projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            sourceCodeFileId: mockSrcFileId,
-            pdfFileId: mockPdfFileId,
-            chatId: mockChatId,
-            feedbackId: null,
-            invoiceId: mockInvoiceId
-          };
-
-          DatabaseEngine.saveServiceRegistrations([dbServiceReg, ...currentRegs]);
-
-          const dbPayment: PaymentTransaction = {
-            id: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
-            clientId: cleanEmail,
-            clientName: cleanName,
-            clientEmail: cleanEmail,
-            amount: 10000,
-            paymentMethod: 'UPI (PhonePe)',
-            status: 'Successful',
-            timestamp: new Date().toISOString(),
-            reference: `Deposit payment for S-CODERS ${registeringService.title}`,
-            interrupted: false,
-            failureReason: null
-          };
-          const currentPayments = DatabaseEngine.getPayments();
-          DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
-
-          const dbChat: ChatConversation = {
-            id: mockChatId,
-            clientName: cleanName,
-            clientEmail: cleanEmail,
-            registrationId: regId,
-            reference: registeringService.title,
-            serviceId: registeringService.id,
-            uniqueAccessKey: generatedKey,
-            messages: [
-              { id: 'msg-init-1', sender: 'team', content: `Welcome ${cleanName} to S-CODERS! We have created a separate database and conversation workspace for your project '${registeringService.title}'. Our team has reviewed your requirements: "${regRequirements}". Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) will reach out shortly.`, timestamp: new Date().toISOString() }
-            ],
-            lastUpdated: new Date().toISOString()
-          };
-          const currentChats = DatabaseEngine.getChats();
-          DatabaseEngine.saveChats([dbChat, ...currentChats]);
-
-          const dbSrcFile: FileRecord = {
-            id: mockSrcFileId,
-            name: `${registeringService.id.replace('srv-', '')}_template_v1.zip`,
-            type: 'project_source_code',
-            url: '#download-source-zip',
-            size: '2.5 MB',
-            clientId: cleanEmail,
-            registrationId: regId,
-            uploadDate: new Date().toISOString().split('T')[0]
-          };
-          const dbPdfFile: FileRecord = {
-            id: mockPdfFileId,
-            name: `${registeringService.id.replace('srv-', '')}_specifications.pdf`,
-            type: 'project_pdf',
-            url: '#download-spec-pdf',
-            size: '1.2 MB',
-            clientId: cleanEmail,
-            registrationId: regId,
-            uploadDate: new Date().toISOString().split('T')[0]
-          };
-          const currentFiles = DatabaseEngine.getFiles();
-          DatabaseEngine.saveFiles([dbSrcFile, dbPdfFile, ...currentFiles]);
-        }
-      } catch (dbErr) {
-        console.error("Database Engine Service Registration Error:", dbErr);
-      }
-
-      // Only hit legacy endpoint if unified endpoint didn't already dispatch email
-      if (!dispatchedViaUnified) {
-        try {
-          const fbRes = await fetch('/api/email/service-accepted', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: cleanEmail,
-              clientName: cleanName,
-              serviceTitle: registeringService.title,
-              uniqueKey: generatedKey,
-              actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
-            })
-          });
-          if (fbRes.ok) {
-            const fbData = await fbRes.json().catch(() => null);
-            if (fbData) {
-              emailDeliveryMode = fbData.deliveryMode;
-              emailRealDelivered = Boolean(fbData.realEmailDelivered);
-              emailPreviewUrl = fbData.previewUrl;
-            }
-          }
-        } catch (emailErr) {
-          console.warn("Service email trigger error:", emailErr);
-        }
-      }
-
+      setResendSvcStatus(null);
       setRegSuccessMeta({
         email: cleanEmail,
         validUntil,
         deduplicated: isDeduplicated,
+        emailSent: Boolean(regData.emailSent),
         emailFrom: 'scoders82@gmail.com',
         deliveryMode: emailDeliveryMode,
         realEmailDelivered: emailRealDelivered,
@@ -637,6 +512,8 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         previewUrl: emailPreviewUrl,
       });
       setRegSuccessKey(generatedKey);
+    } catch (apiErr: any) {
+      setKeyError(apiErr?.message || 'Unable to reach registration server. Please check your connection and try again.');
     } finally {
       setServiceSubmitting(false);
     }
@@ -646,7 +523,7 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     e.preventDefault();
     if (!registeringService || !inputtedKey.trim() || verifyingKey) return;
 
-    const trimmed = inputtedKey.trim().toUpperCase();
+    const trimmed = inputtedKey.replace(/\s+/g, '').trim().toUpperCase();
     const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
     const expectedPrefix = `BTD-SERV-${serviceCode}-`;
 
@@ -659,23 +536,38 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: trimmed, section: 'service' }),
       });
-      const verifyData = await verifyRes.json();
+      const verifyData = await verifyRes.json().catch(() => ({}));
 
       if (verifyRes.ok && verifyData?.valid && verifyData?.record) {
         const rec = verifyData.record;
-        const serviceRegs = DatabaseEngine.getServiceRegistrations();
-        const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
-        const allChats = DatabaseEngine.getChats();
-        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+        DatabaseEngine.hydrateVerifiedRecord(rec, verifyData.hydrated);
 
-        const restoredName = rec.clientName || existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
-        const restoredEmail = rec.clientEmail || existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
-        const restoredReq = rec.metadata?.requirements || existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
-        const restoredBudget = rec.metadata?.budget || existingReg?.budget || 'TBD';
-        const restoredTimeline = rec.metadata?.timeline || existingReg?.timeline || 'TBD';
-        const restoredChatId = rec.chatId || existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+        const svcReg = verifyData.hydrated?.serviceRegistration;
+        const restoredName = svcReg?.clientProfile?.name || rec.clientName || currentUser?.name || 'Registered Client';
+        const restoredEmail = (svcReg?.clientProfile?.email || rec.clientEmail || currentUser?.email || '').toLowerCase();
+        const restoredPhone = svcReg?.clientProfile?.phone || rec.clientPhone || verifyData.clientAccount?.phone || '';
+        const restoredRole = svcReg?.clientProfile?.company || rec.clientRole || 'Client Partner';
+        const restoredReq = svcReg?.projectRequirements || rec.metadata?.requirements || '';
+        const restoredNotes = svcReg?.notes || rec.metadata?.notes || restoredReq || '';
+        const restoredBudget = svcReg?.budget || rec.metadata?.budget || 'TBD';
+        const restoredTimeline = svcReg?.timeline || rec.metadata?.timeline || 'TBD';
+        const restoredChatId = svcReg?.chatId || rec.chatId || `chat-svc-${trimmed}`;
+        const matchedCatalogService = services.find(s => s.id === rec.itemId) || registeringService;
+        const targetServiceId = matchedCatalogService.id;
 
-        const targetServiceId = rec.itemId && services.some(s => s.id === rec.itemId) ? rec.itemId : registeringService.id;
+        if (!currentUser && restoredEmail) {
+          const restoredUser: AppUser = {
+            uid: verifyData.clientAccount?.uid || `client-${Date.now()}`,
+            name: verifyData.clientAccount?.name || restoredName,
+            email: restoredEmail,
+            role: 'client',
+            company: verifyData.clientAccount?.company || restoredRole,
+            phone: restoredPhone || 'Not Specified',
+            createdAt: verifyData.clientAccount?.createdAt || new Date().toISOString(),
+          };
+          localStorage.setItem('scoders_user', JSON.stringify(restoredUser));
+          setCurrentUser(restoredUser);
+        }
 
         const newKeys = {
           ...registeredKeys,
@@ -683,8 +575,10 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
             key: trimmed,
             name: restoredName,
             email: restoredEmail,
-            role: restoredReq,
+            phone: restoredPhone,
+            role: restoredRole,
             requirements: restoredReq,
+            notes: restoredNotes,
             budget: restoredBudget,
             timeline: restoredTimeline,
             chatId: restoredChatId,
@@ -694,9 +588,13 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         };
         setRegisteredKeys(newKeys);
         localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+        window.dispatchEvent(new Event('scoders_auth_change'));
+        window.dispatchEvent(new Event('scoders_sessions_change'));
+
         setRegisteringService(null);
         setInputtedKey('');
         setKeyError(null);
+        setActiveWorkspaceService(matchedCatalogService);
         return;
       }
 
@@ -705,27 +603,34 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         return;
       }
 
-      // Check local database before rejecting (handles offline / legacy format compatibility)
+      // Check local database only if matching record exists locally
       const serviceRegs = DatabaseEngine.getServiceRegistrations();
-      const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
+      const existingReg = serviceRegs.find(r => r.uniqueKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed);
       const allChats = DatabaseEngine.getChats();
-      const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
 
       if (existingReg || existingChat) {
+        DatabaseEngine.addSessionUnlockedUid(trimmed);
         const restoredName = existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
-        const restoredEmail = existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
-        const restoredRole = existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
+        const restoredEmail = (existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || '').toLowerCase();
+        const restoredPhone = existingReg?.clientProfile?.phone || '';
+        const restoredRole = existingReg?.clientProfile?.company || existingReg?.projectRequirements || 'Client Partner';
         const restoredBudget = existingReg?.budget || 'TBD';
         const restoredTimeline = existingReg?.timeline || 'TBD';
         const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+        const matchedCatalogService = services.find(s => s.id === existingReg?.serviceId) || registeringService;
+        const targetServiceId = matchedCatalogService.id;
 
         const newKeys = {
           ...registeredKeys,
-          [registeringService.id]: {
+          [targetServiceId]: {
             key: trimmed,
             name: restoredName,
             email: restoredEmail,
+            phone: restoredPhone,
             role: restoredRole,
+            requirements: existingReg?.projectRequirements || '',
+            notes: existingReg?.notes || existingReg?.projectRequirements || '',
             budget: restoredBudget,
             timeline: restoredTimeline,
             chatId: restoredChatId,
@@ -735,9 +640,11 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         };
         setRegisteredKeys(newKeys);
         localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
+        window.dispatchEvent(new Event('scoders_sessions_change'));
         setRegisteringService(null);
         setInputtedKey('');
         setKeyError(null);
+        setActiveWorkspaceService(matchedCatalogService);
         return;
       }
 
@@ -746,27 +653,34 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
           `No active service registration found for code "${trimmed}". Expected format like ${expectedPrefix}XXXX-XXXX or recover via email.`
       );
     } catch {
-      // Offline fallback: check local DatabaseEngine / expected key prefix
-      if (trimmed.startsWith(expectedPrefix) && trimmed.length >= expectedPrefix.length + 4) {
-        const serviceRegs = DatabaseEngine.getServiceRegistrations();
-        const existingReg = serviceRegs.find(r => r.uniqueKey?.trim().toUpperCase() === trimmed);
-        const allChats = DatabaseEngine.getChats();
-        const existingChat = allChats.find(c => c.uniqueAccessKey?.trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
+      // Offline fallback strictly requires a matching stored record
+      const serviceRegs = DatabaseEngine.getServiceRegistrations();
+      const existingReg = serviceRegs.find(r => r.uniqueKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed);
+      const allChats = DatabaseEngine.getChats();
+      const existingChat = allChats.find(c => c.uniqueAccessKey?.replace(/\s+/g, '').trim().toUpperCase() === trimmed || c.id?.toUpperCase().includes(trimmed));
 
+      if (existingReg || existingChat) {
+        DatabaseEngine.addSessionUnlockedUid(trimmed);
         const restoredName = existingReg?.clientProfile?.name || existingChat?.clientName || currentUser?.name || 'Registered Client';
-        const restoredEmail = existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || 'client@scoders.dev';
-        const restoredRole = existingReg?.projectRequirements || existingReg?.clientProfile?.company || 'Client Partner';
+        const restoredEmail = (existingReg?.clientProfile?.email || existingChat?.clientEmail || currentUser?.email || '').toLowerCase();
+        const restoredPhone = existingReg?.clientProfile?.phone || '';
+        const restoredRole = existingReg?.clientProfile?.company || existingReg?.projectRequirements || 'Client Partner';
         const restoredBudget = existingReg?.budget || 'TBD';
         const restoredTimeline = existingReg?.timeline || 'TBD';
         const restoredChatId = existingReg?.chatId || existingChat?.id || `chat-svc-${trimmed}`;
+        const matchedCatalogService = services.find(s => s.id === existingReg?.serviceId) || registeringService;
+        const targetServiceId = matchedCatalogService.id;
 
         const newKeys = {
           ...registeredKeys,
-          [registeringService.id]: {
+          [targetServiceId]: {
             key: trimmed,
             name: restoredName,
             email: restoredEmail,
+            phone: restoredPhone,
             role: restoredRole,
+            requirements: existingReg?.projectRequirements || '',
+            notes: existingReg?.notes || existingReg?.projectRequirements || '',
             budget: restoredBudget,
             timeline: restoredTimeline,
             chatId: restoredChatId,
@@ -779,8 +693,9 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         setRegisteringService(null);
         setInputtedKey('');
         setKeyError(null);
+        setActiveWorkspaceService(matchedCatalogService);
       } else {
-        setKeyError(`Invalid key format. Key for this service must follow format: ${expectedPrefix}XXXX-XXXX`);
+        setKeyError(`Unable to verify key "${trimmed}". Please check your internet connection or recover via email.`);
       }
     } finally {
       setVerifyingKey(false);
@@ -808,61 +723,71 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
     setQrPayVerifying(true);
 
     try {
-      await new Promise(r => setTimeout(r, 1000));
+      const regRes = await fetch('/api/registrations/register-and-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'service',
+          itemId: registeringService.id,
+          itemTitle: registeringService.title,
+          clientName: payerName,
+          clientEmail: payerEmail,
+          clientPhone: regPhone.trim() || (currentUser?.phone !== 'Not Specified' ? currentUser?.phone : '') || '',
+          clientRole: regRole || 'Client Developer',
+          amount: qrPayAmount,
+          paymentStatus: 'VERIFIED',
+          paymentId: `UPI_UTR_${cleanUtr}`,
+          metadata: {
+            requirements: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
+            notes: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
+            budget: `Paid ₹${qrPayAmount.toLocaleString()}`,
+            timeline: regTimeline || 'Active Workflow',
+          },
+          actionUrl: buildPublicShareUrl('/?view=services'),
+        })
+      });
 
-      const serviceCode = registeringService.id.substring(0, 4).toUpperCase();
-      let generatedKey = `BTD-SERV-${serviceCode}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
-      let validUntil: string | undefined;
-      let dispatchedViaUnified = false;
-      let emailDeliveryMode: string | undefined;
-      let emailRealDelivered: boolean | undefined;
-      let emailDeliveryError: string | undefined;
-      let emailPreviewUrl: string | undefined;
+      const regData = await regRes.json().catch(() => ({}));
+      if (!regRes.ok || !regData?.success || !regData?.uid) {
+        setQrPayVerifying(false);
+        setQrPayError(regData?.error || 'Could not save service payment registration to database. Please try again.');
+        return;
+      }
 
-      try {
-        const regRes = await fetch('/api/registrations/register-and-notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            section: 'service',
-            itemId: registeringService.id,
-            itemTitle: registeringService.title,
-            clientName: payerName,
-            clientEmail: payerEmail,
-            clientRole: regRole || 'Client Developer',
-            amount: qrPayAmount,
-            paymentStatus: 'VERIFIED',
-            paymentId: `UPI_UTR_${cleanUtr}`,
-            metadata: {
-              requirements: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
-              budget: `Paid ₹${qrPayAmount.toLocaleString()}`,
-              timeline: regTimeline || 'Active Workflow',
-            },
-          })
-        });
-        if (regRes.ok) {
-          const regData = await regRes.json();
-          if (regData?.success && regData?.uid) {
-            generatedKey = regData.uid;
-            validUntil = regData.validUntil || regData.record?.validUntil;
-            emailDeliveryMode = regData.deliveryMode;
-            emailRealDelivered = Boolean(regData.realEmailDelivered);
-            emailDeliveryError = regData.emailError;
-            emailPreviewUrl = regData.previewUrl;
-            dispatchedViaUnified = true;
-          }
-        }
-      } catch {}
+      const generatedKey = String(regData.uid).trim().toUpperCase();
+      const validUntil: string | undefined = regData.validUntil || regData.record?.validUntil;
+      const emailDeliveryMode: string | undefined = regData.deliveryMode;
+      const emailRealDelivered = Boolean(regData.realEmailDelivered);
+      const emailDeliveryError: string | undefined = regData.emailError;
+      const emailPreviewUrl: string | undefined = regData.previewUrl;
 
-      const mockChatId = `chat-svc-${generatedKey}`;
+      if (!currentUser || currentUser.email?.toLowerCase() !== payerEmail) {
+        const syncedUser: AppUser = {
+          uid: regData.clientAccount?.uid || `client-${Date.now()}`,
+          name: regData.clientAccount?.name || payerName,
+          email: payerEmail,
+          role: 'client',
+          company: regData.clientAccount?.company || regRole || 'Client Developer',
+          phone: regPhone.trim() || regData.clientAccount?.phone || 'Not Specified',
+          createdAt: regData.clientAccount?.createdAt || new Date().toISOString(),
+        };
+        localStorage.setItem('scoders_user', JSON.stringify(syncedUser));
+        setCurrentUser(syncedUser);
+      }
+
+      DatabaseEngine.hydrateVerifiedRecord(regData.record, regData.hydrated);
+
+      const mockChatId = regData.hydrated?.serviceRegistration?.chatId || regData.record?.chatId || `chat-svc-${generatedKey}`;
       const newKeys = {
         ...registeredKeys,
         [registeringService.id]: {
           key: generatedKey,
           name: payerName,
           email: payerEmail,
+          phone: regPhone.trim() || regData.clientAccount?.phone || '',
           role: regRole || 'Client Developer',
           requirements: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
+          notes: regRequirements || 'Advance Booking Paid via Bank of Baroda UPI QR',
           budget: `Paid ₹${qrPayAmount.toLocaleString()}`,
           timeline: regTimeline || 'Active Workflow',
           chatId: mockChatId,
@@ -872,114 +797,16 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
 
       setRegisteredKeys(newKeys);
       localStorage.setItem('scoders_registered_services', JSON.stringify(newKeys));
-
-      // Save Relational Database Record
-      try {
-        const regId = 'REG-SVC-' + Date.now().toString().slice(-4);
-        const mockSrcFileId = 'FIL-SRC-' + Date.now().toString().slice(-4);
-        const mockPdfFileId = 'FIL-PDF-' + Date.now().toString().slice(-4);
-        const mockInvoiceId = 'INV-2026-' + Date.now().toString().slice(-3);
-
-        const dbServiceReg: ServiceRegistration = {
-          id: regId,
-          clientProfile: {
-            name: payerName,
-            email: payerEmail,
-            phone: '+91 99999 00000',
-            company: 'Independent Client'
-          },
-          serviceId: registeringService.id,
-          selectedServiceTitle: registeringService.title,
-          uniqueKey: generatedKey,
-          projectRequirements: regRequirements || 'Advance Booking Deposit Verified',
-          budget: `₹${qrPayAmount.toLocaleString()}`,
-          timeline: regTimeline || '2-3 Weeks',
-          projectStatus: 'In Progress',
-          registrationDate: new Date().toISOString().split('T')[0],
-          projectSubmissionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          sourceCodeFileId: mockSrcFileId,
-          pdfFileId: mockPdfFileId,
-          chatId: mockChatId,
-          feedbackId: null,
-          invoiceId: mockInvoiceId
-        };
-
-        const currentRegs = DatabaseEngine.getServiceRegistrations();
-        DatabaseEngine.saveServiceRegistrations([dbServiceReg, ...currentRegs]);
-
-        const dbPayment: PaymentTransaction = {
-          id: 'TXN-' + Math.floor(100000 + Math.random() * 900000).toString(),
-          clientId: payerEmail,
-          clientName: payerName,
-          clientEmail: payerEmail,
-          amount: qrPayAmount,
-          paymentMethod: `UPI QR (Ref: ${cleanUtr})`,
-          status: 'Successful',
-          timestamp: new Date().toISOString(),
-          reference: `Advance payment for S-CODERS ${registeringService.title}`,
-          interrupted: false,
-          failureReason: null
-        };
-        const currentPayments = DatabaseEngine.getPayments();
-        DatabaseEngine.savePayments([dbPayment, ...currentPayments]);
-
-        // Save Chat Conversation for QR Registration
-        const dbChat: ChatConversation = {
-          id: mockChatId,
-          clientName: payerName,
-          clientEmail: payerEmail,
-          registrationId: regId,
-          reference: registeringService.title,
-          serviceId: registeringService.id,
-          uniqueAccessKey: generatedKey,
-          messages: [
-            { 
-              id: 'msg-init-1', 
-              sender: 'team', 
-              senderName: 'S-CODERS Lead Team',
-              senderRole: 'S-CODERS Founder & CEO',
-              content: `Welcome ${payerName} to S-CODERS! We have initialized your dedicated WhatsApp-style workspace for '${registeringService.title}'. Shreyas M. (Founder & CEO) and Bhuvan M. (Tech Lead) are directly assigned to coordinate your deliverables.`, 
-              timestamp: new Date().toISOString() 
-            }
-          ],
-          lastUpdated: new Date().toISOString()
-        };
-        const currentChats = DatabaseEngine.getChats();
-        DatabaseEngine.saveChats([dbChat, ...currentChats]);
-      } catch (e) {}
-
-      if (!dispatchedViaUnified) {
-        try {
-          const fbRes = await fetch('/api/email/service-accepted', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: payerEmail,
-              clientName: payerName,
-              serviceId: registeringService.id,
-              serviceTitle: registeringService.title,
-              uniqueKey: generatedKey,
-              amount: qrPayAmount,
-              paymentStatus: 'VERIFIED',
-              paymentId: `UPI_UTR_${cleanUtr}`,
-              actionUrl: buildPublicShareUrl(`/?view=services&key=${generatedKey}`)
-            })
-          });
-          if (fbRes.ok) {
-            const fbData = await fbRes.json().catch(() => null);
-            if (fbData) {
-              emailDeliveryMode = fbData.deliveryMode;
-              emailRealDelivered = Boolean(fbData.realEmailDelivered);
-              emailPreviewUrl = fbData.previewUrl;
-            }
-          }
-        } catch {}
-      }
+      window.dispatchEvent(new Event('scoders_auth_change'));
+      window.dispatchEvent(new Event('scoders_sessions_change'));
 
       setQrPayVerifying(false);
+      setResendSvcStatus(null);
       setRegSuccessMeta({
         email: payerEmail,
         validUntil,
+        deduplicated: Boolean(regData.deduplicated),
+        emailSent: Boolean(regData.emailSent),
         emailFrom: 'scoders82@gmail.com',
         deliveryMode: emailDeliveryMode,
         realEmailDelivered: emailRealDelivered,
@@ -987,9 +814,9 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
         previewUrl: emailPreviewUrl,
       });
       setRegSuccessKey(generatedKey);
-    } catch (err) {
+    } catch (err: any) {
       setQrPayVerifying(false);
-      setQrPayError('Failed to verify transaction. Please double check your 12-digit UTR.');
+      setQrPayError(err?.message || 'Failed to verify transaction with server. Please try again.');
     }
   };
 
@@ -1670,12 +1497,16 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               : 'text-blue-200'
                           }`}
                         >
-                          {regSuccessMeta?.realEmailDelivered
+                          {regSuccessMeta?.deduplicated && regSuccessMeta?.emailSent === false && regSuccessMeta?.realEmailDelivered
+                            ? '✓ Active Registration Restored — Email Already Sent via scoders82@gmail.com'
+                            : regSuccessMeta?.realEmailDelivered
                             ? '✓ Sent Directly to Your Email Inbox via scoders82@gmail.com'
                             : regSuccessMeta?.deliveryMode === 'ethereal' || regSuccessMeta?.deliveryMode === 'simulated'
                             ? 'Email Prepared in SMTP Sandbox Mode (scoders82@gmail.com)'
                             : regSuccessMeta?.deliveryMode === 'failed'
                             ? 'Email Delivery Pending — Registered UID Saved'
+                            : regSuccessMeta?.deduplicated && regSuccessMeta?.emailSent === false
+                            ? 'Existing Registration Matched — Click Resend Below to Email Inbox'
                             : 'Confirmation Emailed from scoders82@gmail.com'}
                         </p>
                         <p className="text-gray-300 leading-relaxed">
@@ -1706,6 +1537,60 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                               <span>Open Test Email Preview (SMTP sandbox)</span>
                             </a>
                           )}
+                          <div className="pt-2 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={resendingSvcEmail}
+                              onClick={async () => {
+                                if (!regSuccessKey || resendingSvcEmail) return;
+                                setResendingSvcEmail(true);
+                                setResendSvcStatus(null);
+                                try {
+                                  const r = await fetch('/api/registrations/resend-email', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      uid: regSuccessKey,
+                                      email: regSuccessMeta?.email || regEmail,
+                                    }),
+                                  });
+                                  const d = await r.json().catch(() => ({}));
+                                  if (!r.ok || !d?.success) {
+                                    setResendSvcStatus({ ok: false, msg: d?.error || 'Could not resend email.' });
+                                  } else {
+                                    setResendSvcStatus({
+                                      ok: true,
+                                      msg: d.realEmailDelivered
+                                        ? `Delivered to ${d.to || regSuccessMeta?.email || regEmail} inbox!`
+                                        : 'Confirmation re-sent via scoders82@gmail.com.',
+                                    });
+                                    setRegSuccessMeta((prev) =>
+                                      prev
+                                        ? {
+                                            ...prev,
+                                            emailSent: Boolean(d.emailSent),
+                                            realEmailDelivered: Boolean(d.realEmailDelivered),
+                                            deliveryMode: d.deliveryMode,
+                                          }
+                                        : prev
+                                    );
+                                  }
+                                } catch {
+                                  setResendSvcStatus({ ok: false, msg: 'Network error while resending.' });
+                                } finally {
+                                  setResendingSvcEmail(false);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-[11px] font-mono font-bold text-white disabled:opacity-50 transition-colors cursor-pointer"
+                            >
+                              <span>{resendingSvcEmail ? 'Sending Email...' : 'Resend Confirmation Email to Inbox'}</span>
+                            </button>
+                            {resendSvcStatus && (
+                              <span className={`text-[11px] font-mono ${resendSvcStatus.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                                {resendSvcStatus.msg}
+                              </span>
+                            )}
+                          </div>
                         </p>
                       </div>
                     </div>
@@ -1847,11 +1732,10 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           <input
                             type="text"
                             required
-                            disabled={!!currentUser}
                             value={regName}
                             onChange={(e) => setRegName(e.target.value)}
                             placeholder="e.g. Rahul Sharma"
-                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
                           />
                         </div>
 
@@ -1860,11 +1744,21 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                           <input
                             type="email"
                             required
-                            disabled={!!currentUser}
                             value={regEmail}
                             onChange={(e) => setRegEmail(e.target.value)}
                             placeholder="e.g. customer@btd-hq.in"
-                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all disabled:opacity-60"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">Mobile / WhatsApp Number</label>
+                          <input
+                            type="tel"
+                            value={regPhone}
+                            onChange={(e) => setRegPhone(e.target.value.replace(/[^\d+\-\s]/g, '').slice(0, 16))}
+                            placeholder="e.g. +91 98765 43210"
+                            className="w-full bg-brand-dark/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-brand-teal transition-all font-mono"
                           />
                         </div>
 
@@ -1916,6 +1810,12 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                             />
                           </div>
                         </div>
+
+                        {keyError && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs font-mono">
+                            {keyError}
+                          </div>
+                        )}
 
                         <div className="pt-2">
                           <button
@@ -1990,7 +1890,11 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
       <AnimatePresence>
         {activeWorkspaceService && (() => {
           const serviceId = activeWorkspaceService.id;
-          const regInfo = registeredKeys[serviceId] || { key: 'ENTER-KEY-TO-VERIFY', name: currentUser?.name || 'Authorized Client' };
+          const regInfo = registeredKeys[serviceId] || {
+            key: 'ENTER-KEY-TO-VERIFY',
+            name: currentUser?.name || 'Authorized Client',
+            email: currentUser?.email || '',
+          };
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-6">
@@ -2056,24 +1960,12 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                     regInfo={regInfo} 
                     isAdmin={isAdmin}
                     currentUser={currentUser}
-                    onUpdateRegInfo={(updatedFields) => {
+                    onUpdateRegInfo={async (updatedFields) => {
                       const svcId = activeWorkspaceService.id;
-                      setRegisteredKeys((prev) => {
-                        const existingEntry = prev[svcId];
-                        if (!existingEntry) return prev;
-                        const next = {
-                          ...prev,
-                          [svcId]: {
-                            ...existingEntry,
-                            ...updatedFields,
-                          },
-                        };
-                        try {
-                          localStorage.setItem('scoders_registered_services', JSON.stringify(next));
-                        } catch {}
-                        return next;
-                      });
-                      DatabaseEngine.updateServiceClientProfile({
+                      if (!regInfo?.key || regInfo.key === 'ENTER-KEY-TO-VERIFY') {
+                        return { success: false, error: 'Please verify your Unique Registration Code (UID) first.' };
+                      }
+                      const result = await DatabaseEngine.updateServiceClientProfile({
                         serviceId: svcId,
                         uniqueKey: regInfo.key,
                         name: updatedFields.name,
@@ -2082,7 +1974,32 @@ export default function Services({ onPayDeposit, onSelectService }: ServicesProp
                         budget: updatedFields.budget,
                         timeline: updatedFields.timeline,
                         requirements: updatedFields.requirements,
+                        notes: updatedFields.notes,
                       });
+                      if (result.success) {
+                        setRegisteredKeys((prev) => {
+                          const existingEntry = prev[svcId];
+                          const baseEntry = existingEntry || {
+                            key: regInfo.key,
+                            name: regInfo.name || 'Authorized Client',
+                            email: regInfo.email || '',
+                            timestamp: new Date().toISOString(),
+                          };
+                          const next = {
+                            ...prev,
+                            [svcId]: {
+                              ...baseEntry,
+                              ...updatedFields,
+                              timestamp: baseEntry.timestamp || new Date().toISOString(),
+                            },
+                          };
+                          try {
+                            localStorage.setItem('scoders_registered_services', JSON.stringify(next));
+                          } catch {}
+                          return next;
+                        });
+                      }
+                      return result;
                     }}
                     onServiceCancelled={(cancelledSvcId, cancelledTitle) => {
                       setRegisteredKeys((prev) => {
@@ -3217,7 +3134,8 @@ export function ServiceProjectSpaceDashboard({
     budget?: string;
     timeline?: string;
     requirements?: string;
-  }) => void;
+    notes?: string;
+  }) => Promise<{ success: boolean; error?: string; record?: any } | void> | void;
   onServiceCancelled?: (serviceId: string, serviceTitle: string) => void;
   onClose: () => void; 
 }) {
@@ -3240,20 +3158,31 @@ export function ServiceProjectSpaceDashboard({
   const [feedEmail, setFeedEmail] = useState(initialDraft?.email ?? regInfo.email ?? '');
   const [feedRole, setFeedRole] = useState(initialDraft?.role ?? regInfo.role ?? '');
   const [feedRating, setFeedRating] = useState<number>(initialDraft?.rating ?? 5);
-  const [feedExperience, setFeedExperience] = useState(initialDraft?.experience ?? '');
+  const [feedExperience, setFeedExperience] = useState(initialDraft?.experience ?? regInfo.notes ?? regInfo.requirements ?? '');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   // Auto-save & Manual Save feedback states
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
   const [manualSaveFlash, setManualSaveFlash] = useState(false);
   const isFirstRenderRef = React.useRef(true);
+
+  useEffect(() => {
+    isFirstRenderRef.current = true;
+    const saved = loadInitialDraft();
+    setFeedName(saved?.name ?? regInfo.name ?? '');
+    setFeedEmail(saved?.email ?? regInfo.email ?? '');
+    setFeedRole(saved?.role ?? regInfo.role ?? '');
+    setFeedRating(typeof saved?.rating === 'number' ? saved.rating : 5);
+    setFeedExperience(saved?.experience ?? regInfo.notes ?? regInfo.requirements ?? '');
+  }, [service.id, regInfo?.key]);
 
   // Cancel Service Confirmation Pop-up states
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  const persistClientInformation = (syncBackend: boolean = true) => {
+  const persistClientInformation = async (syncBackend: boolean = true): Promise<boolean> => {
     try {
       localStorage.setItem(
         draftStorageKey,
@@ -3268,13 +3197,34 @@ export function ServiceProjectSpaceDashboard({
       );
     } catch {}
 
-    if (syncBackend && onUpdateRegInfo) {
-      onUpdateRegInfo({
-        name: feedName,
-        email: feedEmail,
-        role: feedRole,
-      });
+    if (syncBackend && (!regInfo?.key || regInfo.key === 'ENTER-KEY-TO-VERIFY')) {
+      setSaveErrorMsg('Please register or verify your Unique Registration Code (UID) first before saving.');
+      setAutoSaveStatus('error');
+      return false;
     }
+
+    if (syncBackend && onUpdateRegInfo) {
+      try {
+        const res = await onUpdateRegInfo({
+          name: feedName,
+          email: feedEmail,
+          role: feedRole,
+          notes: feedExperience,
+        });
+        if (res && typeof res === 'object' && 'success' in res && !res.success) {
+          setSaveErrorMsg(res.error || 'Could not save details to backend database.');
+          setAutoSaveStatus('error');
+          return false;
+        }
+      } catch (err: any) {
+        setSaveErrorMsg(err?.message || 'Failed to sync changes to database.');
+        setAutoSaveStatus('error');
+        return false;
+      }
+    }
+    setSaveErrorMsg(null);
+    setAutoSaveStatus('saved');
+    return true;
   };
 
   // Automatic Auto-Save whenever client information or form fields change
@@ -3285,21 +3235,22 @@ export function ServiceProjectSpaceDashboard({
     }
     setAutoSaveStatus('saving');
     const timer = setTimeout(() => {
-      persistClientInformation(true);
-      setAutoSaveStatus('saved');
-    }, 400);
+      void persistClientInformation(true);
+    }, 500);
     return () => clearTimeout(timer);
   }, [feedName, feedEmail, feedRole, feedRating, feedExperience]);
 
-  const handleManualSave = () => {
-    persistClientInformation(true);
-    setAutoSaveStatus('saved');
-    setManualSaveFlash(true);
-    setTimeout(() => setManualSaveFlash(false), 2000);
+  const handleManualSave = async () => {
+    setAutoSaveStatus('saving');
+    const ok = await persistClientInformation(true);
+    if (ok) {
+      setManualSaveFlash(true);
+      setTimeout(() => setManualSaveFlash(false), 2000);
+    }
   };
 
-  const handleCloseWorkspace = () => {
-    persistClientInformation(true);
+  const handleCloseWorkspace = async () => {
+    await persistClientInformation(true);
     onClose();
   };
 
@@ -4070,9 +4021,15 @@ export function ServiceProjectSpaceDashboard({
             <span>💡</span>
             <span>Live sandboxed prototype for {service.title}.</span>
           </p>
-          <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
+          <span className={`text-[11px] font-mono flex items-center gap-1.5 ${autoSaveStatus === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            <span>{autoSaveStatus === 'saving' ? 'Saving...' : 'Auto-saved'}</span>
+            <span>
+              {autoSaveStatus === 'saving'
+                ? 'Saving to Database...'
+                : autoSaveStatus === 'error'
+                  ? (saveErrorMsg || 'Database save error')
+                  : 'Saved to Database'}
+            </span>
           </span>
         </div>
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   CheckCircle2, Copy, Check, ExternalLink, X, ShieldCheck, 
   Sparkles, Clock, ArrowRight, MessageCircle, Mail, Key,
-  BookOpen, Download, Terminal, CheckSquare
+  BookOpen, Download, Terminal, CheckSquare, RefreshCw
 } from 'lucide-react';
 
 export interface EmailNotificationData {
@@ -35,12 +35,45 @@ interface EmailNotificationModalProps {
 export default function EmailNotificationModal({ data, isOpen, onClose }: EmailNotificationModalProps) {
   const [copied, setCopied] = useState(false);
   const [hasJoinedWhatsApp, setHasJoinedWhatsApp] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendFeedback, setResendFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const handleCopyKey = () => {
     if (!data?.uniqueKey) return;
     navigator.clipboard.writeText(data.uniqueKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!data?.uniqueKey || resendingEmail) return;
+    setResendingEmail(true);
+    setResendFeedback(null);
+    try {
+      const res = await fetch('/api/registrations/resend-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: data.uniqueKey,
+          email: data.recipientEmail,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setResendFeedback({ ok: false, msg: json?.error || 'Could not resend email right now.' });
+        return;
+      }
+      setResendFeedback({
+        ok: true,
+        msg: json.realEmailDelivered
+          ? `Confirmation email delivered to ${data.recipientEmail} inbox!`
+          : 'Confirmation email re-dispatched from scoders82@gmail.com.',
+      });
+    } catch {
+      setResendFeedback({ ok: false, msg: 'Network error while resending confirmation email.' });
+    } finally {
+      setResendingEmail(false);
+    }
   };
 
   const isService = data?.type === 'service';
@@ -263,6 +296,22 @@ export default function EmailNotificationModal({ data, isOpen, onClose }: EmailN
                         </a>
                       </div>
                     )}
+                    <div className="pt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResendConfirmation}
+                        disabled={resendingEmail}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-[11px] font-mono font-bold text-white disabled:opacity-50 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${resendingEmail ? 'animate-spin' : ''}`} />
+                        <span>{resendingEmail ? 'Sending to Inbox...' : 'Resend Confirmation Email'}</span>
+                      </button>
+                      {resendFeedback && (
+                        <span className={`text-[11px] font-mono ${resendFeedback.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                          {resendFeedback.msg}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
